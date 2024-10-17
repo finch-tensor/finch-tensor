@@ -7,7 +7,7 @@ This is the beginnings of a sparse tensor library for Python, backed by the
 
 Finch is available on PyPi, and can be installed with pip:
 ```bash
-pip install finch
+pip install finch-tensor
 ```
 
 ## Contributing
