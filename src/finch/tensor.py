@@ -156,7 +156,7 @@ class Tensor(_Display, SparseArray):
 
     def __matmul__(self, other):
         # TODO: Implement and use mul instead of tensordot
-        # https://github.com/willow-ahrens/finch-tensor/pull/22#issuecomment-2007884763
+        # https://github.com/FinchTensor/finch-tensor-python/pull/22#issuecomment-2007884763
         if self.ndim != 2 or other.ndim != 2:
             raise ValueError(
                 f"Both tensors must be 2-dimensional, but are: {self.ndim=} and {other.ndim=}."
@@ -686,7 +686,7 @@ def asarray(
 def reshape(
     x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None
 ) -> Tensor:
-    # TODO: https://github.com/willow-ahrens/Finch.jl/issues/558
+    # TODO: https://github.com/FinchTensor/Finch.jl/issues/558
     #       Only to run array-api-tests that require it for multiple tests.
     #       Must be reimplemented once `reshape` is available in Finch.jl.
     warnings.warn("`reshape` densified the input tensor.", PerformanceWarning)
