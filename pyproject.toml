@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "finch-tensor"
-version = "0.1.31"
+version = "0.1.32"
 description = ""
 authors = ["Willow Ahrens <willow.marie.ahrens@gmail.com>"]
 readme = "README.md"
