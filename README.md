@@ -1,11 +1,11 @@
-# finch-tensor
+# finch-tensor-python
 
 This is the beginnings of a sparse tensor library for Python, backed by the
-[Finch.jl](https://github.com/FinchTensor/Finch.jl) tensor compiler.
+[Finch.jl](https://github.com/finch-tensor/Finch.jl) tensor compiler.
 
 ## Source
 
-The source code for `finch-tensor` is available on GitHub at [https://github.com/FinchTensor/finch-tensor-python](https://github.com/FinchTensor/finch-tensor-python) 
+The source code for `finch-tensor` is available on GitHub at [https://github.com/finch-tensor/finch-tensor-python](https://github.com/FinchTensor/finch-tensor-python) 
 
 ## Installation
 
