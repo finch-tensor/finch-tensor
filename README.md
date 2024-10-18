@@ -5,7 +5,7 @@ This is the beginnings of a sparse tensor library for Python, backed by the
 
 ## Source
 
-The source code for `finch-tensor` is available on GitHub at [https://github.com/FinchTensor/finch-tensor-python](https://github.com/FinchTensor/finch-tensor-python) 
+The source code for `finch-tensor` is available on GitHub at [https://github.com/FinchTensor/finch-tensor-python](https://github.com/finch-tensor/finch-tensor-python) 
 
 ## Installation
 
