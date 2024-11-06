@@ -1022,8 +1022,8 @@ def eye(
     jl.seval(f"""
         @finch begin
             tns .= 0
-            for i=_, j=_
-                if i+{k} == j
+            for j=_, i=_
+                if i == j - {k}
                     tns[i, j] += 1
                 end
             end
