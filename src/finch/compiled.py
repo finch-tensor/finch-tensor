@@ -27,8 +27,18 @@ def lazy(tensor: Tensor):
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
 
+def set_optimizer(opt="default"):
+    if opt == "default":
+        jl.Finch.set_scheduler_b(jl.Finch.default_scheduler())
+    elif opt == "galley":
+        jl.Finch.set_scheduler_b(jl.Finch.galley_scheduler())
+    return
 
-def compute(tensor: Tensor, *, verbose: bool = False):
+
+def compute(tensor: Tensor, *, verbose: bool = False, opt="default"):
     if not tensor.is_computed():
-        return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose))
+        if opt == "default":
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose))
+        elif opt == "galley":
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, ctx=jl.Finch.galley_scheduler()))
     return tensor
