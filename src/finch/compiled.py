@@ -34,11 +34,16 @@ def set_optimizer(opt="default"):
         jl.Finch.set_scheduler_b(jl.Finch.galley_scheduler())
     return
 
+def clear_optimizer_cache():
+    jl.empty_b(jl.Finch.codes)
+    return
 
-def compute(tensor: Tensor, *, verbose: bool = False, opt="default"):
+def compute(tensor: Tensor, *, verbose: bool = False, opt=""):
     if not tensor.is_computed():
-        if opt == "default":
+        if opt == "":
             return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose))
+        elif opt == "default":
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, ctx=jl.Finch.default_scheduler()))
         elif opt == "galley":
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, ctx=jl.Finch.galley_scheduler()))
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, ctx=jl.Finch.galley_scheduler(verbose=verbose)))
     return tensor

@@ -112,7 +112,8 @@ from .compiled import (
     lazy,
     compiled,
     compute,
-    set_optimizer
+    set_optimizer,
+    clear_optimizer_cache
 )
 from .dtypes import (
     int_,
