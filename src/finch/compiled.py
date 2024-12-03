@@ -4,7 +4,7 @@ from .julia import jl
 from .tensor import Tensor
 
 
-def compiled(func):
+def compiled(func, opt="galley"):
     @wraps(func)
     def wrapper_func(*args, **kwargs):
         new_args = []
@@ -15,7 +15,7 @@ def compiled(func):
                 new_args.append(arg)
 
         result = func(*new_args, **kwargs)
-        result_tensor = Tensor(jl.Finch.compute(result._obj))
+        result_tensor = Tensor(jl.Finch.compute(result._obj, opt=opt))
 
         return result_tensor
 
