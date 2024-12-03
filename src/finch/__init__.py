@@ -113,7 +113,6 @@ from .compiled import (
     compiled,
     compute,
     set_optimizer,
-    clear_optimizer_cache
 )
 from .dtypes import (
     int_,
