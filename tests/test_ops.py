@@ -9,7 +9,9 @@ arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
 
 arr1d = np.array([1, 1, 2, 3])
 
-@pytest.mark.parametrize("opt", ["default", "galley"])
+parametrize_optimizer = pytest.mark.parametrize("opt", ["default", "galley"])  
+
+@parametrize_optimizer
 def test_eager(arr3d, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -21,7 +23,7 @@ def test_eager(arr3d, opt):
     assert_equal(result.todense(), np.multiply(arr3d, arr2d))
 
 
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_lazy_mode(arr3d, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -71,7 +73,7 @@ def test_lazy_mode(arr3d, opt):
         "trunc",
     ],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_elemwise_ops_1_arg(arr3d, func_name, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -88,7 +90,7 @@ def test_elemwise_ops_1_arg(arr3d, func_name, opt):
     "func_name", ["real", "imag", "conj"]
 )
 @pytest.mark.parametrize("dtype", [np.complex128, np.complex64, np.float64, np.int64])
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_elemwise_complex_ops_1_arg(func_name, dtype, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -106,7 +108,7 @@ def test_elemwise_complex_ops_1_arg(func_name, dtype, opt):
     "meth_name",
     ["__pos__", "__neg__", "__abs__", "__invert__"],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_elemwise_tensor_ops_1_arg(arr3d, meth_name, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -122,7 +124,7 @@ def test_elemwise_tensor_ops_1_arg(arr3d, meth_name, opt):
     "func_name",
     ["logaddexp", "logical_and", "logical_or", "logical_xor"],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_elemwise_ops_2_args(arr3d, func_name, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -162,7 +164,7 @@ def test_elemwise_ops_2_args(arr3d, func_name, opt):
         "__ne__",
     ],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -178,7 +180,7 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
 
 @pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all"])
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_reductions(arr3d, func_name, axis, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -202,7 +204,7 @@ def test_reductions(arr3d, func_name, axis, opt):
         (finch.float64, finch.complex128, np.complex128),
     ],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -231,7 +233,7 @@ def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dt
         ),
     ],
 )
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_tensordot(arr3d, storage, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -262,7 +264,7 @@ def test_tensordot(arr3d, storage, opt):
     assert_equal(actual.todense(), expected)
 
 
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_matmul(arr2d, arr3d, opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
@@ -282,7 +284,7 @@ def test_matmul(arr2d, arr3d, opt):
         A_finch @ D_finch
 
 
-@pytest.mark.parametrize("opt", ["default", "galley"])
+@parametrize_optimizer
 def test_negative__mod__(opt):
     finch.set_optimizer(opt)
     finch.clear_optimizer_cache()
