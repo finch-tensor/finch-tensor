@@ -15,7 +15,7 @@ def compiled(func, opt="galley"):
                 new_args.append(arg)
 
         result = func(*new_args, **kwargs)
-        result_tensor = Tensor(jl.Finch.compute(result._obj, opt=opt))
+        result_tensor = compute(result, opt=opt)
 
         return result_tensor
 
