@@ -5,7 +5,7 @@ import sparse
 
 import finch
 
-parametrize_optimizer =  pytest.mark.parametrize("opt", ["default", "galley"])
+parametrize_optimizer = pytest.mark.parametrize("opt", [finch.DefaultScheduler(), finch.GalleyScheduler()])  
 
 @pytest.mark.parametrize(
     "dtype,jl_dtype",

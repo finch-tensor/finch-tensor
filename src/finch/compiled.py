@@ -4,12 +4,6 @@ from .julia import jl
 from .tensor import Tensor
 
 
-def get_scheduler(name, verbose=False):
-    if name == "default":
-        return jl.Finch.default_scheduler()
-    elif name == "galley":
-        return jl.Finch.galley_scheduler(verbose=verbose)
-
 def compiled(opt=""):
     def inner(func):  
         @wraps(func)  
@@ -33,17 +27,31 @@ def lazy(tensor: Tensor):
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
 
-def set_optimizer(opt="default"):
-    if opt == "default":
-        jl.Finch.set_scheduler_b(jl.Finch.default_scheduler())
-    elif opt == "galley":
-        jl.Finch.set_scheduler_b(jl.Finch.galley_scheduler())
+class AbstractScheduler():
+    pass
+
+class GalleyScheduler(AbstractScheduler):
+    def __init__(self, verbose=False):
+        self.verbose=verbose
+
+class DefaultScheduler(AbstractScheduler):
+    def __init__(self, verbose=False):
+        self.verbose=verbose
+
+def get_julia_scheduler(opt):
+    if isinstance(opt, DefaultScheduler):
+        return jl.Finch.default_scheduler(verbose=opt.verbose)
+    elif isinstance(opt, GalleyScheduler):
+        return jl.Finch.galley_scheduler(verbose=opt.verbose)
+
+def set_optimizer(opt):
+    jl.Finch.set_scheduler_b(get_julia_scheduler(opt))
     return
 
-def compute(tensor: Tensor, *, verbose: bool = False, opt="", tag=-1):
+def compute(tensor: Tensor, *, verbose: bool = False, opt=None, tag=-1):
     if not tensor.is_computed():
-        if opt == "":
+        if opt == None:
             return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag))
         else:            
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag, ctx=get_scheduler(opt, verbose=verbose)))
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag, ctx=get_julia_scheduler(opt)))
     return tensor

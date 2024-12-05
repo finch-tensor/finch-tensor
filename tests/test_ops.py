@@ -9,7 +9,7 @@ arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
 
 arr1d = np.array([1, 1, 2, 3])
 
-parametrize_optimizer = pytest.mark.parametrize("opt", ["default", "galley"])  
+parametrize_optimizer = pytest.mark.parametrize("opt", [finch.DefaultScheduler(), finch.GalleyScheduler()])  
 
 @parametrize_optimizer
 def test_eager(arr3d, opt):

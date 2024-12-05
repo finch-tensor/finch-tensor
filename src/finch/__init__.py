@@ -113,6 +113,8 @@ from .compiled import (
     compiled,
     compute,
     set_optimizer,
+    DefaultScheduler,
+    GalleyScheduler,
 )
 from .dtypes import (
     int_,
