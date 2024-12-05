@@ -112,6 +112,9 @@ from .compiled import (
     lazy,
     compiled,
     compute,
+    set_optimizer,
+    DefaultScheduler,
+    GalleyScheduler,
 )
 from .dtypes import (
     int_,

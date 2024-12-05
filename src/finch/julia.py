@@ -11,7 +11,7 @@ def add_package(name: str, hash: str, version: str) -> None:
 
 
 _FINCH_NAME = "Finch"
-_FINCH_VERSION = "0.6.32"
+_FINCH_VERSION = "1.0"
 _FINCH_HASH = "9177782c-1635-4eb9-9bfb-d9dfa25e6bce"
 _FINCH_REPO_PATH = os.environ.get("FINCH_REPO_PATH", default=None)
 _FINCH_REPO_URL = os.environ.get("FINCH_URL_PATH", default=None)

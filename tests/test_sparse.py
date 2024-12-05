@@ -5,6 +5,7 @@ import sparse
 
 import finch
 
+parametrize_optimizer = pytest.mark.parametrize("opt", [finch.DefaultScheduler(), finch.GalleyScheduler()])  
 
 @pytest.mark.parametrize(
     "dtype,jl_dtype",
@@ -116,7 +117,10 @@ def test_csf(arr3d):
     "permutation", [(0, 1, 2), (2, 1, 0), (0, 2, 1), (1, 2, 0), (2, 0, 1)]
 )
 @pytest.mark.parametrize("order", ["C", "F"])
-def test_permute_dims(arr3d, permutation, order):
+@parametrize_optimizer
+def test_permute_dims(arr3d, permutation, order, opt):
+    
+    finch.set_optimizer(opt)
     arr = np.array(arr3d, order=order)
     storage = finch.Storage(
         finch.Dense(finch.SparseList(finch.SparseList(finch.Element(0)))), order=order
@@ -144,7 +148,10 @@ def test_permute_dims(arr3d, permutation, order):
 
 
 @pytest.mark.parametrize("order", ["C", "F"])
-def test_astype(arr3d, order):
+@parametrize_optimizer
+def test_astype(arr3d, order, opt):
+    
+    finch.set_optimizer(opt)
     arr = np.array(arr3d, order=order, dtype=np.int64)
     storage = finch.Storage(
         finch.Dense(finch.SparseList(finch.SparseList(finch.Element(np.int64(0))))),
@@ -176,7 +183,10 @@ def test_astype(arr3d, order):
 
 
 @pytest.mark.parametrize("random_state", [42, np.random.default_rng(42)])
-def test_random(random_state):
+@parametrize_optimizer
+def test_random(random_state, opt):
+    
+    finch.set_optimizer(opt)
     result = finch.random((10, 20, 30), density=0.0, random_state=random_state)
     expected = sparse.random((10, 20, 30), density=0.0, random_state=random_state)
 
@@ -192,7 +202,9 @@ def test_random(random_state):
 
 @pytest.mark.parametrize("order", ["C", "F"])
 @pytest.mark.parametrize("format", ["coo", "csr", "csc", "csf", "dense", None])
-def test_asarray(arr2d, arr3d, order, format):
+@parametrize_optimizer
+def test_asarray(arr2d, arr3d, order, format, opt):
+    finch.set_optimizer(opt)
     arr = arr3d if format == "csf" else arr2d
     arr = np.array(arr, order=order)
     arr_finch = finch.Tensor(arr)
@@ -212,7 +224,10 @@ def test_asarray(arr2d, arr3d, order, format):
     ],
 )
 @pytest.mark.parametrize("order", ["C", "F"])
-def test_reshape(arr, new_shape, order):
+@parametrize_optimizer
+def test_reshape(arr, new_shape, order, opt):
+    finch.set_optimizer(opt)
+    
     arr = np.array(arr, order=order)
     arr_finch = finch.Tensor(arr)
 
@@ -223,7 +238,10 @@ def test_reshape(arr, new_shape, order):
 @pytest.mark.parametrize("shape", [10, (3, 3), (2, 1, 5)])
 @pytest.mark.parametrize("dtype_name", [None, "int64", "float64"])
 @pytest.mark.parametrize("format", ["coo", "dense"])
-def test_full_ones_zeros_empty(shape, dtype_name, format):
+@parametrize_optimizer
+def test_full_ones_zeros_empty(shape, dtype_name, format, opt):
+    finch.set_optimizer(opt)
+    
     jl_dtype = getattr(finch, dtype_name) if dtype_name is not None else None
     np_dtype = getattr(np, dtype_name) if dtype_name is not None else None
 
@@ -262,7 +280,10 @@ def test_device_keyword(func, arg):
     "order_and_format",
     [("C", None), ("F", None), ("C", "coo"), ("F", "coo"), ("F", "csc")],
 )
-def test_where(order_and_format):
+@parametrize_optimizer
+def test_where(order_and_format, opt):
+    finch.set_optimizer(opt)
+    
     order, format = order_and_format
     cond = np.array(
         [
@@ -296,7 +317,10 @@ def test_where(order_and_format):
         ("csc", (5, 10)),
     ],
 )
-def test_nonzero(order, format_shape):
+@parametrize_optimizer
+def test_nonzero(order, format_shape, opt):
+    finch.set_optimizer(opt)
+    
     format, shape = format_shape
     rng = np.random.default_rng(0)
     arr = rng.random(shape)
@@ -315,14 +339,20 @@ def test_nonzero(order, format_shape):
 @pytest.mark.parametrize("dtype_name", ["int64", "float64", "complex128"])
 @pytest.mark.parametrize("k", [0, -1, 1, -2, 2])
 @pytest.mark.parametrize("format", ["coo", "dense"])
-def test_eye(dtype_name, k, format):
+@parametrize_optimizer
+def test_eye(dtype_name, k, format, opt):
+    finch.set_optimizer(opt)
+    
     result = finch.eye(3, 4, k=k, dtype=getattr(finch, dtype_name), format=format)
     expected = np.eye(3, 4, k=k, dtype=getattr(np, dtype_name))
 
     assert_equal(result.todense(), expected)
 
 
-def test_to_scalar():
+@parametrize_optimizer
+def test_to_scalar(opt):
+    finch.set_optimizer(opt)
+    
     for obj, meth_name in [
         (True, "__bool__"), (1, "__int__"), (1.0, "__float__"), (1, "__index__"), (1+1j, "__complex__")
     ]:
@@ -337,7 +367,10 @@ def test_to_scalar():
 
 
 @pytest.mark.parametrize("dtype_name", [None, "int16", "float64"])
-def test_arange_linspace(dtype_name):
+@parametrize_optimizer
+def test_arange_linspace(dtype_name, opt):
+    finch.set_optimizer(opt)
+    
     if dtype_name is not None:
         finch_dtype = getattr(finch, dtype_name)
         np_dtype = getattr(np, dtype_name)
