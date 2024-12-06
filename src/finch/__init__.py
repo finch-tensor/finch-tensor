@@ -156,6 +156,8 @@ __all__ = [
     "SparseHash",
     "Storage",
     "DenseStorage",
+    "DefaultScheduler",
+    "GalleyScheduler",
     "asarray",
     "astype",
     "random",
@@ -269,6 +271,7 @@ __all__ = [
     "empty_like",
     "arange",
     "linspace",
+    "set_optimizer",
 ]
 
 __array_api_version__: str = "2023.12"
