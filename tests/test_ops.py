@@ -31,7 +31,7 @@ def test_lazy_mode(arr3d, opt):
     B_finch = finch.Tensor(arr2d)
     C_finch = finch.Tensor(arr1d)
 
-    @finch.compiled()
+    @finch.compiled(opt=opt)
     def my_custom_fun(arr1, arr2, arr3):
         temp = finch.multiply(arr1, arr2)
         temp = finch.divide(temp, arr3)
