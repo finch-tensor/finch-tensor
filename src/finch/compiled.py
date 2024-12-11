@@ -4,7 +4,7 @@ from .julia import jl
 from .tensor import Tensor
 
 
-def compiled(opt=None):
+def compiled(opt=None, tag = -1):
     def inner(func):
         @wraps(func)
         def wrapper_func(*args, **kwargs):
@@ -15,11 +15,10 @@ def compiled(opt=None):
                 else:  
                     new_args.append(arg)
             result = func(*new_args, **kwargs)
-            kwargs = {"ctx": opt.get_julia_scheduler()} if opt is not None else {}
+            kwargs = {"ctx": opt.get_julia_scheduler(), "tag": tag} if opt is not None else {}
             result_tensor = Tensor(jl.Finch.compute(result._obj, **kwargs))
             return result_tensor
         return wrapper_func
-
     return inner
 
 def lazy(tensor: Tensor):
@@ -48,10 +47,10 @@ def set_optimizer(opt):
     jl.Finch.set_scheduler_b(opt.get_julia_scheduler())
     return
 
-def compute(tensor: Tensor, *, verbose: bool = False, opt=None, tag=-1):
+def compute(tensor: Tensor, *,  opt=None, tag=-1):
     if not tensor.is_computed():
         if opt == None:
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag))
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=opt.verbose))
         else:            
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag, ctx=opt.get_julia_scheduler()))
+            return Tensor(jl.Finch.compute(tensor._obj, verbose=opt.verbose, ctx=opt.get_julia_scheduler()))
     return tensor
