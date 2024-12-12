@@ -6,17 +6,17 @@ from .tensor import Tensor
 
 def _recurse(x, /, *, f):
     if isinstance(x, tuple | list):
-        return type(x)(_recurse(xi) for xi in x)
+        return type(x)(_recurse(xi, f=f) for xi in x)
     if isinstance(x, dict):
-        return {k: _recurse(v) for k, v in x}
+        return {k: _recurse(v, f=f) for k, v in x}
     return f(x)
 
 
 def _recurse_iter(x, /):
     if isinstance(x, tuple | list):
-        yield from (_recurse(xi) for xi in x)
+        yield from (_recurse_iter(xi) for xi in x)
     if isinstance(x, dict):
-        yield from (_recurse(xi) for xi in x.values())
+        yield from (_recurse_iter(xi) for xi in x.values())
     yield x
 
 

@@ -162,3 +162,7 @@ cython_debug/
 
 # mac os
 .DS_Store
+
+# pixi environments
+.pixi
+*.egg-info
