@@ -159,7 +159,25 @@ class Tensor(_Display, SparseArray):
 
     @compiled()
     def __matmul__(self, other: "Tensor") -> "Tensor":
-        return sum(self[..., None] * other[..., None, :], axis=-2)
+        if self.ndim < 2 or other.ndim < 2:
+            raise NotImplementedError(
+                "`@` is not implemented for arrays with less than two dimensions."
+            )
+        index_self = (slice(None),) * (self.ndim - 1) + (None, slice(None))
+        index_other = (slice(None),) * (other.ndim - 2) + (
+            None,
+            slice(None),
+            slice(None),
+        )
+        other_permutation = list(range(other.ndim))
+        other_permutation[-1], other_permutation[-2] = (
+            other_permutation[-2],
+            other_permutation[-1],
+        )
+        return sum(
+            self[index_self] * other.permute_dims(other_permutation)[index_other],
+            axis=-1,
+        )
 
     def __abs__(self):
         return self._elemwise_op("abs")

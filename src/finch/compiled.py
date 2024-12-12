@@ -1,7 +1,6 @@
 from functools import wraps
 
 from .julia import jl
-from .tensor import Tensor
 
 
 def _recurse(x, /, *, f):
@@ -21,6 +20,8 @@ def _recurse_iter(x, /):
 
 
 def _to_lazy_tensor(x, /):
+    from .tensor import Tensor
+
     if isinstance(x, Tensor) and not jl.isa(x._obj, jl.Finch.LazyTensor):
         return Tensor(jl.Finch.LazyTensor(x._obj))
 
@@ -31,6 +32,8 @@ def compiled(opt=None, force_materialization=False):
     def inner(func):
         @wraps(func)
         def wrapper_func(*args, **kwargs):
+            from .tensor import Tensor
+
             args = tuple(args)
             kwargs = dict(kwargs)
             compute_at_end = True
@@ -56,7 +59,9 @@ def compiled(opt=None, force_materialization=False):
     return inner
 
 
-def lazy(tensor: Tensor):
+def lazy(tensor):
+    from .tensor import Tensor
+
     if tensor.is_computed():
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
@@ -87,7 +92,9 @@ def set_optimizer(opt):
     return
 
 
-def compute(tensor: Tensor, *, verbose: bool = False, opt=None, tag=-1):
+def compute(tensor, *, verbose: bool = False, opt=None, tag=-1):
+    from .tensor import Tensor
+
     if not tensor.is_computed():
         if opt is None:
             return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag))

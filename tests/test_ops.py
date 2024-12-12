@@ -285,7 +285,7 @@ def test_matmul(arr2d, arr3d, opt):
     actual = A_finch @ C_finch
     assert_equal(actual.todense(), expected)
 
-    with pytest.raises(ValueError, match="Both tensors must be 2-dimensional"):
+    with pytest.raises(Exception, match="DimensionMismatch"):
         A_finch @ D_finch
 
 
