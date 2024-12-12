@@ -5,7 +5,7 @@ import juliapkg
 
 def add_package(name: str, hash: str, version: str) -> None:
     deps = juliapkg.deps.load_cur_deps()
-    if (deps.get("packages", {}).get(name, {}).get("version", None) != version):
+    if deps.get("packages", {}).get(name, {}).get("version", None) != version:
         juliapkg.add(name, hash, version=version)
         juliapkg.resolve()
 
@@ -17,7 +17,9 @@ _FINCH_REPO_PATH = os.environ.get("FINCH_REPO_PATH", default=None)
 _FINCH_REPO_URL = os.environ.get("FINCH_URL_PATH", default=None)
 
 if _FINCH_REPO_PATH and _FINCH_REPO_URL:
-    raise ValueError("FINCH_REPO_PATH and FINCH_URL_PATH can't be set at the same time.")
+    raise ValueError(
+        "FINCH_REPO_PATH and FINCH_URL_PATH can't be set at the same time."
+    )
 
 if _FINCH_REPO_PATH:  # Also account for empty string
     juliapkg.add(_FINCH_NAME, _FINCH_HASH, path=_FINCH_REPO_PATH, dev=True)

@@ -1,5 +1,3 @@
-import os
-
 from numpy.testing import assert_equal
 
 import finch

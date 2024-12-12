@@ -55,36 +55,46 @@ def compiled(opt=None, force_materialization=False):
 
     return inner
 
+
 def lazy(tensor: Tensor):
     if tensor.is_computed():
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
 
-class AbstractScheduler():
+
+class AbstractScheduler:
     pass
+
 
 class GalleyScheduler(AbstractScheduler):
     def __init__(self, verbose=False):
-        self.verbose=verbose
+        self.verbose = verbose
 
     def get_julia_scheduler(self):
         return jl.Finch.galley_scheduler(verbose=self.verbose)
-    
+
+
 class DefaultScheduler(AbstractScheduler):
     def __init__(self, verbose=False):
-        self.verbose=verbose
+        self.verbose = verbose
 
     def get_julia_scheduler(self):
         return jl.Finch.default_scheduler(verbose=self.verbose)
+
 
 def set_optimizer(opt):
     jl.Finch.set_scheduler_b(opt.get_julia_scheduler())
     return
 
+
 def compute(tensor: Tensor, *, verbose: bool = False, opt=None, tag=-1):
     if not tensor.is_computed():
-        if opt == None:
+        if opt is None:
             return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag))
-        else:            
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag, ctx=opt.get_julia_scheduler()))
+        else:
+            return Tensor(
+                jl.Finch.compute(
+                    tensor._obj, verbose=verbose, tag=tag, ctx=opt.get_julia_scheduler()
+                )
+            )
     return tensor
