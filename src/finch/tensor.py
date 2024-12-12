@@ -18,6 +18,7 @@ from .levels import (
     SparseList,
     sparse_formats_names,
 )
+from .compiled import compiled
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
 
 
@@ -156,14 +157,9 @@ class Tensor(_Display, SparseArray):
     def __pow__(self, other):
         return self._elemwise_op("^", other)
 
-    def __matmul__(self, other):
-        # TODO: Implement and use mul instead of tensordot
-        # https://github.com/FinchTensor/finch-tensor-python/pull/22#issuecomment-2007884763
-        if self.ndim != 2 or other.ndim != 2:
-            raise ValueError(
-                f"Both tensors must be 2-dimensional, but are: {self.ndim=} and {other.ndim=}."
-            )
-        return tensordot(self, other, axes=((-1,), (-2,)))
+    @compiled()
+    def __matmul__(self, other: "Tensor") -> "Tensor":
+        return sum(self[..., None] * other[..., None, :], axis=-2)
 
     def __abs__(self):
         return self._elemwise_op("abs")
