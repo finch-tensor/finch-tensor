@@ -1,6 +1,8 @@
+from abc import abstractmethod
 from functools import wraps
 
 from .julia import jl
+from .typing import JuliaObj
 
 
 def _recurse(x, /, *, f):
@@ -28,7 +30,7 @@ def _to_lazy_tensor(x, /):
     return x
 
 
-def compiled(opt=None, force_materialization=False):
+def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
     def inner(func):
         @wraps(func)
         def wrapper_func(*args, **kwargs):
@@ -51,12 +53,36 @@ def compiled(opt=None, force_materialization=False):
             compute_kwargs = (
                 {"ctx": opt.get_julia_scheduler()} if opt is not None else {}
             )
-            result_tensor = Tensor(jl.Finch.compute(result._obj, **compute_kwargs))
-            return result_tensor
+            if tag is not None:
+                compute_kwargs["tag"] = tag
+            return Tensor(jl.Finch.compute(result._obj, **compute_kwargs))
 
         return wrapper_func
 
     return inner
+
+
+class AbstractScheduler:
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+
+    @abstractmethod
+    def get_julia_scheduler(self) -> JuliaObj:
+        pass
+
+
+class GalleyScheduler(AbstractScheduler):
+    def get_julia_scheduler(self) -> JuliaObj:
+        return jl.Finch.galley_scheduler(verbose=self.verbose)
+
+
+class DefaultScheduler(AbstractScheduler):
+    def get_julia_scheduler(self) -> JuliaObj:
+        return jl.Finch.default_scheduler(verbose=self.verbose)
+
+
+def set_optimizer(opt: AbstractScheduler) -> None:
+    jl.Finch.set_scheduler_b(opt.get_julia_scheduler())
 
 
 def lazy(tensor):
@@ -67,41 +93,19 @@ def lazy(tensor):
     return tensor
 
 
-class AbstractScheduler:
-    pass
-
-
-class GalleyScheduler(AbstractScheduler):
-    def __init__(self, verbose=False):
-        self.verbose = verbose
-
-    def get_julia_scheduler(self):
-        return jl.Finch.galley_scheduler(verbose=self.verbose)
-
-
-class DefaultScheduler(AbstractScheduler):
-    def __init__(self, verbose=False):
-        self.verbose = verbose
-
-    def get_julia_scheduler(self):
-        return jl.Finch.default_scheduler(verbose=self.verbose)
-
-
-def set_optimizer(opt):
-    jl.Finch.set_scheduler_b(opt.get_julia_scheduler())
-    return
-
-
-def compute(tensor, *, verbose: bool = False, opt=None, tag=-1):
+def compute(tensor, *, opt: AbstractScheduler | None = None, tag: int = -1):
     from .tensor import Tensor
 
     if not tensor.is_computed():
         if opt is None:
-            return Tensor(jl.Finch.compute(tensor._obj, verbose=verbose, tag=tag))
+            return Tensor(jl.Finch.compute(tensor._obj, tag=tag))
         else:
             return Tensor(
                 jl.Finch.compute(
-                    tensor._obj, verbose=verbose, tag=tag, ctx=opt.get_julia_scheduler()
+                    tensor._obj,
+                    verbose=opt.verbose,
+                    ctx=opt.get_julia_scheduler(),
+                    tag=tag,
                 )
             )
     return tensor
