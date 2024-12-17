@@ -269,3 +269,34 @@ def test_negative__mod__(opt):
     actual = arr_finch % 5
     expected = arr % 5
     assert_equal(actual.todense(), expected)
+
+
+@pytest.mark.parametrize("force_materialization", [False, True])
+def test_recursive_compiled(
+    opt, force_materialization: bool, arr3d: finch.Tensor
+) -> None:
+    decorator = finch.compiled(opt=opt, force_materialization=force_materialization)
+
+    @decorator
+    def my_custom_fun_inner(
+        arr1: finch.Tensor, arr2: finch.Tensor, arr3: finch.Tensor
+    ) -> finch.Tensor:
+        temp = finch.multiply(arr1, arr2)
+        temp = finch.divide(temp, arr3)
+        reduced = finch.sum(temp, axis=(0, 1))
+        return finch.add(temp, reduced)
+
+    @decorator
+    def my_custom_fun_outer(
+        arr1: finch.Tensor, arr2: finch.Tensor, arr3: finch.Tensor
+    ) -> finch.Tensor:
+        arr = my_custom_fun_inner(arr1, arr2, arr3)
+        assert arr.is_computed() == force_materialization
+        return arr
+
+    A_finch = finch.Tensor(arr3d)
+    B_finch = finch.Tensor(arr2d)
+    C_finch = finch.Tensor(arr1d)
+
+    result = my_custom_fun_outer(A_finch, B_finch, C_finch)
+    assert result.is_computed()

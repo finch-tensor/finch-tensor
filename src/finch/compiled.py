@@ -16,17 +16,16 @@ def _recurse(x, /, *, f):
 
 def _recurse_iter(x, /):
     if isinstance(x, tuple | list):
-        yield from (_recurse_iter(xi) for xi in x)
+        for xi in x:
+            yield from _recurse_iter(xi)
     if isinstance(x, dict):
-        yield from (_recurse_iter(xi) for xi in x.values())
+        for xi in x.values():
+            yield from _recurse_iter(xi)
     yield x
 
 
 def _to_lazy_tensor(x: Tensor | Any, /):
-    if isinstance(x, Tensor) and not jl.isa(x._obj, jl.Finch.LazyTensor):
-        return Tensor(jl.Finch.LazyTensor(x._obj))
-
-    return x
+    return x if not isinstance(x, Tensor) else lazy(x)
 
 
 def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
@@ -35,13 +34,11 @@ def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
         def wrapper_func(*args, **kwargs):
             args = tuple(args)
             kwargs = dict(kwargs)
-            compute_at_end = True
-            if not force_materialization and any(
-                isinstance(arg, Tensor) and jl.isa(arg._obj, jl.Finch.LazyTensor)
-                for arg in _recurse_iter((args, kwargs))
-            ):
-                compute_at_end = False
-
+            compute_at_end = force_materialization or all(
+                t.is_computed()
+                for t in _recurse_iter((args, kwargs))
+                if isinstance(t, Tensor)
+            )
             args = _recurse(args, f=_to_lazy_tensor)
             kwargs = _recurse(kwargs, f=_to_lazy_tensor)
             result = func(*args, **kwargs)
