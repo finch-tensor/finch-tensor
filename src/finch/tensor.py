@@ -18,7 +18,6 @@ from .levels import (
     SparseList,
     sparse_formats_names,
 )
-from .compiled import compiled
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
 
 
@@ -157,7 +156,6 @@ class Tensor(_Display, SparseArray):
     def __pow__(self, other):
         return self._elemwise_op("^", other)
 
-    @compiled()
     def __matmul__(self, other: "Tensor") -> "Tensor":
         if self.ndim < 2 or other.ndim < 2:
             raise NotImplementedError(
