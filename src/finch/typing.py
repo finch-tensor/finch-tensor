@@ -1,10 +1,10 @@
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import juliacall as jc
 import numpy as np
 
 
-OrderType = Union[Literal["C", "F"], tuple[int, ...], None]
+OrderType = Literal["C", "F"] | tuple[int, ...] | None
 
 TupleOf3Arrays = tuple[np.ndarray, np.ndarray, np.ndarray]
 
@@ -14,4 +14,4 @@ DType = jc.AnyValue  # represents jl.DataType
 
 spmatrix = Any
 
-Device = Union[Literal["cpu"], None]
+Device = Literal["cpu"] | None

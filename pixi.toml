@@ -1,0 +1,30 @@
+[project]
+authors = ["Hameer Abbasi <2190658+hameerabbasi@users.noreply.github.com>"]
+channels = ["conda-forge"]
+description = "Add a short description here"
+name = "finch-tensor"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.10,<3.13"
+juliaup = ">=1.17.10,<2"
+
+[pypi-dependencies]
+finch-tensor = { path = ".", editable = true }
+juliapkg = ">=0.1.15,<0.2"
+juliacall = ">=0.9.23,<0.10"
+numpy = ">=1.17"
+
+[feature.test.pypi-dependencies]
+pytest = "*"
+pytest-cov = "*"
+sparse = "*"
+numba = ">=0.55,<0.60"
+scipy = "*"
+pytest-xdist = ">=3.6.1,<4"
+
+[environments]
+test = ["test"]

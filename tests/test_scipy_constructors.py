@@ -54,15 +54,14 @@ def test_to_scipy_sparse(format_with_cls_with_order, fill_value_in, fill_value_o
 
     finch_arr = finch.asarray(np_arr, format=format, fill_value=fill_value_in)
 
-    if (
-        not (fill_value_in in {0, None} and fill_value_out in {0, None}) and
-        not _eq_scalars(fill_value_in, fill_value_out)
-    ):
+    if not (
+        fill_value_in in {0, None} and fill_value_out in {0, None}
+    ) and not _eq_scalars(fill_value_in, fill_value_out):
         match_fill_value_out = 0 if fill_value_out is None else fill_value_out
         with pytest.raises(
             ValueError,
-            match=fr"Can only convert arrays with \[{match_fill_value_out}\] fill-values "
-                  "to a Scipy sparse matrix."
+            match=rf"Can only convert arrays with \[{match_fill_value_out}\] fill-values "
+            "to a Scipy sparse matrix.",
         ):
             finch_arr.to_scipy_sparse(accept_fv=fill_value_out)
         return

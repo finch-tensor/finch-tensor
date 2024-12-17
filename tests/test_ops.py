@@ -9,12 +9,18 @@ arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
 
 arr1d = np.array([1, 1, 2, 3])
 
-parametrize_optimizer = pytest.mark.parametrize("opt", [finch.DefaultScheduler(), finch.GalleyScheduler()])  
 
-@parametrize_optimizer
+@pytest.fixture(
+    scope="module",
+    params=[finch.DefaultScheduler(), finch.GalleyScheduler()],
+    ids=["default", "galley"],
+)
+def opt(request):
+    finch.set_optimizer(request.param)
+    yield request.param
+
+
 def test_eager(arr3d, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr3d)
     B_finch = finch.Tensor(arr2d)
 
@@ -23,10 +29,7 @@ def test_eager(arr3d, opt):
     assert_equal(result.todense(), np.multiply(arr3d, arr2d))
 
 
-@parametrize_optimizer
 def test_lazy_mode(arr3d, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr3d)
     B_finch = finch.Tensor(arr2d)
     C_finch = finch.Tensor(arr1d)
@@ -73,10 +76,7 @@ def test_lazy_mode(arr3d, opt):
         "trunc",
     ],
 )
-@parametrize_optimizer
 def test_elemwise_ops_1_arg(arr3d, func_name, opt):
-    finch.set_optimizer(opt)
-    
     arr = arr3d + 1.6
     A_finch = finch.Tensor(arr)
 
@@ -86,15 +86,12 @@ def test_elemwise_ops_1_arg(arr3d, func_name, opt):
     assert_allclose(actual.todense(), expected)
 
 
-@pytest.mark.parametrize(
-    "func_name", ["real", "imag", "conj"]
-)
+@pytest.mark.parametrize("func_name", ["real", "imag", "conj"])
 @pytest.mark.parametrize("dtype", [np.complex128, np.complex64, np.float64, np.int64])
-@parametrize_optimizer
 def test_elemwise_complex_ops_1_arg(func_name, dtype, opt):
-    finch.set_optimizer(opt)
-    
-    arr = np.asarray([[1+1j, 2+2j], [3+3j, 4-4j], [-5-5j, -6-6j]]).astype(dtype)
+    arr = np.asarray([[1 + 1j, 2 + 2j], [3 + 3j, 4 - 4j], [-5 - 5j, -6 - 6j]]).astype(
+        dtype
+    )
     arr_finch = finch.asarray(arr)
 
     actual = getattr(finch, func_name)(arr_finch)
@@ -108,10 +105,7 @@ def test_elemwise_complex_ops_1_arg(func_name, dtype, opt):
     "meth_name",
     ["__pos__", "__neg__", "__abs__", "__invert__"],
 )
-@parametrize_optimizer
 def test_elemwise_tensor_ops_1_arg(arr3d, meth_name, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr3d)
 
     actual = getattr(A_finch, meth_name)()
@@ -124,10 +118,7 @@ def test_elemwise_tensor_ops_1_arg(arr3d, meth_name, opt):
     "func_name",
     ["logaddexp", "logical_and", "logical_or", "logical_xor"],
 )
-@parametrize_optimizer
 def test_elemwise_ops_2_args(arr3d, func_name, opt):
-    finch.set_optimizer(opt)
-    
     arr2d = np.array([[0, 3, 2, 0], [0, 0, 3, 2]])
     if func_name.startswith("logical"):
         arr3d = arr3d.astype(bool)
@@ -164,10 +155,7 @@ def test_elemwise_ops_2_args(arr3d, func_name, opt):
         "__ne__",
     ],
 )
-@parametrize_optimizer
 def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
-    finch.set_optimizer(opt)
-    
     arr2d = np.array([[2, 3, 2, 3], [3, 2, 3, 2]])
     A_finch = finch.Tensor(arr3d)
     B_finch = finch.Tensor(arr2d)
@@ -180,10 +168,7 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
 
 @pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all"])
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
-@parametrize_optimizer
 def test_reductions(arr3d, func_name, axis, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr3d)
 
     actual = getattr(finch, func_name)(A_finch, axis=axis)
@@ -204,10 +189,9 @@ def test_reductions(arr3d, func_name, axis, opt):
         (finch.float64, finch.complex128, np.complex128),
     ],
 )
-@parametrize_optimizer
-def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt):
-    finch.set_optimizer(opt)
-    
+def test_sum_prod_dtype_arg(
+    arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt
+):
     arr_finch = finch.asarray(np.abs(arr3d), dtype=in_dtype)
 
     actual = getattr(finch, func_name)(arr_finch, axis=axis, dtype=dtype).todense()
@@ -233,10 +217,7 @@ def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dt
         ),
     ],
 )
-@parametrize_optimizer
 def test_tensordot(arr3d, storage, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr1d)
     B_finch = finch.Tensor(arr2d)
     C_finch = finch.Tensor(arr3d)
@@ -264,10 +245,7 @@ def test_tensordot(arr3d, storage, opt):
     assert_equal(actual.todense(), expected)
 
 
-@parametrize_optimizer
 def test_matmul(arr2d, arr3d, opt):
-    finch.set_optimizer(opt)
-    
     A_finch = finch.Tensor(arr2d)
     B_finch = finch.Tensor(arr2d.T)
     C_finch = finch.permute_dims(A_finch, (1, 0))
@@ -280,17 +258,45 @@ def test_matmul(arr2d, arr3d, opt):
     actual = A_finch @ C_finch
     assert_equal(actual.todense(), expected)
 
-    with pytest.raises(ValueError, match="Both tensors must be 2-dimensional"):
+    with pytest.raises(Exception, match="DimensionMismatch"):
         A_finch @ D_finch
 
 
-@parametrize_optimizer
 def test_negative__mod__(opt):
-    finch.set_optimizer(opt)
-    
     arr = np.array([-1, 0, 0, -2, -3, 0])
     arr_finch = finch.asarray(arr)
 
     actual = arr_finch % 5
     expected = arr % 5
     assert_equal(actual.todense(), expected)
+
+
+@pytest.mark.parametrize("force_materialization", [False, True])
+def test_recursive_compiled(
+    opt, force_materialization: bool, arr3d: finch.Tensor
+) -> None:
+    decorator = finch.compiled(opt=opt, force_materialization=force_materialization)
+
+    @decorator
+    def my_custom_fun_inner(
+        arr1: finch.Tensor, arr2: finch.Tensor, arr3: finch.Tensor
+    ) -> finch.Tensor:
+        temp = finch.multiply(arr1, arr2)
+        temp = finch.divide(temp, arr3)
+        reduced = finch.sum(temp, axis=(0, 1))
+        return finch.add(temp, reduced)
+
+    @decorator
+    def my_custom_fun_outer(
+        arr1: finch.Tensor, arr2: finch.Tensor, arr3: finch.Tensor
+    ) -> finch.Tensor:
+        arr = my_custom_fun_inner(arr1, arr2, arr3)
+        assert arr.is_computed() == force_materialization
+        return arr
+
+    A_finch = finch.Tensor(arr3d)
+    B_finch = finch.Tensor(arr2d)
+    C_finch = finch.Tensor(arr1d)
+
+    result = my_custom_fun_outer(A_finch, B_finch, C_finch)
+    assert result.is_computed()

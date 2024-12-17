@@ -93,7 +93,9 @@ class Tensor(_Display, SparseArray):
     ):
         if isinstance(obj, (int, float, complex, bool, list)):
             if copy is False:
-                raise ValueError("copy=False isn't supported for scalar inputs and Python lists")
+                raise ValueError(
+                    "copy=False isn't supported for scalar inputs and Python lists"
+                )
             obj = np.asarray(obj)
         if fill_value is None:
             fill_value = 0.0
@@ -154,12 +156,10 @@ class Tensor(_Display, SparseArray):
     def __pow__(self, other):
         return self._elemwise_op("^", other)
 
-    def __matmul__(self, other):
-        # TODO: Implement and use mul instead of tensordot
-        # https://github.com/FinchTensor/finch-tensor-python/pull/22#issuecomment-2007884763
-        if self.ndim != 2 or other.ndim != 2:
-            raise ValueError(
-                f"Both tensors must be 2-dimensional, but are: {self.ndim=} and {other.ndim=}."
+    def __matmul__(self, other: "Tensor") -> "Tensor":
+        if self.ndim < 2 or other.ndim < 2:
+            raise NotImplementedError(
+                "`@` is not implemented for arrays with less than two dimensions."
             )
         return tensordot(self, other, axes=((-1,), (-2,)))
 
@@ -299,7 +299,9 @@ class Tensor(_Display, SparseArray):
     def device(self) -> str:
         return "cpu"
 
-    def to_device(self, device: Device, /, *, stream: int | Any | None = None) -> "Tensor":
+    def to_device(
+        self, device: Device, /, *, stream: int | Any | None = None
+    ) -> "Tensor":
         if device != "cpu":
             raise ValueError("Only `device='cpu'` is supported.")
 
@@ -391,7 +393,9 @@ class Tensor(_Display, SparseArray):
         return jl.dropfills(result) if tensor._is_dense else result
 
     @classmethod
-    def _from_numpy(cls, arr: np.ndarray, fill_value: np.number, copy: bool | None = None) -> JuliaObj:
+    def _from_numpy(
+        cls, arr: np.ndarray, fill_value: np.number, copy: bool | None = None
+    ) -> JuliaObj:
         if copy:
             arr = arr.copy()
         order_char = "F" if np.isfortran(arr) else "C"
@@ -428,8 +432,12 @@ class Tensor(_Display, SparseArray):
         fill_value: np.number | None = None,
         copy: bool | None = None,
     ) -> JuliaObj:
-        if copy is False and not (x.format in ("coo", "csr", "csc") and x.has_canonical_format):
-            raise ValueError("Unable to avoid copy while creating an array as requested.")
+        if copy is False and not (
+            x.format in ("coo", "csr", "csc") and x.has_canonical_format
+        ):
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
         if x.format not in ("coo", "csr", "csc"):
             x = x.asformat("coo")
         if copy:
@@ -564,10 +572,7 @@ class Tensor(_Display, SparseArray):
 
     @classmethod
     def construct_csf(
-        cls,
-        arg: TupleOf3Arrays,
-        shape: tuple[int, ...],
-        fill_value: np.number = 0.0
+        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
     ) -> "Tensor":
         return Tensor(cls.construct_csf_jl_object(arg, shape, fill_value))
 
@@ -657,10 +662,16 @@ def asarray(
     if format not in {"coo", "csr", "csc", "csf", "dense", None}:
         raise ValueError(f"{format} format not supported.")
     _validate_device(device)
-    tensor = obj if isinstance(obj, Tensor) else Tensor(obj, fill_value=fill_value, copy=copy)
+    tensor = (
+        obj
+        if isinstance(obj, Tensor)
+        else Tensor(obj, fill_value=fill_value, copy=copy)
+    )
     if format is not None:
         if copy is False:
-            raise ValueError("Unable to avoid copy while creating an array as requested.")
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
         order = tensor.get_order()
         if format == "coo":
             storage = Storage(SparseCOO(tensor.ndim, Element(tensor.fill_value)), order)
@@ -811,7 +822,7 @@ def arange(
     step: int | float = 1,
     *,
     dtype: DType | None = None,
-    device: Device = None
+    device: Device = None,
 ) -> Tensor:
     _validate_device(device)
     return Tensor(np.arange(start, stop, step, jl_dtypes.jl_to_np_dtype[dtype]))
@@ -829,7 +840,13 @@ def linspace(
 ) -> Tensor:
     _validate_device(device)
     return Tensor(
-        np.linspace(start, stop, num=num, dtype=jl_dtypes.jl_to_np_dtype[dtype], endpoint=endpoint)
+        np.linspace(
+            start,
+            stop,
+            num=num,
+            dtype=jl_dtypes.jl_to_np_dtype[dtype],
+            endpoint=endpoint,
+        )
     )
 
 
@@ -846,7 +863,8 @@ def astype(x: Tensor, dtype: DType, /, *, copy: bool = True):
 
     finch_tns = x._obj.body
     result = jl.copyto_b(
-        jl.similar(finch_tns, jc.convert(dtype, jl.default(finch_tns)), dtype), finch_tns
+        jl.similar(finch_tns, jc.convert(dtype, jl.default(finch_tns)), dtype),
+        finch_tns,
     )
     return Tensor(jl.swizzle(result, *x.get_order(zero_indexing=False)))
 
@@ -902,7 +920,7 @@ def _reduce_sum_prod(
         result = jl.Tensor(
             jl.Element(
                 jc.convert(tmp_dtype, 0),
-                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[tmp_dtype])
+                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[tmp_dtype]),
             )
         )
 
@@ -930,7 +948,7 @@ def _reduce(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None):
         result = jl.Tensor(
             jl.Element(
                 jc.convert(x.dtype, 0),
-                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[x.dtype])
+                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[x.dtype]),
             )
         )
     return Tensor(result)
@@ -1291,6 +1309,5 @@ def _eq_scalars(x, y):
 def _validate_device(device: Device) -> None:
     if device not in {"cpu", None}:
         raise ValueError(
-            "Device not understood. Only \"cpu\" is allowed, "
-            f"but received: {device}"
+            'Device not understood. Only "cpu" is allowed, ' f"but received: {device}"
         )

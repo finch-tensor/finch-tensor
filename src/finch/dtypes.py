@@ -47,11 +47,14 @@ jl_to_np_dtype = {
     None: None,
 }
 
+
 def finfo(dtype):
     return np.finfo(jl_to_np_dtype[dtype])
 
+
 def iinfo(dtype):
     return np.iinfo(jl_to_np_dtype[dtype])
+
 
 def can_cast(from_, to, /) -> builtins.bool:
     if hasattr(from_, "dtype"):

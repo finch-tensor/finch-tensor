@@ -5,7 +5,10 @@ import sparse
 
 import finch
 
-parametrize_optimizer = pytest.mark.parametrize("opt", [finch.DefaultScheduler(), finch.GalleyScheduler()])  
+parametrize_optimizer = pytest.mark.parametrize(
+    "opt", [finch.DefaultScheduler(), finch.GalleyScheduler()]
+)
+
 
 @pytest.mark.parametrize(
     "dtype,jl_dtype",
@@ -56,6 +59,7 @@ def test_copy_fully_dense(dtype, order, copy, arr3d):
         assert not np.shares_memory(arr_todense, arr)
     else:
         assert np.shares_memory(arr_todense, arr)
+
 
 def test_coo(rng):
     coords = (
@@ -119,7 +123,6 @@ def test_csf(arr3d):
 @pytest.mark.parametrize("order", ["C", "F"])
 @parametrize_optimizer
 def test_permute_dims(arr3d, permutation, order, opt):
-    
     finch.set_optimizer(opt)
     arr = np.array(arr3d, order=order)
     storage = finch.Storage(
@@ -150,7 +153,6 @@ def test_permute_dims(arr3d, permutation, order, opt):
 @pytest.mark.parametrize("order", ["C", "F"])
 @parametrize_optimizer
 def test_astype(arr3d, order, opt):
-    
     finch.set_optimizer(opt)
     arr = np.array(arr3d, order=order, dtype=np.int64)
     storage = finch.Storage(
@@ -160,7 +162,7 @@ def test_astype(arr3d, order, opt):
     arr_finch = finch.Tensor(arr).to_storage(storage)
 
     result = finch.astype(arr_finch, finch.int64)
-    assert not result is arr_finch
+    assert result is not arr_finch
     result = result.todense()
     assert_equal(result, arr)
     assert result.dtype == arr.dtype
@@ -185,7 +187,6 @@ def test_astype(arr3d, order, opt):
 @pytest.mark.parametrize("random_state", [42, np.random.default_rng(42)])
 @parametrize_optimizer
 def test_random(random_state, opt):
-    
     finch.set_optimizer(opt)
     result = finch.random((10, 20, 30), density=0.0, random_state=random_state)
     expected = sparse.random((10, 20, 30), density=0.0, random_state=random_state)
@@ -227,7 +228,7 @@ def test_asarray(arr2d, arr3d, order, format, opt):
 @parametrize_optimizer
 def test_reshape(arr, new_shape, order, opt):
     finch.set_optimizer(opt)
-    
+
     arr = np.array(arr, order=order)
     arr_finch = finch.Tensor(arr)
 
@@ -241,7 +242,7 @@ def test_reshape(arr, new_shape, order, opt):
 @parametrize_optimizer
 def test_full_ones_zeros_empty(shape, dtype_name, format, opt):
     finch.set_optimizer(opt)
-    
+
     jl_dtype = getattr(finch, dtype_name) if dtype_name is not None else None
     np_dtype = getattr(np, dtype_name) if dtype_name is not None else None
 
@@ -271,7 +272,8 @@ def test_device_keyword(func, arg):
     func(arg, device="cpu")
 
     with pytest.raises(
-        ValueError, match="Device not understood. Only \"cpu\" is allowed, but received: cuda"
+        ValueError,
+        match='Device not understood. Only "cpu" is allowed, but received: cuda',
     ):
         func(arg, device="cuda")
 
@@ -283,7 +285,7 @@ def test_device_keyword(func, arg):
 @parametrize_optimizer
 def test_where(order_and_format, opt):
     finch.set_optimizer(opt)
-    
+
     order, format = order_and_format
     cond = np.array(
         [
@@ -320,7 +322,7 @@ def test_where(order_and_format, opt):
 @parametrize_optimizer
 def test_nonzero(order, format_shape, opt):
     finch.set_optimizer(opt)
-    
+
     format, shape = format_shape
     rng = np.random.default_rng(0)
     arr = rng.random(shape)
@@ -342,7 +344,7 @@ def test_nonzero(order, format_shape, opt):
 @parametrize_optimizer
 def test_eye(dtype_name, k, format, opt):
     finch.set_optimizer(opt)
-    
+
     result = finch.eye(3, 4, k=k, dtype=getattr(finch, dtype_name), format=format)
     expected = np.eye(3, 4, k=k, dtype=getattr(np, dtype_name))
 
@@ -352,9 +354,13 @@ def test_eye(dtype_name, k, format, opt):
 @parametrize_optimizer
 def test_to_scalar(opt):
     finch.set_optimizer(opt)
-    
+
     for obj, meth_name in [
-        (True, "__bool__"), (1, "__int__"), (1.0, "__float__"), (1, "__index__"), (1+1j, "__complex__")
+        (True, "__bool__"),
+        (1, "__int__"),
+        (1.0, "__float__"),
+        (1, "__index__"),
+        (1 + 1j, "__complex__"),
     ]:
         tns = finch.asarray(np.asarray(obj))
         assert getattr(tns, meth_name)() == obj
@@ -370,7 +376,7 @@ def test_to_scalar(opt):
 @parametrize_optimizer
 def test_arange_linspace(dtype_name, opt):
     finch.set_optimizer(opt)
-    
+
     if dtype_name is not None:
         finch_dtype = getattr(finch, dtype_name)
         np_dtype = getattr(np, dtype_name)
