@@ -2,11 +2,12 @@ from abc import abstractmethod
 from functools import wraps
 
 from .julia import jl
-from .typing import JuliaObj, Any
+from .typing import JuliaObj
+from typing import Any, Iterable, Iterator, Callable
 from .tensor import Tensor
 
 
-def _recurse(x, /, *, f):
+def _recurse(x: Iterable | Any, /, *, f: Callable[[Any], Any]) -> Iterable | Any:
     if isinstance(x, tuple | list):
         return type(x)(_recurse(xi, f=f) for xi in x)
     if isinstance(x, dict):
@@ -14,7 +15,7 @@ def _recurse(x, /, *, f):
     return f(x)
 
 
-def _recurse_iter(x, /):
+def _recurse_iter(x: Iterable | Any, /) -> Iterator[Any]:
     if isinstance(x, tuple | list):
         for xi in x:
             yield from _recurse_iter(xi)
@@ -24,7 +25,7 @@ def _recurse_iter(x, /):
     yield x
 
 
-def _to_lazy_tensor(x: Tensor | Any, /):
+def _to_lazy_tensor(x: Tensor | Any, /) -> Tensor | Any:
     return x if not isinstance(x, Tensor) else lazy(x)
 
 
@@ -79,13 +80,15 @@ def set_optimizer(opt: AbstractScheduler) -> None:
     jl.Finch.set_scheduler_b(opt.get_julia_scheduler())
 
 
-def lazy(tensor: Tensor):
+def lazy(tensor: Tensor) -> Tensor:
     if tensor.is_computed():
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
 
 
-def compute(tensor: Tensor, *, opt: AbstractScheduler | None = None, tag: int = -1):
+def compute(
+    tensor: Tensor, *, opt: AbstractScheduler | None = None, tag: int = -1
+) -> Tensor:
     if not tensor.is_computed():
         if opt is None:
             return Tensor(jl.Finch.compute(tensor._obj, tag=tag))
