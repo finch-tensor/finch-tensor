@@ -244,8 +244,9 @@ class Tensor(_Display, SparseArray):
     def __getitem__(self, key):
         if not isinstance(key, tuple):
             key = (key,)
-
-        if None in key:
+        # if key is a numpy array or similar, == does not provide a boolean
+        # see: https://docs.python.org/3/reference/expressions.html#membership-test-operations
+        if any(k is None for k in key):
             # lazy indexing mode
             key = _process_lazy_indexing(key)
         else:
