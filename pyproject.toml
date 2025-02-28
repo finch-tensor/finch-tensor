@@ -8,7 +8,7 @@ packages = [{include = "finch", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-juliapkg = "^0.1.10"
+juliapkg = "^0.1.16"
 juliacall = "^0.9.15"
 numpy = ">=1.19"
 
