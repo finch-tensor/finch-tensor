@@ -298,7 +298,7 @@ class Tensor(_Display, SparseArray):
     @property
     def mT(self) -> "Tensor":
         axes = list(range(self.ndim))
-        axes[-2:] = axes[:-3:-1]
+        axes[-2], axes[-1] = axes[-1], axes[-2]
         axes = tuple(axes)
         return self.permute_dims(axes)
 

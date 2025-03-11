@@ -55,6 +55,24 @@ def test_lazy_mode(arr3d, opt):
     assert_equal(result.todense(), np.multiply(arr3d, arr2d))
 
 
+def test_lazy_mode_mult_output(opt):
+    A_finch = finch.Tensor(arr1d)
+    B_finch = finch.Tensor(arr2d)
+
+    @finch.compiled(opt=opt)
+    def mult_out_fun(arr1, arr2):
+        out1 = finch.add(arr1, arr2)
+        out2 = finch.multiply(arr1, arr2)
+        out3 = arr2**finch.asarray(2)
+        return out1, out2, out3
+
+    res1, res2, res3 = mult_out_fun(A_finch, B_finch)
+
+    assert_equal(res1.todense(), np.add(arr1d, arr2d))
+    assert_equal(res2.todense(), np.multiply(arr1d, arr2d))
+    assert_equal(res3.todense(), arr2d**2)
+
+
 @pytest.mark.parametrize(
     "func_name",
     [
