@@ -1,8 +1,10 @@
 from .julia import jl
-from .typing import OrderType, DType
+from .typing import OrderType, DType, JuliaObj
 
 
 class _Display:
+    _obj: JuliaObj
+
     def __repr__(self):
         return jl.sprint(jl.show, self._obj)
 
