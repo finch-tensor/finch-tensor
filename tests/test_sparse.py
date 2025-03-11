@@ -149,6 +149,14 @@ def test_permute_dims(arr3d, permutation, order, opt):
     assert_equal(actual_eager_mode.todense(), expected)
     assert_equal(actual_lazy_mode.todense(), expected)
 
+    # test `.mT`
+    actual_eager_mode = arr_finch.mT
+    actual_lazy_mode = finch.compute(finch.lazy(arr_finch).mT)
+    expected = arr.mT
+
+    assert_equal(actual_eager_mode.todense(), expected)
+    assert_equal(actual_lazy_mode.todense(), expected)
+
 
 @pytest.mark.parametrize("order", ["C", "F"])
 @parametrize_optimizer

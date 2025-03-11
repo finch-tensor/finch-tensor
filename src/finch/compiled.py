@@ -50,6 +50,13 @@ def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
             )
             if tag is not None:
                 compute_kwargs["tag"] = tag
+
+            if isinstance(result, Iterable):
+                computed = jl.Finch.compute(
+                    *map(lambda x: x._obj, result), **compute_kwargs
+                )
+                return tuple(Tensor(c) for c in computed)
+
             return Tensor(jl.Finch.compute(result._obj, **compute_kwargs))
 
         return wrapper_func

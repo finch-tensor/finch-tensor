@@ -141,6 +141,7 @@ from .io import (
     read,
     write,
 )
+from . import linalg
 
 __all__ = [
     "Tensor",
@@ -272,6 +273,7 @@ __all__ = [
     "arange",
     "linspace",
     "set_optimizer",
+    "linalg",
 ]
 
 __array_api_version__: str = "2023.12"
