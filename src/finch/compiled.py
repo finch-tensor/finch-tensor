@@ -1,32 +1,81 @@
 from abc import abstractmethod
 from functools import wraps
+from dataclasses import dataclass
 
 from .julia import jl
 from .typing import JuliaObj
-from typing import Any, Iterable, Iterator, Callable
+from typing import Any, Iterator, Callable
 from .tensor import Tensor
 
+IterObj = tuple | list | dict | Any
 
-def _recurse(x: Iterable | Any, /, *, f: Callable[[Any], Any]) -> Iterable | Any:
+
+def _recurse(x: IterObj, /, *, f: Callable[[Any], Any]) -> IterObj:
     if isinstance(x, tuple | list):
         return type(x)(_recurse(xi, f=f) for xi in x)
     if isinstance(x, dict):
-        return {k: _recurse(v, f=f) for k, v in x}
+        ret = {k: _recurse(v, f=f) for k, v in x.items()}
+        if type(x) is not dict:
+            ret = type(x)(ret)
+        return ret
     return f(x)
 
 
-def _recurse_iter(x: Iterable | Any, /) -> Iterator[Any]:
+def _recurse_iter(x: IterObj, /) -> Iterator[Any]:
     if isinstance(x, tuple | list):
         for xi in x:
             yield from _recurse_iter(xi)
+        return
     if isinstance(x, dict):
         for xi in x.values():
             yield from _recurse_iter(xi)
+        return
     yield x
 
 
 def _to_lazy_tensor(x: Tensor | Any, /) -> Tensor | Any:
     return x if not isinstance(x, Tensor) else lazy(x)
+
+
+@dataclass
+class _ArgumentIndexer:
+    _idx: int = 0
+
+    def index(self, _) -> int:
+        ret = self._idx
+        self._idx += 1
+        return ret
+
+
+def _recurse_iter_compute(x: IterObj, /, *, compute_kwargs: dict[str, Any]) -> IterObj:
+    # Make a recursive iterator of indices.
+    idx_obj = _recurse(x, f=_ArgumentIndexer().index)
+    jl_computed = []
+    py_computed = []
+
+    # Collect lazy tensors; use placeholder
+    _placeholder = object()
+    for xi in _recurse_iter(x):
+        if isinstance(xi, Tensor) and not xi.is_computed():
+            jl_computed.append(xi._obj)
+            py_computed.append(_placeholder)
+        else:
+            py_computed.append(xi)
+    jl_len = len(jl_computed)
+    # This doesn't return an iterable of arrays -- only a single array
+    # for `len(jl_computed) == 1`
+    jl_computed = jl.Finch.compute(*jl_computed, **compute_kwargs)
+    if jl_len == 1:
+        jl_computed = (jl_computed,)
+
+    # Replace placeholders with computed tensors.
+    jl_computed_iter = iter(jl_computed)
+    for i in range(len(py_computed)):
+        if py_computed[i] is _placeholder:
+            py_computed[i] = Tensor(next(jl_computed_iter))
+
+    # Replace recursive indices by actual computed objects
+    return _recurse(idx_obj, f=lambda idx: py_computed[idx])
 
 
 def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
@@ -50,7 +99,8 @@ def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
             )
             if tag is not None:
                 compute_kwargs["tag"] = tag
-            return Tensor(jl.Finch.compute(result._obj, **compute_kwargs))
+
+            return _recurse_iter_compute(result, compute_kwargs=compute_kwargs)
 
         return wrapper_func
 

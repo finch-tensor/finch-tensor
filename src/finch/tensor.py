@@ -296,6 +296,13 @@ class Tensor(_Display, SparseArray):
         return jl.typeof(self._obj).parameters[1]
 
     @property
+    def mT(self) -> "Tensor":
+        axes = list(range(self.ndim))
+        axes[-2], axes[-1] = axes[-1], axes[-2]
+        axes = tuple(axes)
+        return self.permute_dims(axes)
+
+    @property
     def device(self) -> str:
         return "cpu"
 

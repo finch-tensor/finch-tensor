@@ -7,6 +7,7 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
+compile = "python -c 'import finch'"
 
 [dependencies]
 python = ">=3.10,<3.13"
@@ -22,9 +23,13 @@ numpy = ">=1.17"
 pytest = "*"
 pytest-cov = "*"
 sparse = "*"
-numba = ">=0.55,<0.60"
+numba = ">=0.60"
 scipy = "*"
+numpy = "==2.*"
 pytest-xdist = ">=3.6.1,<4"
+
+[feature.test.tasks]
+test = { cmd = "pytest", depends-on = ["compile"] }
 
 [environments]
 test = ["test"]
