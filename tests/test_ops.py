@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.testing import assert_equal, assert_allclose
 import pytest
+from functools import reduce
 
 import finch
 
@@ -63,7 +64,7 @@ def test_lazy_mode_mult_output(opt):
     def mult_out_fun(arr1, arr2):
         out1 = finch.add(arr1, arr2)
         out2 = finch.multiply(arr1, arr2)
-        out3 = arr2**finch.asarray(2)
+        out3 = arr2 ** finch.asarray(2)
         return out1, out2, out3
 
     res1, res2, res3 = mult_out_fun(A_finch, B_finch)
@@ -71,6 +72,30 @@ def test_lazy_mode_mult_output(opt):
     assert_equal(res1.todense(), np.add(arr1d, arr2d))
     assert_equal(res2.todense(), np.multiply(arr1d, arr2d))
     assert_equal(res3.todense(), arr2d**2)
+
+
+def test_lazy_mode_heterogenous_output():
+    A_finch = finch.Tensor(arr1d)
+    B_finch = finch.Tensor(arr2d)
+
+    @finch.compiled()
+    def heterogenous_fun(a: list[finch.Tensor], b: int):
+        sum_a = reduce(lambda x1, x2: x1 + x2, a)
+        b_squared = b**2
+        return (a, sum_a, (b, "text"), {"key1": 12, "key2": b_squared})
+
+    ret = heterogenous_fun([A_finch, B_finch], 3)
+
+    assert type(ret) is tuple
+    assert len(ret) == 4
+    assert type(ret[0]) is list
+    assert len(ret[0]) == 2
+    assert_equal(ret[0][0].todense(), arr1d)
+    assert_equal(ret[0][1].todense(), arr2d)
+    assert_equal(ret[1].todense(), arr1d + arr2d)
+    assert ret[2] == (3, "text")
+    assert type(ret[3]) is dict
+    assert ret[3] == {"key1": 12, "key2": 9}
 
 
 @pytest.mark.parametrize(
