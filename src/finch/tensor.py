@@ -168,8 +168,14 @@ class Tensor(_Display, SparseArray):
                 f"`{self.ndim=}`, `{other.ndim=}`. Both must be greater than `0`."
             )
 
-        if self.ndim == 1 or other.ndim == 1:
-            return finch.sum(self[..., :] * other[..., :], axis=-1)
+        if self.ndim == 1 and other.ndim == 1:
+            return finch.sum(self * other, axis=-1)
+
+        if self.ndim == 1:
+            return finch.sum(self * other[..., :, :].mT, axis=-1)
+
+        if other.ndim == 1:
+            return finch.sum(self * other, axis=-1)
 
         return finch.sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
 
@@ -255,7 +261,7 @@ class Tensor(_Display, SparseArray):
         if not isinstance(key, tuple):
             key = (key,)
 
-        if None in key:
+        if not self.is_computed():
             # lazy indexing mode
             key = _process_lazy_indexing(key, self.ndim)
         else:
@@ -1273,7 +1279,7 @@ def _expand_ellipsis(key: tuple, shape: tuple[int, ...]) -> tuple:
     key_without_ellipsis = ()
     # first we need to find the ellipsis and confirm it's the only one
     for pos, idx in enumerate(key):
-        if idx == Ellipsis:
+        if idx is Ellipsis:
             if ellipsis_pos is None:
                 ellipsis_pos = pos
             else:

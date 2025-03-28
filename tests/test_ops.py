@@ -6,9 +6,15 @@ from functools import reduce
 import finch
 
 
-arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
-
 arr1d = np.array([1, 1, 2, 3])
+arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
+arr3d = np.array(
+    [
+        [[0, 1, 0, 0], [1, 0, 0, 3]],
+        [[4, 0, -1, 0], [2, 2, 0, 0]],
+        [[0, 0, 0, 0], [1, 5, 0, 3]],
+    ]
+)
 
 
 @pytest.fixture(
@@ -288,25 +294,34 @@ def test_tensordot(arr3d, storage, opt):
     assert_equal(actual.todense(), expected)
 
 
-def test_matmul(arr2d, arr3d, opt):
-    A_finch = finch.Tensor(arr2d)
-    B_finch = finch.Tensor(arr2d.T)
-    C_finch = finch.permute_dims(A_finch, (1, 0))
-    D_finch = finch.Tensor(arr3d)
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        (arr2d, arr2d.mT),
+        (arr2d, arr3d.mT),
+        (arr2d.mT, arr3d),
+        (arr3d, arr3d.mT),
+        (arr1d, arr1d),
+        (arr1d, arr2d.mT),
+        (arr2d, arr1d),
+        (arr1d, arr3d.mT),
+        (arr3d, arr1d),
+    ],
+)
+def test_matmul(opt, a, b):
+    A_finch = finch.Tensor(a)
+    B_finch = finch.Tensor(b)
 
+    expected = a @ b
     actual = A_finch @ B_finch
-    expected = arr2d @ arr2d.T
+
     assert_equal(actual.todense(), expected)
 
-    actual = A_finch @ C_finch
-    assert_equal(actual.todense(), expected)
+    if a.ndim >= 2 and b.ndim >= 2:
+        At_finch = A_finch.mT
+        Bt_finch = B_finch.mT
 
-    expected_3d = arr3d @ arr3d.mT
-    actual_3d = D_finch @ D_finch.mT
-    assert_equal(actual_3d.todense(), expected_3d)
-
-    with pytest.raises(Exception, match="DimensionMismatch"):
-        A_finch @ D_finch
+        assert_equal((Bt_finch @ At_finch).todense(), expected.mT)
 
 
 def test_negative__mod__(opt):
