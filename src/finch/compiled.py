@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from abc import abstractmethod
 from functools import wraps
 from dataclasses import dataclass
 
 from .julia import jl
 from .typing import JuliaObj
-from typing import Any, Iterator, Callable
-from .tensor import Tensor
+from typing import Any, Iterator, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .tensor import Tensor
 
 IterObj = tuple | list | dict | Any
 
@@ -34,6 +38,8 @@ def _recurse_iter(x: IterObj, /) -> Iterator[Any]:
 
 
 def _to_lazy_tensor(x: Tensor | Any, /) -> Tensor | Any:
+    from .tensor import Tensor
+
     return x if not isinstance(x, Tensor) else lazy(x)
 
 
@@ -48,6 +54,8 @@ class _ArgumentIndexer:
 
 
 def _recurse_iter_compute(x: IterObj, /, *, compute_kwargs: dict[str, Any]) -> IterObj:
+    from .tensor import Tensor
+
     # Make a recursive iterator of indices.
     idx_obj = _recurse(x, f=_ArgumentIndexer().index)
     jl_computed = []
@@ -82,6 +90,8 @@ def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
     def inner(func):
         @wraps(func)
         def wrapper_func(*args, **kwargs):
+            from .tensor import Tensor
+
             args = tuple(args)
             kwargs = dict(kwargs)
             compute_at_end = force_materialization or all(
@@ -131,6 +141,8 @@ def set_optimizer(opt: AbstractScheduler) -> None:
 
 
 def lazy(tensor: Tensor) -> Tensor:
+    from .tensor import Tensor
+
     if tensor.is_computed():
         return Tensor(jl.Finch.LazyTensor(tensor._obj))
     return tensor
@@ -139,6 +151,8 @@ def lazy(tensor: Tensor) -> Tensor:
 def compute(
     tensor: Tensor, *, opt: AbstractScheduler | None = None, tag: int = -1
 ) -> Tensor:
+    from .tensor import Tensor
+
     if not tensor.is_computed():
         if opt is None:
             return Tensor(jl.Finch.compute(tensor._obj, tag=tag))

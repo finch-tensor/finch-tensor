@@ -301,6 +301,10 @@ def test_matmul(arr2d, arr3d, opt):
     actual = A_finch @ C_finch
     assert_equal(actual.todense(), expected)
 
+    expected_3d = arr3d @ arr3d.mT
+    actual_3d = D_finch @ D_finch.mT
+    assert_equal(actual_3d.todense(), expected_3d)
+
     with pytest.raises(Exception, match="DimensionMismatch"):
         A_finch @ D_finch
 

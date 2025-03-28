@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import builtins
 from typing import Any, Callable, Optional, Iterable, Literal
 import warnings
@@ -19,6 +21,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
+from .compiled import compiled
 
 
 class SparseArray:
@@ -156,12 +159,19 @@ class Tensor(_Display, SparseArray):
     def __pow__(self, other):
         return self._elemwise_op("^", other)
 
-    def __matmul__(self, other: "Tensor") -> "Tensor":
-        if self.ndim < 2 or other.ndim < 2:
-            raise NotImplementedError(
-                "`@` is not implemented for arrays with less than two dimensions."
+    @compiled()
+    def __matmul__(self, other: Tensor) -> Tensor:
+        import finch
+
+        if self.ndim == 0 or other.ndim == 0:
+            raise ValueError(
+                f"`{self.ndim=}`, `{other.ndim=}`. Both must be greater than `0`."
             )
-        return tensordot(self, other, axes=((-1,), (-2,)))
+
+        if self.ndim == 1 or other.ndim == 1:
+            return finch.sum(self[..., :] * other[..., :], axis=-1)
+
+        return finch.sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
 
     def __abs__(self):
         return self._elemwise_op("abs")
@@ -202,7 +212,7 @@ class Tensor(_Display, SparseArray):
     def __ne__(self, other):
         return self._elemwise_op("!=", other)
 
-    def _elemwise_op(self, op: str, other: Optional["Tensor"] = None) -> "Tensor":
+    def _elemwise_op(self, op: str, other: Optional[Tensor] = None) -> Tensor:
         if other is None:
             result = jl.broadcast(jl.seval(op), self._obj)
         else:
@@ -247,7 +257,7 @@ class Tensor(_Display, SparseArray):
 
         if None in key:
             # lazy indexing mode
-            key = _process_lazy_indexing(key)
+            key = _process_lazy_indexing(key, self.ndim)
         else:
             # standard indexing mode
             key = _expand_ellipsis(key, self.shape)
@@ -296,7 +306,7 @@ class Tensor(_Display, SparseArray):
         return jl.typeof(self._obj).parameters[1]
 
     @property
-    def mT(self) -> "Tensor":
+    def mT(self) -> Tensor:
         axes = list(range(self.ndim))
         axes[-2], axes[-1] = axes[-1], axes[-2]
         axes = tuple(axes)
@@ -308,7 +318,7 @@ class Tensor(_Display, SparseArray):
 
     def to_device(
         self, device: Device, /, *, stream: int | Any | None = None
-    ) -> "Tensor":
+    ) -> Tensor:
         if device != "cpu":
             raise ValueError("Only `device='cpu'` is supported.")
 
@@ -382,17 +392,17 @@ class Tensor(_Display, SparseArray):
         result = np.asarray(jl.reshape(dense_tensor.val, shape))
         return result.transpose(self.get_order()) if self._is_dense else result
 
-    def permute_dims(self, axes: tuple[int, ...]) -> "Tensor":
+    def permute_dims(self, axes: tuple[int, ...]) -> Tensor:
         axes = tuple(i + 1 for i in axes)
         new_obj = jl.permutedims(self._obj, axes)
         new_tensor = Tensor(new_obj)
         return new_tensor
 
-    def to_storage(self, storage: Storage) -> "Tensor":
+    def to_storage(self, storage: Storage) -> Tensor:
         return Tensor(self._from_other_tensor(self, storage=storage))
 
     @classmethod
-    def _from_other_tensor(cls, tensor: "Tensor", storage: Storage) -> JuliaObj:
+    def _from_other_tensor(cls, tensor: Tensor, storage: Storage) -> JuliaObj:
         order = cls.preprocess_order(storage.order, tensor.ndim)
         result = jl.copyto_b(
             jl.swizzle(jl.Tensor(storage.levels_descr._obj), *order), tensor._obj
@@ -426,7 +436,7 @@ class Tensor(_Display, SparseArray):
         x,
         fill_value: np.number | None = None,
         copy: bool | None = None,
-    ) -> "Tensor":
+    ) -> Tensor:
         if not _is_scipy_sparse_obj(x):
             raise ValueError("{x} is not a SciPy sparse object.")
         return Tensor(x, fill_value=fill_value, copy=copy)
@@ -496,7 +506,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_coo(
         cls, coords, data, shape, order=row_major, fill_value=0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(
             cls.construct_coo_jl_object(coords, data, shape, order, fill_value)
         )
@@ -536,7 +546,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csc(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csc_jl_object(arg, shape, fill_value))
 
     @classmethod
@@ -550,7 +560,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csr(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csr_jl_object(arg, shape, fill_value))
 
     @staticmethod
@@ -580,7 +590,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csf(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csf_jl_object(arg, shape, fill_value))
 
     def to_scipy_sparse(self, accept_fv=None):
@@ -1292,13 +1302,16 @@ def _add_missing_dims(key: tuple, shape: tuple[int, ...]) -> tuple:
     return key
 
 
-def _process_lazy_indexing(key: tuple) -> tuple:
+def _process_lazy_indexing(key: tuple, ndim: int) -> tuple:
     new_key = ()
     for idx in key:
         if idx == slice(None):
             new_key += (jl.Colon(),)
         elif idx is None:
             new_key += (jl.nothing,)
+        elif idx is Ellipsis:
+            num_of_colons = ndim - len(tuple(k for k in key if isinstance(k, slice)))
+            new_key += (jl.Colon(),) * num_of_colons
         else:
             raise ValueError(f"Invalid lazy index member: {idx}")
     return new_key
@@ -1316,5 +1329,5 @@ def _eq_scalars(x, y):
 def _validate_device(device: Device) -> None:
     if device not in {"cpu", None}:
         raise ValueError(
-            'Device not understood. Only "cpu" is allowed, ' f"but received: {device}"
+            f'Device not understood. Only "cpu" is allowed, but received: {device}'
         )
