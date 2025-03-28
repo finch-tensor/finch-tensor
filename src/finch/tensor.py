@@ -161,23 +161,18 @@ class Tensor(_Display, SparseArray):
 
     @compiled()
     def __matmul__(self, other: Tensor) -> Tensor:
-        import finch
-
         if self.ndim == 0 or other.ndim == 0:
             raise ValueError(
                 f"`{self.ndim=}`, `{other.ndim=}`. Both must be greater than `0`."
             )
 
-        if self.ndim == 1 and other.ndim == 1:
-            return finch.sum(self * other, axis=-1)
+        if other.ndim == 1:
+            return sum(self * other, axis=-1)
 
         if self.ndim == 1:
-            return finch.sum(self * other[..., :, :].mT, axis=-1)
+            return sum(self * other.mT, axis=-1)
 
-        if other.ndim == 1:
-            return finch.sum(self * other, axis=-1)
-
-        return finch.sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
+        return sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
 
     def __abs__(self):
         return self._elemwise_op("abs")
@@ -1253,30 +1248,37 @@ def _slice_plus_one(s: slice, size: int) -> range:
     else:
         stop = stop_default
 
+    if (start, stop, step) == (1, size, 1):
+        return jl.Colon()
+
     return jl.range(start=start, step=step, stop=stop)
 
 
 def _add_plus_one(key: tuple, shape: tuple[int, ...]) -> tuple:
-    new_key = ()
-    for idx, size in zip(key, shape):
+    new_key = []
+    sizes = iter(shape)
+    for idx in key:
+        if idx is None:
+            new_key.append(jl.nothing)
+            continue
+
+        size = next(sizes)
         if isinstance(idx, int):
-            new_key += (normalize_axis_index(idx, size) + 1,)
+            new_key.append(normalize_axis_index(idx, size) + 1)
         elif isinstance(idx, slice):
-            new_key += (_slice_plus_one(idx, size),)
+            new_key.append(_slice_plus_one(idx, size))
         elif isinstance(idx, (list, np.ndarray, tuple)):
             idx = normalize_axis_tuple(idx, size)
-            new_key += (jl.Vector([i + 1 for i in idx]),)
-        elif idx is None:
-            raise IndexError("`None` in the index is supported only in lazy indexing")
+            new_key.append(jl.Vector([i + 1 for i in idx]))
         else:
-            new_key += (idx,)
-    return new_key
+            new_key.append(idx)
+
+    return tuple(new_key)
 
 
 def _expand_ellipsis(key: tuple, shape: tuple[int, ...]) -> tuple:
-    ndim = len(shape)
     ellipsis_pos = None
-    key_without_ellipsis = ()
+    key_without_ellipsis = []
     # first we need to find the ellipsis and confirm it's the only one
     for pos, idx in enumerate(key):
         if idx is Ellipsis:
@@ -1285,27 +1287,20 @@ def _expand_ellipsis(key: tuple, shape: tuple[int, ...]) -> tuple:
             else:
                 raise IndexError("an index can only have a single ellipsis ('...')")
         else:
-            key_without_ellipsis += (idx,)
+            key_without_ellipsis.append(idx)
     key = key_without_ellipsis
 
     # then we expand ellipsis with a full range
     if ellipsis_pos is not None:
-        ellipsis_indices = range(ellipsis_pos, ellipsis_pos + ndim - len(key))
-        new_key = ()
-        key_iter = iter(key)
-        for i in range(ndim):
-            if i in ellipsis_indices:
-                new_key = new_key + (jl.range(start=1, stop=shape[i]),)
-            else:
-                new_key = new_key + (next(key_iter),)
-        key = new_key
-    return key
+        n_missing_idxs = len(shape) - builtins.sum(1 for k in key if k is not None)
+        key = key[:ellipsis_pos] + [slice(None)] * n_missing_idxs + key[ellipsis_pos:]
+
+    return tuple(key)
 
 
 def _add_missing_dims(key: tuple, shape: tuple[int, ...]) -> tuple:
-    for i in range(len(key), len(shape)):
-        key = key + (jl.range(start=1, stop=shape[i]),)
-    return key
+    missing_dims = len(shape) - builtins.sum(1 for k in key if k is not None)
+    return key + (slice(None),) * missing_dims
 
 
 def _process_lazy_indexing(key: tuple, ndim: int) -> tuple:
