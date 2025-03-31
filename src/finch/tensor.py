@@ -868,11 +868,19 @@ def linspace(
     )
 
 
-def permute_dims(x: Tensor, axes: tuple[int, ...]):
+def permute_dims(x: Tensor, axes: tuple[int, ...]) -> Tensor:
     return x.permute_dims(axes)
 
 
-def astype(x: Tensor, dtype: DType, /, *, copy: bool = True):
+def moveaxis(x: Tensor, source: int, destination: int) -> Tensor:
+    axes = list(range(x.ndim))
+    norm_source = normalize_axis_index(source, x.ndim)
+    norm_dest = normalize_axis_index(destination, x.ndim)
+    axes.insert(norm_dest, axes.pop(norm_source))
+    return x.permute_dims(tuple(axes))
+
+
+def astype(x: Tensor, dtype: DType, /, *, copy: bool = True) -> Tensor:
     if not copy:
         if x.dtype == dtype:
             return x

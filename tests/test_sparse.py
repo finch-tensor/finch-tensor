@@ -164,6 +164,20 @@ def test_permute_dims(arr3d, permutation, format, order, opt):
     assert_equal(actual_lazy_mode.todense(), expected)
 
 
+@pytest.mark.parametrize(
+    "src_dest", [(0, 1), (1, 0), (-1, 2), (-2, -1), (1, 1)]
+)
+@parametrize_optimizer
+def test_moveaxis(arr3d, src_dest, opt):
+    finch.set_optimizer(opt)
+    src, dest = src_dest
+    arr_finch = finch.Tensor(arr3d)
+
+    actual = finch.moveaxis(arr_finch, src, dest)
+    expected = np.moveaxis(arr3d, src, dest)
+    assert_equal(actual.todense(), expected)
+
+
 @pytest.mark.parametrize("order", ["C", "F"])
 @parametrize_optimizer
 def test_astype(arr3d, order, opt):
