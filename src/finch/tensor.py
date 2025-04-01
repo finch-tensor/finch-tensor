@@ -1305,14 +1305,19 @@ def _add_missing_dims(key: tuple, shape: tuple[int, ...]) -> tuple:
 
 def _process_lazy_indexing(key: tuple, ndim: int) -> tuple:
     new_key = ()
+    ellipsis_found = False
     for idx in key:
         if idx == slice(None):
             new_key += (jl.Colon(),)
         elif idx is None:
             new_key += (jl.nothing,)
         elif idx is Ellipsis:
-            num_of_colons = ndim - len(tuple(k for k in key if isinstance(k, slice)))
+            num_of_colons = ndim - builtins.sum(1 for k in key if k is not None) + 1
             new_key += (jl.Colon(),) * num_of_colons
+            if ellipsis_found:
+                raise IndexError("an index can only have a single ellipsis ('...')")
+
+            ellipsis_found = True
         else:
             raise ValueError(f"Invalid lazy index member: {idx}")
     return new_key
