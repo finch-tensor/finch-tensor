@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import builtins
 from typing import Any, Callable, Optional, Iterable, Literal
 import warnings
@@ -19,6 +21,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
+from .compiled import compiled
 
 
 class SparseArray:
@@ -156,12 +159,20 @@ class Tensor(_Display, SparseArray):
     def __pow__(self, other):
         return self._elemwise_op("^", other)
 
-    def __matmul__(self, other: "Tensor") -> "Tensor":
-        if self.ndim < 2 or other.ndim < 2:
-            raise NotImplementedError(
-                "`@` is not implemented for arrays with less than two dimensions."
+    @compiled()
+    def __matmul__(self, other: Tensor) -> Tensor:
+        if self.ndim == 0 or other.ndim == 0:
+            raise ValueError(
+                f"`{self.ndim=}`, `{other.ndim=}`. Both must be greater than `0`."
             )
-        return tensordot(self, other, axes=((-1,), (-2,)))
+
+        if other.ndim == 1:
+            return sum(self * other, axis=-1)
+
+        if self.ndim == 1:
+            return sum(self * other.mT, axis=-1)
+
+        return sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
 
     def __abs__(self):
         return self._elemwise_op("abs")
@@ -202,7 +213,7 @@ class Tensor(_Display, SparseArray):
     def __ne__(self, other):
         return self._elemwise_op("!=", other)
 
-    def _elemwise_op(self, op: str, other: Optional["Tensor"] = None) -> "Tensor":
+    def _elemwise_op(self, op: str, other: Optional[Tensor] = None) -> Tensor:
         if other is None:
             result = jl.broadcast(jl.seval(op), self._obj)
         else:
@@ -245,9 +256,9 @@ class Tensor(_Display, SparseArray):
         if not isinstance(key, tuple):
             key = (key,)
 
-        if None in key:
+        if not self.is_computed():
             # lazy indexing mode
-            key = _process_lazy_indexing(key)
+            key = _process_lazy_indexing(key, self.ndim)
         else:
             # standard indexing mode
             key = _expand_ellipsis(key, self.shape)
@@ -296,7 +307,7 @@ class Tensor(_Display, SparseArray):
         return jl.typeof(self._obj).parameters[1]
 
     @property
-    def mT(self) -> "Tensor":
+    def mT(self) -> Tensor:
         axes = list(range(self.ndim))
         axes[-2], axes[-1] = axes[-1], axes[-2]
         axes = tuple(axes)
@@ -308,7 +319,7 @@ class Tensor(_Display, SparseArray):
 
     def to_device(
         self, device: Device, /, *, stream: int | Any | None = None
-    ) -> "Tensor":
+    ) -> Tensor:
         if device != "cpu":
             raise ValueError("Only `device='cpu'` is supported.")
 
@@ -382,17 +393,17 @@ class Tensor(_Display, SparseArray):
         result = np.asarray(jl.reshape(dense_tensor.val, shape))
         return result.transpose(self.get_order()) if self._is_dense else result
 
-    def permute_dims(self, axes: tuple[int, ...]) -> "Tensor":
+    def permute_dims(self, axes: tuple[int, ...]) -> Tensor:
         axes = tuple(i + 1 for i in axes)
         new_obj = jl.permutedims(self._obj, axes)
         new_tensor = Tensor(new_obj)
         return new_tensor
 
-    def to_storage(self, storage: Storage) -> "Tensor":
+    def to_storage(self, storage: Storage) -> Tensor:
         return Tensor(self._from_other_tensor(self, storage=storage))
 
     @classmethod
-    def _from_other_tensor(cls, tensor: "Tensor", storage: Storage) -> JuliaObj:
+    def _from_other_tensor(cls, tensor: Tensor, storage: Storage) -> JuliaObj:
         order = cls.preprocess_order(storage.order, tensor.ndim)
         result = jl.copyto_b(
             jl.swizzle(jl.Tensor(storage.levels_descr._obj), *order), tensor._obj
@@ -426,7 +437,7 @@ class Tensor(_Display, SparseArray):
         x,
         fill_value: np.number | None = None,
         copy: bool | None = None,
-    ) -> "Tensor":
+    ) -> Tensor:
         if not _is_scipy_sparse_obj(x):
             raise ValueError("{x} is not a SciPy sparse object.")
         return Tensor(x, fill_value=fill_value, copy=copy)
@@ -496,7 +507,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_coo(
         cls, coords, data, shape, order=row_major, fill_value=0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(
             cls.construct_coo_jl_object(coords, data, shape, order, fill_value)
         )
@@ -536,7 +547,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csc(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csc_jl_object(arg, shape, fill_value))
 
     @classmethod
@@ -550,7 +561,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csr(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csr_jl_object(arg, shape, fill_value))
 
     @staticmethod
@@ -580,7 +591,7 @@ class Tensor(_Display, SparseArray):
     @classmethod
     def construct_csf(
         cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> "Tensor":
+    ) -> Tensor:
         return Tensor(cls.construct_csf_jl_object(arg, shape, fill_value))
 
     def to_scipy_sparse(self, accept_fv=None):
@@ -1237,68 +1248,76 @@ def _slice_plus_one(s: slice, size: int) -> range:
     else:
         stop = stop_default
 
+    if (start, stop, step) == (1, size, 1):
+        return jl.Colon()
+
     return jl.range(start=start, step=step, stop=stop)
 
 
 def _add_plus_one(key: tuple, shape: tuple[int, ...]) -> tuple:
-    new_key = ()
-    for idx, size in zip(key, shape):
+    new_key = []
+    sizes = iter(shape)
+    for idx in key:
+        if idx is None:
+            new_key.append(jl.nothing)
+            continue
+
+        size = next(sizes)
         if isinstance(idx, int):
-            new_key += (normalize_axis_index(idx, size) + 1,)
+            new_key.append(normalize_axis_index(idx, size) + 1)
         elif isinstance(idx, slice):
-            new_key += (_slice_plus_one(idx, size),)
+            new_key.append(_slice_plus_one(idx, size))
         elif isinstance(idx, (list, np.ndarray, tuple)):
             idx = normalize_axis_tuple(idx, size)
-            new_key += (jl.Vector([i + 1 for i in idx]),)
-        elif idx is None:
-            raise IndexError("`None` in the index is supported only in lazy indexing")
+            new_key.append(jl.Vector([i + 1 for i in idx]))
         else:
-            new_key += (idx,)
-    return new_key
+            new_key.append(idx)
+
+    return tuple(new_key)
 
 
 def _expand_ellipsis(key: tuple, shape: tuple[int, ...]) -> tuple:
-    ndim = len(shape)
     ellipsis_pos = None
-    key_without_ellipsis = ()
+    key_without_ellipsis = []
     # first we need to find the ellipsis and confirm it's the only one
     for pos, idx in enumerate(key):
-        if idx == Ellipsis:
+        if idx is Ellipsis:
             if ellipsis_pos is None:
                 ellipsis_pos = pos
             else:
                 raise IndexError("an index can only have a single ellipsis ('...')")
         else:
-            key_without_ellipsis += (idx,)
+            key_without_ellipsis.append(idx)
     key = key_without_ellipsis
 
     # then we expand ellipsis with a full range
     if ellipsis_pos is not None:
-        ellipsis_indices = range(ellipsis_pos, ellipsis_pos + ndim - len(key))
-        new_key = ()
-        key_iter = iter(key)
-        for i in range(ndim):
-            if i in ellipsis_indices:
-                new_key = new_key + (jl.range(start=1, stop=shape[i]),)
-            else:
-                new_key = new_key + (next(key_iter),)
-        key = new_key
-    return key
+        n_missing_idxs = len(shape) - builtins.sum(1 for k in key if k is not None)
+        key = key[:ellipsis_pos] + [slice(None)] * n_missing_idxs + key[ellipsis_pos:]
+
+    return tuple(key)
 
 
 def _add_missing_dims(key: tuple, shape: tuple[int, ...]) -> tuple:
-    for i in range(len(key), len(shape)):
-        key = key + (jl.range(start=1, stop=shape[i]),)
-    return key
+    missing_dims = len(shape) - builtins.sum(1 for k in key if k is not None)
+    return key + (slice(None),) * missing_dims
 
 
-def _process_lazy_indexing(key: tuple) -> tuple:
+def _process_lazy_indexing(key: tuple, ndim: int) -> tuple:
     new_key = ()
+    ellipsis_found = False
     for idx in key:
         if idx == slice(None):
             new_key += (jl.Colon(),)
         elif idx is None:
             new_key += (jl.nothing,)
+        elif idx is Ellipsis:
+            num_of_colons = ndim - builtins.sum(1 for k in key if k is not None) + 1
+            new_key += (jl.Colon(),) * num_of_colons
+            if ellipsis_found:
+                raise IndexError("an index can only have a single ellipsis ('...')")
+
+            ellipsis_found = True
         else:
             raise ValueError(f"Invalid lazy index member: {idx}")
     return new_key
@@ -1316,5 +1335,5 @@ def _eq_scalars(x, y):
 def _validate_device(device: Device) -> None:
     if device not in {"cpu", None}:
         raise ValueError(
-            'Device not understood. Only "cpu" is allowed, ' f"but received: {device}"
+            f'Device not understood. Only "cpu" is allowed, but received: {device}'
         )

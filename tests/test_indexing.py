@@ -109,11 +109,9 @@ def test_indexing_3d(arr3d, index, levels_descr, order):
     assert_equal(actual, expected)
 
 
-def test_invalid_index_none(arr3d):
-    arr_finch = finch.Tensor(arr3d)
-
-    with pytest.raises(ValueError, match="Invalid lazy index member: Ellipsis"):
-        arr_finch[..., None]
+def test_lazy_none_ellipsis(arr3d):
+    arr_finch = finch.lazy(finch.Tensor(arr3d))
+    assert_equal(finch.compute(arr_finch[..., None]).todense(), arr3d[..., None])
 
     with pytest.raises(
         jc.JuliaError,
