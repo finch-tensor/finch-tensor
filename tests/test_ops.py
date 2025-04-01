@@ -2,6 +2,7 @@ import numpy as np
 from numpy.testing import assert_equal, assert_allclose
 import pytest
 from functools import reduce
+import juliacall as jc
 
 import finch
 
@@ -322,6 +323,14 @@ def test_matmul(opt, a: np.ndarray, b: np.ndarray):
         Bt_finch = B_finch.mT
 
         assert_equal((Bt_finch @ At_finch).todense(), expected.mT)
+
+
+def test_matmul_dimension_mismatch(opt):
+    A_finch = finch.Tensor(arr2d)
+    B_finch = finch.Tensor(arr3d)
+
+    with pytest.raises(jc.JuliaError, match="DimensionMismatch"):
+        A_finch @ B_finch
 
 
 def test_negative__mod__(opt):
