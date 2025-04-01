@@ -308,7 +308,7 @@ def test_tensordot(arr3d, storage, opt):
         (arr3d, arr1d),
     ],
 )
-def test_matmul(opt, a, b):
+def test_matmul(opt, a: np.ndarray, b: np.ndarray):
     A_finch = finch.Tensor(a)
     B_finch = finch.Tensor(b)
 
