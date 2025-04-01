@@ -380,7 +380,7 @@ class Tensor(_Display, SparseArray):
             dense_tensor = dense_tensor.lvl
 
         result = np.asarray(jl.reshape(dense_tensor.val, shape))
-        return result.transpose(self.get_inv_order()) if self._is_dense else result
+        return result.transpose(self.get_order()) if self._is_dense else result
 
     def permute_dims(self, axes: tuple[int, ...]) -> "Tensor":
         axes = tuple(i + 1 for i in axes)

@@ -118,16 +118,22 @@ def test_csf(arr3d):
 
 
 @pytest.mark.parametrize(
-    "permutation", [(0, 1, 2), (2, 1, 0), (0, 2, 1), (1, 2, 0), (2, 0, 1)]
+    "permutation",
+    [(0, 1, 2), (2, 1, 0), (0, 2, 1), (1, 2, 0), (2, 0, 1), (1, 0, 2)],
+)
+@pytest.mark.parametrize(
+    "format",
+    [
+        finch.Dense(finch.SparseList(finch.SparseList(finch.Element(0)))),
+        finch.Dense(finch.Dense(finch.Dense(finch.Element(0)))),
+    ],
 )
 @pytest.mark.parametrize("order", ["C", "F"])
 @parametrize_optimizer
-def test_permute_dims(arr3d, permutation, order, opt):
+def test_permute_dims(arr3d, permutation, format, order, opt):
     finch.set_optimizer(opt)
     arr = np.array(arr3d, order=order)
-    storage = finch.Storage(
-        finch.Dense(finch.SparseList(finch.SparseList(finch.Element(0)))), order=order
-    )
+    storage = finch.Storage(format, order=order)
 
     arr_finch = finch.Tensor(arr).to_storage(storage)
 
