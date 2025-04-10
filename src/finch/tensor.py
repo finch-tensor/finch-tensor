@@ -1041,6 +1041,70 @@ def all(
 ) -> Tensor:
     return _reduce(x != 0, jl.all, axis)
 
+def mean(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.mean, axis)
+
+def std(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False,
+) -> Tensor:
+    def _std(x):
+        return jl.std(x, correction=correction)
+    return _reduce(x, _std, axis)
+
+def var(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False,
+) -> Tensor:
+    def _var(x):
+        return jl.var(x, correction=correction)
+    return _reduce(x, _var, axis)
+
+def squeeze(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...] | None = None,
+) -> Tensor:
+    _reduce(x, jl.dropdims, axis)
+
+def expand_dims(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...] | None = None,
+) -> Tensor:
+    _reduce(x, jl.expanddims, axis)
+
+def argmin(
+    x: Tensor,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.argmin_python, axis)
+
+def argmax(
+    x: Tensor,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.argmax_python, axis)
 
 def eye(
     n_rows: int,
