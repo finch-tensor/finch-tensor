@@ -1095,7 +1095,7 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.argmin_python, axis)
+    return _reduce(x, jl.Finch.argmin_python, axis)
 
 def argmax(
     x: Tensor,
@@ -1104,7 +1104,7 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.argmax_python, axis)
+    return _reduce(x, jl.Finch.argmax_python, axis)
 
 def eye(
     n_rows: int,

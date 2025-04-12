@@ -216,13 +216,37 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
     assert_equal(actual.todense(), expected)
 
 
-@pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all"])
+@pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all", "mean", "std", "var"])
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
 def test_reductions(arr3d, func_name, axis, opt):
     A_finch = finch.Tensor(arr3d)
 
     actual = getattr(finch, func_name)(A_finch, axis=axis)
     expected = getattr(np, func_name)(arr3d, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+@pytest.mark.parametrize("func_name", ["argmax", "argmin"])
+@pytest.mark.parametrize("axis", [None, -1, 1, 2, (0, 1, 2)])
+def test_reductions(arr3d, func_name, axis, opt):
+    A_finch = finch.Tensor(arr3d)
+
+    actual = getattr(finch, func_name)(A_finch, axis=axis)
+    expected = getattr(np, func_name)(arr3d, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+@pytest.mark.parametrize("axis", [-1, 1, (0, 1), (0, 1, 2)])
+def test_reductions(arr3d, axis, opt):
+    A_finch = finch.Tensor(arr3d)
+
+    actual = finch.expand_dims(A_finch, axis=axis)
+    expected = np.expand_dims(arr3d, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+    actual = finch.squeeze(actual, axis=axis)
+    expected = np.squeeze(expected, axis=axis)
 
     assert_equal(actual.todense(), expected)
 
