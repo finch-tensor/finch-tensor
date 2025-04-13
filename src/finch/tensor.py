@@ -1079,14 +1079,22 @@ def squeeze(
     /,
     axis: int | tuple[int, ...] | None = None,
 ) -> Tensor:
-    _reduce(x, jl.dropdims, axis)
+    return _reduce(x, jl.dropdims, axis)
 
 def expand_dims(
     x: Tensor,
     /,
     axis: int | tuple[int, ...] | None = None,
 ) -> Tensor:
-    _reduce(x, jl.expanddims, axis)
+    if axis is not None:
+        if isinstance(axis, int):
+            axis = (axis,)
+        axis = normalize_axis_tuple(axis, x.ndim + len(axis))
+        axis = tuple(i + 1 for i in axis)
+        result = jl.expanddims(x._obj, dims=axis)
+    else:
+        result = jl.expanddims(x._obj)
+    return Tensor(result)
 
 def argmin(
     x: Tensor,
