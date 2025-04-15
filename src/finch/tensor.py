@@ -21,7 +21,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
-from .compiled import compiled
+from .compiled import compiled, lazy, compute
 
 
 class SparseArray:
@@ -291,7 +291,7 @@ class Tensor(_Display, SparseArray):
 
     @property
     def fill_value(self) -> np.number:
-        return jl.default(self._obj)
+        return jl.fill_value(self._obj)
 
     @property
     def _is_dense(self) -> bool:
@@ -382,7 +382,7 @@ class Tensor(_Display, SparseArray):
         else:
             # create materialized dense array
             shape = jl.size(obj)
-            dense_lvls = jl.Element(jc.convert(self.dtype, jl.default(obj)))
+            dense_lvls = jl.Element(jc.convert(self.dtype, jl.fill_value(obj)))
             for _ in range(self.ndim):
                 dense_lvls = jl.Dense(dense_lvls)
             dense_tensor = jl.Tensor(dense_lvls, obj).lvl  # materialize
@@ -889,7 +889,7 @@ def astype(x: Tensor, dtype: DType, /, *, copy: bool = True) -> Tensor:
 
     finch_tns = x._obj.body
     result = jl.copyto_b(
-        jl.similar(finch_tns, jc.convert(dtype, jl.default(finch_tns)), dtype),
+        jl.similar(finch_tns, jc.convert(dtype, jl.fill_value(finch_tns)), dtype),
         finch_tns,
     )
     return Tensor(jl.swizzle(result, *x.get_order(zero_indexing=False)))
@@ -1114,6 +1114,18 @@ def argmax(
 ) -> Tensor:
     return _reduce(x, jl.Finch.argmax_python, axis)
 
+def diagonal(
+    x: Tensor,
+    /,
+    *,
+    offset: int = 0
+) -> Tensor:
+    m = x.shape[-2]
+    n = x.shape[-1]
+    mask = eye(m, n, k=offset, format="coo", dtype=bool)
+    res = compute(sum(where(mask, lazy(x), zeros(x.shape)), axis=-1))
+    return res[..., 0:builtins.min(m, n, m + offset, n - offset)]
+
 def eye(
     n_rows: int,
     n_cols: int | None = None,
@@ -1127,26 +1139,13 @@ def eye(
     _validate_device(device)
     n_cols = n_rows if n_cols is None else n_cols
     dtype = jl_dtypes.float64 if dtype is None else dtype
+    tns = jl.Finch.eye_python(n_rows, n_cols, k, dtype(False))
     if format == "coo":
-        tns_def = "SparseCOO{2}" + f"(Element({dtype}(0.0)))"
+        return Tensor(tns)
     elif format == "dense":
-        tns_def = f"Dense(Dense(Element({dtype}(0.0))))"
+        return Tensor(jl.Tensor(jl.DenseFormat(2, z=dtype(False)), tns))
     else:
         raise ValueError(f"{format} not supported, only 'coo' and 'dense' is allowed.")
-
-    obj = jl.seval(f"tns = Tensor({tns_def}, {n_rows}, {n_cols})")
-    jl.seval(f"""
-        @finch begin
-            tns .= 0
-            for j=_, i=_
-                if i == j - {k}
-                    tns[i, j] += 1
-                end
-            end
-        end
-    """)
-    return Tensor(obj)
-
 
 def tensordot(x1: Tensor, x2: Tensor, /, *, axes=2) -> Tensor:
     if not isinstance(x1, Tensor):
