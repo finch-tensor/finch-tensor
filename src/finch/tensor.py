@@ -715,13 +715,10 @@ def asarray(
 def reshape(
     x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None
 ) -> Tensor:
-    # TODO: https://github.com/FinchTensor/Finch.jl/issues/558
-    #       Only to run array-api-tests that require it for multiple tests.
-    #       Must be reimplemented once `reshape` is available in Finch.jl.
-    warnings.warn("`reshape` densified the input tensor.", PerformanceWarning)
-    arr = x.todense()
-    arr = arr.reshape(shape)
-    return Tensor(arr)
+    if copy is False:
+        raise ValueError("Unable to avoid copy during reshape.")
+    dims = [dim if dim >= 0 else jl.Colon() for dim in shape]
+    return Tensor(jl.reshape(x._obj, *dims))
 
 
 def full(
@@ -920,14 +917,18 @@ def nonzero(x: Tensor, /) -> tuple[np.ndarray, ...]:
     return tuple(Tensor(i[sort_order]) for i in indices)
 
 
-def _reduce_core(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None):
-    if axis is not None:
-        axis = normalize_axis_tuple(axis, x.ndim)
-        axis = tuple(i + 1 for i in axis)
-        result = fn(x._obj, dims=axis)
+def _reduce_core(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False):
+    if axis is None:
+        axis = tuple(range(x.ndim))
+    axis = normalize_axis_tuple(axis, x.ndim)
+    axis = tuple(i + 1 for i in axis)
+    if keepdims:
+        return fn(x._obj, dims=axis)
     else:
-        result = fn(x._obj)
-    return result
+        if x.is_computed():
+            return jl.compute(jl.dropdims(fn(jl.lazy(x._obj), dims=axis), dims=axis))
+        else:
+            return jl.dropdims(fn(x._obj, dims=axis), dims=axis)
 
 
 def _reduce_sum_prod(
@@ -935,8 +936,9 @@ def _reduce_sum_prod(
     fn: Callable,
     axis: int | tuple[int, ...] | None,
     dtype: DType | None,
+    keepdims: bool = False,
 ) -> Tensor:
-    result = _reduce_core(x, fn, axis)
+    result = _reduce_core(x, fn, axis, keepdims)
 
     if np.isscalar(result):
         if jl.seval(f"{x.dtype} <: Integer"):
@@ -968,8 +970,8 @@ def _reduce_sum_prod(
     return result
 
 
-def _reduce(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None):
-    result = _reduce_core(x, fn, axis)
+def _reduce(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False) -> Tensor:
+    result = _reduce_core(x, fn, axis, keepdims)
     if np.isscalar(result):
         result = jl.Tensor(
             jl.Element(
@@ -988,7 +990,7 @@ def sum(
     dtype: DType | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce_sum_prod(x, jl.sum, axis, dtype)
+    return _reduce_sum_prod(x, jl.sum, axis, dtype, keepdims)
 
 
 def prod(
@@ -999,7 +1001,7 @@ def prod(
     dtype: DType | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce_sum_prod(x, jl.prod, axis, dtype)
+    return _reduce_sum_prod(x, jl.prod, axis, dtype, keepdims)
 
 
 def max(
@@ -1009,7 +1011,7 @@ def max(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.maximum, axis)
+    return _reduce(x, jl.maximum, axis, keepdims)
 
 
 def min(
@@ -1019,7 +1021,7 @@ def min(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.minimum, axis)
+    return _reduce(x, jl.minimum, axis, keepdims)
 
 
 def any(
@@ -1029,7 +1031,7 @@ def any(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x != 0, jl.any, axis)
+    return _reduce(x != 0, jl.any, axis, keepdims)
 
 
 def all(
@@ -1039,7 +1041,7 @@ def all(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x != 0, jl.all, axis)
+    return _reduce(x != 0, jl.all, axis, keepdims)
 
 def mean(
     x: Tensor,
@@ -1048,7 +1050,7 @@ def mean(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.mean, axis)
+    return _reduce(x, jl.mean, axis, keepdims)
 
 def std(
     x: Tensor,
@@ -1060,7 +1062,7 @@ def std(
 ) -> Tensor:
     def _std(x):
         return jl.std(x, correction=correction)
-    return _reduce(x, _std, axis)
+    return _reduce(x, _std, axis, keepdims)
 
 def var(
     x: Tensor,
@@ -1072,29 +1074,7 @@ def var(
 ) -> Tensor:
     def _var(x):
         return jl.var(x, correction=correction)
-    return _reduce(x, _var, axis)
-
-def squeeze(
-    x: Tensor,
-    /,
-    axis: int | tuple[int, ...] | None = None,
-) -> Tensor:
-    return _reduce(x, jl.dropdims, axis)
-
-def expand_dims(
-    x: Tensor,
-    /,
-    axis: int | tuple[int, ...] | None = None,
-) -> Tensor:
-    if axis is not None:
-        if isinstance(axis, int):
-            axis = (axis,)
-        axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-        axis = tuple(i + 1 for i in axis)
-        result = jl.expanddims(x._obj, dims=axis)
-    else:
-        result = jl.expanddims(x._obj)
-    return Tensor(result)
+    return _reduce(x, _var, axis, keepdims)
 
 def argmin(
     x: Tensor,
@@ -1103,7 +1083,7 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.Finch.argmin_python, axis)
+    return _reduce(x, jl.Finch.argmin_python, axis, keepdims)
 
 def argmax(
     x: Tensor,
@@ -1112,7 +1092,32 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.Finch.argmax_python, axis)
+    return _reduce(x, jl.Finch.argmax_python, axis, keepdims)
+
+def squeeze(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...],
+) -> Tensor:
+    if isinstance(axis, int):
+        axis = (axis,)
+    axis = normalize_axis_tuple(axis, x.ndim)
+    axis = tuple(i + 1 for i in axis)
+    result = jl.dropdims(x._obj, dims=axis)
+    return Tensor(result)
+
+def expand_dims(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...] = 0,
+) -> Tensor:
+    if isinstance(axis, int):
+        axis = (axis,)
+    axis = normalize_axis_tuple(axis, x.ndim + len(axis))
+    axis = tuple(i + 1 for i in axis)
+    result = jl.expanddims(x._obj, dims=axis)
+    return Tensor(result)
+
 
 def diagonal(
     x: Tensor,

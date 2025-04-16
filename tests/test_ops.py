@@ -250,6 +250,27 @@ def test_reductions(arr3d, axis, opt):
 
     assert_equal(actual.todense(), expected)
 
+    @pytest.mark.parametrize("offset", [-1, 0, 1])
+    def test_diagonal_2d_array(offset, opt):
+        arr2d = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        A_finch = finch.Tensor(arr2d)
+
+        actual = finch.diagonal(A_finch, offset=offset)
+        expected = np.diagonal(arr2d, offset=offset)
+
+        assert_equal(actual.todense(), expected)
+
+
+    @pytest.mark.parametrize("offset", [-1, 0, 1])
+    def test_diagonal_high_dimensional_array(offset, opt):
+        arr_high_dim = np.random.rand(4, 3, 5, 6)
+        A_finch = finch.Tensor(arr_high_dim)
+
+        actual = finch.diagonal(A_finch, offset=offset)
+        expected = np.diagonal(arr_high_dim, offset=offset)
+
+        assert_equal(actual.todense(), expected)
+
 
 @pytest.mark.parametrize("func_name", ["sum", "prod"])
 @pytest.mark.parametrize("axis", [None, 0, 1])
