@@ -718,7 +718,10 @@ def reshape(
     if copy is False:
         raise ValueError("Unable to avoid copy during reshape.")
     dims = [dim if dim >= 0 else jl.Colon() for dim in shape]
-    return Tensor(jl.reshape(x._obj, *dims))
+    obj = jl.swizzle(x._obj, *tuple(reversed(range(1, jl.ndims(x._obj) + 1))))
+    obj = jl.reshape(obj, *reversed(dims))
+    obj = jl.swizzle(obj, *tuple(reversed(range(1, jl.ndims(obj) + 1))))
+    return Tensor(obj)
 
 
 def full(
@@ -1148,7 +1151,7 @@ def eye(
     if format == "coo":
         return Tensor(tns)
     elif format == "dense":
-        return Tensor(jl.Tensor(jl.DenseFormat(2, z=dtype(False)), tns))
+        return Tensor(jl.Tensor(jl.DenseFormat(2, dtype(False)), tns))
     else:
         raise ValueError(f"{format} not supported, only 'coo' and 'dense' is allowed.")
 
