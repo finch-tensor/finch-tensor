@@ -216,7 +216,7 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
     assert_equal(actual.todense(), expected)
 
 
-@pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all"])
+@pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all", "mean", "std", "var"])
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
 def test_reductions(arr3d, func_name, axis, opt):
     A_finch = finch.Tensor(arr3d)
@@ -225,6 +225,51 @@ def test_reductions(arr3d, func_name, axis, opt):
     expected = getattr(np, func_name)(arr3d, axis=axis)
 
     assert_equal(actual.todense(), expected)
+
+@pytest.mark.parametrize("func_name", ["argmax", "argmin"])
+@pytest.mark.parametrize("axis", [None, -1, 1, 2, (0, 1, 2)])
+def test_reductions(arr3d, func_name, axis, opt):
+    A_finch = finch.Tensor(arr3d)
+
+    actual = getattr(finch, func_name)(A_finch, axis=axis)
+    expected = getattr(np, func_name)(arr3d, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+@pytest.mark.parametrize("axis", [-1, 1, (0, 1), (0, 1, 2)])
+def test_reductions(arr3d, axis, opt):
+    A_finch = finch.Tensor(arr3d)
+
+    actual = finch.expand_dims(A_finch, axis=axis)
+    expected = np.expand_dims(arr3d, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+    actual = finch.squeeze(actual, axis=axis)
+    expected = np.squeeze(expected, axis=axis)
+
+    assert_equal(actual.todense(), expected)
+
+    @pytest.mark.parametrize("offset", [-1, 0, 1])
+    def test_diagonal_2d_array(offset, opt):
+        arr2d = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        A_finch = finch.Tensor(arr2d)
+
+        actual = finch.diagonal(A_finch, offset=offset)
+        expected = np.diagonal(arr2d, offset=offset)
+
+        assert_equal(actual.todense(), expected)
+
+
+    @pytest.mark.parametrize("offset", [-1, 0, 1])
+    def test_diagonal_high_dimensional_array(offset, opt):
+        arr_high_dim = np.random.rand(4, 3, 5, 6)
+        A_finch = finch.Tensor(arr_high_dim)
+
+        actual = finch.diagonal(A_finch, offset=offset)
+        expected = np.diagonal(arr_high_dim, offset=offset)
+
+        assert_equal(actual.todense(), expected)
 
 
 @pytest.mark.parametrize("func_name", ["sum", "prod"])

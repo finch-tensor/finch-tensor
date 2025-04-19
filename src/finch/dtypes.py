@@ -47,7 +47,6 @@ jl_to_np_dtype = {
     None: None,
 }
 
-
 def finfo(dtype):
     return np.finfo(jl_to_np_dtype[dtype])
 

@@ -9,17 +9,16 @@ packages = [{include = "finch", from = "src"}]
 [tool.poetry.dependencies]
 python = "^3.10"
 juliapkg = "^0.1.16"
-juliacall = "^0.9.23"
 numpy = ">=1.19"
+juliacall = "^0.9.24"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7.4.4"
 pre-commit = "^3.6.0"
 pytest-cov = "^4.1.0"
-sparse = "^0.15.1"
+sparse = "^0.16.0"
 scipy = "^1.7"
-numba = ">=0.55.0,<0.61.0rc1"
-llvmlite = "<0.44.0rc1"
+numba = "^0.61.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.8"]

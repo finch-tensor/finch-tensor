@@ -21,7 +21,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import OrderType, JuliaObj, spmatrix, TupleOf3Arrays, DType, Device
-from .compiled import compiled
+from .compiled import compiled, lazy, compute
 
 
 class SparseArray:
@@ -291,7 +291,7 @@ class Tensor(_Display, SparseArray):
 
     @property
     def fill_value(self) -> np.number:
-        return jl.default(self._obj)
+        return jl.fill_value(self._obj)
 
     @property
     def _is_dense(self) -> bool:
@@ -382,7 +382,7 @@ class Tensor(_Display, SparseArray):
         else:
             # create materialized dense array
             shape = jl.size(obj)
-            dense_lvls = jl.Element(jc.convert(self.dtype, jl.default(obj)))
+            dense_lvls = jl.Element(jc.convert(self.dtype, jl.fill_value(obj)))
             for _ in range(self.ndim):
                 dense_lvls = jl.Dense(dense_lvls)
             dense_tensor = jl.Tensor(dense_lvls, obj).lvl  # materialize
@@ -715,13 +715,13 @@ def asarray(
 def reshape(
     x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None
 ) -> Tensor:
-    # TODO: https://github.com/FinchTensor/Finch.jl/issues/558
-    #       Only to run array-api-tests that require it for multiple tests.
-    #       Must be reimplemented once `reshape` is available in Finch.jl.
-    warnings.warn("`reshape` densified the input tensor.", PerformanceWarning)
-    arr = x.todense()
-    arr = arr.reshape(shape)
-    return Tensor(arr)
+    if copy is False:
+        raise ValueError("Unable to avoid copy during reshape.")
+    dims = [dim if dim >= 0 else jl.Colon() for dim in shape]
+    obj = jl.swizzle(x._obj, *tuple(reversed(range(1, jl.ndims(x._obj) + 1))))
+    obj = jl.reshape(obj, *reversed(dims))
+    obj = jl.swizzle(obj, *tuple(reversed(range(1, jl.ndims(obj) + 1))))
+    return Tensor(obj)
 
 
 def full(
@@ -889,7 +889,7 @@ def astype(x: Tensor, dtype: DType, /, *, copy: bool = True) -> Tensor:
 
     finch_tns = x._obj.body
     result = jl.copyto_b(
-        jl.similar(finch_tns, jc.convert(dtype, jl.default(finch_tns)), dtype),
+        jl.similar(finch_tns, jc.convert(dtype, jl.fill_value(finch_tns)), dtype),
         finch_tns,
     )
     return Tensor(jl.swizzle(result, *x.get_order(zero_indexing=False)))
@@ -920,14 +920,18 @@ def nonzero(x: Tensor, /) -> tuple[np.ndarray, ...]:
     return tuple(Tensor(i[sort_order]) for i in indices)
 
 
-def _reduce_core(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None):
-    if axis is not None:
-        axis = normalize_axis_tuple(axis, x.ndim)
-        axis = tuple(i + 1 for i in axis)
-        result = fn(x._obj, dims=axis)
+def _reduce_core(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False):
+    if axis is None:
+        axis = tuple(range(x.ndim))
+    axis = normalize_axis_tuple(axis, x.ndim)
+    axis = tuple(i + 1 for i in axis)
+    if keepdims:
+        return fn(x._obj, dims=axis)
     else:
-        result = fn(x._obj)
-    return result
+        if x.is_computed():
+            return jl.compute(jl.dropdims(fn(jl.lazy(x._obj), dims=axis), dims=axis))
+        else:
+            return jl.dropdims(fn(x._obj, dims=axis), dims=axis)
 
 
 def _reduce_sum_prod(
@@ -935,8 +939,9 @@ def _reduce_sum_prod(
     fn: Callable,
     axis: int | tuple[int, ...] | None,
     dtype: DType | None,
+    keepdims: bool = False,
 ) -> Tensor:
-    result = _reduce_core(x, fn, axis)
+    result = _reduce_core(x, fn, axis, keepdims)
 
     if np.isscalar(result):
         if jl.seval(f"{x.dtype} <: Integer"):
@@ -968,8 +973,8 @@ def _reduce_sum_prod(
     return result
 
 
-def _reduce(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None):
-    result = _reduce_core(x, fn, axis)
+def _reduce(x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False) -> Tensor:
+    result = _reduce_core(x, fn, axis, keepdims)
     if np.isscalar(result):
         result = jl.Tensor(
             jl.Element(
@@ -988,7 +993,7 @@ def sum(
     dtype: DType | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce_sum_prod(x, jl.sum, axis, dtype)
+    return _reduce_sum_prod(x, jl.sum, axis, dtype, keepdims)
 
 
 def prod(
@@ -999,7 +1004,7 @@ def prod(
     dtype: DType | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce_sum_prod(x, jl.prod, axis, dtype)
+    return _reduce_sum_prod(x, jl.prod, axis, dtype, keepdims)
 
 
 def max(
@@ -1009,7 +1014,7 @@ def max(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.maximum, axis)
+    return _reduce(x, jl.maximum, axis, keepdims)
 
 
 def min(
@@ -1019,7 +1024,7 @@ def min(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x, jl.minimum, axis)
+    return _reduce(x, jl.minimum, axis, keepdims)
 
 
 def any(
@@ -1029,7 +1034,7 @@ def any(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x != 0, jl.any, axis)
+    return _reduce(x != 0, jl.any, axis, keepdims)
 
 
 def all(
@@ -1039,8 +1044,95 @@ def all(
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
 ) -> Tensor:
-    return _reduce(x != 0, jl.all, axis)
+    return _reduce(x != 0, jl.all, axis, keepdims)
 
+def mean(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.mean, axis, keepdims)
+
+def std(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False,
+) -> Tensor:
+    def _std(x):
+        return jl.std(x, correction=correction)
+    return _reduce(x, _std, axis, keepdims)
+
+def var(
+    x: Tensor,
+    /,
+    *,
+    axis: int | tuple[int, ...] | None = None,
+    correction: int | float = 0.0,
+    keepdims: bool = False,
+) -> Tensor:
+    def _var(x):
+        return jl.var(x, correction=correction)
+    return _reduce(x, _var, axis, keepdims)
+
+def argmin(
+    x: Tensor,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.Finch.argmin_python, axis, keepdims)
+
+def argmax(
+    x: Tensor,
+    /,
+    *,
+    axis: int | None = None,
+    keepdims: bool = False,
+) -> Tensor:
+    return _reduce(x, jl.Finch.argmax_python, axis, keepdims)
+
+def squeeze(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...],
+) -> Tensor:
+    if isinstance(axis, int):
+        axis = (axis,)
+    axis = normalize_axis_tuple(axis, x.ndim)
+    axis = tuple(i + 1 for i in axis)
+    result = jl.dropdims(x._obj, dims=axis)
+    return Tensor(result)
+
+def expand_dims(
+    x: Tensor,
+    /,
+    axis: int | tuple[int, ...] = 0,
+) -> Tensor:
+    if isinstance(axis, int):
+        axis = (axis,)
+    axis = normalize_axis_tuple(axis, x.ndim + len(axis))
+    axis = tuple(i + 1 for i in axis)
+    result = jl.expanddims(x._obj, dims=axis)
+    return Tensor(result)
+
+
+def diagonal(
+    x: Tensor,
+    /,
+    *,
+    offset: int = 0
+) -> Tensor:
+    m = x.shape[-2]
+    n = x.shape[-1]
+    mask = eye(m, n, k=offset, format="coo", dtype=bool)
+    res = compute(sum(where(mask, lazy(x), zeros(x.shape)), axis=-1))
+    return res[..., 0:builtins.min(m, n, m + offset, n - offset)]
 
 def eye(
     n_rows: int,
@@ -1055,26 +1147,13 @@ def eye(
     _validate_device(device)
     n_cols = n_rows if n_cols is None else n_cols
     dtype = jl_dtypes.float64 if dtype is None else dtype
+    tns = jl.Finch.eye_python(n_rows, n_cols, k, dtype(False))
     if format == "coo":
-        tns_def = "SparseCOO{2}" + f"(Element({dtype}(0.0)))"
+        return Tensor(tns)
     elif format == "dense":
-        tns_def = f"Dense(Dense(Element({dtype}(0.0))))"
+        return Tensor(jl.Tensor(jl.DenseFormat(2, dtype(False)), tns))
     else:
         raise ValueError(f"{format} not supported, only 'coo' and 'dense' is allowed.")
-
-    obj = jl.seval(f"tns = Tensor({tns_def}, {n_rows}, {n_cols})")
-    jl.seval(f"""
-        @finch begin
-            tns .= 0
-            for j=_, i=_
-                if i == j - {k}
-                    tns[i, j] += 1
-                end
-            end
-        end
-    """)
-    return Tensor(obj)
-
 
 def tensordot(x1: Tensor, x2: Tensor, /, *, axes=2) -> Tensor:
     if not isinstance(x1, Tensor):
