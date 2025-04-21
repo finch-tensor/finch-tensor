@@ -26,6 +26,18 @@ poetry install --with test
 ```
 to install the current project and dev dependencies.
 
+### Working with a local copy of Finch.jl
+The `develop.py ` script can be used to set up a local copy of Finch.jl for development.
+
+```
+Usage:
+    develop.py [--restore] [--path <path>]
+
+Options:
+    --restore   Restore the original juliapkg.json file.
+    --path      Path to the local copy of Finch.jl [default: ../Finch.jl].
+```
+
 ### Publishing
 
 The "Publish" GitHub Action is a manual workflow for publishing Python packages to PyPI using Poetry. It handles the version management based on the `pyproject.toml` file and automates tagging and creating GitHub releases.
