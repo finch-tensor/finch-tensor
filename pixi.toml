@@ -4,7 +4,7 @@ channels = ["conda-forge"]
 description = "Add a short description here"
 name = "finch-tensor"
 platforms = ["osx-arm64"]
-version = "0.2.10"
+version = "0.2.12"
 
 [tasks]
 compile = "python -c 'import finch'"
@@ -16,14 +16,14 @@ juliaup = ">=1.17.10,<2"
 [pypi-dependencies]
 finch-tensor = { path = ".", editable = true }
 juliapkg = ">=0.1.16,<0.2"
-juliacall = ">=0.9.23,<0.10"
+juliacall = ">=0.9.24,<0.10"
 numpy = ">=1.19"
 
 [feature.test.pypi-dependencies]
 pytest = "*"
 pytest-cov = "*"
-sparse = "*"
-numba = ">=0.60"
+sparse = ">=0.16,<0.17"
+numba = ">=0.61"
 scipy = "*"
 numpy = "==2.*"
 pytest-xdist = ">=3.6.1,<4"
