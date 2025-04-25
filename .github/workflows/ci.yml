@@ -1,4 +1,9 @@
 name: CI
+
+defaults:
+  run:
+    shell: bash -leo pipefail {0}
+
 jobs:
   test:
     defaults:
@@ -30,6 +35,34 @@ jobs:
         run: |
           poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
       - uses: codecov/codecov-action@v3
+
+  array_api_tests:
+    env:
+      ARRAY_API_TESTS_DIR: ${{ github.workspace }}/array-api-tests
+    runs-on: macos-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v4
+    - name: Checkout array-api-tests
+      run: ci/clone_array_api_tests.sh
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - name: Install Poetry
+      run: |
+        pip install poetry
+    - name: Build wheel
+      run: |
+        python -m poetry build --format wheel
+    - name: Install build and test dependencies from PyPI
+      run: |
+        pip install dist/*.whl
+        pip install -U setuptools wheel
+        pip install pytest-xdist hypothesis==6.131.0 -r "$ARRAY_API_TESTS_DIR/requirements.txt"
+    - name: Run the test suite
+      run: ci/test_array_api.sh
 
 on:
   # Trigger the workflow on push or pull request,

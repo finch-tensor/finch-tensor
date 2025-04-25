@@ -287,4 +287,4 @@ __all__ = [
     "linalg",
 ]
 
-__array_api_version__: str = "2023.12"
+__array_api_version__: str = "2022.12"
