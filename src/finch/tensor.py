@@ -645,9 +645,9 @@ class Tensor(_Display, SparseArray):
 
     def __array_namespace__(self, *, api_version: str | None = None) -> Any:
         if api_version is None:
-            api_version = "2023.12"
+            api_version = "2024.12"
 
-        if api_version not in {"2021.12", "2022.12", "2023.12"}:
+        if api_version not in {"2021.12", "2022.12", "2023.12", "2024.12"}:
             raise ValueError(f'"{api_version}" Array API version not supported.')
         import finch
 
@@ -717,12 +717,13 @@ def reshape(
 ) -> Tensor:
     if copy is False:
         raise ValueError("Unable to avoid copy during reshape.")
-    dims = [dim if dim >= 0 else jl.Colon() for dim in shape]
-    obj = jl.swizzle(x._obj, *tuple(reversed(range(1, jl.ndims(x._obj) + 1))))
-    obj = jl.reshape(obj, *reversed(dims))
-    obj = jl.swizzle(obj, *tuple(reversed(range(1, jl.ndims(obj) + 1))))
-    return Tensor(obj)
-
+    # TODO: https://github.com/finch-tensor/Finch.jl/issues/743
+    #       Revert to `jl.reshape` implementation once aforementioned
+    #       issue is solved.
+    warnings.warn("`reshape` densified the input tensor.", PerformanceWarning)
+    arr = x.todense()
+    arr = arr.reshape(shape)
+    return Tensor(arr)
 
 def full(
     shape: int | tuple[int, ...],

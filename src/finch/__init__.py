@@ -151,6 +151,7 @@ from .io import (
     write,
 )
 from . import linalg
+from ._array_api_info import __array_namespace_info__
 
 __all__ = [
     "Tensor",
@@ -287,4 +288,4 @@ __all__ = [
     "linalg",
 ]
 
-__array_api_version__: str = "2023.12"
+__array_api_version__: str = "2024.12"

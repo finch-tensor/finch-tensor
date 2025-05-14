@@ -31,6 +31,38 @@ jobs:
           poetry run pytest --junit-xml=test-${{ matrix.os }}-Python-${{ matrix.python }}.xml
       - uses: codecov/codecov-action@v3
 
+  array_api_tests:
+    env:
+      ARRAY_API_TESTS_DIR: ${{ github.workspace }}/array-api-tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v4
+    - name: Checkout array-api-tests
+      run: ci/clone_array_api_tests.sh
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - name: Install Poetry
+      run: |
+        pip install poetry
+    - name: Build wheel
+      run: |
+        python -m poetry build --format wheel
+    - name: Install build and test dependencies from PyPI
+      run: |
+        pip install dist/*.whl
+        pip install -U setuptools wheel
+        pip install pytest-xdist hypothesis==6.131.0 -r "$ARRAY_API_TESTS_DIR/requirements.txt"
+    - name: Run the test suite
+      env:
+        ARRAY_API_TESTS_MODULE: finch
+      run: |
+        python -c 'import finch'
+        pytest "$ARRAY_API_TESTS_DIR/array_api_tests/" -v -c "$ARRAY_API_TESTS_DIR/pytest.ini" --ci --max-examples=2 --derandomize --disable-deadline --disable-warnings -n auto --skips-file ci/array-api-skips.txt
+
 on:
   # Trigger the workflow on push or pull request,
   # but only for the main branch
