@@ -249,7 +249,11 @@ def test_asarray(arr2d, arr3d, order, format, opt):
         (np.ones((10, 10)), (100,)),
         (np.ones((3, 4, 5)), (5, 2, 2, 3)),
         (np.arange(1), (1, 1, 1, 1)),
+        (np.arange(1).reshape((1, 1, 1)), (1,)),
+        (np.arange(1).reshape((1, 1)), ()),
         (np.zeros((10, 1, 2)), (1, 5, 4, 1)),
+        (np.int64(0), ()),
+        (np.int64(0), (1, 1)),
     ],
 )
 @pytest.mark.parametrize("order", ["C", "F"])
