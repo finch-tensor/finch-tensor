@@ -1,11 +1,13 @@
-import numpy as np
-from numpy.testing import assert_equal, assert_allclose
-import pytest
 from functools import reduce
+
+import pytest
+
+import numpy as np
+from numpy.testing import assert_allclose, assert_equal
+
 import juliacall as jc
 
 import finch
-
 
 arr1d = np.array([1, 1, 2, 3])
 arr2d = np.array([[1, 2, 0, 0], [0, 1, 0, 1]])
@@ -216,7 +218,9 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
     assert_equal(actual.todense(), expected)
 
 
-@pytest.mark.parametrize("func_name", ["sum", "prod", "max", "min", "any", "all", "mean", "std", "var"])
+@pytest.mark.parametrize(
+    "func_name", ["sum", "prod", "max", "min", "any", "all", "mean", "std", "var"]
+)
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
 def test_reductions(arr3d, func_name, axis, opt):
     A_finch = finch.Tensor(arr3d)
@@ -225,6 +229,7 @@ def test_reductions(arr3d, func_name, axis, opt):
     expected = getattr(np, func_name)(arr3d, axis=axis)
 
     assert_equal(actual.todense(), expected)
+
 
 @pytest.mark.parametrize("func_name", ["argmax", "argmin"])
 @pytest.mark.parametrize("axis", [None, -1, 1, 2, (0, 1, 2)])
@@ -235,6 +240,7 @@ def test_reductions(arr3d, func_name, axis, opt):
     expected = getattr(np, func_name)(arr3d, axis=axis)
 
     assert_equal(actual.todense(), expected)
+
 
 @pytest.mark.parametrize("axis", [-1, 1, (0, 1), (0, 1, 2)])
 def test_reductions(arr3d, axis, opt):
@@ -260,7 +266,6 @@ def test_reductions(arr3d, axis, opt):
 
         assert_equal(actual.todense(), expected)
 
-
     @pytest.mark.parametrize("offset", [-1, 0, 1])
     def test_diagonal_high_dimensional_array(offset, opt):
         arr_high_dim = np.random.rand(4, 3, 5, 6)
@@ -284,9 +289,7 @@ def test_reductions(arr3d, axis, opt):
         (finch.float64, finch.complex128, np.complex128),
     ],
 )
-def test_sum_prod_dtype_arg(
-    arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt
-):
+def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt):
     arr_finch = finch.asarray(np.abs(arr3d), dtype=in_dtype)
 
     actual = getattr(finch, func_name)(arr_finch, axis=axis, dtype=dtype).todense()

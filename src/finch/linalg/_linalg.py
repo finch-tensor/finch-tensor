@@ -10,7 +10,7 @@ def vector_norm(
     *,
     axis: int | tuple[int, ...] | None = None,
     keepdims: bool = False,
-    ord: int | float = 2,
+    ord: float = 2,
 ) -> Tensor:
     if axis is not None:
         axis = normalize_axis_tuple(axis, x.ndim)

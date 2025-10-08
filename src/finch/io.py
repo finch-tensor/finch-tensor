@@ -3,6 +3,7 @@ from pathlib import Path
 from .julia import jl
 from .tensor import Tensor
 
+
 def read(filename: Path | str) -> Tensor:
     fn = str(filename)
     julia_obj = jl.fread(fn)

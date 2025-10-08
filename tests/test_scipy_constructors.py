@@ -1,7 +1,8 @@
-import numpy as np
-from numpy.testing import assert_equal
 import pytest
+
+import numpy as np
 import scipy.sparse as sp
+from numpy.testing import assert_equal
 
 import finch
 from finch.tensor import _eq_scalars
@@ -111,9 +112,7 @@ def test_from_scipy_sparse(format_with_pattern, fill_value):
 def test_non_canonical_format(format):
     sp_arr = sp.random(3, 4, density=0.5, format=format)
 
-    with pytest.raises(
-        ValueError, match="Unable to avoid copy while creating an array"
-    ):
+    with pytest.raises(ValueError, match="Unable to avoid copy while creating an array"):
         finch.asarray(sp_arr, copy=False)
 
     finch_arr = finch.asarray(sp_arr)
