@@ -15,7 +15,9 @@ def test_write(tmp_path, arr2d):
     tns = finch.asarray(arr2d)
     finch.write(tmp_path / "tmp.ttx", tns)
 
-    expected = open(f"{base_path}/matrix_1.ttx").read()
-    actual = open(tmp_path / "tmp.ttx").read()
+    with open(f"{base_path}/matrix_1.ttx") as f:
+        expected = f.read()
+    with open(tmp_path / "tmp.ttx") as f:
+        actual = f.read()
 
     assert actual == expected

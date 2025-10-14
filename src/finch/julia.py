@@ -2,12 +2,12 @@
 # Use pyjuliapkg to modify the `juliapkg.json` file in the root of this repo.
 # You can also run `develop.py` to quickly use a local copy of Finch.jl.
 # An example development json is found in `juliapkg_dev.json`
-import juliacall as jc  # noqa
+import juliacall as jc  # noqa: F401
 import juliapkg
 
 juliapkg.resolve()
 
-from juliacall import Main as jl  # noqa
+from juliacall import Main as jl  # noqa: E402, F401
 
 jl.seval("using Finch")
 jl.seval("using HDF5")

@@ -105,7 +105,9 @@ def compiled(opt=None, *, force_materialization=False, tag: int | None = None):
             result = func(*args, **kwargs)
             if not compute_at_end:
                 return result
-            compute_kwargs = {"ctx": opt.get_julia_scheduler()} if opt is not None else {}
+            compute_kwargs = (
+                {"ctx": opt.get_julia_scheduler()} if opt is not None else {}
+            )
             if tag is not None:
                 compute_kwargs["tag"] = tag
 

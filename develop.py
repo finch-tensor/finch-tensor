@@ -19,7 +19,10 @@ Options:
     --path      Path to the local copy of Finch.jl [default: ../Finch.jl].
 """
 parser = argparse.ArgumentParser(
-    description="Development script for Finch. This script allows you to specify the location of a local copy of Finch.jl.",
+    description=(
+        "Development script for Finch. This script allows you to specify "
+        "the location of a local copy of Finch.jl."
+    ),
     usage=usage,
 )
 parser.add_argument(
@@ -39,7 +42,7 @@ if args.restore:
         print("Restored src/finch/juliapkg.json from backup.")
     except FileNotFoundError:
         print("Error: Backup file src/finch/juliapkg.json.orig does not exist.")
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         print(f"An error occurred: {e}")
     exit()
 
@@ -50,7 +53,7 @@ finch_path = os.path.abspath(args.path)
 try:
     if not os.path.exists(backup_file):
         shutil.copy(source_file, backup_file)
-except Exception as e:
+except (OSError, PermissionError) as e:
     print(f"An error occurred: {e}")
 
 # Checkout Finch for development

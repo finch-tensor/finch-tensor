@@ -61,8 +61,10 @@ def test_to_scipy_sparse(format_with_cls_with_order, fill_value_in, fill_value_o
         match_fill_value_out = 0 if fill_value_out is None else fill_value_out
         with pytest.raises(
             ValueError,
-            match=rf"Can only convert arrays with \[{match_fill_value_out}\] fill-values "
-            "to a Scipy sparse matrix.",
+            match=(
+                rf"Can only convert arrays with \[{match_fill_value_out}\] "
+                "fill-values to a Scipy sparse matrix."
+            ),
         ):
             finch_arr.to_scipy_sparse(accept_fv=fill_value_out)
         return
@@ -112,7 +114,9 @@ def test_from_scipy_sparse(format_with_pattern, fill_value):
 def test_non_canonical_format(format):
     sp_arr = sp.random(3, 4, density=0.5, format=format)
 
-    with pytest.raises(ValueError, match="Unable to avoid copy while creating an array"):
+    with pytest.raises(
+        ValueError, match="Unable to avoid copy while creating an array"
+    ):
         finch.asarray(sp_arr, copy=False)
 
     finch_arr = finch.asarray(sp_arr)

@@ -38,28 +38,33 @@ class Tensor(_Display, SparseArray):
     Constructors
     ------------
     Tensor(scipy.sparse.spmatrix)
-        Construct a Tensor out of a `scipy.sparse` object. Supported formats are: `COO`, `CSC`, and `CSR`.
+        Construct a Tensor out of a `scipy.sparse` object. Supported formats are: `COO`,
+        `CSC`, and `CSR`.
     Tensor(numpy.ndarray)
         Construct a Tensor out of a NumPy array object. This is a no-copy operation.
     Tensor(Storage)
-        Initialize a Tensor with a `storage` description. `storage` can already hold data.
+        Initialize a Tensor with a `storage` description. `storage` can already hold
+        data.
     Tensor(julia_object)
-        Tensor created from a compatible raw Julia object. Must be a `SwizzleArray` or `LazyTensor`.
+        Tensor created from a compatible raw Julia object. Must be a `SwizzleArray` or
+        `LazyTensor`.
         This is a no-copy operation.
 
     Parameters
     ----------
     obj : np.ndarray or scipy.sparse or Storage or Finch.SwizzleArray
-        Input to construct a Tensor. It's a no-copy operation of for NumPy and SciPy input. For Storage
-        it's levels' description with order. The order numbers the dimensions from the fastest to slowest.
-        The leaf nodes have mode `0` and the root node has mode `n-1`. If the tensor was square of size `N`,
-        then `N .^ order == strides`. Available options are "C" (row-major), "F" (column-major), or a custom
-        order. Default: row-major.
+        Input to construct a Tensor. It's a no-copy operation of for NumPy and
+        SciPy input. For Storage it's levels' description with order. The order
+        numbers the dimensions from the fastest to slowest.  The leaf nodes have
+        mode `0` and the root node has mode `n-1`. If the tensor was square of
+        size `N`, then `N .^ order == strides`. Available options are "C"
+        (row-major), "F" (column-major), or a custom order. Default: row-major.
     fill_value : np.number, optional
         Only used when `numpy.ndarray` or `scipy.sparse` is passed.
     copy : bool, optional
-        If ``True``, then the object is copied. If ``None`` then the object is copied only if needed.
-        For ``False`` it raises a ``ValueError`` if a copy cannot be avoided. Default: ``None``.
+        If ``True``, then the object is copied. If ``None`` then the object is
+        copied only if needed.  For ``False`` it raises a ``ValueError`` if a
+        copy cannot be avoided. Default: ``None``.
 
     Returns
     -------
@@ -97,7 +102,7 @@ class Tensor(_Display, SparseArray):
         fill_value: np.number | None = None,
         copy: bool | None = None,
     ):
-        if isinstance(obj, (int, float, complex, bool, list)):
+        if isinstance(obj, int | float | complex | bool | list):
             if copy is False:
                 raise ValueError(
                     "copy=False isn't supported for scalar inputs and Python lists"
@@ -319,7 +324,9 @@ class Tensor(_Display, SparseArray):
     def device(self) -> str:
         return "cpu"
 
-    def to_device(self, device: Device, /, *, stream: int | Any | None = None) -> Tensor:
+    def to_device(
+        self, device: Device, /, *, stream: int | Any | None = None
+    ) -> Tensor:
         if device != "cpu":
             raise ValueError("Only `device='cpu'` is supported.")
 
@@ -338,13 +345,15 @@ class Tensor(_Display, SparseArray):
             if builtins.min(order) == 0:
                 order = tuple(i + 1 for i in order)
             if len(order) == ndim and builtins.all(
-                [i in order for i in range(1, ndim + 1)]
+                i in order for i in range(1, ndim + 1)
             ):
                 permutation = order
             else:
                 raise ValueError(f"Custom order is not a permutation: {order}.")
         else:
-            raise ValueError(f"order must be 'C', 'F' or a tuple, but is: {type(order)}.")
+            raise ValueError(
+                f"order must be 'C', 'F' or a tuple, but is: {type(order)}."
+            )
 
         return permutation
 
@@ -394,8 +403,7 @@ class Tensor(_Display, SparseArray):
     def permute_dims(self, axes: tuple[int, ...]) -> Tensor:
         axes = tuple(i + 1 for i in axes)
         new_obj = jl.permutedims(self._obj, axes)
-        new_tensor = Tensor(new_obj)
-        return new_tensor
+        return Tensor(new_obj)
 
     def to_storage(self, storage: Storage) -> Tensor:
         return Tensor(self._from_other_tensor(self, storage=storage))
@@ -419,7 +427,9 @@ class Tensor(_Display, SparseArray):
         inv_order = tuple(i - 1 for i in jl.invperm(order))
 
         dtype = arr.dtype.type
-        if dtype == np.bool_:  # Fails with: Finch currently only supports isbits defaults
+        if (
+            dtype == np.bool_
+        ):  # Fails with: Finch currently only supports isbits defaults
             dtype = jl_dtypes.bool
         fill_value = dtype(fill_value)
         lvl = Element(fill_value, arr.reshape(-1, order=order_char))
@@ -449,7 +459,9 @@ class Tensor(_Display, SparseArray):
         if copy is False and not (
             x.format in ("coo", "csr", "csc") and x.has_canonical_format
         ):
-            raise ValueError("Unable to avoid copy while creating an array as requested.")
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
         if x.format not in ("coo", "csr", "csc"):
             x = x.asformat("coo")
         if copy:
@@ -492,14 +504,15 @@ class Tensor(_Display, SparseArray):
         ptr = jl.Vector[jl.Int]([1, len(data) + 1])
         tbl = tuple(jl.PlusOneVector(arr) for arr in coords)
 
-        jl_data = jl.swizzle(jl.Tensor(jl.SparseCOO[ndim](lvl, shape, ptr, tbl)), *order)
-        return jl_data
+        return jl.swizzle(jl.Tensor(jl.SparseCOO[ndim](lvl, shape, ptr, tbl)), *order)
 
     @classmethod
     def construct_coo(
         cls, coords, data, shape, order=row_major, fill_value=0.0
     ) -> Tensor:
-        return Tensor(cls.construct_coo_jl_object(coords, data, shape, order, fill_value))
+        return Tensor(
+            cls.construct_coo_jl_object(coords, data, shape, order, fill_value)
+        )
 
     @staticmethod
     def _construct_compressed2d_jl_object(
@@ -517,11 +530,12 @@ class Tensor(_Display, SparseArray):
         indptr = jl.PlusOneVector(indptr)
 
         lvl = jl.Element(dtype(fill_value), data)
-        jl_data = jl.swizzle(
-            jl.Tensor(jl.Dense(jl.SparseList(lvl, shape[0], indptr, indices), shape[1])),
+        return jl.swizzle(
+            jl.Tensor(
+                jl.Dense(jl.SparseList(lvl, shape[0], indptr, indices), shape[1])
+            ),
             *order,
         )
-        return jl_data
 
     @classmethod
     def construct_csc_jl_object(
@@ -572,10 +586,9 @@ class Tensor(_Display, SparseArray):
         ):
             lvl = jl.SparseList(lvl, size, indptr, indices)
 
-        jl_data = jl.swizzle(
+        return jl.swizzle(
             jl.Tensor(jl.Dense(lvl, shape[-1])), *range(1, len(shape) + 1)
         )
-        return jl_data
 
     @classmethod
     def construct_csf(
@@ -669,11 +682,15 @@ def asarray(
         raise ValueError(f"{format} format not supported.")
     _validate_device(device)
     tensor = (
-        obj if isinstance(obj, Tensor) else Tensor(obj, fill_value=fill_value, copy=copy)
+        obj
+        if isinstance(obj, Tensor)
+        else Tensor(obj, fill_value=fill_value, copy=copy)
     )
     if format is not None:
         if copy is False:
-            raise ValueError("Unable to avoid copy while creating an array as requested.")
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
         order = tensor.get_order()
         if format == "coo":
             storage = Storage(SparseCOO(tensor.ndim, Element(tensor.fill_value)), order)
@@ -695,13 +712,17 @@ def asarray(
     return tensor
 
 
-def reshape(x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None) -> Tensor:
+def reshape(
+    x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None
+) -> Tensor:
     if copy is False:
         raise ValueError("Unable to avoid copy during reshape.")
     # TODO: https://github.com/finch-tensor/Finch.jl/issues/743
     #       Revert to `jl.reshape` implementation once aforementioned
     #       issue is solved.
-    warnings.warn("`reshape` densified the input tensor.", PerformanceWarning)
+    warnings.warn(
+        "`reshape` densified the input tensor.", PerformanceWarning, stacklevel=2
+    )
     arr = x.todense()
     arr = arr.reshape(shape)
     return Tensor(arr)
@@ -927,10 +948,7 @@ def _reduce_sum_prod(
     result = _reduce_core(x, fn, axis, keepdims)
 
     if np.isscalar(result):
-        if jl.seval(f"{x.dtype} <: Integer"):
-            tmp_dtype = jl_dtypes.int_
-        else:
-            tmp_dtype = x.dtype
+        tmp_dtype = jl_dtypes.int_ if jl.seval(f"{x.dtype} <: Integer") else x.dtype
         result = jl.Tensor(
             jl.Element(
                 jc.convert(tmp_dtype, 0),
@@ -1319,7 +1337,9 @@ def _slice_plus_one(s: slice, size: int) -> range:
 
     if s.stop is not None:
         stop_offset = 2 if step < 0 else 0
-        stop = normalize_axis_index(s.stop, size) + stop_offset if s.stop < size else size
+        stop = (
+            normalize_axis_index(s.stop, size) + stop_offset if s.stop < size else size
+        )
     else:
         stop = stop_default
 
@@ -1342,7 +1362,7 @@ def _add_plus_one(key: tuple, shape: tuple[int, ...]) -> tuple:
             new_key.append(normalize_axis_index(idx, size) + 1)
         elif isinstance(idx, slice):
             new_key.append(_slice_plus_one(idx, size))
-        elif isinstance(idx, (list, np.ndarray, tuple)):
+        elif isinstance(idx, list | np.ndarray | tuple):
             idx = normalize_axis_tuple(idx, size)
             new_key.append(jl.Vector([i + 1 for i in idx]))
         else:

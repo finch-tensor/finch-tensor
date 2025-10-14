@@ -117,6 +117,9 @@ def test_lazy_none_ellipsis(arr3d):
 
     with pytest.raises(
         jc.JuliaError,
-        match="Cannot index a lazy tensor with more or fewer `:` dims than it had original dims.",
+        match=(
+            "Cannot index a lazy tensor with more or fewer `:` dims than it had "
+            "original dims."
+        ),
     ):
         arr_finch[None, :]

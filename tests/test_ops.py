@@ -233,7 +233,7 @@ def test_reductions(arr3d, func_name, axis, opt):
 
 @pytest.mark.parametrize("func_name", ["argmax", "argmin"])
 @pytest.mark.parametrize("axis", [None, -1, 1, 2, (0, 1, 2)])
-def test_reductions(arr3d, func_name, axis, opt):
+def test_arg_reductions(arr3d, func_name, axis, opt):
     A_finch = finch.Tensor(arr3d)
 
     actual = getattr(finch, func_name)(A_finch, axis=axis)
@@ -243,7 +243,7 @@ def test_reductions(arr3d, func_name, axis, opt):
 
 
 @pytest.mark.parametrize("axis", [-1, 1, (0, 1), (0, 1, 2)])
-def test_reductions(arr3d, axis, opt):
+def test_expand_dims(arr3d, axis, opt):
     A_finch = finch.Tensor(arr3d)
 
     actual = finch.expand_dims(A_finch, axis=axis)
@@ -268,7 +268,8 @@ def test_reductions(arr3d, axis, opt):
 
     @pytest.mark.parametrize("offset", [-1, 0, 1])
     def test_diagonal_high_dimensional_array(offset, opt):
-        arr_high_dim = np.random.rand(4, 3, 5, 6)
+        rng = np.random.default_rng(42)
+        arr_high_dim = rng.random((4, 3, 5, 6))
         A_finch = finch.Tensor(arr_high_dim)
 
         actual = finch.diagonal(A_finch, offset=offset)
@@ -289,7 +290,9 @@ def test_reductions(arr3d, axis, opt):
         (finch.float64, finch.complex128, np.complex128),
     ],
 )
-def test_sum_prod_dtype_arg(arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt):
+def test_sum_prod_dtype_arg(
+    arr3d, func_name, axis, in_dtype, dtype, expected_dtype, opt
+):
     arr_finch = finch.asarray(np.abs(arr3d), dtype=in_dtype)
 
     actual = getattr(finch, func_name)(arr_finch, axis=axis, dtype=dtype).todense()
