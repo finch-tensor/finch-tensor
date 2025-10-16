@@ -5,8 +5,6 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose, assert_equal
 
-import juliacall as jc
-
 import finch
 
 arr1d = np.array([1, 1, 2, 3])
@@ -395,6 +393,8 @@ def test_matmul(opt, a: np.ndarray, b: np.ndarray):
 def test_matmul_dimension_mismatch(opt):
     A_finch = finch.Tensor(arr2d)
     B_finch = finch.Tensor(arr3d)
+
+    import juliacall as jc
 
     with pytest.raises(jc.JuliaError, match="DimensionMismatch"):
         A_finch @ B_finch

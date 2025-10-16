@@ -3,8 +3,6 @@ import pytest
 import numpy as np
 from numpy.testing import assert_equal
 
-import juliacall as jc
-
 import finch
 
 
@@ -114,6 +112,8 @@ def test_indexing_3d(arr3d, index, levels_descr, order):
 def test_lazy_none_ellipsis(arr3d):
     arr_finch = finch.lazy(finch.Tensor(arr3d))
     assert_equal(finch.compute(arr_finch[..., None]).todense(), arr3d[..., None])
+
+    import juliacall as jc
 
     with pytest.raises(
         jc.JuliaError,
