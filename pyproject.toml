@@ -1,16 +1,19 @@
 [project]
 name = "finch-tensor"
 version = "0.2.13"
-description = ""
-dynamic = ["version"]
+description = "Sparse Tensor Programming in Python powered by Finch.jl"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
-requires-python = '>=3.10,<4.0'
-dependencies = ['juliapkg (>=0.1.16,<0.2.0)', 'numpy (>=1.19)', 'juliacall (>=0.9.24,<0.10.0)']
+requires-python = ">=3.10,<4.0"
+dependencies = [
+    "juliapkg (>=0.1.16,<0.2.0)",
+    "numpy (>=1.19)",
+    "juliacall (>=0.9.24,<0.10.0)",
+]
 
 [tool.poetry]
 packages = [{include = "finch", from = "src"}]
-requires-poetry = '>=2.0,<3.0'
+requires-poetry = ">=2.0,<3.0"
 
 [project.optional-dependencies]
 test = [
@@ -19,7 +22,7 @@ test = [
     "pytest-cov>=4.1.0,<5",
     "sparse>=0.16.0",
     "scipy>=1.7,<2",
-    "numba>=0.61.0"
+    "numba>=0.61.0",
 ]
 
 [build-system]

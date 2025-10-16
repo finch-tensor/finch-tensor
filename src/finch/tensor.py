@@ -1068,8 +1068,8 @@ def std(
     correction: float = 0.0,
     keepdims: bool = False,
 ) -> Tensor:
-    def _std(x):
-        return jl.std(x, correction=correction)
+    def _std(x, dims):
+        return jl.std(x, correction=correction, dims=dims)
 
     return _reduce(x, _std, axis, keepdims)
 
@@ -1082,8 +1082,8 @@ def var(
     correction: float = 0.0,
     keepdims: bool = False,
 ) -> Tensor:
-    def _var(x):
-        return jl.var(x, correction=correction)
+    def _var(x, dims):
+        return jl.var(x, correction=correction, dims=dims)
 
     return _reduce(x, _var, axis, keepdims)
 
