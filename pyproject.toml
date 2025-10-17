@@ -4,7 +4,7 @@ version = "0.2.13"
 description = "Sparse Tensor Programming in Python powered by Finch.jl"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11,<4.0"
 dependencies = [
     "juliapkg (>=0.1.16,<0.2.0)",
     "numpy (>=1.19)",
