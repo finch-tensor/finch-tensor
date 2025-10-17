@@ -1,28 +1,60 @@
-[tool.poetry]
+[project]
 name = "finch-tensor"
 version = "0.2.13"
-description = ""
-authors = ["Willow Ahrens <willow.marie.ahrens@gmail.com>"]
+description = "Sparse Tensor Programming in Python powered by Finch.jl"
 readme = "README.md"
-packages = [{include = "finch", from = "src"}]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-juliapkg = "^0.1.16"
-numpy = ">=1.19"
-juliacall = [
-    { version = "0.9.24", platform = "darwin" },
-    { version = "^0.9.24" }
+authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "juliapkg (>=0.1.16,<0.2.0)",
+    "numpy (>=1.19)",
+    "juliacall (>=0.9.24,<0.10.0)",
 ]
 
-[tool.poetry.group.test.dependencies]
-pytest = "^7.4.4"
-pre-commit = "^3.6.0"
-pytest-cov = "^4.1.0"
-sparse = "^0.16.0"
-scipy = "^1.7"
-numba = "^0.61.0"
+[tool.poetry]
+packages = [{include = "finch", from = "src"}]
+requires-poetry = ">=2.0,<3.0"
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.4.4,<8",
+    "pre-commit>=3.6.0,<4",
+    "pytest-cov>=4.1.0,<5",
+    "sparse>=0.16.0",
+    "scipy>=1.7,<2",
+    "numba>=0.61.0",
+]
 
 [build-system]
 requires = ["poetry-core>=1.0.8"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "B", "UP", "YTT", "BLE", "C4", "T10", "ISC", "ICN", "PIE", "PYI", "RSE", "RET", "SIM", "PGH", "FLY", "NPY", "PERF", "RUF022"]
+ignore = ["PYI024"]
+
+[tool.ruff.lint.isort.sections]
+numpy = ["numpy", "numpy.*", "scipy", "scipy.*"]
+pytest = ["pytest", "pytest.*"]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "pytest",
+    "numpy",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.mypy]
+ignore_missing_imports = true
+exclude = ["tests/reference"]

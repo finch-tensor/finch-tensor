@@ -1,8 +1,9 @@
-import finch
-import numpy as np
-from numpy.testing import assert_allclose
 import pytest
 
+import numpy as np
+from numpy.testing import assert_allclose
+
+import finch
 
 arr1d = np.array([1, -1, 2, 3])
 arr2d = np.array([[1, 2, 0, 4, 0], [0, -2, 1, 0, 1]])

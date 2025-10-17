@@ -1,7 +1,8 @@
-import numpy as np
-from numpy.testing import assert_equal
 import pytest
+
+import numpy as np
 import scipy.sparse as sp
+from numpy.testing import assert_equal
 
 import finch
 from finch.tensor import _eq_scalars
@@ -60,8 +61,10 @@ def test_to_scipy_sparse(format_with_cls_with_order, fill_value_in, fill_value_o
         match_fill_value_out = 0 if fill_value_out is None else fill_value_out
         with pytest.raises(
             ValueError,
-            match=rf"Can only convert arrays with \[{match_fill_value_out}\] fill-values "
-            "to a Scipy sparse matrix.",
+            match=(
+                rf"Can only convert arrays with \[{match_fill_value_out}\] "
+                "fill-values to a Scipy sparse matrix."
+            ),
         ):
             finch_arr.to_scipy_sparse(accept_fv=fill_value_out)
         return

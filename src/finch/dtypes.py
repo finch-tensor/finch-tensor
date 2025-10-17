@@ -4,7 +4,6 @@ import numpy as np
 
 from .julia import jl
 
-
 int_: jl.DataType = jl.Int
 int8: jl.DataType = jl.Int8
 int16: jl.DataType = jl.Int16
@@ -46,6 +45,7 @@ jl_to_np_dtype = {
     bool: builtins.bool,
     None: None,
 }
+
 
 def finfo(dtype):
     return np.finfo(jl_to_np_dtype[dtype])

@@ -3,10 +3,10 @@ from .typing import DType
 
 
 class __array_namespace_info__:
-
     def capabilities(self) -> dict[str, bool]:
         return {
-            "boolean indexing": True, "data-dependent shapes": True,
+            "boolean indexing": True,
+            "data-dependent shapes": True,
         }
 
     def default_device(self) -> str:
@@ -15,8 +15,7 @@ class __array_namespace_info__:
     def default_dtypes(self, *, device: str | None = None) -> dict[str, DType]:
         if device not in ["cpu", None]:
             raise ValueError(
-                "Device not understood. Only \"cpu\" is allowed, but "
-                f"received: {device}"
+                f'Device not understood. Only "cpu" is allowed, but received: {device}'
             )
         return {
             "real floating": dtypes.float64,
@@ -55,14 +54,15 @@ class __array_namespace_info__:
     ) -> dict[str, DType]:
         if device not in ["cpu", None]:
             raise ValueError(
-                "Device not understood. Only \"cpu\" is allowed, but "
-                f"received: {device}"
+                f'Device not understood. Only "cpu" is allowed, but received: {device}'
             )
         if kind is None:
             return (
-                self._bool_dtypes | self._signed_integer_dtypes |
-                self._unsigned_integer_dtypes | self._real_floating_dtypes |
-                self._complex_floating_dtypes
+                self._bool_dtypes
+                | self._signed_integer_dtypes
+                | self._unsigned_integer_dtypes
+                | self._real_floating_dtypes
+                | self._complex_floating_dtypes
             )
         if kind == "bool":
             return self._bool_dtypes
@@ -78,8 +78,10 @@ class __array_namespace_info__:
             return self._complex_floating_dtypes
         if kind == "numeric":
             return (
-                self._signed_integer_dtypes | self._unsigned_integer_dtypes |
-                self._real_floating_dtypes | self._complex_floating_dtypes
+                self._signed_integer_dtypes
+                | self._unsigned_integer_dtypes
+                | self._real_floating_dtypes
+                | self._complex_floating_dtypes
             )
         if isinstance(kind, tuple):
             res = {}

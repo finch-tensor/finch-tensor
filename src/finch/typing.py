@@ -1,8 +1,8 @@
 from typing import Any, Literal
 
-import juliacall as jc
 import numpy as np
 
+import juliacall as jc
 
 OrderType = Literal["C", "F"] | tuple[int, ...] | None
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from functools import wraps
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from functools import wraps
+from typing import TYPE_CHECKING, Any
 
 from .julia import jl
 from .typing import JuliaObj
-from typing import Any, Iterator, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .tensor import Tensor
@@ -156,13 +157,12 @@ def compute(
     if not tensor.is_computed():
         if opt is None:
             return Tensor(jl.Finch.compute(tensor._obj, tag=tag))
-        else:
-            return Tensor(
-                jl.Finch.compute(
-                    tensor._obj,
-                    verbose=opt.verbose,
-                    ctx=opt.get_julia_scheduler(),
-                    tag=tag,
-                )
+        return Tensor(
+            jl.Finch.compute(
+                tensor._obj,
+                verbose=opt.verbose,
+                ctx=opt.get_julia_scheduler(),
+                tag=tag,
             )
+        )
     return tensor

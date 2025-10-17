@@ -1,6 +1,8 @@
+import pytest
+
 import numpy as np
 from numpy.testing import assert_equal
-import pytest
+
 import sparse
 
 import finch
@@ -164,9 +166,7 @@ def test_permute_dims(arr3d, permutation, format, order, opt):
     assert_equal(actual_lazy_mode.todense(), expected)
 
 
-@pytest.mark.parametrize(
-    "src_dest", [(0, 1), (1, 0), (-1, 2), (-2, -1), (1, 1)]
-)
+@pytest.mark.parametrize("src_dest", [(0, 1), (1, 0), (-1, 2), (-2, -1), (1, 1)])
 @parametrize_optimizer
 def test_moveaxis(arr3d, src_dest, opt):
     finch.set_optimizer(opt)
@@ -366,7 +366,7 @@ def test_nonzero(order, format_shape, opt):
 
     actual = finch.nonzero(tns)
     expected = np.nonzero(arr)
-    for actual_i, expected_i in zip(actual, expected):
+    for actual_i, expected_i in zip(actual, expected, strict=False):
         assert_equal(actual_i.todense(), expected_i)
 
 

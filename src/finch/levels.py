@@ -1,5 +1,5 @@
 from .julia import jl
-from .typing import OrderType, DType, JuliaObj
+from .typing import DType, JuliaObj, OrderType
 
 
 class _Display:
