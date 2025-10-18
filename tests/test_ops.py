@@ -230,7 +230,7 @@ def test_elemwise_tensor_ops_2_args(arr3d, meth_name, opt):
         "mean",
         pytest.param("std", marks=pytest.mark.xfail(reason="TODO: to debug")),
         pytest.param("var", marks=pytest.mark.xfail(reason="TODO: to debug")),
-    ]
+    ],
 )
 @pytest.mark.parametrize("axis", [None, -1, 1, (0, 1), (0, 1, 2)])
 def test_reductions(arr3d, func_name, axis, opt):

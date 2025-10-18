@@ -24,3 +24,6 @@ repos:
       types_or: [ python, pyi, jupyter ]
     - id: ruff-format
       types_or: [ python, pyi, jupyter ]
+
+ci:
+    autofix_prs: false
