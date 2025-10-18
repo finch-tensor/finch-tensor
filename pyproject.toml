@@ -1,6 +1,6 @@
 [project]
 name = "finch-tensor"
-version = "0.2.13"
+version = "0.2.14"
 description = "Sparse Tensor Programming in Python powered by Finch.jl"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
