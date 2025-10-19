@@ -9,6 +9,7 @@ dependencies = [
     "juliapkg (>=0.1.16,<0.2.0)",
     "numpy (>=1.19)",
     "juliacall (>=0.9.24,<0.10.0)",
+    "lark (>=1.3.0,<2.0.0)",
 ]
 
 [tool.poetry]

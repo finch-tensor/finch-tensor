@@ -4,6 +4,7 @@ import builtins
 import warnings
 from collections.abc import Callable, Iterable
 from typing import Any, Literal
+import sys
 
 import numpy as np
 from numpy.core.numeric import normalize_axis_index, normalize_axis_tuple
@@ -23,7 +24,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import Device, DType, JuliaObj, OrderType, TupleOf3Arrays, spmatrix
-
+from .einsum import einop_impl
 
 class SparseArray:
     """
@@ -1320,6 +1321,43 @@ def logical_or(x1: Tensor, x2: Tensor, /) -> Tensor:
 def logical_xor(x1: Tensor, x2: Tensor, /) -> Tensor:
     return x1._elemwise_op("Finch.xor", x2)
 
+def einop(prgm, **kwargs):
+    """Execute an einsum-like expression
+
+    This function parses and executes einsum-like expressions with extended syntax
+    that supports various operations beyond traditional Einstein summation notation.
+
+    Args:
+        prgm (str): Einsum program string specifying the computation. The syntax
+            supports:
+            - Assignment: "C[i,j] = A[i,j] + B[j,i]"
+            - Increment: "C[i,j] += A[i,k] * B[k,j]"
+            - Reductions: "C[i] += A[i,j]", "C[i] max= A[i,j]", "C[i] &= A[i,j]"
+            - Arithmetic operations: +, -, *, /, //, %, **
+            - Comparison operations: ==, !=, <, <=, >, >=
+            - Logical operations: and, or, not
+            - Bitwise operations: &, |, ^, <<, >>
+            - Function calls and complex expressions with parentheses
+            - Mathematical functions: abs, sqrt, exp, log, sin, cos, tan, etc.
+            - Literal values: integers, floats, booleans, and complex numbers
+            - Python operator precedence and parentheses for grouping
+        **kwargs: Named arrays referenced in the einsum expression. The keys
+            should match the tensor names used in the program string.
+
+    Returns:
+        The result array from executing the einsum expression.
+
+    Examples:
+        >>> A = finch.random.rand(3, 4)
+        >>> B = finch.random.rand(4, 3)
+        >>> # Matrix addition with transpose
+        >>> C = finch.einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
+        >>> # Matrix multiplication
+        >>> D = finch.einop("D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
+        >>> # Min-Plus multiplication with shift
+        >>> E = finch.einop("E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
+    """
+    einop_impl(sys.modules[__name__], prgm, **kwargs)
 
 def _is_scipy_sparse_obj(x):
     return hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse")
