@@ -48,6 +48,13 @@ jobs:
     - name: Install Poetry
       run: |
         pip install poetry
+    - name: Configure Poetry
+      run: |
+        if [[ "${{ runner.os }}" == "Windows" ]]; then
+          poetry env use python
+        else
+          poetry env use python${{ matrix.python }}
+        fi
     - name: Build wheel
       run: |
         python -m poetry build --format wheel
