@@ -7,14 +7,17 @@ repos:
     - id: trailing-whitespace
     - id: fix-byte-order-marker
     - id: destroyed-symlinks
-    - id: fix-encoding-pragma
-      args: ["--remove"]
     - id: mixed-line-ending
     - id: name-tests-test
       args: ["--pytest-test-first"]
     - id: no-commit-to-branch
     - id: pretty-format-json
       args: ["--autofix", "--no-ensure-ascii"]
+
+-   repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.0
+    hooks:
+    -   id: pyupgrade
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   rev: v0.14.2
