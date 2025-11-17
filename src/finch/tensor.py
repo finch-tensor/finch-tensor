@@ -1359,7 +1359,7 @@ def einop(prgm, **kwargs):
     """
     import finch
 
-    einop_impl(finch, prgm, **kwargs)
+    return einop_impl(finch, prgm, **kwargs)
 
 def einsum(*args, **kwargs):
     """

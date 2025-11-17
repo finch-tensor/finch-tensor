@@ -404,8 +404,8 @@ def einop_impl(xp, prgm, **kwargs):
         >>> E = einop_impl(np, "E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
     """
     prgm = parse_einop(prgm)
-    kwargs = {var:xp.lazy(xp.Tensor(tns)) for var, tns in kwargs.items()}
-    res = prgm.run(xp, kwargs)
+    kwargs = {var:xp.Tensor(tns) for var, tns in kwargs.items()}
+    res = prgm.run(xp, {var:xp.lazy(tns) for var, tns in kwargs.items()})
     if all(map(lambda tns: tns.is_computed(), kwargs.values())):
         return xp.compute(res)
     return res

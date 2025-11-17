@@ -159,13 +159,13 @@ def test_operator_precedence_addition_and_multiplication(rng):
 
 def test_operator_precedence_logical_and_or(rng):
     """Test that 'and' has higher precedence than 'or'"""
-    A = (rng.random((3, 3)) > 0.3).astype(float)  # Boolean-like arrays
-    B = (rng.random((3, 3)) > 0.3).astype(float)
-    C = (rng.random((3, 3)) > 0.3).astype(float)
+    A = (rng.random((3, 3)) > 0.3)  # Boolean-like arrays
+    B = (rng.random((3, 3)) > 0.3)
+    C = (rng.random((3, 3)) > 0.3)
 
     # Test: A or B and C should be A or (B and C), not (A or B) and C
     result = finch.einop("D[i,j] = A[i,j] or B[i,j] and C[i,j]", A=A, B=B, C=C).todense()
-    expected = np.logical_or(A, np.logical_and(B, C)).astype(float)
+    expected = np.logical_or(A, np.logical_and(B, C))
 
     assert np.allclose(result, expected)
 
@@ -211,7 +211,7 @@ def test_operator_precedence_comparison_with_arithmetic(rng):
 
     # Test: A + B == C should be (A + B) == C, not A + (B == C)
     result = finch.einop("D[i,j] = A[i,j] + B[i,j] == C[i,j]", A=A, B=B, C=C).todense()
-    expected = ((A + B) == C).astype(float)
+    expected = ((A + B) == C)
 
     assert np.allclose(result, expected)
 
@@ -280,7 +280,7 @@ def test_comparison_chaining(rng):
 
     # Test: A < B < C should be (A < B) and (B < C), not (A < B) < C
     result = finch.einop("D[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C).todense()
-    expected = np.logical_and(A < B, B < C).astype(float)
+    expected = np.logical_and(A < B, B < C)
 
     assert np.allclose(result, expected)
 
@@ -293,7 +293,7 @@ def test_comparison_chaining_three_way(rng):
 
     # Test: A <= B < C should be (A <= B) and (B < C)
     result = finch.einop("D[i,j] = A[i,j] <= B[i,j] < C[i,j]", A=A, B=B, C=C).todense()
-    expected = np.logical_and(A <= B, B < C).astype(float)
+    expected = np.logical_and(A <= B, B < C)
 
     assert np.allclose(result, expected)
 
@@ -309,7 +309,7 @@ def test_comparison_chaining_four_way(rng):
     result = finch.einop(
         "E[i,j] = A[i,j] < B[i,j] < C[i,j] < D[i,j]", A=A, B=B, C=C, D=D
     ).todense()
-    expected = np.logical_and(np.logical_and(A < B, B < C), C < D).astype(float)
+    expected = np.logical_and(np.logical_and(A < B, B < C), C < D)
 
     assert np.allclose(result, expected)
 
@@ -322,12 +322,12 @@ def test_single_comparison_vs_chained(rng):
 
     # Single comparison: A < B should be True
     result_single = finch.einop("D[i,j] = A[i,j] < B[i,j]", A=A, B=B).todense()
-    expected_single = (A < B).astype(float)
+    expected_single = (A < B)
 
     # Chained comparison: A < B < C should be (A < B) and (B < C)
     # = True and False = False
     result_chained = finch.einop("E[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C).todense()
-    expected_chained = np.logical_and(A < B, B < C).astype(float)
+    expected_chained = np.logical_and(A < B, B < C)
 
     assert np.allclose(result_single, expected_single)
     assert np.allclose(result_chained, expected_chained)
