@@ -1321,6 +1321,7 @@ def logical_or(x1: Tensor, x2: Tensor, /) -> Tensor:
 def logical_xor(x1: Tensor, x2: Tensor, /) -> Tensor:
     return x1._elemwise_op("Finch.xor", x2)
 
+
 def power(x1: Tensor, x2: Tensor, /) -> Tensor:
     return x1._elemwise_op("^", x2)
 

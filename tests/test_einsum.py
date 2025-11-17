@@ -494,6 +494,7 @@ def test_literal_edge_cases1(rng):
     expected_multi = A + 1 + 2 + 3  # Should be A + 6
     assert np.allclose(result_multi, expected_multi)
 
+
 def test_literal_edge_cases2(rng):
     """Test edge cases with literals"""
     A = rng.random((2, 2))
@@ -501,6 +502,7 @@ def test_literal_edge_cases2(rng):
     result_comp = finch.einop("C[i,j] = A[i,j] > 0.5", A=A).todense()
     expected_comp = (A > 0.5).astype(float)
     assert np.allclose(result_comp, expected_comp)
+
 
 def test_literal_edge_cases3(rng):
     """Test edge cases with literals"""
