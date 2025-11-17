@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 from lark import Lark, Tree
-from typing import Any
+
 
 class EinsumExpr(ABC):
     @abstractmethod
@@ -160,7 +161,7 @@ class Literal(EinsumExpr):
     def run(self, xp, loops, kwargs):
         # Create a scalar array with the same shape as needed
         shape = [1] * len(loops)
-        return xp.full(shape, self.value)
+        return xp.full(shape, self.value, format="dense")
 
 
 @dataclass
@@ -345,7 +346,6 @@ def _parse_einop_expr(t: Tree) -> EinsumExpr:
 
 def parse_einop(expr: str) -> Einsum:
     tree = lark_parser.parse(expr)
-    print(f"Parsed tree: {tree.pretty()}")
 
     match tree:
         case Tree(
@@ -404,9 +404,9 @@ def einop_impl(xp, prgm, **kwargs):
         >>> E = einop_impl(np, "E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
     """
     prgm = parse_einop(prgm)
-    kwargs = {var:xp.Tensor(tns) for var, tns in kwargs.items()}
-    res = prgm.run(xp, {var:xp.lazy(tns) for var, tns in kwargs.items()})
-    if all(map(lambda tns: tns.is_computed(), kwargs.values())):
+    kwargs = {var: xp.Tensor(tns) for var, tns in kwargs.items()}
+    res = prgm.run(xp, {var: xp.lazy(tns) for var, tns in kwargs.items()})
+    if all(tns.is_computed() for tns in kwargs.values()):
         return xp.compute(res)
     return res
 
@@ -523,16 +523,15 @@ def parse_einsum(*args_) -> tuple[Einsum, dict[str, Any]]:
         "Output indices must be a subset of input indices."
     )
     tag = 0
+
     def freshen(x):
         nonlocal tag
         tag += 1
         return f"{x}_{tag}"
+
     for j in all_idxs:
         freshen(j)
-    if output_idxs == all_idxs:
-        op = None
-    else:
-        op = "add"
+    op = None if output_idxs == all_idxs else "add"
     out_tns = freshen("B")
     idxs = tuple(output_idxs)
     in_tnss = [freshen("A") for _ in operands]
@@ -544,18 +543,19 @@ def parse_einsum(*args_) -> tuple[Einsum, dict[str, Any]]:
         )  # type: ignore[assignment]
     return (
         Einsum(
+            arg,
             op,
             out_tns,
             idxs,
-            arg,
         ),
         {in_tnss[i]: operands[i] for i in range(len(operands))},
     )
 
+
 def einsum_impl(xp, *args):
     prgm, kwargs = parse_einsum(*args)
-    kwargs = {var:xp.lazy(xp.Tensor(tns)) for var, tns in kwargs.items()}
-    res = prgm.run(xp, kwargs)
-    if all(map(lambda tns: tns.is_computed(), kwargs.values())):
+    kwargs = {var: xp.Tensor(tns) for var, tns in kwargs.items()}
+    res = prgm.run(xp, {var: xp.lazy(tns) for var, tns in kwargs.items()})
+    if all(tns.is_computed() for tns in kwargs.values()):
         return xp.compute(res)
     return res

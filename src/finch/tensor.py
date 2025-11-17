@@ -4,13 +4,13 @@ import builtins
 import warnings
 from collections.abc import Callable, Iterable
 from typing import Any, Literal
-import sys
 
 import numpy as np
 from numpy.core.numeric import normalize_axis_index, normalize_axis_tuple
 
 from . import dtypes as jl_dtypes
 from .compiled import compiled, compute, lazy
+from .einstein import einop_impl, einsum_impl
 from .errors import PerformanceWarning
 from .julia import jc, jl
 from .levels import (
@@ -24,7 +24,7 @@ from .levels import (
     sparse_formats_names,
 )
 from .typing import Device, DType, JuliaObj, OrderType, TupleOf3Arrays, spmatrix
-from .einstein import einop_impl, einsum_impl
+
 
 class SparseArray:
     """
@@ -1321,6 +1321,10 @@ def logical_or(x1: Tensor, x2: Tensor, /) -> Tensor:
 def logical_xor(x1: Tensor, x2: Tensor, /) -> Tensor:
     return x1._elemwise_op("Finch.xor", x2)
 
+def power(x1: Tensor, x2: Tensor, /) -> Tensor:
+    return x1._elemwise_op("^", x2)
+
+
 def einop(prgm, **kwargs):
     """Execute an einsum-like expression
 
@@ -1360,6 +1364,7 @@ def einop(prgm, **kwargs):
     import finch
 
     return einop_impl(finch, prgm, **kwargs)
+
 
 def einsum(*args, **kwargs):
     """
@@ -1613,6 +1618,7 @@ def einsum(*args, **kwargs):
     import finch
 
     return einsum_impl(finch, *args)
+
 
 def _is_scipy_sparse_obj(x):
     return hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse")

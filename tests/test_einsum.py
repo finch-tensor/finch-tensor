@@ -151,7 +151,9 @@ def test_operator_precedence_addition_and_multiplication(rng):
     C = rng.random((3, 3)) + 1  # Add 1 to avoid numerical issues
 
     # Test: A + B * C ** 2 should be A + (B * (C ** 2))
-    result = finch.einop("D[i,j] = A[i,j] + B[i,j] * C[i,j] ** 2", A=A, B=B, C=C).todense()
+    result = finch.einop(
+        "D[i,j] = A[i,j] + B[i,j] * C[i,j] ** 2", A=A, B=B, C=C
+    ).todense()
     expected = A + (B * (C**2))
 
     assert np.allclose(result, expected)
@@ -159,12 +161,14 @@ def test_operator_precedence_addition_and_multiplication(rng):
 
 def test_operator_precedence_logical_and_or(rng):
     """Test that 'and' has higher precedence than 'or'"""
-    A = (rng.random((3, 3)) > 0.3)  # Boolean-like arrays
-    B = (rng.random((3, 3)) > 0.3)
-    C = (rng.random((3, 3)) > 0.3)
+    A = rng.random((3, 3)) > 0.3  # Boolean-like arrays
+    B = rng.random((3, 3)) > 0.3
+    C = rng.random((3, 3)) > 0.3
 
     # Test: A or B and C should be A or (B and C), not (A or B) and C
-    result = finch.einop("D[i,j] = A[i,j] or B[i,j] and C[i,j]", A=A, B=B, C=C).todense()
+    result = finch.einop(
+        "D[i,j] = A[i,j] or B[i,j] and C[i,j]", A=A, B=B, C=C
+    ).todense()
     expected = np.logical_or(A, np.logical_and(B, C))
 
     assert np.allclose(result, expected)
@@ -211,7 +215,7 @@ def test_operator_precedence_comparison_with_arithmetic(rng):
 
     # Test: A + B == C should be (A + B) == C, not A + (B == C)
     result = finch.einop("D[i,j] = A[i,j] + B[i,j] == C[i,j]", A=A, B=B, C=C).todense()
-    expected = ((A + B) == C)
+    expected = (A + B) == C
 
     assert np.allclose(result, expected)
 
@@ -322,11 +326,13 @@ def test_single_comparison_vs_chained(rng):
 
     # Single comparison: A < B should be True
     result_single = finch.einop("D[i,j] = A[i,j] < B[i,j]", A=A, B=B).todense()
-    expected_single = (A < B)
+    expected_single = A < B
 
     # Chained comparison: A < B < C should be (A < B) and (B < C)
     # = True and False = False
-    result_chained = finch.einop("E[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C).todense()
+    result_chained = finch.einop(
+        "E[i,j] = A[i,j] < B[i,j] < C[i,j]", A=A, B=B, C=C
+    ).todense()
     expected_chained = np.logical_and(A < B, B < C)
 
     assert np.allclose(result_single, expected_single)
@@ -368,7 +374,7 @@ def test_alphanumeric_tensor_names(rng):
 
 def test_bool_literals(rng):
     """Test that boolean literals work correctly"""
-    A = rng.random((2, 2))
+    A = rng.random((2, 2)) > 0.5
 
     # Test True literal
     result_true = finch.einop("B[i,j] = A[i,j] and True", A=A).todense()
@@ -479,7 +485,7 @@ def test_mixed_literal_types(rng):
     assert np.allclose(result_power, expected_power)
 
 
-def test_literal_edge_cases(rng):
+def test_literal_edge_cases1(rng):
     """Test edge cases with literals"""
     A = rng.random((2, 2))
 
@@ -488,11 +494,17 @@ def test_literal_edge_cases(rng):
     expected_multi = A + 1 + 2 + 3  # Should be A + 6
     assert np.allclose(result_multi, expected_multi)
 
+def test_literal_edge_cases2(rng):
+    """Test edge cases with literals"""
+    A = rng.random((2, 2))
     # Test literals in comparisons
     result_comp = finch.einop("C[i,j] = A[i,j] > 0.5", A=A).todense()
     expected_comp = (A > 0.5).astype(float)
     assert np.allclose(result_comp, expected_comp)
 
+def test_literal_edge_cases3(rng):
+    """Test edge cases with literals"""
+    A = rng.random((2, 2))
     # Test literals with parentheses
     result_parens = finch.einop("D[i,j] = A[i,j] * (2 + 3)", A=A).todense()
     expected_parens = A * (2 + 3)  # Should be A * 5
