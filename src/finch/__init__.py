@@ -205,6 +205,8 @@ from .tensor import (
     where,
     zeros,
     zeros_like,
+    einsum,
+    einop,
 )
 
 __all__ = [
@@ -237,6 +239,8 @@ __all__ = [
     "asin",
     "asinh",
     "astype",
+    "einsum",
+    "einop",
     "atan",
     "atan2",
     "atanh",
