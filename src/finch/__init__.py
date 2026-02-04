@@ -134,7 +134,7 @@ from .levels import (
 )
 from .tensor import (
     SparseArray,
-    Tensor,
+    FinchJLTensor,
     acos,
     acosh,
     all,
@@ -225,7 +225,7 @@ __all__ = [
     "SparseList",
     "SparseVBL",
     "Storage",
-    "Tensor",
+    "FinchJLTensor",
     "__array_namespace_info__",
     "abs",
     "acos",
