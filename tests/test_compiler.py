@@ -34,6 +34,7 @@ from finch.compiler import FinchJLCompiler
 a = np.zeros(dtype=np.float64, shape=(3, 3))
 a_format = ftype(BufferizedNDArray.from_numpy(a))
 
+
 @pytest.mark.parametrize(
     "finch_ntn, julia_code",
     [
@@ -95,54 +96,6 @@ a_format = ftype(BufferizedNDArray.from_numpy(a))
                                             ),
                                             Block(
                                                 (
-                                                    Assign(
-                                                        Variable("a_ik", np.float64),
-                                                        Unwrap(
-                                                            Access(
-                                                                Slot("A_", a_format),
-                                                                Read(),
-                                                                (
-                                                                    Variable(
-                                                                        "i", np.int64
-                                                                    ),
-                                                                    Variable(
-                                                                        "k", np.int64
-                                                                    ),
-                                                                ),
-                                                            )
-                                                        ),
-                                                    ),
-                                                    Assign(
-                                                        Variable("b_kj", np.float64),
-                                                        Unwrap(
-                                                            Access(
-                                                                Slot("B_", a_format),
-                                                                Read(),
-                                                                (
-                                                                    Variable(
-                                                                        "k", np.int64
-                                                                    ),
-                                                                    Variable(
-                                                                        "j", np.int64
-                                                                    ),
-                                                                ),
-                                                            )
-                                                        ),
-                                                    ),
-                                                    Assign(
-                                                        Variable("c_ij", np.float64),
-                                                        Call(
-                                                            Literal(operator.mul),
-                                                            (
-                                                                Variable(
-                                                                    "a_ik", np.float64
-                                                                ),
-                                                                Variable(
-                                                                    "b_kj", np.float64
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
                                                     Increment(
                                                         Access(
                                                             Slot("C_", a_format),
@@ -154,30 +107,73 @@ a_format = ftype(BufferizedNDArray.from_numpy(a))
                                                                 Variable("j", np.int64),
                                                             ),
                                                         ),
-                                                        Variable("c_ij", np.float64),
+                                                        Call(
+                                                            Literal(operator.mul),
+                                                            (
+                                                                Unwrap(
+                                                                    Access(
+                                                                        Slot(
+                                                                            "A_",
+                                                                            a_format,
+                                                                        ),
+                                                                        Read(),
+                                                                        (
+                                                                            Variable(
+                                                                                "i",
+                                                                                np.int64,
+                                                                            ),
+                                                                            Variable(
+                                                                                "k",
+                                                                                np.int64,
+                                                                            ),
+                                                                        ),
+                                                                    )
+                                                                ),
+                                                                Unwrap(
+                                                                    Access(
+                                                                        Slot(
+                                                                            "B_",
+                                                                            a_format,
+                                                                        ),
+                                                                        Read(),
+                                                                        (
+                                                                            Variable(
+                                                                                "k",
+                                                                                np.int64,
+                                                                            ),
+                                                                            Variable(
+                                                                                "j",
+                                                                                np.int64,
+                                                                            ),
+                                                                        ),
+                                                                    )
+                                                                ),
+                                                            ),
+                                                        ),
                                                     ),
-                                                )
+                                                ),
                                             ),
                                         ),
                                     ),
                                 ),
-                                Freeze(Slot("C_", a_format), Literal(operator.add)),
-                                Repack(Slot("C_", a_format), Variable("C", a_format)),
-                                Return(Variable("C", a_format)),
-                            )
+                                    Freeze(Slot("C_", a_format), Literal(operator.add)),
+                                    Repack(
+                                        Slot("C_", a_format), Variable("C", a_format)
+                                    ),
+                                    Return(Variable("C", a_format)),
+                                ),
+                            ),
                         ),
-                    ),
-                )
+                    )
             ),
             """function matmul(C,A,B)
-    C .= 0
-    for i = _
-        for k = _
-            for j = _
-                a_ik = A[i,k]
-                b_kj = B[k,j]
-                c_ij = a_ik * b_kj
-                C[i,j] = c_ij
+    @finch C .= 0.0
+    @finch begin
+        for i = _
+            for k = _
+                for j = _
+                    C[i,j] += *(A[i,k],B[k,j])
+                end
             end
         end
     end
