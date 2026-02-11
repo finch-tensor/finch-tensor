@@ -1,2 +1,2 @@
-class PerformanceWarning(Warning):
-    pass
+# class PerformanceWarning(Warning):
+#     pass
