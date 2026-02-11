@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Any
 from finchlite import EagerTensor, TensorFType, Tensor
+from . import dtypes as jl_dtypes
 
 from .typing import OrderType, JuliaObj
 from .julia import jc, jl
