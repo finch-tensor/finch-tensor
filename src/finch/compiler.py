@@ -8,7 +8,7 @@ from typing import Any
 
 import operator
 
-from juliacall import Main as jl
+from .julia import jc, jl
 
 ops_map = {operator.add: "+", operator.mul: "*"}
 
@@ -20,15 +20,9 @@ class FinchJLKernel(AssemblyKernel):
         self.func_name = func_name
         jl.seval(self.jl_code)
 
-    # TODO: Switch back to (self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]
-    def __call__(self, *args: tuple[FinchJLTensor, ...]):
-        argList = []
-        for arg in args:
-            argList.append(f"arg{len(argList)}")
-            setattr(jl, argList[-1], arg)
-
-        jl.seval(f"{self.func_name}({','.join(argList)})")
-
+    def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
+        finch_fn = getattr(jl, self.func_name)
+        return tuple(finch_fn(*[arg._obj for arg in args]))
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):

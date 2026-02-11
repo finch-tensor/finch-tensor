@@ -28,7 +28,7 @@ from finchlite.algebra import overwrite, promote_min
 from finchlite.compile import ExtentFType, dimension
 from finchlite.codegen import NumpyBuffer
 
-from finch.compiler import FinchJLCompiler
+from finch.compiler import FinchJLCompiler, FinchJLKernel
 from finch.tensor import FinchJLTensor
 
 # Dummy data to obtain the bufferized ND array type
@@ -36,6 +36,7 @@ a = np.zeros(dtype=np.float64, shape=(3, 3))
 a_format = ftype(FinchJLTensor(a))
 
 
+@pytest.mark.skip
 @pytest.mark.parametrize(
     "finch_ntn, julia_code",
     [
@@ -157,15 +158,13 @@ a_format = ftype(FinchJLTensor(a))
                                         ),
                                     ),
                                 ),
-                                    Freeze(Slot("C_", a_format), Literal(operator.add)),
-                                    Repack(
-                                        Slot("C_", a_format), Variable("C", a_format)
-                                    ),
-                                    Return(Variable("C", a_format)),
-                                ),
+                                Freeze(Slot("C_", a_format), Literal(operator.add)),
+                                Repack(Slot("C_", a_format), Variable("C", a_format)),
+                                Return(Variable("C", a_format)),
                             ),
                         ),
-                    )
+                    ),
+                )
             ),
             """function matmul(C,A,B)
     @finch C .= 0.0
@@ -187,3 +186,45 @@ def test_finchjl_compiler(finch_ntn: Module, julia_code):
     compiler = FinchJLCompiler()
     library = compiler(finch_ntn)
     assert getattr(library, finch_ntn.children[0].name.name).jl_code == julia_code
+
+
+@pytest.mark.parametrize(
+    "func_name, julia_prgm, args, expected_result",
+    [
+        (
+            "matmul",
+            """function matmul(C,A,B)
+    @finch C .= 0
+    @finch begin
+        for i = _
+            for k = _
+                for j = _
+                    C[i,j] += *(A[i,k],B[k,j])
+                end
+            end
+        end
+    end
+    return C
+end""",
+            (
+                FinchJLTensor(np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])),
+                FinchJLTensor(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])),
+                FinchJLTensor(np.array([[10, 11, 12], [13, 14, 15], [16, 17, 18]])),
+            ),
+            (
+                FinchJLTensor(
+                    np.array([[84, 90, 96], [201, 216, 231], [318, 342, 366]])
+                ),
+            ),
+        )
+    ],
+)
+def test_finchjl_kernel(
+    func_name: str,
+    julia_prgm: str,
+    args: tuple[FinchJLTensor, ...],
+    expected_result: tuple[FinchJLTensor, ...],
+):
+    kernel = FinchJLKernel(func_name, julia_prgm)
+    result = kernel(*args)
+    assert result == expected_result

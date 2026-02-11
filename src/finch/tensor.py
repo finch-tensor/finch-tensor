@@ -15,6 +15,7 @@ from .levels import (
     sparse_formats_names,
 )
 
+
 class FinchJLTensorFType(TensorFType):
     def __init__(self, jltype, shape_type):
         # Julia type associated with the tensor
@@ -23,13 +24,13 @@ class FinchJLTensorFType(TensorFType):
 
     def ndims(self) -> np.intp:
         return np.intp(jl.ndims(self.jltype))
-    
+
     def fill_value(self) -> Any:
         return jl.fill_value(self.jltype)
-    
+
     def element_type(self) -> Any:
         return jl.eltype(self.jltype)
-    
+
     def shape_type(self) -> tuple[type, ...]:
         return self._shape_type
 
@@ -38,7 +39,7 @@ class FinchJLTensorFType(TensorFType):
 
     def from_numpy(self, arr: np.ndarray) -> Tensor:
         return FinchJLTensor(arr)
-    
+
     def __eq__(self, other):
         if not isinstance(other, FinchJLTensorFType):
             return False
@@ -46,6 +47,7 @@ class FinchJLTensorFType(TensorFType):
 
     def __hash__(self):
         return hash(self.jltype)
+
 
 # TODO: Do we need the scipy and raw julia stuff
 class FinchJLTensor(_Display, EagerTensor):
@@ -75,7 +77,7 @@ class FinchJLTensor(_Display, EagerTensor):
                 "Either scalar, numpy, scipy.sparse or a raw julia object should "
                 f"be provided. Found: {type(obj)}"
             )
-        
+
     @property
     def ftype(self):
         """
@@ -85,12 +87,12 @@ class FinchJLTensor(_Display, EagerTensor):
         for idx in self._shape:
             shape_type.append(type(idx))
         return FinchJLTensorFType(jltype=jl.typeof(self._obj), shape_type=shape_type)
-    
+
     @property
     def shape(self) -> tuple:
         """Shape of the tensor."""
         return self._shape
-    
+
     # TODO: do we need to have all the order stuff still?
     @classmethod
     def _from_numpy(
@@ -112,15 +114,13 @@ class FinchJLTensor(_Display, EagerTensor):
         for i in inv_order:
             lvl = Dense(lvl, arr.shape[i])
         return jl.swizzle(jl.Tensor(lvl._obj), *order)
-    
+
     @classmethod
     def preprocess_order(cls, order: OrderType, ndim: int) -> tuple[int, ...]:
-        if order == 'F':
+        if order == "F":
             permutation = tuple(range(1, ndim + 1))
-        elif order == 'C':
+        elif order == "C":
             permutation = tuple(range(1, ndim + 1)[::-1])
         else:
-            raise ValueError(
-                f"order must be 'C' or 'F'."
-            )
+            raise ValueError(f"order must be 'C' or 'F'.")
         return permutation
