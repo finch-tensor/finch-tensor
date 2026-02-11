@@ -13,6 +13,8 @@ from .julia import jc, jl
 ops_map = {operator.add: "+", operator.mul: "*"}
 
 
+# https://github.com/finch-tensor/finch-tensor-lite/blob/main/tests/test_notation_interpreter.py
+
 class FinchJLKernel(AssemblyKernel):
     def __init__(self, func_name, jl_code):
         # We store this code so that we can verify it in pytest

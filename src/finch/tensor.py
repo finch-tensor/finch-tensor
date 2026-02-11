@@ -16,6 +16,10 @@ from .levels import (
     sparse_formats_names,
 )
 
+# Singleton classes for levels types
+# finch tensor lite, formatter stage
+# level ftype without the need to create tthe object
+# https://github.com/finch-tensor/finch-tensor-lite/blob/main/src/finchlite/autoschedule/formatter.py
 
 class FinchJLTensorFType(TensorFType):
     def __init__(self, jltype, shape_type):
