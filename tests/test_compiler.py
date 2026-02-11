@@ -25,14 +25,15 @@ from finchlite.finch_notation.nodes import (
 import operator
 from finchlite import ftype
 from finchlite.algebra import overwrite, promote_min
-from finchlite.compile import ExtentFType, dimension, BufferizedNDArray
+from finchlite.compile import ExtentFType, dimension
 from finchlite.codegen import NumpyBuffer
 
 from finch.compiler import FinchJLCompiler
+from finch.tensor import FinchJLTensor
 
 # Dummy data to obtain the bufferized ND array type
 a = np.zeros(dtype=np.float64, shape=(3, 3))
-a_format = ftype(BufferizedNDArray.from_numpy(a))
+a_format = ftype(FinchJLTensor(a))
 
 
 @pytest.mark.parametrize(

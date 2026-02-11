@@ -2,6 +2,7 @@ import numpy as np
 from typing import Any
 from finchlite import EagerTensor, TensorFType, Tensor
 
+from .typing import OrderType, JuliaObj
 from .julia import jc, jl
 from .levels import (
     Dense,
@@ -37,6 +38,14 @@ class FinchJLTensorFType(TensorFType):
 
     def from_numpy(self, arr: np.ndarray) -> Tensor:
         return FinchJLTensor(arr)
+    
+    def __eq__(self, other):
+        if not isinstance(other, FinchJLTensorFType):
+            return False
+        return self.jltype == other.jltype
+
+    def __hash__(self):
+        return hash(self.jltype)
 
 # TODO: Do we need the scipy and raw julia stuff
 class FinchJLTensor(_Display, EagerTensor):
@@ -105,7 +114,7 @@ class FinchJLTensor(_Display, EagerTensor):
         return jl.swizzle(jl.Tensor(lvl._obj), *order)
     
     @classmethod
-    def preprocess_order(cls, order: str, ndim: int) -> tuple[int, ...]:
+    def preprocess_order(cls, order: OrderType, ndim: int) -> tuple[int, ...]:
         if order == 'F':
             permutation = tuple(range(1, ndim + 1))
         elif order == 'C':

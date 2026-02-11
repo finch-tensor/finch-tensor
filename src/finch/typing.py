@@ -13,3 +13,5 @@ JuliaObj = jc.AnyValue
 DType = jc.AnyValue  # represents jl.DataType
 
 Device = Literal["cpu"] | None
+
+OrderType = Literal["C", "F"] | tuple[int, ...] | None

@@ -1,3 +1,5 @@
+from finch.tensor import FinchJLTensor
+
 from finchlite.compile import NotationCompiler
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 import finchlite.finch_notation.nodes as ntn
@@ -13,14 +15,13 @@ ops_map = {operator.add: "+", operator.mul: "*"}
 
 class FinchJLKernel(AssemblyKernel):
     def __init__(self, func_name, jl_code):
+        # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
-
-        print(jl_code)
-        # jl.seval(jl_code)
+        jl.seval(self.jl_code)
 
     # TODO: Switch back to (self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]
-    def __call__(self, *args: tuple[Any, ...]):
+    def __call__(self, *args: tuple[FinchJLTensor, ...]):
         argList = []
         for arg in args:
             argList.append(f"arg{len(argList)}")
@@ -70,7 +71,7 @@ class FinchJLGenerator:
                 # finding loop bounds
                 if isinstance(rhs, ntn.Call) and rhs.op.val == dimension:
                     return ""
-                
+
                 tab_str = "    " * nestingLvl
                 return f"{tab_str}{self.generate_julia(lhs, nestingLvl)} = {self.generate_julia(rhs, nestingLvl)}"
 
@@ -85,7 +86,7 @@ class FinchJLGenerator:
 
             case ntn.Loop(idx, _, body):
                 tab_str = "    " * nestingLvl
-                tab_str_1 = "    " * (nestingLvl+1)
+                tab_str_1 = "    " * (nestingLvl + 1)
 
                 is_outermost_loop = False
                 if self.in_finch_block is False:
@@ -94,7 +95,7 @@ class FinchJLGenerator:
                     loop_body = self.generate_julia(body, nestingLvl + 2)
                 else:
                     loop_body = self.generate_julia(body, nestingLvl + 1)
-                
+
                 if not is_outermost_loop:
                     return f"{tab_str}for {idx.name} = _\n{loop_body}{tab_str}end\n"
                 else:
