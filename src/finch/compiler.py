@@ -1,19 +1,18 @@
-from finch.tensor import FinchJLTensor
-
-from finchlite.compile import NotationCompiler
-from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
-import finchlite.finch_notation.nodes as ntn
-from finchlite.compile import dimension
-from typing import Any
-
 import operator
 
-from .julia import jc, jl
+import finchlite.finch_notation.nodes as ntn
+from finchlite.compile import NotationCompiler, dimension
+from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
+
+from finch.tensor import FinchJLTensor
+
+from .julia import jl
 
 ops_map = {operator.add: "+", operator.mul: "*"}
 
 
 # https://github.com/finch-tensor/finch-tensor-lite/blob/main/tests/test_notation_interpreter.py
+
 
 class FinchJLKernel(AssemblyKernel):
     def __init__(self, func_name, jl_code):
@@ -25,6 +24,7 @@ class FinchJLKernel(AssemblyKernel):
     def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
         finch_fn = getattr(jl, self.func_name)
         return tuple(finch_fn(*[arg._obj for arg in args]))
+
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
@@ -69,12 +69,18 @@ class FinchJLGenerator:
                     return ""
 
                 tab_str = "    " * nestingLvl
-                return f"{tab_str}{self.generate_julia(lhs, nestingLvl)} = {self.generate_julia(rhs, nestingLvl)}"
+                return (
+                    f"{tab_str}{self.generate_julia(lhs, nestingLvl)} = "
+                    f"{self.generate_julia(rhs, nestingLvl)}"
+                )
 
-            case ntn.Declare(tns, init, op, shape):
+            case ntn.Declare(tns, init, op, _):
                 # TODO: what is the purpose of op here
                 tab_str = "    " * nestingLvl
-                return f"{tab_str}@finch {self.generate_julia(tns, nestingLvl)} .= {self.generate_julia(init, nestingLvl)}"
+                return (
+                    f"{tab_str}@finch {self.generate_julia(tns, nestingLvl)} .= "
+                    f"{self.generate_julia(init, nestingLvl)}"
+                )
 
             case ntn.Return(val):
                 tab_str = "    " * nestingLvl
@@ -94,9 +100,11 @@ class FinchJLGenerator:
 
                 if not is_outermost_loop:
                     return f"{tab_str}for {idx.name} = _\n{loop_body}{tab_str}end\n"
-                else:
-                    self.in_finch_block = False
-                    return f"{tab_str}@finch begin\n{tab_str_1}for {idx.name} = _\n{loop_body}{tab_str_1}end\n{tab_str}end"
+                self.in_finch_block = False
+                return (
+                    f"{tab_str}@finch begin\n{tab_str_1}for {idx.name} = "
+                    f"_\n{loop_body}{tab_str_1}end\n{tab_str}end"
+                )
 
             case ntn.Access(tns, _, idxs):
                 tns_str = self.generate_julia(tns, nestingLvl)
@@ -121,7 +129,10 @@ class FinchJLGenerator:
                 cond_str = self.generate_julia(cond, nestingLvl)
                 then_body_str = self.generate_julia(then_body, nestingLvl + 1)
                 else_body_str = self.generate_julia(else_body, nestingLvl + 1)
-                return f"{tab_str}if {cond_str}\n{then_body_str}\n{tab_str}else\n{else_body_str}\n{tab_str}end"
+                return (
+                    f"{tab_str}if {cond_str}\n{then_body_str}\n"
+                    f"{tab_str}else\n{else_body_str}\n{tab_str}end"
+                )
 
             case ntn.Increment(lhs, rhs):
                 tab_str = "    " * nestingLvl
