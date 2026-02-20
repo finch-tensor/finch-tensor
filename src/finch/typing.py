@@ -1,10 +1,6 @@
-from typing import Literal, Any
-
-import numpy as np
+from typing import Any, Literal
 
 import juliacall as jc
-
-TupleOf3Arrays = tuple[np.ndarray, np.ndarray, np.ndarray]
 
 spmatrix = Any
 
@@ -14,4 +10,4 @@ DType = jc.AnyValue  # represents jl.DataType
 
 Device = Literal["cpu"] | None
 
-OrderType = Literal["C", "F"] | tuple[int, ...] | None
+number = int | float | bool | complex

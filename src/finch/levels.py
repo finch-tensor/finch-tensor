@@ -1,110 +1,85 @@
+from abc import abstractmethod
+from typing import Any
+
+import numpy as np
+
+from finchlite import Tensor, TensorFType
+
 from .julia import jl
-from .typing import DType, JuliaObj, OrderType
+from .tensor import FinchJLTensor
+from .typing import JuliaObj, number
 
 
-class _Display:
-    _obj: JuliaObj
+class LevelFType(TensorFType):
+    def from_numpy(self, _) -> Tensor:
+        raise NotImplementedError
 
-    def __repr__(self):
-        return jl.sprint(jl.show, self._obj)
-
-    def __str__(self):
-        return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
+    def shape_type(self) -> tuple[type, ...]:
+        return tuple(self.element_type for _ in range(self.ndim))
 
 
-# LEVEL
+class Element(LevelFType):
+    def __init__(self, fill_value: number):
+        self._fill_value = fill_value
+
+    def ndims(self) -> np.intp:
+        return np.intp(0)
+
+    def fill_value(self) -> Any:
+        return self._fill_value
+
+    def element_type(self) -> Any:
+        return type(self._fill_value)
+
+    def __call__(self, _) -> Tensor:
+        raise Exception("Cannot create an object of element type!")
+
+    def __eq__(self, other):
+        return isinstance(other, Element) and self._fill_value == other.fill_value
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._fill_value))
+
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.Element(self._fill_value)
 
 
-class AbstractLevel(_Display):
-    pass
+class NestedLevelFType(LevelFType):
+    def __init__(self, lvl: LevelFType):
+        self.lvl = lvl
+
+    def ndims(self) -> np.intp:
+        return self.lvl.ndims + np.intp(1)
+
+    def fill_value(self) -> Any:
+        return self.lvl.fill_value
+
+    def element_type(self) -> Any:
+        return self.lvl.element_type
+
+    def __call__(self, shape: tuple) -> FinchJLTensor:
+        return FinchJLTensor(jl.Finch.Tensor(self.create_jl_obj(), shape))
+
+    def __eq__(self, other):
+        return type(other) is type(self) and self.lvl == other.lvl
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self.lvl.__hash__))
+
+    @abstractmethod
+    def create_jl_obj(self) -> JuliaObj: ...
 
 
-# core levels
+class Dense(NestedLevelFType):
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.Dense(self.lvl.create_jl_obj())
 
 
-class Dense(AbstractLevel):
-    def __init__(self, lvl, shape=None):
-        args = [lvl._obj]
-        if shape is not None:
-            args.append(shape)
-        self._obj = jl.Dense(*args)
+class SparseList(NestedLevelFType):
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.SparseList(self.lvl.create_jl_obj())
 
 
-class Element(AbstractLevel):
-    def __init__(self, fill_value, data=None):
-        args = [fill_value]
-        if data is not None:
-            args.append(data)
-        self._obj = jl.Element(*args)
-
-
-class Pattern(AbstractLevel):
-    def __init__(self):
-        self._obj = jl.Pattern()
-
-
-# advanced levels
-
-
-class SparseList(AbstractLevel):
-    def __init__(self, lvl):
-        self._obj = jl.SparseList(lvl._obj)
-
-
-class SparseByteMap(AbstractLevel):
-    def __init__(self, lvl):
-        self._obj = jl.SparseByteMap(lvl._obj)
-
-
-class RepeatRLE(AbstractLevel):
-    def __init__(self, lvl):
-        self._obj = jl.RepeatRLE(lvl._obj)
-
-
-class SparseVBL(AbstractLevel):
-    def __init__(self, lvl):
-        self._obj = jl.SparseVBL(lvl._obj)
-
-
-class SparseCOO(AbstractLevel):
-    def __init__(self, ndim, lvl):
-        self._obj = jl.SparseCOO[ndim](lvl._obj)
-
-
-class SparseHash(AbstractLevel):
-    def __init__(self, ndim, lvl):
-        self._obj = jl.SparseHash[ndim](lvl._obj)
-
-
-sparse_formats_names = (
-    "SparseList",
-    "Sparse",
-    "SparseHash",
-    "SparseCOO",
-    "SparseRLE",
-    "SparseVBL",
-    "SparseBand",
-    "SparsePoint",
-    "SparseInterval",
-)
-
-
-# STORAGE
-
-
-class Storage:
-    def __init__(self, levels_descr: AbstractLevel, order: OrderType = None):
-        self.levels_descr = levels_descr
-        self.order = order if order is not None else "C"
-
-    def __str__(self) -> str:
-        return f"Storage(lvl={str(self.levels_descr)}, order={self.order})"
-
-
-class DenseStorage(Storage):
-    def __init__(self, ndim: int, dtype: DType, order: OrderType = None):
-        lvl = Element(dtype(0))
-        for _ in range(ndim):
-            lvl = Dense(lvl)
-
-        super().__init__(levels_descr=lvl, order=order)
+class SparseByteMap(NestedLevelFType):
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.SparseByteMap(self.lvl.create_jl_obj())
