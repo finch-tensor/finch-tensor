@@ -1,39 +1,38 @@
+import operator
+
 import pytest
+
 import numpy as np
+
+from finchlite.compile import ExtentFType, dimension
 from finchlite.finch_notation.nodes import (
-    Module,
-    Function,
-    Variable,
-    Block,
-    Assign,
-    Call,
-    Literal,
-    Update,
-    Unpack,
-    Slot,
-    Loop,
-    Increment,
     Access,
-    Unwrap,
+    Assign,
+    Block,
+    Call,
+    Declare,
     Freeze,
+    Function,
+    Increment,
+    Literal,
+    Loop,
+    Module,
     Read,
     Repack,
     Return,
-    Declare,
+    Slot,
+    Unpack,
+    Unwrap,
+    Update,
+    Variable,
 )
 
-import operator
-from finchlite import ftype
-from finchlite.algebra import overwrite, promote_min
-from finchlite.compile import ExtentFType, dimension
-from finchlite.codegen import NumpyBuffer
-
 from finch.compiler import FinchJLCompiler, FinchJLKernel
+from finch.julia import jl
+from finch.levels import Dense, Element
 from finch.tensor import FinchJLTensor
 
-# Dummy data to obtain the bufferized ND array type
-a = np.zeros(dtype=np.float64, shape=(3, 3))
-a_format = ftype(FinchJLTensor(a))
+a_format = Dense(Dense(Element(0)))
 
 
 @pytest.mark.skip
@@ -207,13 +206,28 @@ def test_finchjl_compiler(finch_ntn: Module, julia_code):
     return C
 end""",
             (
-                FinchJLTensor(np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])),
-                FinchJLTensor(np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])),
-                FinchJLTensor(np.array([[10, 11, 12], [13, 14, 15], [16, 17, 18]])),
+                FinchJLTensor(
+                    jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0))), (3, 3))
+                ),
+                FinchJLTensor(
+                    jl.Finch.Tensor(
+                        jl.Dense(jl.Dense(jl.Element(0))),
+                        [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+                    )
+                ),
+                FinchJLTensor(
+                    jl.Finch.Tensor(
+                        jl.Dense(jl.Dense(jl.Element(0))),
+                        [[10, 11, 12], [13, 14, 15], [16, 17, 18]],
+                    )
+                ),
             ),
             (
                 FinchJLTensor(
-                    np.array([[84, 90, 96], [201, 216, 231], [318, 342, 366]])
+                    jl.Finch.Tensor(
+                        jl.Dense(jl.Dense(jl.Element(0))),
+                        [[84, 90, 96], [201, 216, 231], [318, 342, 366]],
+                    )
                 ),
             ),
         )

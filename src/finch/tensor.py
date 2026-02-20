@@ -20,8 +20,8 @@ class _Display:
 
 
 class FinchJLTensor(_Display, EagerTensor):
-    def __init__(self, obj: jl.Finch.Tensor):
-        if isinstance(obj, jl.Finch.Tensor):
+    def __init__(self, obj: JuliaObj):
+        if isinstance(obj, JuliaObj):
             self._obj = obj
         else:
             raise ValueError(f"Raw julia object expected. Found: {type(obj)}")

@@ -4,14 +4,10 @@ import finchlite.finch_notation.nodes as ntn
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
-from finch.tensor import FinchJLTensor
-
 from .julia import jl
+from .tensor import FinchJLTensor
 
 ops_map = {operator.add: "+", operator.mul: "*"}
-
-
-# https://github.com/finch-tensor/finch-tensor-lite/blob/main/tests/test_notation_interpreter.py
 
 
 class FinchJLKernel(AssemblyKernel):
@@ -34,6 +30,8 @@ class FinchJLLibrary(AssemblyLibrary):
         return self.kernel_dict[name]
 
 
+# Test with
+# https://github.com/finch-tensor/finch-tensor-lite/blob/main/tests/test_notation_interpreter.py
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
