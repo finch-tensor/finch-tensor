@@ -29,8 +29,7 @@ from finchlite.finch_notation.nodes import (
 
 from finch.compiler import FinchJLCompiler, FinchJLKernel
 from finch.julia import jl
-from finch.levels import Dense, Element
-from finch.tensor import FinchJLTensor
+from finch.tensor import Dense, Element, FinchJLTensor
 
 a_format = Dense(Dense(Element(0)))
 

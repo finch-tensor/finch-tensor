@@ -12,7 +12,7 @@ from finchlite.finch_logic import LogicLoader
 from finchlite.interface.fuse import set_default_scheduler
 
 from .compiler import FinchJLCompiler
-from .levels import Dense, Element
+from .tensor import Dense, Element
 
 
 class FinchJLLogicFormatter(LogicFormatter):
