@@ -6,10 +6,10 @@ import numpy as np
 from finchlite import Tensor, TensorFType
 
 from .julia import jl
-from .tensor import FinchJLTensor
 from .typing import JuliaObj, number
 
 
+# Abstract FTypes
 class LevelFType(TensorFType):
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
@@ -17,48 +17,22 @@ class LevelFType(TensorFType):
     def shape_type(self) -> tuple[type, ...]:
         return tuple(self.element_type for _ in range(self.ndim))
 
-
-class Element(LevelFType):
-    def __init__(self, fill_value: number):
-        self._fill_value = fill_value
-
-    def ndims(self) -> np.intp:
-        return np.intp(0)
-
-    def fill_value(self) -> Any:
-        return self._fill_value
-
-    def element_type(self) -> Any:
-        return type(self._fill_value)
-
     def __call__(self, _) -> Tensor:
-        raise Exception("Cannot create an object of element type!")
-
-    def __eq__(self, other):
-        return isinstance(other, Element) and self._fill_value == other.fill_value
-
-    def __hash__(self):
-        return hash((self.__class__.__name__, self._fill_value))
-
-    def create_jl_obj(self) -> JuliaObj:
-        return jl.Element(self._fill_value)
+        raise Exception("Cannot create an object of this type!")
 
 
 class NestedLevelFType(LevelFType):
     def __init__(self, lvl: LevelFType):
         self.lvl = lvl
 
-    def ndims(self) -> np.intp:
-        return self.lvl.ndims + np.intp(1)
+    def ndim(self) -> np.intp:
+        return self.lvl.ndim + np.intp(1)
 
     def fill_value(self) -> Any:
         return self.lvl.fill_value
 
     def element_type(self) -> Any:
         return self.lvl.element_type
-
-    def __call__(self, shape: tuple) -> FinchJLTensor:
-        return FinchJLTensor(jl.Finch.Tensor(self.create_jl_obj(), shape))
 
     def __eq__(self, other):
         return type(other) is type(self) and self.lvl == other.lvl
@@ -68,6 +42,30 @@ class NestedLevelFType(LevelFType):
 
     @abstractmethod
     def create_jl_obj(self) -> JuliaObj: ...
+
+
+# Concrete FTypes
+class Element(LevelFType):
+    def __init__(self, fill_value: number):
+        self._fill_value = fill_value
+
+    def ndim(self) -> np.intp:
+        return np.intp(0)
+
+    def fill_value(self) -> Any:
+        return self._fill_value
+
+    def element_type(self) -> Any:
+        return type(self._fill_value)
+
+    def __eq__(self, other):
+        return isinstance(other, Element) and self._fill_value == other.fill_value
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._fill_value))
+
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.Element(self._fill_value)
 
 
 class Dense(NestedLevelFType):
