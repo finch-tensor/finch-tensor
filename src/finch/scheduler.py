@@ -9,7 +9,6 @@ from finchlite.autoschedule import (
     LogicStandardizer,
 )
 from finchlite.finch_logic import LogicLoader
-from finchlite.interface.fuse import set_default_scheduler
 
 from .compiler import FinchJLCompiler
 from .tensor import Dense, Element
@@ -36,5 +35,3 @@ COMPILE_JULIA = LogicNormalizer(
         )
     )
 )
-
-set_default_scheduler(COMPILE_JULIA)
