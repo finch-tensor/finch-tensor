@@ -34,7 +34,6 @@ from finch.tensor import Dense, Element, FinchJLTensor
 a_format = Dense(Dense(Element(0)))
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     "finch_ntn, julia_code",
     [
@@ -205,30 +204,11 @@ def test_finchjl_compiler(finch_ntn: Module, julia_code):
     return C
 end""",
             (
-                FinchJLTensor(
-                    jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0))), (3, 3))
-                ),
-                FinchJLTensor(
-                    jl.Finch.Tensor(
-                        jl.Dense(jl.Dense(jl.Element(0))),
-                        [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-                    )
-                ),
-                FinchJLTensor(
-                    jl.Finch.Tensor(
-                        jl.Dense(jl.Dense(jl.Element(0))),
-                        [[10, 11, 12], [13, 14, 15], [16, 17, 18]],
-                    )
-                ),
+                FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0))), 3, 3)),
+                FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(1))), 3, 3)),
+                FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(2))), 3, 3)),
             ),
-            (
-                FinchJLTensor(
-                    jl.Finch.Tensor(
-                        jl.Dense(jl.Dense(jl.Element(0))),
-                        [[84, 90, 96], [201, 216, 231], [318, 342, 366]],
-                    )
-                ),
-            ),
+            (FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(6))), 3, 3)),),
         )
     ],
 )

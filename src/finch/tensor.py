@@ -22,8 +22,8 @@ class NestedLevelFType(LevelFType):
     def __init__(self, lvl: LevelFType):
         self.lvl = lvl
 
-    def ndims(self) -> np.intp:
-        return self.lvl.ndims + np.intp(1)
+    def ndim(self) -> np.intp:
+        return self.lvl.ndim + np.intp(1)
 
     def fill_value(self) -> Any:
         return self.lvl.fill_value
@@ -49,7 +49,7 @@ class Element(LevelFType):
     def __init__(self, fill_value: number):
         self._fill_value = fill_value
 
-    def ndims(self) -> np.intp:
+    def ndim(self) -> np.intp:
         return np.intp(0)
 
     def fill_value(self) -> Any:
@@ -97,24 +97,25 @@ class FinchJLTensor(EagerTensor):
         # TODO: figure out a way to walk through the levels and construct the ftype
         self._ftype = Dense(Dense(Element(0)))
 
-    @property
     def ftype(self):
         """Returns the ftype of the buffer"""
         return self._ftype
 
-    @property
     def shape(self) -> tuple:
         """Shape of the tensor."""
         return self.obj.shape
 
-    def ndims(self) -> np.intp:
-        return self._ftype.ndims
+    def ndim(self) -> np.intp:
+        return self._ftype.ndim
 
     def fill_value(self) -> Any:
         return self._ftype.fill_value
 
     def element_type(self) -> Any:
         return self._ftype.element_type
+
+    def __eq__(self, other):
+        return isinstance(other, FinchJLTensor) and self._obj == other._obj
 
     def __repr__(self):
         return jl.sprint(jl.show, self._obj)

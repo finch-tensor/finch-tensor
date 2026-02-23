@@ -19,7 +19,13 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
         finch_fn = getattr(jl, self.func_name)
-        return tuple(finch_fn(*[arg._obj for arg in args]))
+        result = finch_fn(*[arg._obj for arg in args])
+
+        # The finch function returns tuples when multiple values are returned
+        # or a non-tuple when a single value is returned.
+        if not isinstance(result, tuple):
+            result = (result,)
+        return tuple(FinchJLTensor(res) for res in result)
 
 
 class FinchJLLibrary(AssemblyLibrary):
