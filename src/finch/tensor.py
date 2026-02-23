@@ -86,7 +86,38 @@ class SparseByteMap(NestedLevelFType):
         return jl.SparseByteMap(self.lvl.create_jl_obj())
 
 
-# Tensor Class
+# Tensor Class and associated ftype
+class FinchJLTensorFType(TensorFType):
+    def __init__(self, lvl):
+        self._lvl: NestedLevelFType = lvl
+
+    def ndim(self) -> np.intp:
+        return self._lvl.ndim
+
+    def fill_value(self) -> Any:
+        return self._lvl.fill_value
+
+    def element_type(self) -> Any:
+        return self._lvl.element_type
+
+    def shape_type(self) -> tuple[type, ...]:
+        return self._lvl.shape_type
+
+    def __call__(self, shape: tuple) -> Tensor:
+        return self._lvl(shape)
+
+    def from_numpy(self, _) -> Tensor:
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, FinchJLTensorFType):
+            return False
+        return self._lvl == other._lvl
+
+    def __hash__(self):
+        return hash(("FinchJLTensorFType", self._lvl))
+
+
 class FinchJLTensor(EagerTensor):
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
@@ -94,25 +125,14 @@ class FinchJLTensor(EagerTensor):
         else:
             raise ValueError(f"Raw julia object expected. Found: {type(obj)}")
 
-        # TODO: figure out a way to walk through the levels and construct the ftype
-        self._ftype = Dense(Dense(Element(0)))
-
     def ftype(self):
         """Returns the ftype of the buffer"""
-        return self._ftype
+        # TODO: figure out a way to walk through the levels and construct the ftype
+        return FinchJLTensorFType(Dense(Dense(Element(0))))
 
     def shape(self) -> tuple:
         """Shape of the tensor."""
         return self.obj.shape
-
-    def ndim(self) -> np.intp:
-        return self._ftype.ndim
-
-    def fill_value(self) -> Any:
-        return self._ftype.fill_value
-
-    def element_type(self) -> Any:
-        return self._ftype.element_type
 
     def __eq__(self, other):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
