@@ -24,7 +24,7 @@ class FinchJLLogicFormatter(LogicFormatter):
 
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
         lvl = Element(fill_value)
-        for _ in len(shape_type):
+        for _ in shape_type:
             lvl = Dense(lvl)
         return FinchJLTensorFType(lvl)
 

@@ -2,13 +2,14 @@ import operator
 
 import finchlite.finch_notation.nodes as ntn
 from finchlite.algebra import make_tuple
+from finchlite.algebra.operator import overwrite
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from .julia import jl
 from .tensor import FinchJLTensor
 
-ops_map = {operator.add: "+", operator.mul: "*"}
+ops_map = {operator.add: "+", operator.mul: "*", operator.eq: "=="}
 ops_to_ignore = [make_tuple]
 
 
@@ -97,6 +98,7 @@ class FinchJLGenerator:
             case ntn.Loop(idx, _, body):
                 tab_str = "    " * nestingLvl
                 tab_str_1 = "    " * (nestingLvl + 1)
+                idx_str = self.generate_julia(idx, nestingLvl)
 
                 is_outermost_loop = False
                 if self.in_finch_block is False:
@@ -107,10 +109,10 @@ class FinchJLGenerator:
                     loop_body = self.generate_julia(body, nestingLvl + 1)
 
                 if not is_outermost_loop:
-                    return f"{tab_str}for {idx.name} = _\n{loop_body}{tab_str}end\n"
+                    return f"{tab_str}for {idx_str} = _\n{loop_body}{tab_str}end\n"
                 self.in_finch_block = False
                 return (
-                    f"{tab_str}@finch begin\n{tab_str_1}for {idx.name} = "
+                    f"{tab_str}@finch begin\n{tab_str_1}for {idx_str} = "
                     f"_\n{loop_body}{tab_str_1}end\n{tab_str}end"
                 )
 
@@ -155,6 +157,9 @@ class FinchJLGenerator:
                 ):
                     raise Exception("Increment expects the lhs to be an access")
 
+                # If the operation is overwrite just codegen an assignment
+                if lhs.mode.op.val == overwrite:
+                    return f"{tab_str}{lhs_str} = {rhs_str}"
                 return f"{tab_str}{lhs_str} {ops_map[lhs.mode.op.val]}= {rhs_str}"
 
             case ntn.Unwrap(arg):
@@ -164,7 +169,7 @@ class FinchJLGenerator:
                 # TODO: Is this the right assumption to make
                 if not isinstance(rhs, ntn.Variable):
                     raise Exception("The unpack was not called with variable as RHS.")
-                self.pack_dict[lhs.name] = rhs.name
+                self.pack_dict[lhs.name] = self.generate_julia(rhs, nestingLvl)
                 return ""
 
             case ntn.Repack(val, _):
