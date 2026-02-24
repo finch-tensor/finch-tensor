@@ -25,6 +25,7 @@ class NestedLevelFType(LevelFType):
     def __init__(self, lvl: LevelFType):
         self.lvl = lvl
 
+    @property
     def ndim(self) -> np.intp:
         return self.lvl.ndim + np.intp(1)
 
@@ -49,6 +50,7 @@ class Element(LevelFType):
     def __init__(self, fill_value: number):
         self._fill_value = fill_value
 
+    @property
     def ndim(self) -> np.intp:
         return np.intp(0)
 
@@ -81,3 +83,12 @@ class SparseList(NestedLevelFType):
 class SparseByteMap(NestedLevelFType):
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseByteMap(self.lvl.create_jl_obj())
+
+
+# Helper Methods
+def construct_levels(obj: JuliaObj, fill_value: number) -> LevelFType:
+    if jl.isa(obj.lvl, jl.ElementLevel):
+        return Element(fill_value)
+    if jl.isa(obj.lvl, jl.DenseLevel):
+        return Dense(construct_levels(obj.lvl, fill_value))
+    raise Exception("Unhandled exception!")

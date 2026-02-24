@@ -11,7 +11,7 @@ from finchlite.autoschedule import (
 from finchlite.finch_logic import LogicLoader
 
 from .compiler import FinchJLCompiler
-from .tensor import Dense, Element
+from .levels import Dense, Element
 
 
 class FinchJLLogicFormatter(LogicFormatter):

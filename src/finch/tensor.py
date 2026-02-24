@@ -4,8 +4,8 @@ import numpy as np
 
 from finchlite import EagerTensor, Tensor, TensorFType
 
-from .julia import jl
-from .levels import Dense, Element, NestedLevelFType
+from .julia import jc, jl
+from .levels import NestedLevelFType, construct_levels
 from .typing import JuliaObj
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
@@ -15,6 +15,7 @@ class FinchJLTensorFType(TensorFType):
     def __init__(self, lvl):
         self._lvl: NestedLevelFType = lvl
 
+    @property
     def ndim(self) -> np.intp:
         return self._lvl.ndim
 
@@ -49,14 +50,15 @@ class FinchJLTensor(EagerTensor):
         else:
             raise ValueError(f"Raw julia object expected. Found: {type(obj)}")
 
-    def ftype(self):
+    @property
+    def ftype(self) -> TensorFType:
         """Returns the ftype of the buffer"""
-        # TODO: figure out a way to walk through the levels and construct the ftype
-        return FinchJLTensorFType(Dense(Dense(Element(0))))
+        return FinchJLTensorFType(construct_levels(self._obj, jl.fill_value(self._obj)))
 
+    @property
     def shape(self) -> tuple:
         """Shape of the tensor."""
-        return self.obj.shape
+        return jl.size(self._obj)
 
     def __getitem__(self, key):
         if not isinstance(key, tuple):
@@ -70,7 +72,35 @@ class FinchJLTensor(EagerTensor):
         result = self._obj[key]
         if jl.isa(result, jl.Finch.Tensor):
             return FinchJLTensor(result)
-        return result
+        return np.array(result)
+
+    def _is_dense(self) -> bool:
+        lvl = self._obj.lvl
+        for _ in self.shape:
+            if not jl.isa(lvl, jl.Finch.Dense):
+                return False
+            lvl = lvl.lvl
+        return True
+
+    def todense(self) -> np.ndarray:
+        obj = self._obj
+
+        if self._is_dense:
+            # don't materialize a dense finch tensor
+            shape = jl.size(obj)
+            dense_tensor = obj.lvl
+        else:
+            # create materialized dense array
+            shape = jl.size(obj)
+            dense_lvls = jl.Element(jc.convert(self.dtype, jl.fill_value(obj)))
+            for _ in range(self.ndim):
+                dense_lvls = jl.Dense(dense_lvls)
+            dense_tensor = jl.Tensor(dense_lvls, obj).lvl  # materialize
+
+        for _ in range(self.ndim):
+            dense_tensor = dense_tensor.lvl
+
+        return np.asarray(jl.reshape(dense_tensor.val, shape))
 
     def __eq__(self, other):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
