@@ -14,6 +14,7 @@ class LevelFType(TensorFType):
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
 
+    @property
     def shape_type(self) -> tuple[type, ...]:
         return tuple(self.element_type for _ in range(self.ndim))
 
@@ -29,9 +30,11 @@ class NestedLevelFType(LevelFType):
     def ndim(self) -> np.intp:
         return self.lvl.ndim + np.intp(1)
 
+    @property
     def fill_value(self) -> Any:
         return self.lvl.fill_value
 
+    @property
     def element_type(self) -> Any:
         return self.lvl.element_type
 
@@ -54,9 +57,11 @@ class Element(LevelFType):
     def ndim(self) -> np.intp:
         return np.intp(0)
 
+    @property
     def fill_value(self) -> Any:
         return self._fill_value
 
+    @property
     def element_type(self) -> Any:
         return type(self._fill_value)
 

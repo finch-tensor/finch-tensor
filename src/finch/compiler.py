@@ -1,6 +1,7 @@
 import operator
 
 import finchlite.finch_notation.nodes as ntn
+from finchlite.algebra import make_tuple
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
@@ -8,6 +9,7 @@ from .julia import jl
 from .tensor import FinchJLTensor
 
 ops_map = {operator.add: "+", operator.mul: "*"}
+ops_to_ignore = [make_tuple]
 
 
 class FinchJLKernel(AssemblyKernel):
@@ -69,7 +71,9 @@ class FinchJLGenerator:
                 # TODO: Can we make this better?
                 # Special condition to ignore all assigns associated with
                 # finding loop bounds
-                if isinstance(rhs, ntn.Call) and rhs.op.val == dimension:
+                if isinstance(rhs, ntn.Dimension) or (
+                    isinstance(rhs, ntn.Call) and rhs.op.val == dimension
+                ):
                     return ""
 
                 tab_str = "    " * nestingLvl
@@ -121,6 +125,8 @@ class FinchJLGenerator:
                 arg_str = ",".join(
                     [self.generate_julia(arg, nestingLvl) for arg in args]
                 )
+                if op.val in ops_to_ignore:
+                    return f"{arg_str}"
                 return f"{ops_map[op.val]}({arg_str})"
 
             case ntn.If(cond, body):
@@ -177,7 +183,9 @@ class FinchJLGenerator:
                 return str(val)
 
             case ntn.Variable(name, _):
-                return name
+                # finch tensor lite uses character(#) in the naming of variables
+                # that however is not valid julia syntax
+                return name.replace("#", "_")
 
             # TODO: Cached, Dimension, Thaw, Stack, Value are unimplemented.
             case _:
@@ -190,6 +198,7 @@ class FinchJLCompiler(NotationCompiler):
 
         kernel_dict = {}
         for func in prgm.children:
-            kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generator(func))
+            generated_prgm = generator(func)
+            kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generated_prgm)
 
         return FinchJLLibrary(kernel_dict)

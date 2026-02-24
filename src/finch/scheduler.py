@@ -12,6 +12,7 @@ from finchlite.finch_logic import LogicLoader
 
 from .compiler import FinchJLCompiler
 from .levels import Dense, Element
+from .tensor import FinchJLTensorFType
 
 
 class FinchJLLogicFormatter(LogicFormatter):
@@ -25,7 +26,7 @@ class FinchJLLogicFormatter(LogicFormatter):
         lvl = Element(fill_value)
         for _ in len(shape_type):
             lvl = Dense(lvl)
-        return lvl
+        return FinchJLTensorFType(lvl)
 
 
 COMPILE_JULIA = LogicNormalizer(

@@ -19,12 +19,15 @@ class FinchJLTensorFType(TensorFType):
     def ndim(self) -> np.intp:
         return self._lvl.ndim
 
+    @property
     def fill_value(self) -> Any:
         return self._lvl.fill_value
 
+    @property
     def element_type(self) -> Any:
         return self._lvl.element_type
 
+    @property
     def shape_type(self) -> tuple[type, ...]:
         return self._lvl.shape_type
 

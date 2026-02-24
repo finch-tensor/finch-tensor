@@ -3,7 +3,7 @@
 import builtins
 
 import numpy as np
-from numpy.core.numeric import normalize_axis_index, normalize_axis_tuple
+from numpy._core.numeric import normalize_axis_index, normalize_axis_tuple
 
 from .julia import jl
 
