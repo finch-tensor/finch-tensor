@@ -92,8 +92,12 @@ class SparseByteMap(NestedLevelFType):
 
 # Helper Methods
 def construct_levels(obj: JuliaObj, fill_value: number) -> LevelFType:
-    if jl.isa(obj.lvl, jl.ElementLevel):
+    if jl.isa(obj.lvl, jl.Finch.Element):
         return Element(fill_value)
-    if jl.isa(obj.lvl, jl.DenseLevel):
+    if jl.isa(obj.lvl, jl.Finch.Dense):
         return Dense(construct_levels(obj.lvl, fill_value))
+    if jl.isa(obj.lvl, jl.Finch.SparseList):
+        return SparseList(construct_levels(obj.lvl, fill_value))
+    if jl.isa(obj.lvl, jl.Finch.SparseByteMap):
+        return SparseByteMap(construct_levels(obj.lvl, fill_value))
     raise Exception("Unhandled exception!")
