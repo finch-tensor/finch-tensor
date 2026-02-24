@@ -1,8 +1,9 @@
+import math
 import operator
 
 import finchlite.finch_notation.nodes as ntn
 from finchlite.algebra import make_tuple
-from finchlite.algebra.operator import overwrite
+from finchlite.algebra.operator import overwrite, promote_max, promote_min
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
@@ -10,6 +11,12 @@ from .julia import jl
 from .tensor import FinchJLTensor
 
 ops_map = {operator.add: "+", operator.mul: "*", operator.eq: "=="}
+red_ops_map = {
+    operator.add: "+",
+    operator.mul: "*",
+    promote_max: "<<max>>",
+    promote_min: "<<min>>",
+}
 ops_to_ignore = [make_tuple]
 
 
@@ -160,7 +167,7 @@ class FinchJLGenerator:
                 # If the operation is overwrite just codegen an assignment
                 if lhs.mode.op.val == overwrite:
                     return f"{tab_str}{lhs_str} = {rhs_str}"
-                return f"{tab_str}{lhs_str} {ops_map[lhs.mode.op.val]}= {rhs_str}"
+                return f"{tab_str}{lhs_str} {red_ops_map[lhs.mode.op.val]}= {rhs_str}"
 
             case ntn.Unwrap(arg):
                 return self.generate_julia(arg, nestingLvl)
@@ -185,6 +192,11 @@ class FinchJLGenerator:
                 return self.pack_dict[name]
 
             case ntn.Literal(val):
+                # Julia represents inf differently than how its represented in python
+                if val > 0 and math.isinf(val):
+                    return "Inf"
+                if val < 0 and math.isinf(val):
+                    return "-Inf"
                 return str(val)
 
             case ntn.Variable(name, _):
