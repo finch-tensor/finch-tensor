@@ -29,12 +29,12 @@ from finchlite.finch_notation.nodes import (
 
 from finch.compiler import FinchJLCompiler, FinchJLKernel
 from finch.julia import jl
-from finch.tensor import Dense, Element, FinchJLTensor
+from finch.levels import Dense, Element
+from finch.tensor import FinchJLTensor
 
 a_format = Dense(Dense(Element(0)))
 
 
-@pytest.mark.skip
 @pytest.mark.parametrize(
     "finch_ntn, julia_code",
     [
