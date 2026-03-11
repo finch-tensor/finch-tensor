@@ -22,33 +22,32 @@ class LevelFType(TensorFType):
         raise Exception("Cannot create an object of this type!")
 
 
-class NestedLevelFType(LevelFType):
-    def __init__(self, lvl: LevelFType):
-        self.lvl = lvl
+class Scalar(LevelFType):
+    def __init__(self, val: number):
+        self._val = val
 
     @property
     def ndim(self) -> np.intp:
-        return self.lvl.ndim + np.intp(1)
+        return np.intp(0)
 
     @property
     def fill_value(self) -> Any:
-        return self.lvl.fill_value
+        return self._val
 
     @property
     def element_type(self) -> Any:
-        return self.lvl.element_type
+        return type(self._val)
 
     def __eq__(self, other):
-        return type(other) is type(self) and self.lvl == other.lvl
+        return isinstance(other, Scalar) and self._val == other._val
 
     def __hash__(self):
-        return hash((self.__class__.__name__, self.lvl.__hash__))
+        return hash((self.__class__.__name__, self._val))
 
-    @abstractmethod
-    def create_jl_obj(self) -> JuliaObj: ...
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.Scalar(self._val)
 
 
-# Concrete FTypes
 class Element(LevelFType):
     def __init__(self, fill_value: number):
         self._fill_value = fill_value
@@ -73,6 +72,34 @@ class Element(LevelFType):
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.Element(self._fill_value)
+
+
+class NestedLevelFType(LevelFType):
+    def __init__(self, lvl: LevelFType):
+        if not isinstance(lvl, NestedLevelFType | Element):
+            raise ValueError("lvl must be a NestedLevelFType or Element.")
+        self.lvl = lvl
+
+    @property
+    def ndim(self) -> np.intp:
+        return self.lvl.ndim + np.intp(1)
+
+    @property
+    def fill_value(self) -> Any:
+        return self.lvl.fill_value
+
+    @property
+    def element_type(self) -> Any:
+        return self.lvl.element_type
+
+    def __eq__(self, other):
+        return type(other) is type(self) and self.lvl == other.lvl
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self.lvl.__hash__))
+
+    @abstractmethod
+    def create_jl_obj(self) -> JuliaObj: ...
 
 
 class Dense(NestedLevelFType):

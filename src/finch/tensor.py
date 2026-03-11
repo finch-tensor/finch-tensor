@@ -5,7 +5,7 @@ import numpy as np
 from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
-from .levels import NestedLevelFType, construct_levels
+from .levels import LevelFType, Scalar, construct_levels
 from .typing import JuliaObj
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
@@ -13,7 +13,7 @@ from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 # Tensor Class and associated ftype
 class FinchJLTensorFType(TensorFType):
     def __init__(self, lvl):
-        self._lvl: NestedLevelFType = lvl
+        self._lvl: LevelFType = lvl
 
     @property
     def ndim(self) -> np.intp:
@@ -31,7 +31,12 @@ class FinchJLTensorFType(TensorFType):
     def shape_type(self) -> tuple[type, ...]:
         return self._lvl.shape_type
 
-    def __call__(self, shape: tuple) -> Tensor:
+    def __call__(self, shape: tuple | None = None) -> Tensor:
+        if isinstance(self._lvl, Scalar):
+            return FinchJLTensor(self._lvl.create_jl_obj())
+
+        if shape is None:
+            raise ValueError("shape argument cannot be None for non scalar tensors.")
         return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), shape))
 
     def from_numpy(self, _) -> Tensor:
@@ -56,6 +61,8 @@ class FinchJLTensor(EagerTensor):
     @property
     def ftype(self) -> TensorFType:
         """Returns the ftype of the buffer"""
+        if self._is_scalar():
+            return FinchJLTensorFType(Scalar(self._obj.val))
         return FinchJLTensorFType(construct_levels(self._obj, jl.fill_value(self._obj)))
 
     @property
@@ -64,6 +71,9 @@ class FinchJLTensor(EagerTensor):
         return jl.size(self._obj)
 
     def __getitem__(self, key):
+        if self._is_scalar():
+            raise ValueError("Scalars are not subscriptable!")
+
         if not isinstance(key, tuple):
             key = (key,)
 
@@ -77,7 +87,13 @@ class FinchJLTensor(EagerTensor):
             return FinchJLTensor(result)
         return np.array(result)
 
+    def _is_scalar(self) -> bool:
+        return jl.isa(self._obj, jl.Finch.Scalar)
+
     def _is_dense(self) -> bool:
+        if self._is_scalar():
+            return False
+
         lvl = self._obj.lvl
         for _ in self.shape:
             if not jl.isa(lvl, jl.Finch.Dense):
@@ -86,6 +102,9 @@ class FinchJLTensor(EagerTensor):
         return True
 
     def todense(self) -> np.ndarray:
+        if self._is_scalar():
+            return np.asarray(self._obj.val)
+
         obj = self._obj
 
         if self._is_dense:
