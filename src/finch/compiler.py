@@ -3,7 +3,7 @@ import operator
 
 import finchlite.finch_notation.nodes as ntn
 from finchlite.algebra import make_tuple
-from finchlite.algebra.operator import overwrite, promote_max, promote_min
+from finchlite.algebra.algebra import overwrite, promote_max, promote_min
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
