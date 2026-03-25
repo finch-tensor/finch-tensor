@@ -1,4 +1,4 @@
-tests/array-api-tests
+array-api-tests
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

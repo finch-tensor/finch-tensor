@@ -4,20 +4,20 @@ import sys
 
 
 def test_array_api():
-    ARRAY_API_TESTS_DIR = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            os.environ.get("ARRAY_API_TESTS_DIR", "array-api-tests"),
-        )
+    ARRAY_API_TESTS_DIR = os.environ.get(
+        "ARRAY_API_TESTS_DIR",
+        os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../array-api-tests"),
+        ),
     )
     ARRAY_API_TESTS_REV = os.environ.get(
         "ARRAY_API_TESTS_REV", "c48410f96fc58e02eea844e6b7f6cc01680f77ce"
     )
-    ARRAY_API_TESTS_SKIPS = os.path.abspath(
-        os.path.join(
-            os.path.dirname(__file__),
-            os.environ.get("ARRAY_API_TESTS_SKIPS", "array-api-skips.txt"),
-        )
+    ARRAY_API_TESTS_SKIPS = os.environ.get(
+        "ARRAY_API_TESTS_SKIPS",
+        os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "../array-api-skips.txt"),
+        ),
     )
     ARRAY_API_TESTS_ARGS = os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s")
 
