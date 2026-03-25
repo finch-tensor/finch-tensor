@@ -3,7 +3,8 @@ from typing import Any
 
 import numpy as np
 
-from finchlite import Tensor, TensorFType
+from finchlite import Tensor, TensorFType, Buffer
+from .buffer import PlusOneBuffer, NumpyBuffer, buffer_to_jlobj, jlobj_to_buffer
 
 from .julia import jl
 from .typing import JuliaObj, number
@@ -202,11 +203,16 @@ class Element(AbstractLevel):
     
     >>> elem = Element(0.0)
     """
-    def __init__(self, fill_value, data=None):
+    def __init__(self, fill_value, data: Buffer | None=None):
         args = [fill_value]
         if data is not None:
-            args.append(data)
+            args.append(buffer_to_jlobj(data))
         self._obj = jl.Element(*args)
+
+    @property
+    def data(self) -> Buffer:
+        """Return the data buffer for this element level."""
+        return jlobj_to_buffer(self._obj.data)
 
 
 class Pattern(AbstractLevel):
@@ -263,12 +269,20 @@ class SparseList(AbstractLevel):
         args = [lvl._obj]
         if dim is not None:
             args.append(dim)
-        if ptr is not None:
-            args.append(np.asarray(ptr))
-        if idx is not None:
-            args.append(np.asarray(idx))
+        if ptr is not None and idx is not None:
+            args.append(buffer_to_jlobj(ptr))
+            args.append(buffer_to_jlobj(idx))
         self._obj = jl.SparseList(*args)
 
+    @property
+    def ptr(self) -> Buffer:
+        """Return the coordinate buffers for this COO level."""
+        return jlobj_to_buffer(self._obj.ptr)
+
+    @property
+    def idx(self) -> Buffer:
+        """Return the coordinate buffers for this COO level."""
+        return jlobj_to_buffer(self._obj.idx)
 
 class SparseByteMap(AbstractLevel):
     """Sparse byte map level storage format.
@@ -369,7 +383,7 @@ class SparseCOO(AbstractLevel):
     
     >>> coo_2d = SparseCOO(2, Element(0.0))
     """
-    def __init__(self, ndim, lvl, dims=None, tbl=None):
+    def __init__(self, ndim, lvl, dims=None, tbl : tuple[Buffer] | None =None):
         args = [lvl._obj]
         if dims is not None:
             if isinstance(dims, (list, tuple)):
@@ -377,11 +391,13 @@ class SparseCOO(AbstractLevel):
             else:
                 args.append(dims)
         if tbl is not None:
-            if isinstance(tbl, (list, tuple)):
-                args.extend([np.asarray(t) for t in tbl])
-            else:
-                args.append(np.asarray(tbl))
+            args.extend([buffer_to_jlobj(t) for t in tbl])
         self._obj = jl.SparseCOO[ndim](*args)
+    
+    @property
+    def tbl(self) -> tuple[Buffer, ...]:
+        """Return the coordinate buffers for this COO level."""
+        return tuple(jlobj_to_buffer(coord) for coord in self._obj.tbl)
 
 
 class SparseHash(AbstractLevel):
