@@ -7,7 +7,7 @@ def test_array_api():
     ARRAY_API_TESTS_DIR = os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
-            os.environ.get("ARRAY_API_TESTS_DIR", "../array-api-tests"),
+            os.environ.get("ARRAY_API_TESTS_DIR", "array-api-tests"),
         )
     )
     ARRAY_API_TESTS_REV = os.environ.get(
