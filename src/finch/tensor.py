@@ -132,3 +132,100 @@ class FinchJLTensor(EagerTensor):
 
     def __str__(self):
         return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
+
+    def __array_namespace__(self, *, api_version: str | None = None) -> Any:
+        if api_version is None:
+            api_version = "2024.12"
+
+        if api_version not in {"2021.12", "2022.12", "2023.12", "2024.12"}:
+            raise ValueError(f'"{api_version}" Array API version not supported.')
+        import finch
+
+        return finch
+
+def asarray(
+    obj,
+    /,
+    *,
+    dtype: DType | None = None,
+    fill_value: np.number | None = None,
+    copy: bool | None = None,
+) -> FinchJLTensor:
+    if fill_value is None:
+        fill_value = 0.0
+    if isinstance(obj, FinchJLTensor):
+        if copy:
+            return obj.copy()
+        else:
+            return obj
+    elif isinstance(obj, np.ndarray):
+        if copy:
+            if np.isfortran(obj):
+                arr = arr.copy()
+            else:
+                obj = np.asfortranarray(obj)
+        dtype = arr.dtype.type
+        if (
+            dtype == np.bool_
+        ):  # Fails with: Finch currently only supports isbits defaults
+            dtype = jl_dtypes.bool
+        lvl = ElementLevel(fill_value, arr.reshape(-1, order="F"))
+        for i in arr.shape:
+            lvl = DenseLevel(lvl, i)
+        return FinchJLTensor(lvl)
+    elif hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse"):
+        if obj.format == "coo":
+            obj = obj.T
+        if copy:
+            if obj.format in ("coo", "csc"):
+                if not x.has_sorted_indices:
+                    obj = obj.sorted_indices()
+                else:
+                    obj = obj.copy()
+                if not x.has_canonical_format:
+                    obj.sum_duplicates()
+            else:
+                obj = obj.asformat("csc")
+        if copy is False and not obj.format in ("coo", "csc") and not obj.has_canonical_format:
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
+        m, n = obj.shape
+        if obj.format == "coo":
+            return Tensor(
+                SparseCOOLevel(
+                    ElementLevel(
+                        dtype,
+                        fill_value,
+                        obj.data
+                    ),
+                    2,
+                    idxs = (
+                        x.cols,
+                        x.rows,
+                    ),
+                )
+            )
+        elif x.format == "csc":
+            return Tensor(
+                DenseLevel(
+                    SparseListLevel(
+                        ElementLevel(
+                            dtype,
+                            fill_value,
+                            obj.data
+                        ),
+                        n,
+                        obj.indptr,
+                        obj.indices
+                    ),
+                    (m, n)
+                )
+            )
+        else:
+            raise ValueError(f"Unsupported SciPy format: {type(x)}")
+    else:
+        raise ValueError(
+            "Either scalar, numpy, scipy.sparse or a raw julia object should "
+            f"be provided. Found: {type(obj)}"
+        )

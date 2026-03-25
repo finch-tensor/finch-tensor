@@ -75,11 +75,6 @@ class Element(LevelFType):
 
 
 class NestedLevelFType(LevelFType):
-    def __init__(self, lvl: LevelFType):
-        if not isinstance(lvl, NestedLevelFType | Element):
-            raise ValueError("lvl must be a NestedLevelFType or Element.")
-        self.lvl = lvl
-
     @property
     def ndim(self) -> np.intp:
         return self.lvl.ndim + np.intp(1)
@@ -102,19 +97,108 @@ class NestedLevelFType(LevelFType):
     def create_jl_obj(self) -> JuliaObj: ...
 
 
+@dataclass(frozen=True)
 class Dense(NestedLevelFType):
+    lvl: NestedLevelFType
+
     def create_jl_obj(self) -> JuliaObj:
         return jl.Dense(self.lvl.create_jl_obj())
-
-
+    
+@dataclass(frozen=True)
 class SparseList(NestedLevelFType):
+    lvl: NestedLevelFType
+
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseList(self.lvl.create_jl_obj())
 
+@dataclass(frozen=True)
+class SparseCOO(NestedLevelFType):
+    lvl: NestedLevelFType
+    N: int = 2
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.SparseCOO(self.lvl.create_jl_obj())
 
+@dataclass(frozen=True)
 class SparseByteMap(NestedLevelFType):
+    lvl: NestedLevelFType
+
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseByteMap(self.lvl.create_jl_obj())
+
+
+class _Display:
+    _obj: JuliaObj
+
+    def __repr__(self):
+        return jl.sprint(jl.show, self._obj)
+
+    def __str__(self):
+        return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
+
+
+# LEVEL
+
+
+class AbstractLevel(_Display):
+    pass
+
+
+# core levels
+
+
+class Dense(AbstractLevel):
+    def __init__(self, lvl, shape=None):
+        args = [lvl._obj]
+        if shape is not None:
+            args.append(shape)
+        self._obj = jl.Dense(*args)
+
+
+class Element(AbstractLevel):
+    def __init__(self, fill_value, data=None):
+        args = [fill_value]
+        if data is not None:
+            args.append(data)
+        self._obj = jl.Element(*args)
+
+
+class Pattern(AbstractLevel):
+    def __init__(self):
+        self._obj = jl.Pattern()
+
+
+# advanced levels
+
+
+class SparseList(AbstractLevel):
+    def __init__(self, lvl):
+        self._obj = jl.SparseList(lvl._obj)
+
+
+class SparseByteMap(AbstractLevel):
+    def __init__(self, lvl):
+        self._obj = jl.SparseByteMap(lvl._obj)
+
+jl.PlusOneVector(arr)
+
+class RepeatRLE(AbstractLevel):
+    def __init__(self, lvl):
+        self._obj = jl.RepeatRLE(lvl._obj)
+
+
+class SparseVBL(AbstractLevel):
+    def __init__(self, lvl):
+        self._obj = jl.SparseVBL(lvl._obj)
+
+
+class SparseCOO(AbstractLevel):
+    def __init__(self, ndim, lvl):
+        self._obj = jl.SparseCOO[ndim](lvl._obj)
+
+
+class SparseHash(AbstractLevel):
+    def __init__(self, ndim, lvl):
+        self._obj = jl.SparseHash[ndim](lvl._obj)
 
 
 # Helper Methods
