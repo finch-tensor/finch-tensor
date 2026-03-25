@@ -7,6 +7,7 @@ from finchlite import Tensor, TensorFType
 
 from .julia import jl
 from .typing import JuliaObj, number
+from dataclasses import dataclass
 
 
 # Abstract FTypes
@@ -21,57 +22,6 @@ class LevelFType(TensorFType):
     def __call__(self, _) -> Tensor:
         raise Exception("Cannot create an object of this type!")
 
-
-class Scalar(LevelFType):
-    def __init__(self, val: number):
-        self._val = val
-
-    @property
-    def ndim(self) -> np.intp:
-        return np.intp(0)
-
-    @property
-    def fill_value(self) -> Any:
-        return self._val
-
-    @property
-    def element_type(self) -> Any:
-        return type(self._val)
-
-    def __eq__(self, other):
-        return isinstance(other, Scalar) and self._val == other._val
-
-    def __hash__(self):
-        return hash((self.__class__.__name__, self._val))
-
-    def create_jl_obj(self) -> JuliaObj:
-        return jl.Scalar(self._val)
-
-
-class Element(LevelFType):
-    def __init__(self, fill_value: number):
-        self._fill_value = fill_value
-
-    @property
-    def ndim(self) -> np.intp:
-        return np.intp(0)
-
-    @property
-    def fill_value(self) -> Any:
-        return self._fill_value
-
-    @property
-    def element_type(self) -> Any:
-        return type(self._fill_value)
-
-    def __eq__(self, other):
-        return isinstance(other, Element) and self._fill_value == other.fill_value
-
-    def __hash__(self):
-        return hash((self.__class__.__name__, self._fill_value))
-
-    def create_jl_obj(self) -> JuliaObj:
-        return jl.Element(self._fill_value)
 
 
 class NestedLevelFType(LevelFType):
@@ -97,29 +47,58 @@ class NestedLevelFType(LevelFType):
     def create_jl_obj(self) -> JuliaObj: ...
 
 
+
+
+class ElementFType(LevelFType):
+    def __init__(self, fill_value: number):
+        self._fill_value = fill_value
+
+    @property
+    def ndim(self) -> np.intp:
+        return np.intp(0)
+
+    @property
+    def fill_value(self) -> Any:
+        return self._fill_value
+
+    @property
+    def element_type(self) -> Any:
+        return type(self._fill_value)
+
+    def __eq__(self, other):
+        return isinstance(other, ElementFType) and self._fill_value == other.fill_value
+
+    def __hash__(self):
+        return hash((self.__class__.__name__, self._fill_value))
+
+    def create_jl_obj(self) -> JuliaObj:
+        return jl.Element(self._fill_value)
+
+
+
 @dataclass(frozen=True)
-class Dense(NestedLevelFType):
+class DenseFType(NestedLevelFType):
     lvl: NestedLevelFType
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.Dense(self.lvl.create_jl_obj())
     
 @dataclass(frozen=True)
-class SparseList(NestedLevelFType):
+class SparseListFType(NestedLevelFType):
     lvl: NestedLevelFType
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseList(self.lvl.create_jl_obj())
 
 @dataclass(frozen=True)
-class SparseCOO(NestedLevelFType):
+class SparseCoOFType(NestedLevelFType):
     lvl: NestedLevelFType
     N: int = 2
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseCOO(self.lvl.create_jl_obj())
 
 @dataclass(frozen=True)
-class SparseByteMap(NestedLevelFType):
+class SparseByteMapFType(NestedLevelFType):
     lvl: NestedLevelFType
 
     def create_jl_obj(self) -> JuliaObj:
