@@ -24,6 +24,9 @@ test = [
     "pytest-cov>=4.1.0,<4.2",
     "sparse>=0.17.0,<0.17.1",
     "scipy>=1.7,<1.17",
+    "hypothesis (>=6.151.9,<7.0.0)",
+    "ndindex (>=1.10.1,<2.0.0)",
+    "pytest-json-report (>=1.5.0,<2.0.0)",
 ]
 
 [build-system]
