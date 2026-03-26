@@ -155,7 +155,7 @@ class AbstractLevel(_Display):
 # core levels
 
 
-class Dense(AbstractLevel):
+class DenseLevel(AbstractLevel):
     """Dense level storage format.
     
     A subfiber of a dense level is an array which stores every slice as a distinct
@@ -174,7 +174,7 @@ class Dense(AbstractLevel):
     --------
     Create a 2D dense tensor:
     
-    >>> dense_2d = Dense(Dense(Element(0.0)))
+    >>> dense_2d = DenseLevel(DenseLevel(ElementLevel(0.0)))
     """
     def __init__(self, lvl, shape=None):
         args = [lvl._obj]
@@ -183,7 +183,7 @@ class Dense(AbstractLevel):
         self._obj = jl.Dense(*args)
 
 
-class Element(AbstractLevel):
+class ElementLevel(AbstractLevel):
     """Element level storage format (leaf level).
     
     A subfiber of an element level is a scalar of a specified type, initialized
@@ -202,7 +202,7 @@ class Element(AbstractLevel):
     --------
     Create an element level with zero fill value:
     
-    >>> elem = Element(0.0)
+    >>> elem = ElementLevel(0.0)
     """
     def __init__(self, fill_value, data: Buffer | None=None):
         args = [fill_value]
@@ -216,7 +216,7 @@ class Element(AbstractLevel):
         return jlobj_to_buffer(self._obj.data)
 
 
-class Pattern(AbstractLevel):
+class PatternLevel(AbstractLevel):
     """Pattern level storage format (leaf level).
     
     A subfiber of a pattern level is the boolean value true, but with a fill
@@ -228,7 +228,7 @@ class Pattern(AbstractLevel):
     --------
     Create a pattern level to track which elements are nonzero:
     
-    >>> pattern = Pattern()
+    >>> pattern = PatternLevel()
     """
     def __init__(self):
         self._obj = jl.Pattern()
@@ -237,7 +237,7 @@ class Pattern(AbstractLevel):
 # advanced levels
 
 
-class SparseList(AbstractLevel):
+class SparseListLevel(AbstractLevel):
     """Sparse list level storage format.
     
     A subfiber of a sparse list level stores only potentially non-fill slices
@@ -264,7 +264,7 @@ class SparseList(AbstractLevel):
     --------
     Create a sparse matrix in CSC format:
     
-    >>> sparse_matrix = SparseList(SparseList(Element(0.0)))
+    >>> sparse_matrix = SparseListLevel(SparseListLevel(ElementLevel(0.0)))
     """
     def __init__(self, lvl, dim=None, ptr=None, idx=None):
         args = [lvl._obj]
@@ -285,7 +285,7 @@ class SparseList(AbstractLevel):
         """Return the index array for this sparse list level."""
         return jlobj_to_buffer(self._obj.idx)
 
-class SparseByteMap(AbstractLevel):
+class SparseByteMapLevel(AbstractLevel):
     """Sparse byte map level storage format.
     
     Similar to SparseList, but uses a dense bitmap to encode which slices are
@@ -305,7 +305,7 @@ class SparseByteMap(AbstractLevel):
     --------
     Create a sparse matrix with byte map storage:
     
-    >>> sparse_matrix = SparseByteMap(SparseByteMap(Element(0.0)))
+    >>> sparse_matrix = SparseByteMapLevel(SparseByteMapLevel(ElementLevel(0.0)))
     """
     def __init__(self, lvl, dim=None):
         args = [lvl._obj]
@@ -314,7 +314,7 @@ class SparseByteMap(AbstractLevel):
         self._obj = jl.SparseByteMap(*args)
 
 
-class RepeatRLE(AbstractLevel):
+class RepeatRLELevel(AbstractLevel):
     """Run-length encoding level for repeated values.
     
     This level stores runs of repeated values, useful for data with
@@ -335,7 +335,7 @@ class RepeatRLE(AbstractLevel):
         self._obj = jl.RepeatRLE(*args)
 
 
-class SparseVBL(AbstractLevel):
+class SparseVBLLevel(AbstractLevel):
     """Sparse variable block list level storage format.
     
     Like SparseList, but stores contiguous slices together in blocks.
@@ -356,7 +356,7 @@ class SparseVBL(AbstractLevel):
         self._obj = jl.SparseVBL(*args)
 
 
-class SparseCOO(AbstractLevel):
+class SparseCOOLevel(AbstractLevel):
     """Coordinate (COO) sparse format level storage.
     
     This level stores sparse data using N coordinate lists (one per dimension).
@@ -382,7 +382,7 @@ class SparseCOO(AbstractLevel):
     --------
     Create a 2D sparse tensor in COO format:
     
-    >>> coo_2d = SparseCOO(2, Element(0.0))
+    >>> coo_2d = SparseCOOLevel(2, ElementLevel(0.0))
     """
     def __init__(self, ndim, lvl, dims=None, tbl : tuple[Buffer] | None =None):
         args = [lvl._obj]
@@ -401,7 +401,7 @@ class SparseCOO(AbstractLevel):
         return tuple(jlobj_to_buffer(coord) for coord in self._obj.tbl)
 
 
-class SparseHash(AbstractLevel):
+class SparseHashLevel(AbstractLevel):
     """Hash table based sparse format level storage.
     
     Uses a hash table to store sparse data, supporting efficient random access
@@ -422,7 +422,7 @@ class SparseHash(AbstractLevel):
     --------
     Create a 2D sparse tensor using hash storage:
     
-    >>> hash_2d = SparseHash(2, Element(0.0))
+    >>> hash_2d = SparseHashLevel(2, ElementLevel(0.0))
     """
     def __init__(self, ndim, lvl, dims=None):
         args = [lvl._obj]
@@ -459,11 +459,11 @@ def construct_levels(obj: JuliaObj, fill_value: number) -> LevelFType:
         If an unsupported level type is encountered.
     """
     if jl.isa(obj.lvl, jl.Finch.Element):
-        return Element(fill_value)
+        return ElementLevel(fill_value)
     if jl.isa(obj.lvl, jl.Finch.Dense):
-        return Dense(construct_levels(obj.lvl, fill_value))
+        return DenseLevel(construct_levels(obj.lvl, fill_value))
     if jl.isa(obj.lvl, jl.Finch.SparseList):
-        return SparseList(construct_levels(obj.lvl, fill_value))
+        return SparseListLevel(construct_levels(obj.lvl, fill_value))
     if jl.isa(obj.lvl, jl.Finch.SparseByteMap):
-        return SparseByteMap(construct_levels(obj.lvl, fill_value))
+        return SparseByteMapLevel(construct_levels(obj.lvl, fill_value))
     raise Exception("Unhandled exception!")

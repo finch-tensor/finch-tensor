@@ -6,7 +6,7 @@ from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
 from .levels import LevelFType, construct_levels
-from .typing import JuliaObj
+from .typing import JuliaObj, DType
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 # Tensor Class and associated ftype
@@ -160,16 +160,15 @@ def asarray(
     elif isinstance(obj, np.ndarray):
         if copy:
             if np.isfortran(obj):
-                arr = arr.copy()
+                obj = obj.copy()
             else:
                 obj = np.asfortranarray(obj)
-        dtype = arr.dtype.type
-        if (
-            dtype == np.bool_
-        ):  # Fails with: Finch currently only supports isbits defaults
-            dtype = jl_dtypes.bool
-        lvl = ElementLevel(fill_value, arr.reshape(-1, order="F"))
-        for i in arr.shape:
+        else:
+            if not np.isfortran(obj):
+                obj = np.asfortranarray(obj)
+        
+        lvl = ElementLevel(fill_value, NumpyBuffer(obj.reshape(-1)))
+        for i in obj.shape:
             lvl = DenseLevel(lvl, i)
         return FinchJLTensor(lvl)
     elif hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse"):
@@ -196,12 +195,12 @@ def asarray(
                     ElementLevel(
                         dtype,
                         fill_value,
-                        obj.data
+                        NumpyBUffer(obj.data)
                     ),
                     2,
                     idxs = (
-                        x.cols,
-                        x.rows,
+                        PlusOneBuffer(NumpyBuuffer(x.cols)),
+                        PlusOneBuffer(NumpyBuuffer(x.rows)),
                     ),
                 )
             )
@@ -215,8 +214,8 @@ def asarray(
                             obj.data
                         ),
                         n,
-                        obj.indptr,
-                        obj.indices
+                        PlusOneBuffer(obj.indptr),
+                        PlusOneBuffer(obj.indices)
                     ),
                     (m, n)
                 )
@@ -225,6 +224,8 @@ def asarray(
             raise ValueError(f"Unsupported SciPy format: {type(x)}")
     else:
         raise ValueError(
-            "Either scalar, numpy, scipy.sparse or a raw julia object should "
+            "Either numpy array or a Finch tensor should "
             f"be provided. Found: {type(obj)}"
         )
+
+

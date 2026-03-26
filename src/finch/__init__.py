@@ -122,6 +122,7 @@ from .dtypes import (
 )
 from .scheduler import COMPILE_JULIA
 from .tensor import (
+    asarray,
     FinchJLTensor,
     FinchJLTensorFType,
 )

@@ -11,7 +11,7 @@ from finchlite.autoschedule import (
 from finchlite.finch_logic import LogicLoader
 
 from .compiler import FinchJLCompiler
-from .levels import Dense, Element
+from .levels import DenseLevel, ElementLevel
 from .tensor import FinchJLTensorFType
 
 
@@ -23,9 +23,9 @@ class FinchJLLogicFormatter(LogicFormatter):
         super().__init__(loader)
 
     def get_output_tns_ftype(self, fill_value: Any, shape_type: tuple[Any, ...]):
-        lvl = Element(fill_value)
+        lvl = ElementLevel(fill_value)
         for _ in shape_type:
-            lvl = Dense(lvl)
+            lvl = DenseLevel(lvl)
         return FinchJLTensorFType(lvl)
 
 
