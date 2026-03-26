@@ -1,6 +1,7 @@
 
 from abc import ABC
-from finchlite import Buffer, NumpyBuffer, BufferFType
+from finchlite.finch_assembly import Buffer, BufferFType
+from finchlite.codegen import NumpyBuffer
 from .julia import jc, jl
 
 class PlusOneBufferFType(BufferFType):

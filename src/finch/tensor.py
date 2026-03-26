@@ -5,10 +5,9 @@ import numpy as np
 from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
-from .levels import LevelFType, Scalar, construct_levels
+from .levels import LevelFType, construct_levels
 from .typing import JuliaObj
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
-
 
 # Tensor Class and associated ftype
 class FinchJLTensorFType(TensorFType):

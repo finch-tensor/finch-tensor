@@ -3,7 +3,8 @@ from typing import Any
 
 import numpy as np
 
-from finchlite import Tensor, TensorFType, Buffer
+from finchlite import Tensor, TensorFType
+from finchlite.finch_assembly import Buffer, BufferFType
 from .buffer import PlusOneBuffer, NumpyBuffer, buffer_to_jlobj, jlobj_to_buffer
 
 from .julia import jl
