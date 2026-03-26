@@ -276,12 +276,12 @@ class SparseList(AbstractLevel):
 
     @property
     def ptr(self) -> Buffer:
-        """Return the coordinate buffers for this COO level."""
+        """Return the pointer array for this sparse list level."""
         return jlobj_to_buffer(self._obj.ptr)
 
     @property
     def idx(self) -> Buffer:
-        """Return the coordinate buffers for this COO level."""
+        """Return the index array for this sparse list level."""
         return jlobj_to_buffer(self._obj.idx)
 
 class SparseByteMap(AbstractLevel):
@@ -396,7 +396,7 @@ class SparseCOO(AbstractLevel):
     
     @property
     def tbl(self) -> tuple[Buffer, ...]:
-        """Return the coordinate buffers for this COO level."""
+        """Return the coordinate array tuple for this COO level."""
         return tuple(jlobj_to_buffer(coord) for coord in self._obj.tbl)
 
 
