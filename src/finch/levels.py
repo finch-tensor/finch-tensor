@@ -149,7 +149,17 @@ class _Display:
 
 
 class AbstractLevel(_Display):
-    pass
+    @property
+    def ndim(self) -> int:
+        return self.ftype().ndim
+    
+    @property
+    def fill_value(self) -> Any:
+        return self.ftype().fill_value
+    
+    @property
+    def element_type(self) -> Any:
+        return self.ftype().element_type
 
 
 # core levels
