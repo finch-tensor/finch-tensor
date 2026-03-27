@@ -74,3 +74,29 @@ tests:
 ```bash
 poetry run pytest
 ```
+
+Array API tests are included in `tests/test_array_api.py`. These tests invoke the [Array API Conformance Tests](https://github.com/data-apis/array-api-tests).
+To forward `pytest` options to the nested
+`array-api-tests` invocation, use `--array-api` (alias:
+`--array-api-pytest-args`):
+
+```bash
+poetry run pytest tests/test_array_api.py \
+    --array-api="-k creation_functions" \
+    --array-api="-x"
+```
+
+By default, the nested Array API run forwards common top-level pytest options
+from your main invocation:
+
+- `-x`/`--maxfail`
+- `-s`
+- `-v`, `-vv`, etc.
+- `-k`
+
+You can repeat `--array-api` (or `--array-api-pytest-args`) multiple times.
+Each value is parsed like shell arguments and appended to the nested `pytest`
+call.
+
+`ARRAY_API_TESTS_ARGS` is still supported as a fallback for compatibility, but
+the CLI option is preferred.

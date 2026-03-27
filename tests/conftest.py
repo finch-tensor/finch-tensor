@@ -3,6 +3,19 @@ import pytest
 import numpy as np
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--array-api",
+        "--array-api-pytest-args",
+        action="append",
+        default=[],
+        help=(
+            "Arguments forwarded to the nested array-api-tests pytest run. "
+            "Repeat this option to pass multiple groups."
+        ),
+    )
+
+
 @pytest.fixture
 def rng():
     return np.random.default_rng(42)

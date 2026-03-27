@@ -1,9 +1,46 @@
 import os
+import shlex
 import subprocess
 import sys
 
 
-def test_array_api():
+def _get_forwarded_main_pytest_args(request):
+    args = []
+
+    maxfail = request.config.getoption("maxfail")
+    if maxfail:
+        args.append(f"--maxfail={maxfail}")
+
+    capture = request.config.getoption("capture")
+    if capture == "no":
+        args.append("-s")
+
+    verbose = request.config.getoption("verbose")
+    if verbose and verbose > 0:
+        args.append(f"-{'v' * verbose}")
+
+    keyword = request.config.getoption("keyword")
+    if keyword:
+        args.extend(["-k", keyword])
+
+    return args
+
+
+def _get_user_array_api_pytest_args(request):
+    cli_args = []
+    for arg_group in request.config.getoption("array_api_pytest_args"):
+        cli_args.extend(shlex.split(arg_group))
+    if cli_args:
+        return cli_args
+
+    env_args = os.environ.get("ARRAY_API_TESTS_ARGS")
+    if env_args:
+        return shlex.split(env_args)
+
+    return ["-vv", "-s"]
+
+
+def test_array_api(request):
     ARRAY_API_TESTS_DIR = os.environ.get(
         "ARRAY_API_TESTS_DIR",
         os.path.abspath(
@@ -19,7 +56,9 @@ def test_array_api():
             os.path.join(os.path.dirname(__file__), "../array-api-skips.txt"),
         ),
     )
-    ARRAY_API_TESTS_ARGS = os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s")
+    FORWARDED_MAIN_PYTEST_ARGS = _get_forwarded_main_pytest_args(request)
+    ARRAY_API_TESTS_ARGS = _get_user_array_api_pytest_args(request)
+    NESTED_PYTEST_ARGS = [*FORWARDED_MAIN_PYTEST_ARGS, *ARRAY_API_TESTS_ARGS]
 
     print(f"[array-api] using dir: {ARRAY_API_TESTS_DIR}", flush=True)
     print(f"[array-api] target rev: {ARRAY_API_TESTS_REV}", flush=True)
@@ -81,12 +120,17 @@ def test_array_api():
 
     # Run the tests using pytest
     print("[array-api] running external array-api-tests...", flush=True)
+    print(
+        f"[array-api] forwarded main pytest args: {FORWARDED_MAIN_PYTEST_ARGS}",
+        flush=True,
+    )
+    print(f"[array-api] user nested pytest args: {ARRAY_API_TESTS_ARGS}", flush=True)
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             "pytest",
-            *ARRAY_API_TESTS_ARGS.split(),
+            *NESTED_PYTEST_ARGS,
             f"{ARRAY_API_TESTS_DIR}/array_api_tests/",
             "--max-examples=2",
             "--derandomize",
