@@ -193,7 +193,9 @@ def jlobj_to_format(obj: JuliaObj) -> LevelFormat:
     if jl.isa(obj, jl.Finch.SparseList):
         return SparseListFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     if jl.isa(obj, jl.Finch.SparseCOO):
-        return SparseCOOFormat(jlobj_to_format(obj.lvl), type(obj).__type_params__[0], type(obj.shape))
+        return SparseCOOFormat(
+            jlobj_to_format(obj.lvl), type(obj).__type_params__[0], type(obj.shape)
+        )
     if jl.isa(obj, jl.Finch.SparseByteMap):
         return SparseByteMapFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     raise Exception("Unhandled exception!")

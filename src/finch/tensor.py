@@ -196,29 +196,33 @@ def asarray(
             )
         m, n = obj.shape
         if obj.format == "coo":
-            return FinchJLTensor(jl.Tensor(
-                jl.SparseCOOLevel(
-                    (n, m),
-                    jl.ElementLevel(dtype, fill_value, obj.data),
-                    2,
-                    idxs=(
-                        jl.Finch.PlusOneVector(obj.cols),
-                        jl.Finch.PlusOneVector(obj.rows),
-                    ),
-                )
-            ))
-        if obj.format == "csr":
-            return FinchJLTensor(jl.Tensor(
-                jl.DenseLevel(
-                    jl.SparseListLevel(
+            return FinchJLTensor(
+                jl.Tensor(
+                    jl.SparseCOOLevel(
+                        (n, m),
                         jl.ElementLevel(dtype, fill_value, obj.data),
-                        m,
-                        jl.Finch.PlusOneVector(obj.indptr),
-                        jl.Finch.PlusOneVector(obj.indices),
-                    ),
-                    n,
+                        2,
+                        idxs=(
+                            jl.Finch.PlusOneVector(obj.cols),
+                            jl.Finch.PlusOneVector(obj.rows),
+                        ),
+                    )
                 )
-            ))
+            )
+        if obj.format == "csr":
+            return FinchJLTensor(
+                jl.Tensor(
+                    jl.DenseLevel(
+                        jl.SparseListLevel(
+                            jl.ElementLevel(dtype, fill_value, obj.data),
+                            m,
+                            jl.Finch.PlusOneVector(obj.indptr),
+                            jl.Finch.PlusOneVector(obj.indices),
+                        ),
+                        n,
+                    )
+                )
+            )
         raise ValueError(f"Unsupported SciPy format: {type(obj)}")
     raise ValueError(
         f"Either numpy array or a Finch tensor should be provided. Found: {type(obj)}"
