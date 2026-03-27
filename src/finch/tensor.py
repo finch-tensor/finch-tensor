@@ -31,6 +31,10 @@ class FinchJLTensorFType(TensorFType):
         return self._lvl.element_type
 
     @property
+    def dtype(self) -> Any:
+        return self.element_type
+
+    @property
     def shape_type(self) -> tuple:
         return reversed(self._lvl.shape_type)
 
@@ -52,6 +56,7 @@ class FinchJLTensorFType(TensorFType):
 class FinchJLTensor(EagerTensor):
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
+            assert jl.isa(obj, jl.Finch.Tensor)
             self._obj = obj
         else:
             raise ValueError(f"Raw julia object expected. Found: {type(obj)}")
@@ -59,7 +64,11 @@ class FinchJLTensor(EagerTensor):
     @property
     def ftype(self) -> TensorFType:
         """Returns the ftype of the buffer"""
-        return FinchJLTensorFType(jlobj_to_format(self._obj, jl.fill_value(self._obj)))
+        return FinchJLTensorFType(jlobj_to_format(self._obj.lvl))
+
+    @property
+    def dtype(self) -> Any:
+        return self.element_type
 
     @property
     def shape(self) -> tuple:
@@ -139,10 +148,18 @@ def asarray(
 ) -> FinchJLTensor:
     if fill_value is None:
         fill_value = 0.0
+    if copy is None:
+        copy = True
     if isinstance(obj, FinchJLTensor):
         if copy:
             return obj.copy()
         return obj
+    if isinstance(obj, int | float | complex | bool | list):
+        if copy is False:
+            raise ValueError(
+                "copy=False isn't supported for scalar inputs and Python lists"
+            )
+        obj = np.asarray(obj)
     if isinstance(obj, np.ndarray):
         if copy:
             obj = obj.copy() if np.isfortran(obj) else np.asfortranarray(obj)
@@ -151,12 +168,12 @@ def asarray(
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
-        buf = np.reshape(np.permute_dims(obj, reversed(range(obj.ndim))), -1)
+        buf = np.reshape(np.permute_dims(obj, tuple(reversed(range(obj.ndim)))), -1)
 
         lvl = jl.ElementLevel(fill_value, buf)
         for i in obj.shape:
             lvl = jl.DenseLevel(lvl, i)
-        return FinchJLTensor(lvl)
+        return FinchJLTensor(jl.Tensor(lvl))
     if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
         if copy:
             if obj.format in ("coo", "csr"):
@@ -175,7 +192,7 @@ def asarray(
             )
         m, n = obj.shape
         if obj.format == "coo":
-            return Tensor(
+            return FinchJLTensor(jl.Tensor(
                 jl.SparseCOOLevel(
                     (n, m),
                     jl.ElementLevel(dtype, fill_value, obj.data),
@@ -185,9 +202,9 @@ def asarray(
                         jl.Finch.PlusOneVector(obj.rows),
                     ),
                 )
-            )
+            ))
         if obj.format == "csr":
-            return Tensor(
+            return FinchJLTensor(jl.Tensor(
                 jl.DenseLevel(
                     jl.SparseListLevel(
                         jl.ElementLevel(dtype, fill_value, obj.data),
@@ -197,7 +214,7 @@ def asarray(
                     ),
                     n,
                 )
-            )
+            ))
         raise ValueError(f"Unsupported SciPy format: {type(obj)}")
     raise ValueError(
         f"Either numpy array or a Finch tensor should be provided. Found: {type(obj)}"

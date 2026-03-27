@@ -178,11 +178,13 @@ def jlobj_to_format(obj: JuliaObj) -> LevelFormat:
         If an unsupported level type is encountered.
     """
     if jl.isa(obj, jl.Finch.Element):
-        return ElementFormat(jl.fill_value(obj))
+        return ElementFormat(jl.Finch.level_fill_value(jl.typeof(obj)))
     if jl.isa(obj, jl.Finch.Dense):
-        return DenseFormat(type(obj.shape), jlobj_to_format(obj.lvl))
+        return DenseFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     if jl.isa(obj, jl.Finch.SparseList):
-        return SparseListFormat(type(obj.shape), jlobj_to_format(obj.lvl))
+        return SparseListFormat(jlobj_to_format(obj.lvl), type(obj.shape))
+    if jl.isa(obj, jl.Finch.SparseCOO):
+        return SparseCOOFormat(jlobj_to_format(obj.lvl), type(obj).__type_params__[0], type(obj.shape))
     if jl.isa(obj, jl.Finch.SparseByteMap):
-        return SparseByteMapFormat(jlobj_to_format(obj.lvl))
+        return SparseByteMapFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     raise Exception("Unhandled exception!")
