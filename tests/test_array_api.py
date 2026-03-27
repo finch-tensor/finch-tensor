@@ -120,7 +120,10 @@ def test_array_api(request):
 
     # Run the tests using pytest
     print("[array-api] running external array-api-tests...", flush=True)
-    print(f"[array-api] forwarded main pytest args: {FORWARDED_MAIN_PYTEST_ARGS}", flush=True)
+    print(
+        f"[array-api] forwarded main pytest args: {FORWARDED_MAIN_PYTEST_ARGS}",
+        flush=True,
+    )
     print(f"[array-api] user nested pytest args: {ARRAY_API_TESTS_ARGS}", flush=True)
     result = subprocess.run(
         [
