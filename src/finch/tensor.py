@@ -5,7 +5,7 @@ import numpy as np
 from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
-from .levels import LevelFType, construct_levels
+from .levels import LevelFType, ElementLevel, DenseLevel, SparseListLevel, SparseCOOLevel
 from .typing import JuliaObj, DType
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 

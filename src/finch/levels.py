@@ -445,7 +445,7 @@ class SparseHashLevel(AbstractLevel):
 
 
 # Helper Methods
-def construct_levels(obj: JuliaObj, fill_value: number) -> LevelFType:
+def jlobj_to_level(obj: JuliaObj, fill_value: number) -> LevelFType:
     """Construct a level hierarchy from a Julia Finch tensor object.
     
     Recursively constructs a Python representation of the tensor's level structure
