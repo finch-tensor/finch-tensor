@@ -4,9 +4,12 @@ import numpy as np
 
 from finchlite import EagerTensor, Tensor, TensorFType
 
+from . import dtypes as jl_dtypes
 from .julia import jc, jl
 from .levels import (
+    ElementFormat,
     LevelFormat,
+    SparseCOOFormat,
     jlobj_to_format,
 )
 from .typing import DType, JuliaObj
@@ -226,4 +229,143 @@ def asarray(
         raise ValueError(f"Unsupported SciPy format: {type(obj)}")
     raise ValueError(
         f"Either numpy array or a Finch tensor should be provided. Found: {type(obj)}"
+    )
+
+
+def reshape(
+    x: FinchJLTensor, /, shape: tuple[int, ...], *, copy: bool | None = None
+) -> FinchJLTensor:
+    if copy is False:
+        raise ValueError("Unable to avoid copy during reshape.")
+    if all(i == 1 for i in x.shape):
+        return full(shape, x[()], dtype=x.dtype)
+    return FinchJLTensor(jl.reshape(x._obj, tuple(reversed(shape))))
+
+
+def full(
+    shape: int | tuple[int, ...],
+    val: jl_dtypes.number,
+    *,
+    dtype: DType | None = None,
+    format=None,
+) -> FinchJLTensor:
+    if not np.isscalar(val):
+        raise ValueError("`fill_value` must be a scalar")
+    if isinstance(shape, int):
+        shape = (shape,)
+    dtype = (
+        np.asarray(val).dtype.type if dtype is None else jl_dtypes.jl_to_np_dtype[dtype]
+    )
+    if dtype == np.bool_:  # Fails with: Finch currently only supports isbits defaults
+        dtype = bool
+
+    if format is None:
+        format = SparseCOOFormat(ElementFormat(val, dtype), len(shape))
+
+    if format.fill_value != val:
+        return FinchJLTensor(
+            jl.Tensor(format.construct_julia_lvl(), np.full(val, reversed(shape)))
+        )
+    return FinchJLTensor(jl.Tensor(format.construct_julia_lvl(), *reversed(shape)))
+
+
+def full_like(
+    x: FinchJLTensor,
+    /,
+    fill_value: jl_dtypes.number,
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    return full(x.shape, fill_value, dtype=dtype, format=format)
+
+
+def ones(
+    shape: int | tuple[int, ...],
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    return full(shape, np.float64(1), dtype=dtype, format=format)
+
+
+def ones_like(
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    dtype = x.dtype if dtype is None else dtype
+    return ones(x.shape, dtype=dtype, format=format)
+
+
+def zeros(
+    shape: int | tuple[int, ...],
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    return full(shape, np.float64(0), dtype=dtype, format=format)
+
+
+def zeros_like(
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    dtype = x.dtype if dtype is None else dtype
+    return zeros(x.shape, dtype=dtype, format=format)
+
+
+def empty(
+    shape: int | tuple[int, ...],
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    return full(shape, np.float64(0), dtype=dtype, format=format)
+
+
+def empty_like(
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+    format: str = "coo",
+) -> FinchJLTensor:
+    dtype = x.dtype if dtype is None else dtype
+    return empty(x.shape, dtype=dtype, format=format)
+
+
+def arange(
+    start: float,
+    /,
+    stop: float | None = None,
+    step: float = 1,
+    *,
+    dtype: DType | None = None,
+) -> FinchJLTensor:
+    return asarray(np.arange(start, stop, step, jl_dtypes.jl_to_np_dtype[dtype]))
+
+
+def linspace(
+    start: complex,
+    stop: complex,
+    /,
+    num: int,
+    *,
+    dtype: DType | None = None,
+    endpoint: bool = True,
+) -> FinchJLTensor:
+    return asarray(
+        np.linspace(
+            start,
+            stop,
+            num=num,
+            dtype=jl_dtypes.jl_to_np_dtype[dtype],
+            endpoint=endpoint,
+        )
     )
