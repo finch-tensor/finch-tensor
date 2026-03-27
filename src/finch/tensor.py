@@ -5,14 +5,14 @@ import numpy as np
 from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
-from .levels import LevelFType, ElementLevel, DenseLevel, SparseListLevel, SparseCOOLevel
+from .levels import LevelFType, ElementLevel, DenseLevel, SparseListLevel, SparseCOOLevel, jlobj_to_format
 from .typing import JuliaObj, DType
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 # Tensor Class and associated ftype
 class FinchJLTensorFType(TensorFType):
     def __init__(self, lvl):
-        self._lvl: LevelFType = lvl
+        self._lvl: LevelFormat = lvl
 
     @property
     def ndim(self) -> np.intp:
@@ -49,7 +49,6 @@ class FinchJLTensorFType(TensorFType):
     def __hash__(self):
         return hash(("FinchJLTensorFType", self._lvl))
 
-
 class FinchJLTensor(EagerTensor):
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
@@ -62,7 +61,7 @@ class FinchJLTensor(EagerTensor):
         """Returns the ftype of the buffer"""
         if self._is_scalar():
             return FinchJLTensorFType(Scalar(self._obj.val))
-        return FinchJLTensorFType(construct_levels(self._obj, jl.fill_value(self._obj)))
+        return FinchJLTensorFType(jlobj_to_format(self._obj, jl.fill_value(self._obj)))
 
     @property
     def shape(self) -> tuple:
@@ -169,18 +168,18 @@ def asarray(
         
         lvl = ElementLevel(fill_value, NumpyBuffer(obj.reshape(-1)))
         for i in obj.shape:
-            lvl = DenseLevel(lvl, i)
+            lvl = jl.DenseLevel(lvl, i)
         return FinchJLTensor(lvl)
     elif hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
         if obj.format == "coo":
             obj = obj.T
         if copy:
             if obj.format in ("coo", "csc"):
-                if not x.has_sorted_indices:
+                if not obj.has_sorted_indices:
                     obj = obj.sorted_indices()
                 else:
                     obj = obj.copy()
-                if not x.has_canonical_format:
+                if not obj.has_canonical_format:
                     obj.sum_duplicates()
             else:
                 obj = obj.asformat("csc")
@@ -191,37 +190,38 @@ def asarray(
         m, n = obj.shape
         if obj.format == "coo":
             return Tensor(
-                SparseCOOLevel(
-                    ElementLevel(
+                jl.SparseCOOLevel(
+                    jl.ElementLevel(
                         dtype,
                         fill_value,
-                        NumpyBUffer(obj.data)
+                        obj.data
                     ),
                     2,
                     idxs = (
-                        PlusOneBuffer(NumpyBuuffer(x.cols)),
-                        PlusOneBuffer(NumpyBuuffer(x.rows)),
+                        jl.Finch.PlusOneVector(obj.cols),
+                        jl.Finch.PlusOneVector(obj.rows),
                     ),
+                    (m, n)
                 )
             )
-        elif x.format == "csc":
+        elif obj.format == "csc":
             return Tensor(
-                DenseLevel(
-                    SparseListLevel(
-                        ElementLevel(
+                jl.DenseLevel(
+                    jl.SparseListLevel(
+                        jl.ElementLevel(
                             dtype,
                             fill_value,
                             obj.data
                         ),
                         n,
-                        PlusOneBuffer(obj.indptr),
-                        PlusOneBuffer(obj.indices)
+                        jl.Finch.PlusOneVector(obj.indptr),
+                        jl.Finch.PlusOneVector(obj.indices)
                     ),
-                    (m, n)
+                    m
                 )
             )
         else:
-            raise ValueError(f"Unsupported SciPy format: {type(x)}")
+            raise ValueError(f"Unsupported SciPy format: {type(obj)}")
     else:
         raise ValueError(
             "Either numpy array or a Finch tensor should "
