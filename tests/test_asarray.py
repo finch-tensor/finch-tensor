@@ -1,12 +1,15 @@
 """Tests for the asarray function."""
 
 import pytest
+
 import numpy as np
+
 from finch import asarray
 from finch.tensor import FinchJLTensor
 
 try:
     import scipy.sparse as sp
+
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
@@ -179,13 +182,13 @@ class TestAsarrayDataTypes:
 
     def test_asarray_complex64(self):
         """Test converting complex64 array."""
-        arr = np.array([[1+2j, 3+4j], [5+6j, 7+8j]], dtype=np.complex64)
+        arr = np.array([[1 + 2j, 3 + 4j], [5 + 6j, 7 + 8j]], dtype=np.complex64)
         result = asarray(arr)
         assert isinstance(result, FinchJLTensor)
 
     def test_asarray_complex128(self):
         """Test converting complex128 array."""
-        arr = np.array([[1+2j, 3+4j], [5+6j, 7+8j]], dtype=np.complex128)
+        arr = np.array([[1 + 2j, 3 + 4j], [5 + 6j, 7 + 8j]], dtype=np.complex128)
         result = asarray(arr)
         assert isinstance(result, FinchJLTensor)
 

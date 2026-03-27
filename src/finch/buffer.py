@@ -1,8 +1,12 @@
-
 from abc import ABC
-from finchlite.finch_assembly import Buffer, BufferFType
+
+import numpy as np
+
 from finchlite.codegen import NumpyBuffer
-from .julia import jc, jl
+from finchlite.finch_assembly import Buffer, BufferFType
+
+from .julia import jl
+
 
 class PlusOneBufferFType(BufferFType):
     def __init__(self, data_ftype):
@@ -10,11 +14,11 @@ class PlusOneBufferFType(BufferFType):
 
     def __call__(self, *args, **kwargs):
         return PlusOneBuffer(self.data_ftype(*args, **kwargs))
-    
+
     @property
     def element_type(self):
         return self.data_ftype.element_type
-    
+
     @property
     def length_type(self):
         return self.data_ftype.length_type
@@ -22,12 +26,13 @@ class PlusOneBufferFType(BufferFType):
 
 class PlusOneBuffer(Buffer, ABC):
     """
-    Buffer that adds one to each element when loaded and subtracts one from each element when stored.
+    Buffer that adds one to each element when loaded and subtracts one from each
+    element when stored.
     """
 
     def __init__(self, data):
-        self.data : Buffer = data
-    
+        self.data: Buffer = data
+
     def ftype(self):
         return PlusOneBufferFType(self.data.ftype())
 
@@ -55,18 +60,18 @@ class PlusOneBuffer(Buffer, ABC):
     def resize(self, len: int):
         self.data.resize(len)
 
+
 def buffer_to_jlobj(buffer: Buffer):
     if isinstance(buffer, PlusOneBuffer):
         return jl.PlusOneVector(buffer_to_jlobj(buffer.data))
-    elif isinstance(buffer, NumpyBuffer):
+    if isinstance(buffer, NumpyBuffer):
         return buffer.arr
-    else:
-        raise ValueError(f"Unsupported buffer type: {type(buffer)}")
+    raise ValueError(f"Unsupported buffer type: {type(buffer)}")
+
 
 def jlobj_to_buffer(jlobj):
     if isinstance(jlobj, jl.PlusOneVector):
         return PlusOneBuffer(jlobj_to_buffer(jlobj.data))
-    elif isinstance(jlobj, np.ndarray):
+    if isinstance(jlobj, np.ndarray):
         return NumpyBuffer(jlobj)
-    else:
-        raise ValueError(f"Unsupported Julia object type: {type(jlobj)}")
+    raise ValueError(f"Unsupported Julia object type: {type(jlobj)}")

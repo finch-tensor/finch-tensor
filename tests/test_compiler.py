@@ -29,10 +29,10 @@ from finchlite.finch_notation.nodes import (
 
 from finch.compiler import FinchJLCompiler, FinchJLKernel
 from finch.julia import jl
-from finch.levels import DenseLevel, ElementLevel
-from finch.tensor import FinchJLTensor
+from finch.levels import DenseFormat, ElementFormat
+from finch.tensor import FinchJLTensor, FinchJLTensorFType
 
-a_format = DenseLevel(DenseLevel(ElementLevel(0)))
+a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
 
 
 @pytest.mark.parametrize(

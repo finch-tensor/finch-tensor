@@ -5,9 +5,13 @@ import numpy as np
 from finchlite import EagerTensor, Tensor, TensorFType
 
 from .julia import jc, jl
-from .levels import LevelFType, ElementLevel, DenseLevel, SparseListLevel, SparseCOOLevel, jlobj_to_format
-from .typing import JuliaObj, DType
+from .levels import (
+    LevelFormat,
+    jlobj_to_format,
+)
+from .typing import DType, JuliaObj
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
+
 
 # Tensor Class and associated ftype
 class FinchJLTensorFType(TensorFType):
@@ -31,9 +35,6 @@ class FinchJLTensorFType(TensorFType):
         return self._lvl.shape_type
 
     def __call__(self, shape: tuple | None = None) -> Tensor:
-        if isinstance(self._lvl, Scalar):
-            return FinchJLTensor(self._lvl.create_jl_obj())
-
         if shape is None:
             raise ValueError("shape argument cannot be None for non scalar tensors.")
         return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), shape))
@@ -49,6 +50,7 @@ class FinchJLTensorFType(TensorFType):
     def __hash__(self):
         return hash(("FinchJLTensorFType", self._lvl))
 
+
 class FinchJLTensor(EagerTensor):
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
@@ -59,8 +61,6 @@ class FinchJLTensor(EagerTensor):
     @property
     def ftype(self) -> TensorFType:
         """Returns the ftype of the buffer"""
-        if self._is_scalar():
-            return FinchJLTensorFType(Scalar(self._obj.val))
         return FinchJLTensorFType(jlobj_to_format(self._obj, jl.fill_value(self._obj)))
 
     @property
@@ -69,9 +69,6 @@ class FinchJLTensor(EagerTensor):
         return jl.size(self._obj)
 
     def __getitem__(self, key):
-        if self._is_scalar():
-            raise ValueError("Scalars are not subscriptable!")
-
         if not isinstance(key, tuple):
             key = (key,)
 
@@ -84,9 +81,6 @@ class FinchJLTensor(EagerTensor):
         if jl.isa(result, jl.Finch.Tensor):
             return FinchJLTensor(result)
         return np.array(result)
-
-    def _is_scalar(self) -> bool:
-        return jl.isa(self._obj, jl.Finch.Scalar)
 
     def _is_dense(self) -> bool:
         if self._is_scalar():
@@ -141,6 +135,7 @@ class FinchJLTensor(EagerTensor):
 
         return finch
 
+
 def asarray(
     obj,
     /,
@@ -154,36 +149,35 @@ def asarray(
     if isinstance(obj, FinchJLTensor):
         if copy:
             return obj.copy()
-        else:
-            return obj
-    elif isinstance(obj, np.ndarray):
+        return obj
+    if isinstance(obj, np.ndarray):
         if copy:
-            if np.isfortran(obj):
-                obj = obj.copy()
-            else:
-                obj = np.asfortranarray(obj)
+            obj = obj.copy() if np.isfortran(obj) else np.asfortranarray(obj)
         else:
             if not np.isfortran(obj):
-                obj = np.asfortranarray(obj)
-        
-        lvl = ElementLevel(fill_value, NumpyBuffer(obj.reshape(-1)))
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+
+        lvl = jl.ElementLevel(fill_value, obj.reshape(-1))
         for i in obj.shape:
             lvl = jl.DenseLevel(lvl, i)
         return FinchJLTensor(lvl)
-    elif hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
+    if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
         if obj.format == "coo":
             obj = obj.T
         if copy:
             if obj.format in ("coo", "csc"):
-                if not obj.has_sorted_indices:
-                    obj = obj.sorted_indices()
-                else:
-                    obj = obj.copy()
+                obj = obj.copy() if obj.has_sorted_indices else obj.sorted_indices()
                 if not obj.has_canonical_format:
                     obj.sum_duplicates()
             else:
                 obj = obj.asformat("csc")
-        if copy is False and not obj.format in ("coo", "csc") and not obj.has_canonical_format:
+        if (
+            copy is False
+            and obj.format not in ("coo", "csc")
+            and not obj.has_canonical_format
+        ):
             raise ValueError(
                 "Unable to avoid copy while creating an array as requested."
             )
@@ -191,41 +185,28 @@ def asarray(
         if obj.format == "coo":
             return Tensor(
                 jl.SparseCOOLevel(
-                    jl.ElementLevel(
-                        dtype,
-                        fill_value,
-                        obj.data
-                    ),
+                    (m, n),
+                    jl.ElementLevel(dtype, fill_value, obj.data),
                     2,
-                    idxs = (
+                    idxs=(
                         jl.Finch.PlusOneVector(obj.cols),
                         jl.Finch.PlusOneVector(obj.rows),
                     ),
-                    (m, n)
                 )
             )
-        elif obj.format == "csc":
+        if obj.format == "csc":
             return Tensor(
                 jl.DenseLevel(
                     jl.SparseListLevel(
-                        jl.ElementLevel(
-                            dtype,
-                            fill_value,
-                            obj.data
-                        ),
+                        jl.ElementLevel(dtype, fill_value, obj.data),
                         n,
                         jl.Finch.PlusOneVector(obj.indptr),
-                        jl.Finch.PlusOneVector(obj.indices)
+                        jl.Finch.PlusOneVector(obj.indices),
                     ),
-                    m
+                    m,
                 )
             )
-        else:
-            raise ValueError(f"Unsupported SciPy format: {type(obj)}")
-    else:
-        raise ValueError(
-            "Either numpy array or a Finch tensor should "
-            f"be provided. Found: {type(obj)}"
-        )
-
-
+        raise ValueError(f"Unsupported SciPy format: {type(obj)}")
+    raise ValueError(
+        f"Either numpy array or a Finch tensor should be provided. Found: {type(obj)}"
+    )

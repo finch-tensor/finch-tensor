@@ -1,4 +1,5 @@
-import os # noqa: I001, F401
+import os  # noqa: I001, F401
+
 os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
 import juliapkg  # noqa: I001, F401
 
