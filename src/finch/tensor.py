@@ -171,7 +171,7 @@ def asarray(
         for i in obj.shape:
             lvl = DenseLevel(lvl, i)
         return FinchJLTensor(lvl)
-    elif hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse"):
+    elif hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
         if obj.format == "coo":
             obj = obj.T
         if copy:
