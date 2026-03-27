@@ -31,13 +31,11 @@ class FinchJLTensorFType(TensorFType):
         return self._lvl.element_type
 
     @property
-    def shape_type(self) -> tuple[type, ...]:
-        return self._lvl.shape_type
+    def shape_type(self) -> tuple:
+        return reversed(self._lvl.shape_type)
 
-    def __call__(self, shape: tuple | None = None) -> Tensor:
-        if shape is None:
-            raise ValueError("shape argument cannot be None for non scalar tensors.")
-        return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), shape))
+    def __call__(self, shape: tuple) -> Tensor:
+        return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), reversed(shape)))
 
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
@@ -77,15 +75,10 @@ class FinchJLTensor(EagerTensor):
         key = add_missing_dims(key, self.shape)
         key = add_plus_one(key, self.shape)
 
-        result = self._obj[key]
-        if jl.isa(result, jl.Finch.Tensor):
-            return FinchJLTensor(result)
-        return np.array(result)
+        result = self._obj[reversed(key)]
+        return FinchJLTensor(jl.Tensor(result))
 
     def _is_dense(self) -> bool:
-        if self._is_scalar():
-            return False
-
         lvl = self._obj.lvl
         for _ in self.shape:
             if not jl.isa(lvl, jl.Finch.Dense):
@@ -94,9 +87,6 @@ class FinchJLTensor(EagerTensor):
         return True
 
     def todense(self) -> np.ndarray:
-        if self._is_scalar():
-            return np.asarray(self._obj.val)
-
         obj = self._obj
 
         if self._is_dense:
@@ -114,16 +104,19 @@ class FinchJLTensor(EagerTensor):
         for _ in range(self.ndim):
             dense_tensor = dense_tensor.lvl
 
-        return np.asarray(jl.reshape(dense_tensor.val, shape))
+        arr = jl.reshape(dense_tensor.val)
+        return np.asarray(np.permute_dims(arr, reversed(range(self.ndims))))
 
     def __eq__(self, other):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
 
     def __repr__(self):
-        return jl.sprint(jl.show, self._obj)
+        swiz = jl.swizzle(self._obj, reversed(range(self.ndim,1,-1)))
+        return jl.sprint(jl.show, swiz)
 
     def __str__(self):
-        return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
+        swiz = jl.swizzle(self._obj, reversed(range(self.ndim,1,-1)))
+        return jl.sprint(jl.show, jl.MIME("text/plain"), swiz)
 
     def __array_namespace__(self, *, api_version: str | None = None) -> Any:
         if api_version is None:
@@ -158,24 +151,23 @@ def asarray(
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
+        buf = np.reshape(np.permute_dims(obj, reversed(range(obj.ndim))), -1)
 
-        lvl = jl.ElementLevel(fill_value, obj.reshape(-1))
+        lvl = jl.ElementLevel(fill_value, buf)
         for i in obj.shape:
             lvl = jl.DenseLevel(lvl, i)
         return FinchJLTensor(lvl)
     if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
-        if obj.format == "coo":
-            obj = obj.T
         if copy:
-            if obj.format in ("coo", "csc"):
+            if obj.format in ("coo", "csr"):
                 obj = obj.copy() if obj.has_sorted_indices else obj.sorted_indices()
                 if not obj.has_canonical_format:
                     obj.sum_duplicates()
             else:
-                obj = obj.asformat("csc")
+                obj = obj.asformat("csr")
         if (
             copy is False
-            and obj.format not in ("coo", "csc")
+            and obj.format not in ("coo", "csr")
             and not obj.has_canonical_format
         ):
             raise ValueError(
@@ -185,7 +177,7 @@ def asarray(
         if obj.format == "coo":
             return Tensor(
                 jl.SparseCOOLevel(
-                    (m, n),
+                    (n, m),
                     jl.ElementLevel(dtype, fill_value, obj.data),
                     2,
                     idxs=(
@@ -194,16 +186,16 @@ def asarray(
                     ),
                 )
             )
-        if obj.format == "csc":
+        if obj.format == "csr":
             return Tensor(
                 jl.DenseLevel(
                     jl.SparseListLevel(
                         jl.ElementLevel(dtype, fill_value, obj.data),
-                        n,
+                        m,
                         jl.Finch.PlusOneVector(obj.indptr),
                         jl.Finch.PlusOneVector(obj.indices),
                     ),
-                    m,
+                    n,
                 )
             )
         raise ValueError(f"Unsupported SciPy format: {type(obj)}")
