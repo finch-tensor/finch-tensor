@@ -45,8 +45,9 @@ class ElementFormat(LevelFormat):
     The element level is a leaf level used at the end of the tensor tree structure.
     """
 
-    def __init__(self, fill_value: number):
+    def __init__(self, fill_value: number, element_type: Any | None = None):
         self._fill_value = fill_value
+        self._element_type = type(fill_value) if element_type is None else element_type
 
     @property
     def ndim(self) -> np.intp:
@@ -58,13 +59,17 @@ class ElementFormat(LevelFormat):
 
     @property
     def element_type(self) -> Any:
-        return type(self._fill_value)
+        return self._element_type
 
     def __eq__(self, other):
-        return isinstance(other, ElementFormat) and self._fill_value == other.fill_value
+        return (
+            isinstance(other, ElementFormat)
+            and self._fill_value == other.fill_value
+            and self._element_type == other.element_type
+        )
 
     def __hash__(self):
-        return hash((self.__class__.__name__, self._fill_value))
+        return hash((self.__class__.__name__, self._fill_value, self._element_type))
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.Element(self._fill_value)
@@ -178,7 +183,11 @@ def jlobj_to_format(obj: JuliaObj) -> LevelFormat:
         If an unsupported level type is encountered.
     """
     if jl.isa(obj, jl.Finch.Element):
-        return ElementFormat(jl.Finch.level_fill_value(jl.typeof(obj)))
+        obj_type = jl.typeof(obj)
+        return ElementFormat(
+            jl.Finch.level_fill_value(obj_type),
+            jl.Finch.level_eltype(obj_type),
+        )
     if jl.isa(obj, jl.Finch.Dense):
         return DenseFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     if jl.isa(obj, jl.Finch.SparseList):

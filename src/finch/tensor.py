@@ -36,10 +36,12 @@ class FinchJLTensorFType(TensorFType):
 
     @property
     def shape_type(self) -> tuple:
-        return reversed(self._lvl.shape_type)
+        return tuple(reversed(self._lvl.shape_type))
 
     def __call__(self, shape: tuple) -> Tensor:
-        return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), reversed(shape)))
+        return FinchJLTensor(
+            jl.Finch.Tensor(self._lvl.create_jl_obj(), tuple(reversed(shape)))
+        )
 
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
@@ -84,8 +86,10 @@ class FinchJLTensor(EagerTensor):
         key = add_missing_dims(key, self.shape)
         key = add_plus_one(key, self.shape)
 
-        result = self._obj[reversed(key)]
-        return FinchJLTensor(jl.Tensor(result))
+        result = self._obj[tuple(reversed(key))]
+        if jl.isa(result, jl.Finch.Tensor):
+            return FinchJLTensor(result)
+        return result
 
     def _is_dense(self) -> bool:
         lvl = self._obj.lvl
@@ -113,18 +117,18 @@ class FinchJLTensor(EagerTensor):
         for _ in range(self.ndim):
             dense_tensor = dense_tensor.lvl
 
-        arr = jl.reshape(dense_tensor.val)
-        return np.asarray(np.permute_dims(arr, reversed(range(self.ndims))))
+        arr = jl.reshape(dense_tensor.val, tuple(shape))
+        return np.asarray(arr)
 
     def __eq__(self, other):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
 
     def __repr__(self):
-        swiz = jl.swizzle(self._obj, reversed(range(self.ndim,1,-1)))
+        swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
         return jl.sprint(jl.show, swiz)
 
     def __str__(self):
-        swiz = jl.swizzle(self._obj, reversed(range(self.ndim,1,-1)))
+        swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
         return jl.sprint(jl.show, jl.MIME("text/plain"), swiz)
 
     def __array_namespace__(self, *, api_version: str | None = None) -> Any:
