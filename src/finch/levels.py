@@ -22,7 +22,7 @@ class NestedLevelFormat(LevelFormat):
 
     @property
     def fill_value(self) -> Any:
-        return self.lvl.fill_value
+        return self.element_type(self.lvl.fill_value)
 
     @property
     def element_type(self) -> Any:
@@ -55,7 +55,7 @@ class ElementFormat(LevelFormat):
 
     @property
     def fill_value(self) -> Any:
-        return self._fill_value
+        return self.element_type(self._fill_value)
 
     @property
     def element_type(self) -> Any:
