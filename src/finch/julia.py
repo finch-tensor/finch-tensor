@@ -1,3 +1,6 @@
+import os  # noqa: I001, F401
+
+os.environ["PYTHON_JULIACALL_HANDLE_SIGNALS"] = "yes"
 import juliapkg  # noqa: I001, F401
 
 # To change the version of Finch used, see the documentation for pyjuliapkg here: https://github.com/JuliaPy/pyjuliapkg

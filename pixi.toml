@@ -22,9 +22,6 @@ numpy = ">=1.19"
 [feature.test.pypi-dependencies]
 pytest = "*"
 pytest-cov = "*"
-sparse = ">=0.16,<0.17"
-numba = ">=0.61"
-scipy = "*"
 numpy = "==2.*"
 pytest-xdist = ">=3.6.1,<4"
 
