@@ -7,6 +7,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--array-api",
         "--array-api-pytest-args",
+        dest="array_api_pytest_args",
         action="append",
         default=[],
         help=(
