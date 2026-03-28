@@ -1,3 +1,5 @@
+import math
+
 from finchlite import (
     abs,
     acos,
@@ -138,6 +140,12 @@ from .tensor import (
     zeros_like,
 )
 
+e = math.e
+pi = math.pi
+inf = math.inf
+nan = math.nan
+newaxis = None
+
 __all__ = [
     "COMPILE_JULIA",
     "FinchJLTensor",
@@ -180,6 +188,7 @@ __all__ = [
     "einop",
     "einsum",
     "elementwise",
+    "e",
     "empty",
     "empty_like",
     "equal",
@@ -203,6 +212,7 @@ __all__ = [
     "hypot",
     "iinfo",
     "imag",
+    "inf",
     "int8",
     "int16",
     "int32",
@@ -234,12 +244,15 @@ __all__ = [
     "mod",
     "moveaxis",
     "multiply",
+    "nan",
     "negative",
     "nextafter",
+    "newaxis",
     "not_equal",
     "ones",
     "ones_like",
     "permute_dims",
+    "pi",
     "positive",
     "pow",
     "power",

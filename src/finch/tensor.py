@@ -1,4 +1,5 @@
 from typing import Any
+import operator
 
 import numpy as np
 
@@ -84,6 +85,10 @@ class FinchJLTensor(EagerTensor):
         if not isinstance(key, tuple):
             key = (key,)
 
+        # Array API behavior: indexing a 0-D array with () is a no-op.
+        if self.shape == () and key == ():
+            return self
+
         # standard indexing mode
         key = expand_ellipsis(key, self.shape)
         key = add_missing_dims(key, self.shape)
@@ -144,6 +149,28 @@ class FinchJLTensor(EagerTensor):
 
         return finch
 
+    def _scalar_value(self):
+        if self.shape != ():
+            raise TypeError("only 0-dimensional arrays can be converted to Python scalars")
+        return jl.getindex(self._obj)
+
+    def __bool__(self) -> bool:
+        return bool(self._scalar_value())
+
+    def __int__(self) -> int:
+        return int(self._scalar_value())
+
+    def __float__(self) -> float:
+        return float(self._scalar_value())
+
+    def __index__(self) -> int:
+        try:
+            return operator.index(self._scalar_value())
+        except TypeError as exc:
+            raise TypeError(
+                "only integer scalar arrays can be converted to an index"
+            ) from exc
+
 
 def asarray(
     obj,
@@ -168,6 +195,8 @@ def asarray(
             )
         obj = np.asarray(obj)
     if isinstance(obj, np.ndarray):
+        if dtype is not None:
+            obj = np.asarray(obj, dtype=jl_dtypes.jl_to_np_dtype[dtype])
         if copy:
             obj = obj.copy() if np.isfortran(obj) else np.asfortranarray(obj)
         else:
@@ -177,7 +206,7 @@ def asarray(
                 )
         buf = np.reshape(np.permute_dims(obj, tuple(reversed(range(obj.ndim)))), -1)
 
-        lvl = jl.ElementLevel(fill_value, buf)
+        lvl = jl.ElementLevel(np.asarray(fill_value, dtype=obj.dtype).item(), buf)
         for i in obj.shape:
             lvl = jl.DenseLevel(lvl, i)
         return FinchJLTensor(jl.Tensor(lvl))
@@ -198,6 +227,8 @@ def asarray(
                 "Unable to avoid copy while creating an array as requested."
             )
         m, n = obj.shape
+        if dtype is not None:
+            fill_value = np.asarray(fill_value, dtype=jl_dtypes.jl_to_np_dtype[dtype]).item()
         if obj.format == "coo":
             return FinchJLTensor(
                 jl.Tensor(
@@ -258,6 +289,11 @@ def full(
     )
     if dtype == np.bool_:  # Fails with: Finch currently only supports isbits defaults
         dtype = bool
+
+    # Rank-0 tensors should be represented as a leaf element level.
+    # Building them through SparseCOO requires an explicit rank parameter.
+    if len(shape) == 0 and format is None:
+        return FinchJLTensor(jl.Tensor(ElementFormat(val, dtype).create_jl_obj()))
 
     if format is None:
         format = SparseCOOFormat(ElementFormat(val, dtype), len(shape))
