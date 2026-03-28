@@ -53,8 +53,6 @@ def _slice_plus_one(s: slice, size: int) -> range:
     else:
         stop = stop_default
 
-    if (start, stop, step) == (1, size, 1):
-        return jl.Colon()
 
     return jl.range(start=start, step=step, stop=stop)
 

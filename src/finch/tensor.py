@@ -89,10 +89,11 @@ class FinchJLTensor(EagerTensor):
         key = add_missing_dims(key, self.shape)
         key = add_plus_one(key, self.shape)
 
-        result = self._obj[tuple(reversed(key))]
-        if jl.isa(result, jl.Finch.Tensor):
-            return FinchJLTensor(result)
-        return result
+        result = jl.getindex(self._obj, *reversed(key))
+        if all(isinstance(k, int) for k in key):
+            return result
+        assert jl.isa(result, jl.Finch.Tensor)
+        return FinchJLTensor(result)
 
     def _is_dense(self) -> bool:
         lvl = self._obj.lvl
@@ -127,8 +128,7 @@ class FinchJLTensor(EagerTensor):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
 
     def __repr__(self):
-        swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
-        return jl.sprint(jl.show, swiz)
+        return jl.sprint(jl.show, self._obj)
 
     def __str__(self):
         swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
@@ -238,7 +238,7 @@ def reshape(
     if copy is False:
         raise ValueError("Unable to avoid copy during reshape.")
     if all(i == 1 for i in x.shape):
-        return full(shape, x[()], dtype=x.dtype)
+        return full(shape, x[tuple(i - 1 for i in x.shape)], dtype=x.dtype)
     return FinchJLTensor(jl.reshape(x._obj, tuple(reversed(shape))))
 
 
@@ -264,9 +264,9 @@ def full(
 
     if format.fill_value != val:
         return FinchJLTensor(
-            jl.Tensor(format.construct_julia_lvl(), np.full(val, reversed(shape)))
+            jl.Tensor(format.create_jl_obj(), np.full(val, reversed(shape)))
         )
-    return FinchJLTensor(jl.Tensor(format.construct_julia_lvl(), *reversed(shape)))
+    return FinchJLTensor(jl.Tensor(format.create_jl_obj(), *reversed(shape)))
 
 
 def full_like(
