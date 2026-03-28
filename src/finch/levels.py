@@ -74,6 +74,7 @@ class ElementFormat(LevelFormat):
     def create_jl_obj(self) -> JuliaObj:
         return jl.Element(self._fill_value)
 
+    @property
     def shape_type(self) -> tuple:
         return ()
 
@@ -93,6 +94,7 @@ class DenseFormat(NestedLevelFormat):
     def create_jl_obj(self) -> JuliaObj:
         return jl.Dense(self.lvl.create_jl_obj())
 
+    @property
     def shape_type(self) -> tuple:
         return self.lvl.shape_type + (self.dim_type,)
 
@@ -112,6 +114,7 @@ class SparseListFormat(NestedLevelFormat):
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseList(self.lvl.create_jl_obj())
 
+    @property
     def shape_type(self) -> tuple:
         return self.lvl.shape_type + (self.dim_type,)
 
@@ -133,6 +136,7 @@ class SparseCOOFormat(NestedLevelFormat):
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseCOO(self.lvl.create_jl_obj())
 
+    @property
     def shape_type(self) -> tuple:
         if self.dim_type is None:
             return self.lvl.shape_type + (self.N * self.lvl.ndim,)
@@ -154,6 +158,7 @@ class SparseByteMapFormat(NestedLevelFormat):
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseByteMap(self.lvl.create_jl_obj())
 
+    @property
     def shape_type(self) -> tuple:
         return self.lvl.shape_type + (self.dim_type,)
 

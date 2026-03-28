@@ -197,6 +197,12 @@ def asarray(
     if isinstance(obj, np.ndarray):
         if dtype is not None:
             obj = np.asarray(obj, dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+        # np.asfortranarray converts 0-D arrays into shape-(1,) arrays,
+        # so keep scalar inputs on the dedicated rank-0 construction path.
+        if obj.ndim == 0:
+            return full((), obj.item(), dtype=dtype)
+
         if copy:
             obj = obj.copy() if np.isfortran(obj) else np.asfortranarray(obj)
         else:
