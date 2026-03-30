@@ -75,7 +75,8 @@ tests:
 poetry run pytest
 ```
 
-Array API tests are included in `tests/test_array_api.py`. These tests invoke the [Array API Conformance Tests](https://github.com/data-apis/array-api-tests).
+Array API tests are included in `tests/test_array_api.py`. These tests invoke
+the [Array API Conformance Tests](https://github.com/data-apis/array-api-tests).
 To forward `pytest` options to the nested
 `array-api-tests` invocation, use `--array-api` (alias:
 `--array-api-pytest-args`):
