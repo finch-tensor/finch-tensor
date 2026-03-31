@@ -196,7 +196,7 @@ class Einsum:
         arg = self.arg.run(xp, loops, kwargs)
         axis = tuple(i for i in range(len(loops)) if loops[i] not in self.idxs)
         if self.op is not None:
-            op = getattr(xp, reduction_ops.get(self.op, None))
+            op = getattr(xp, reduction_ops.get(self.op))
             val = op(arg, axis=axis)
         else:
             assert set(self.idxs) == set(loops)
