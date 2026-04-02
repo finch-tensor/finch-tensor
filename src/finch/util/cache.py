@@ -2,6 +2,7 @@
 # AI modified: 2024-12-31T23:59:00Z parent=06953a764918de34b3a35c1b698198c3b74c5890
 # AI modified: 2025-01-01T00:00:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
 # AI modified: 2025-01-01T00:01:00Z parent=4f5a2e5021678965ce8d830bb9edecac1dd3fea9
+# AI modified: 2026-04-02T22:59:00Z parent=197d5a907823d2a53fcd3b68b674f3f4d4f50b5d
 import atexit
 import shutil
 import tempfile
@@ -82,17 +83,14 @@ def _ensure_cache_fresh(cache_root: Path) -> None:
     timestamp_file = cache_root / cache_timestamp_filename
     current_mtime = _session_finch_code_mtime_ns
     should_clear = False
+    global _cache_checked
     cache_root = Path(config.get("data_path")) / "cache" / get_version()
     if cache_root.exists():
         _clear_cache_root(cache_root, keep_timestamp=False)
+    _cache_checked = False
 
 
 def _ensure_cache_fresh(cache_root: Path) -> None:
-    global _cache_checked
-    if _cache_checked:
-        return
-    _cache_checked = True
-
     cache_root.mkdir(parents=True, exist_ok=True)
     timestamp_file = cache_root / cache_timestamp_filename
     current_mtime = _session_finch_code_mtime_ns
@@ -138,8 +136,11 @@ def file_cache(*, ext: str, domain: str) -> Callable:
             if not _cache_checked:
                 _ensure_cache_fresh(cache_root)
                 _cache_checked = True
+            global _cache_checked
             cache_root = Path(config.get("data_path")) / "cache" / get_version()
-            _ensure_cache_fresh(cache_root)
+            if not _cache_checked:
+                _ensure_cache_fresh(cache_root)
+                _cache_checked = True
             cache_dir = cache_root / domain
         else:
             cache_dir = Path(
