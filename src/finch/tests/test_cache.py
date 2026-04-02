@@ -7,6 +7,9 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+# AI modified: 2025-01-01T00:00:00Z parent=154b5aeaa66d01a2373296ba9af9705a3db73ed9
+# AI modified: 2025-01-01T00:00:00Z parent=06953a764918de34b3a35c1b698198c3b74c5890
+from finch.util import cache
 
 import finch.util.cache as cache
 
@@ -109,3 +112,18 @@ def test_ensure_cache_fresh_keeps_cache_when_code_unchanged(tmp_path, monkeypatc
 
     assert cached_file.exists()
     assert timestamp_file.read_text() == "20"
+
+
+def test_ensure_cache_fresh_clears_cache_when_timestamp_missing(tmp_path, monkeypatch):
+    cache_root = tmp_path / "cache"
+    cached_file = cache_root / "c" / "artifact.txt"
+    cached_file.parent.mkdir(parents=True)
+    cached_file.write_text("cached")
+
+    monkeypatch.setattr(cache, "_latest_finch_code_mtime_ns", lambda: 20)
+    cache._checked_cache_roots.clear()
+
+    cache._ensure_cache_fresh(cache_root)
+
+    assert not cached_file.exists()
+    assert (cache_root / cache.cache_timestamp_filename).read_text() == "20"

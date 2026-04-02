@@ -1,5 +1,7 @@
-# AI modified: 2026-04-02T20:46:24Z parent=154b5aeaa66d01a2373296ba9af9705a3db73ed9
+# AI modified: 2025-01-01T00:00:00Z parent=154b5aeaa66d01a2373296ba9af9705a3db73ed9
+# AI modified: 2025-01-01T00:00:00Z parent=06953a764918de34b3a35c1b698198c3b74c5890
 import atexit
+import functools
 import shutil
 import tempfile
 import uuid
@@ -25,13 +27,19 @@ def _latest_finch_code_mtime_ns() -> int:
             and path.suffix not in {".pyc", ".pyo"}
         ):
 _checked_cache_roots: set[Path] = set()
+# util/cache.py lives in src/finchlite/util/, so parent.parent is src/finchlite.
+_finch_source_root = Path(__file__).resolve().parent.parent
 
 
+@functools.cache
 def _latest_finch_code_mtime_ns() -> int:
-    finch_root = Path(__file__).resolve().parents[1]
     latest_mtime = 0
-    for path in finch_root.rglob("*"):
-        if path.is_file():
+    for path in _finch_source_root.rglob("*"):
+        if (
+            "__pycache__" not in path.parts
+            and path.is_file()
+            and path.suffix not in {".pyc", ".pyo"}
+        ):
             latest_mtime = max(latest_mtime, path.stat().st_mtime_ns)
     return latest_mtime
 
@@ -46,6 +54,8 @@ def _clear_cache_root(cache_root: Path, *, keep_timestamp: bool = True) -> None:
             continue
 def _clear_cache_root(cache_root: Path) -> None:
     for path in cache_root.iterdir():
+        if path.name == cache_timestamp_filename:
+            continue
         if path.is_dir():
             shutil.rmtree(path)
         else:
@@ -80,6 +90,7 @@ def _ensure_cache_fresh(cache_root: Path) -> None:
     cache_root.mkdir(parents=True, exist_ok=True)
     timestamp_file = cache_root / cache_timestamp_filename
     current_mtime = _latest_finch_code_mtime_ns()
+    should_clear = False
 
     if timestamp_file.exists():
         try:
