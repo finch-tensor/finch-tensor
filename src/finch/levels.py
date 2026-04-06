@@ -134,12 +134,17 @@ class SparseCOOFormat(NestedLevelFormat):
     dim_type: tuple | None = np.intp
 
     def create_jl_obj(self) -> JuliaObj:
-        return jl.SparseCOO(self.lvl.create_jl_obj())
+        coo_type = jl.seval(f"Finch.SparseCOO{{{self.N}}}")
+        return coo_type(self.lvl.create_jl_obj())
+
+    @property
+    def ndim(self) -> np.intp:
+        return self.lvl.ndim + np.intp(self.N)  # FIXME: not sure about this fix.
 
     @property
     def shape_type(self) -> tuple:
         if self.dim_type is None:
-            return self.lvl.shape_type + (self.N * self.lvl.ndim,)
+            return self.lvl.shape_type + (np.intp,) * self.N
         return self.lvl.shape_type + self.dim_type
 
 
@@ -198,9 +203,8 @@ def jlobj_to_format(obj: JuliaObj) -> LevelFormat:
     if jl.isa(obj, jl.Finch.SparseList):
         return SparseListFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     if jl.isa(obj, jl.Finch.SparseCOO):
-        return SparseCOOFormat(
-            jlobj_to_format(obj.lvl), type(obj).__type_params__[0], type(obj.shape)
-        )
+        N = jl.seval("Finch.level_ndims")(jl.typeof(obj))
+        return SparseCOOFormat(jlobj_to_format(obj.lvl), N, None)
     if jl.isa(obj, jl.Finch.SparseByteMap):
         return SparseByteMapFormat(jlobj_to_format(obj.lvl), type(obj.shape))
     raise Exception("Unhandled exception!")

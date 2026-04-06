@@ -1,5 +1,5 @@
-from typing import Any
 import operator
+from typing import Any
 
 import numpy as np
 
@@ -111,7 +111,10 @@ class FinchJLTensor(EagerTensor):
     def todense(self) -> np.ndarray:
         obj = self._obj
 
-        if self._is_dense:
+        if self.ndim == 0:  # early return for 0-D tensor.
+            return np.array(jl.fill_value(obj))
+
+        if self._is_dense():
             # don't materialize a dense finch tensor
             shape = jl.size(obj)
             dense_tensor = obj.lvl
@@ -149,9 +152,14 @@ class FinchJLTensor(EagerTensor):
 
         return finch
 
+    def copy(self) -> "FinchJLTensor":
+        return FinchJLTensor(jl.deepcopy(self._obj))
+
     def _scalar_value(self):
         if self.shape != ():
-            raise TypeError("only 0-dimensional arrays can be converted to Python scalars")
+            raise TypeError(
+                "only 0-dimensional arrays can be converted to Python scalars"
+            )
         return jl.getindex(self._obj)
 
     def __bool__(self) -> bool:
@@ -234,7 +242,9 @@ def asarray(
             )
         m, n = obj.shape
         if dtype is not None:
-            fill_value = np.asarray(fill_value, dtype=jl_dtypes.jl_to_np_dtype[dtype]).item()
+            fill_value = np.asarray(
+                fill_value, dtype=jl_dtypes.jl_to_np_dtype[dtype]
+            ).item()
         if obj.format == "coo":
             return FinchJLTensor(
                 jl.Tensor(
@@ -317,7 +327,7 @@ def full_like(
     fill_value: jl_dtypes.number,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     return full(x.shape, fill_value, dtype=dtype, format=format)
 
@@ -326,7 +336,7 @@ def ones(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     return full(shape, np.float64(1), dtype=dtype, format=format)
 
@@ -336,7 +346,7 @@ def ones_like(
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
     return ones(x.shape, dtype=dtype, format=format)
@@ -346,7 +356,7 @@ def zeros(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     return full(shape, np.float64(0), dtype=dtype, format=format)
 
@@ -356,7 +366,7 @@ def zeros_like(
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
     return zeros(x.shape, dtype=dtype, format=format)
@@ -366,7 +376,7 @@ def empty(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     return full(shape, np.float64(0), dtype=dtype, format=format)
 
@@ -376,7 +386,7 @@ def empty_like(
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
+    format=None,
 ) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
     return empty(x.shape, dtype=dtype, format=format)
@@ -391,6 +401,39 @@ def arange(
     dtype: DType | None = None,
 ) -> FinchJLTensor:
     return asarray(np.arange(start, stop, step, jl_dtypes.jl_to_np_dtype[dtype]))
+
+
+def real(  # finchlite versions caused infinite recursion.
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+) -> FinchJLTensor:
+    return asarray(np.real(x.todense()), dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+
+def imag(  # finchlite versions caused infinite recursion.
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+) -> FinchJLTensor:
+    return asarray(np.imag(x.todense()), dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+
+def _to_numpy(x):
+    if isinstance(x, FinchJLTensor):
+        return x.todense()
+    return np.asarray(x)
+
+
+def where(
+    condition,
+    x1,
+    x2,
+    /,
+) -> FinchJLTensor:
+    return asarray(np.where(_to_numpy(condition), _to_numpy(x1), _to_numpy(x2)))
 
 
 def linspace(
