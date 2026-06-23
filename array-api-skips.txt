@@ -199,6 +199,7 @@ array_api_tests/test_has_names.py::test_has_names[manipulation-squeeze]
 array_api_tests/test_has_names.py::test_has_names[manipulation-stack]
 array_api_tests/test_has_names.py::test_has_names[manipulation-tile]
 array_api_tests/test_has_names.py::test_has_names[manipulation-unstack]
+array_api_tests/test_has_names.py::test_has_names[manipulation-reshape]
 array_api_tests/test_has_names.py::test_has_names[sorting-argsort]
 array_api_tests/test_has_names.py::test_has_names[sorting-sort]
 array_api_tests/test_has_names.py::test_has_names[data_type-isdtype]
@@ -284,6 +285,7 @@ array_api_tests/test_manipulation_functions.py::test_stack
 array_api_tests/test_manipulation_functions.py::test_unstack
 array_api_tests/test_manipulation_functions.py::test_repeat
 array_api_tests/test_manipulation_functions.py::test_tile
+array_api_tests/test_manipulation_functions.py::test_reshape
 
 # test_searching_functions
 

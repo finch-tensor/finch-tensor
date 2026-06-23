@@ -190,12 +190,12 @@ def asarray(
 ) -> FinchJLTensor:
     if fill_value is None:
         fill_value = 0.0
-    if copy is None:
-        copy = True
     if isinstance(obj, FinchJLTensor):
         if copy:
             return obj.copy()
         return obj
+    if copy is None:
+        copy = True
     if isinstance(obj, int | float | complex | bool | list):
         if copy is False:
             raise ValueError(
@@ -226,10 +226,13 @@ def asarray(
         return FinchJLTensor(jl.Tensor(lvl))
     if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
         if copy:
-            if obj.format in ("coo", "csr"):
+            if obj.format == "csr":
                 obj = obj.copy() if obj.has_sorted_indices else obj.sorted_indices()
                 if not obj.has_canonical_format:
                     obj.sum_duplicates()
+            elif obj.format == "coo":
+                obj = obj.copy()
+                obj.sum_duplicates()
             else:
                 obj = obj.asformat("csr")
         if (
@@ -250,11 +253,11 @@ def asarray(
                 jl.Tensor(
                     jl.SparseCOOLevel(
                         (n, m),
-                        jl.ElementLevel(dtype, fill_value, obj.data),
+                        jl.ElementLevel(fill_value, obj.data),
                         2,
                         idxs=(
-                            jl.Finch.PlusOneVector(obj.cols),
-                            jl.Finch.PlusOneVector(obj.rows),
+                            jl.Finch.PlusOneVector(obj.col),
+                            jl.Finch.PlusOneVector(obj.row),
                         ),
                     )
                 )
@@ -264,7 +267,7 @@ def asarray(
                 jl.Tensor(
                     jl.DenseLevel(
                         jl.SparseListLevel(
-                            jl.ElementLevel(dtype, fill_value, obj.data),
+                            jl.ElementLevel(fill_value, obj.data),
                             m,
                             jl.Finch.PlusOneVector(obj.indptr),
                             jl.Finch.PlusOneVector(obj.indices),
