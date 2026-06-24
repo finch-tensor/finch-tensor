@@ -38,6 +38,7 @@ from finchlite import (
     flatten,
     floor,
     floor_divide,
+    get_default_scheduler,
     greater,
     greater_equal,
     hypot,
@@ -77,6 +78,7 @@ from finchlite import (
     reduce,
     remainder,
     round,
+    set_default_scheduler,
     sign,
     signbit,
     sin,
@@ -140,6 +142,11 @@ from .tensor import (
     zeros,
     zeros_like,
 )
+
+# finch's whole purpose is being the Julia-backed array API implementation,
+# so it should default to executing through Finch.jl rather than finchlite's
+# generic fallback interpreter.
+set_default_scheduler(COMPILE_JULIA)
 
 e = math.e
 pi = math.pi

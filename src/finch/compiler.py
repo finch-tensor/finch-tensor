@@ -124,7 +124,7 @@ class FinchJLGenerator:
             case ntn.Access(tns, _, idxs):
                 tns_str = self.generate_julia(tns, nestingLvl)
                 idx_str = ",".join(
-                    [self.generate_julia(idx, nestingLvl) for idx in idxs]
+                    [self.generate_julia(idx, nestingLvl) for idx in reversed(idxs)]
                 )
                 return f"{tns_str}[{idx_str}]"
 

@@ -1,9 +1,9 @@
 import numpy as np
 
 import finchlite
-from juliacall import Main as jl
 
-from finch import COMPILE_JULIA, FinchJLTensor
+import finch
+from finch import COMPILE_JULIA
 
 
 def test_pass_through(rng):
@@ -11,7 +11,7 @@ def test_pass_through(rng):
     A = rng.random((5, 5))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
+    A_finch = finch.asarray(A)
     B = finchlite.einop("B[i,j] = A[i,j]", A=A_finch)
 
     np.allclose(B.todense(), A)
@@ -22,7 +22,7 @@ def test_transpose(rng):
     A = rng.random((5, 5))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
+    A_finch = finch.asarray(A)
     B = finchlite.einop("B[i,j] = A[j, i]", A=A_finch)
 
     np.allclose(B.todense(), A.T)
@@ -34,8 +34,8 @@ def test_basic_addition_with_transpose(rng):
     B = rng.random((5, 5))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
-    B_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), B))
+    A_finch = finch.asarray(A)
+    B_finch = finch.asarray(B)
     C = finchlite.einop("C[i,j] = A[i,j] + B[j,i]", A=A_finch, B=B_finch)
     C_ref = A + B.T
 
@@ -48,8 +48,8 @@ def test_matrix_multiplication(rng):
     B = rng.random((4, 5))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
-    B_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), B))
+    A_finch = finch.asarray(A)
+    B_finch = finch.asarray(B)
     C = finchlite.einop("C[i,j] += A[i,k] * B[k,j]", A=A_finch, B=B_finch)
     C_ref = A @ B
 
@@ -62,8 +62,8 @@ def test_element_wise_multiplication(rng):
     B = rng.random((4, 4))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
-    B_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), B))
+    A_finch = finch.asarray(A)
+    B_finch = finch.asarray(B)
     C = finchlite.einop("C[i,j] = A[i,j] * B[i,j]", A=A_finch, B=B_finch)
     C_ref = A * B
 
@@ -75,7 +75,7 @@ def test_sum_reduction(rng):
     A = rng.random((3, 4))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
+    A_finch = finch.asarray(A)
     C = finchlite.einop("C[i] += A[i,j]", A=A_finch)
     C_ref = np.sum(A, axis=1)
 
@@ -87,7 +87,7 @@ def test_maximum_reduction(rng):
     A = rng.random((3, 4))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
+    A_finch = finch.asarray(A)
     C = finchlite.einop("C[i] max= A[i,j]", A=A_finch)
     C_ref = np.max(A, axis=1)
 
@@ -100,8 +100,8 @@ def test_outer_product(rng):
     B = rng.random(4)
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Element(0.0)), A))
-    B_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Element(0.0)), B))
+    A_finch = finch.asarray(A)
+    B_finch = finch.asarray(B)
     C = finchlite.einop("C[i,j] = A[i] * B[j]", A=A_finch, B=B_finch)
     C_ref = np.outer(A, B)
 
@@ -114,12 +114,8 @@ def test_batch_matrix_multiplication(rng):
     B = rng.random((2, 4, 5))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(
-        jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Dense(jl.Element(0.0)))), A)
-    )
-    B_finch = FinchJLTensor(
-        jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Dense(jl.Element(0.0)))), B)
-    )
+    A_finch = finch.asarray(A)
+    B_finch = finch.asarray(B)
     C = finchlite.einop("C[b,i,j] += A[b,i,k] * B[b,k,j]", A=A_finch, B=B_finch)
     C_ref = np.matmul(A, B)
 
@@ -131,7 +127,7 @@ def test_minimum_reduction(rng):
     A = rng.random((3, 4))
 
     finchlite.interface.set_default_scheduler(ctx=COMPILE_JULIA)
-    A_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0.0))), A))
+    A_finch = finch.asarray(A)
     C = finchlite.einop("C[i] min= A[i,j]", A=A_finch)
     C_ref = np.min(A, axis=1)
 

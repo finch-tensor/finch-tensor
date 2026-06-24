@@ -4,6 +4,7 @@ from numpy.testing import assert_equal
 
 from juliacall import Main as jl
 
+import finch
 from finch import FinchJLTensor
 
 
@@ -49,7 +50,7 @@ def test_indexing_1d(arr1d, index):
     ],
 )
 def test_indexing_2d(arr2d, index):
-    arr_finch = FinchJLTensor(jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Element(0))), arr2d))
+    arr_finch = finch.asarray(arr2d)
 
     actual = arr_finch[index]
     expected = arr2d[index]
@@ -88,9 +89,7 @@ def test_indexing_2d(arr2d, index):
     ],
 )
 def test_indexing_3d(arr3d, index):
-    arr_finch = FinchJLTensor(
-        jl.Finch.Tensor(jl.Dense(jl.Dense(jl.Dense(jl.Element(0)))), arr3d)
-    )
+    arr_finch = finch.asarray(arr3d)
 
     actual = arr_finch[index]
     expected = arr3d[index]

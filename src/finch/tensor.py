@@ -43,12 +43,12 @@ class FinchJLTensorFType(TensorFType):
         return tuple(reversed(self._lvl.shape_type))
 
     def construct(self, shape: tuple) -> Tensor:
-        # `jl.Finch.Tensor(lvl, dims)` sets the resulting tensor's raw
-        # `jl.size` directly to `dims` (no implicit row/col-major swap, unlike
-        # construction from real array data), and `FinchJLTensor.shape` reports
-        # that raw size unreversed -- so `shape` must be passed through as-is
-        # to keep it in the same (Python) axis order the caller gave us.
-        return FinchJLTensor(jl.Finch.Tensor(self._lvl.create_jl_obj(), shape))
+        # EXPERIMENTAL reversed-axis convention: jl.size is always kept as
+        # the reverse of the Python-facing shape; FinchJLTensor.shape un-
+        # reverses it back on the way out (see there for the full rationale).
+        return FinchJLTensor(
+            jl.Finch.Tensor(self._lvl.create_jl_obj(), tuple(reversed(shape)))
+        )
 
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
@@ -86,8 +86,13 @@ class FinchJLTensor(Tensor):
 
     @property
     def shape(self) -> tuple:
-        """Shape of the tensor."""
-        return jl.size(self._obj)
+        """Shape of the tensor.
+
+        EXPERIMENTAL: jl.size is always kept as the reverse of the
+        Python-facing shape (see asarray/full/__getitem__/todense), so this
+        un-reverses it back to Python axis order.
+        """
+        return tuple(reversed(jl.size(self._obj)))
 
     def __getitem__(self, key):
         if not isinstance(key, tuple):
@@ -103,7 +108,7 @@ class FinchJLTensor(Tensor):
         key = add_plus_one(key, self.shape)
 
         if all(isinstance(k, int) for k in key):
-            return jl.getindex(self._obj, *key)
+            return jl.getindex(self._obj, *reversed(key))
 
         # Finch's getindex has no notion of `None`/newaxis, so strip those
         # entries out, index normally, then re-insert size-1 axes into the
@@ -118,7 +123,7 @@ class FinchJLTensor(Tensor):
             elif not isinstance(k, int):
                 axis += 1
 
-        result = jl.getindex(self._obj, *real_key)
+        result = jl.getindex(self._obj, *reversed(real_key))
 
         if not newaxis_positions:
             assert jl.isa(result, jl.Finch.Tensor)
@@ -164,8 +169,11 @@ class FinchJLTensor(Tensor):
         for _ in range(self.ndim):
             dense_tensor = dense_tensor.lvl
 
+        # `shape` here is jl.size(obj), i.e. the reversed-axis shape; reshape
+        # into that, then transpose (a cheap stride-only view) back to the
+        # Python-facing axis order.
         arr = jl.reshape(dense_tensor.val, tuple(shape))
-        return np.asarray(arr)
+        return np.asarray(arr).transpose()
 
     def __eq__(self, other):
         return isinstance(other, FinchJLTensor) and self._obj == other._obj
@@ -241,22 +249,25 @@ def asarray(
         if dtype is not None:
             obj = np.asarray(obj, dtype=jl_dtypes.jl_to_np_dtype[dtype])
 
-        # np.asfortranarray converts 0-D arrays into shape-(1,) arrays,
-        # so keep scalar inputs on the dedicated rank-0 construction path.
         if obj.ndim == 0:
             return full((), obj.item(), dtype=dtype)
 
+        # EXPERIMENTAL reversed-axis convention: keep the buffer in its
+        # natural C (row-major) layout -- which is exactly the column-major
+        # layout of the *reversed*-shape tensor -- instead of permuting data
+        # to Fortran order, and build the DenseLevel nest in reverse axis
+        # order so jl.size ends up as reversed(obj.shape).
         if copy:
-            obj = obj.copy() if np.isfortran(obj) else np.asfortranarray(obj)
+            obj = obj.copy() if obj.flags["C_CONTIGUOUS"] else np.ascontiguousarray(obj)
         else:
-            if not np.isfortran(obj):
+            if not obj.flags["C_CONTIGUOUS"]:
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
-        buf = np.reshape(np.permute_dims(obj, tuple(reversed(range(obj.ndim)))), -1)
+        buf = np.reshape(obj, -1)
 
         lvl = jl.ElementLevel(np.asarray(fill_value, dtype=obj.dtype).item(), buf)
-        for i in obj.shape:
+        for i in reversed(obj.shape):
             lvl = jl.DenseLevel(lvl, i)
         return FinchJLTensor(jl.Tensor(lvl))
     if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
@@ -284,15 +295,12 @@ def asarray(
                 fill_value, dtype=jl_dtypes.jl_to_np_dtype[dtype]
             ).item()
         if obj.format == "coo":
-            # SparseCOOLevel keeps shape/axis order as given (no row<->col
-            # swap, unlike Dense levels: COO has no flat buffer to
-            # reinterpret with reversed strides, so there's nothing to
-            # transpose there).
-            # Finch's COO reader does not sort or dedupe its inputs, but does
-            # expect them pre-sorted in column-major scan order (row fastest,
-            # col slowest); np.lexsort sorts by its *last* key first, so this
-            # sorts by col primarily and row secondarily.
-            order = np.lexsort((obj.row, obj.col))
+            # EXPERIMENTAL reversed-axis convention: shape and coordinate
+            # order are both given reversed ((n, m) and (col, row)), so axis
+            # 0 of the SparseCOOLevel is "col". Sorting must vary axis 0
+            # (col) fastest -- i.e. row primary, col secondary -- so col is
+            # lexsort's secondary (first) key and row its primary (last) key.
+            order = np.lexsort((obj.col, obj.row))
             row_s = obj.row[order]
             col_s = obj.col[order]
             data_s = obj.data[order]
@@ -301,7 +309,7 @@ def asarray(
                 jl.Tensor(
                     jl.SparseCOOLevel(
                         jl.ElementLevel(fill_value, data_s),
-                        (m, n),
+                        (n, m),
                         # ptr marks the single coordinate block [1, nnz+1);
                         # it's a plain Python list, so it needs an explicit
                         # jl.Vector to become a real Julia array (numpy arrays
@@ -309,8 +317,8 @@ def asarray(
                         # PyArray wrapping).
                         jl.Vector([1, nnz + 1]),
                         (
-                            jl.Finch.PlusOneVector(row_s),
                             jl.Finch.PlusOneVector(col_s),
+                            jl.Finch.PlusOneVector(row_s),
                         ),
                     )
                 )
@@ -371,8 +379,14 @@ def full(
         format = SparseCOOFormat(ElementFormat(val, dtype), len(shape))
 
     if format.fill_value != val:
-        return FinchJLTensor(jl.Tensor(format.create_jl_obj(), np.full(shape, val)))
-    return FinchJLTensor(jl.Tensor(format.create_jl_obj(), *shape))
+        # jl.Tensor(lvl, real_array) infers jl.size literally from the
+        # array's own .shape (no implicit reversal on that path -- proven
+        # separately), so under the reversed-axis convention the array
+        # passed here must itself already be shaped in reverse.
+        return FinchJLTensor(
+            jl.Tensor(format.create_jl_obj(), np.full(tuple(reversed(shape)), val))
+        )
+    return FinchJLTensor(jl.Tensor(format.create_jl_obj(), *reversed(shape)))
 
 
 def full_like(
