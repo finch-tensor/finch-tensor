@@ -85,3 +85,9 @@ def to_fl_dtype(x) -> FType:
     if fl_dtype is not None:
         return fl_dtype
     return fl.ftype(x)
+
+
+# finchlite FType -> Julia DataType, the inverse of jl_dtype_to_fl, used when
+# a real Julia type is needed (e.g. juliacall.convert) for an FType obtained
+# from a tensor's dtype/element_type.
+fl_dtype_to_jl = {v: k for k, v in jl_dtype_to_fl.items()}
