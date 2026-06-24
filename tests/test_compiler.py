@@ -27,6 +27,7 @@ from finchlite.finch_notation.nodes import (
     Variable,
 )
 
+import finch
 from finch.compiler import FinchJLCompiler, FinchJLKernel
 from finch.julia import jl
 from finch.levels import DenseFormat, ElementFormat
@@ -51,21 +52,27 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                         Block(
                             (
                                 Assign(
-                                    Variable("m", ExtentFType(np.int64, np.int64)),
+                                    Variable(
+                                        "m", ExtentFType(finch.int64, finch.int64)
+                                    ),
                                     Call(
                                         Literal(dimension),
                                         (Variable("A", a_format), Literal(0)),
                                     ),
                                 ),
                                 Assign(
-                                    Variable("n", ExtentFType(np.int64, np.int64)),
+                                    Variable(
+                                        "n", ExtentFType(finch.int64, finch.int64)
+                                    ),
                                     Call(
                                         Literal(dimension),
                                         (Variable("B", a_format), Literal(1)),
                                     ),
                                 ),
                                 Assign(
-                                    Variable("p", ExtentFType(np.int64, np.int64)),
+                                    Variable(
+                                        "p", ExtentFType(finch.int64, finch.int64)
+                                    ),
                                     Call(
                                         Literal(dimension),
                                         (Variable("A", a_format), Literal(1)),
@@ -79,20 +86,29 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                     Literal(0.0),
                                     Literal(operator.add),
                                     (
-                                        Variable("m", ExtentFType(np.int64, np.int64)),
-                                        Variable("n", ExtentFType(np.int64, np.int64)),
+                                        Variable(
+                                            "m", ExtentFType(finch.int64, finch.int64)
+                                        ),
+                                        Variable(
+                                            "n", ExtentFType(finch.int64, finch.int64)
+                                        ),
                                     ),
                                 ),
                                 Loop(
-                                    Variable("i", np.int64),
-                                    Variable("m", ExtentFType(np.int64, np.int64)),
+                                    Variable("i", finch.int64),
+                                    Variable(
+                                        "m", ExtentFType(finch.int64, finch.int64)
+                                    ),
                                     Loop(
-                                        Variable("k", np.int64),
-                                        Variable("p", ExtentFType(np.int64, np.int64)),
+                                        Variable("k", finch.int64),
+                                        Variable(
+                                            "p", ExtentFType(finch.int64, finch.int64)
+                                        ),
                                         Loop(
-                                            Variable("j", np.int64),
+                                            Variable("j", finch.int64),
                                             Variable(
-                                                "n", ExtentFType(np.int64, np.int64)
+                                                "n",
+                                                ExtentFType(finch.int64, finch.int64),
                                             ),
                                             Block(
                                                 (
@@ -103,8 +119,12 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                                                 Literal(operator.add)
                                                             ),
                                                             (
-                                                                Variable("i", np.int64),
-                                                                Variable("j", np.int64),
+                                                                Variable(
+                                                                    "i", finch.int64
+                                                                ),
+                                                                Variable(
+                                                                    "j", finch.int64
+                                                                ),
                                                             ),
                                                         ),
                                                         Call(
@@ -120,11 +140,11 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                                                         (
                                                                             Variable(
                                                                                 "i",
-                                                                                np.int64,
+                                                                                finch.int64,
                                                                             ),
                                                                             Variable(
                                                                                 "k",
-                                                                                np.int64,
+                                                                                finch.int64,
                                                                             ),
                                                                         ),
                                                                     )
@@ -139,11 +159,11 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                                                         (
                                                                             Variable(
                                                                                 "k",
-                                                                                np.int64,
+                                                                                finch.int64,
                                                                             ),
                                                                             Variable(
                                                                                 "j",
-                                                                                np.int64,
+                                                                                finch.int64,
                                                                             ),
                                                                         ),
                                                                     )

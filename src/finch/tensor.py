@@ -3,7 +3,7 @@ from typing import Any
 
 import numpy as np
 
-from finchlite import EagerTensor, Tensor, TensorFType
+from finchlite import Tensor, TensorFType
 
 from . import dtypes as jl_dtypes
 from .julia import jc, jl
@@ -42,13 +42,18 @@ class FinchJLTensorFType(TensorFType):
     def shape_type(self) -> tuple:
         return tuple(reversed(self._lvl.shape_type))
 
-    def __call__(self, shape: tuple) -> Tensor:
+    def construct(self, shape: tuple) -> Tensor:
         return FinchJLTensor(
             jl.Finch.Tensor(self._lvl.create_jl_obj(), tuple(reversed(shape)))
         )
 
     def from_numpy(self, _) -> Tensor:
         raise NotImplementedError
+
+    def __call__(self, val: Any) -> Tensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, FinchJLTensorFType):
@@ -59,7 +64,7 @@ class FinchJLTensorFType(TensorFType):
         return hash(("FinchJLTensorFType", self._lvl))
 
 
-class FinchJLTensor(EagerTensor):
+class FinchJLTensor(Tensor):
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
             assert jl.isa(obj, jl.Finch.Tensor)

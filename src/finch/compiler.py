@@ -2,7 +2,9 @@ import math
 import operator
 
 import finchlite.finch_notation.nodes as ntn
-from finchlite.algebra import make_tuple, overwrite, promote_max, promote_min
+from finchlite.algebra.ffuncs import make_tuple, overwrite
+from finchlite.algebra.ffuncs import max as fl_max
+from finchlite.algebra.ffuncs import min as fl_min
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
@@ -13,8 +15,8 @@ ops_map = {operator.add: "+", operator.mul: "*", operator.eq: "=="}
 red_ops_map = {
     operator.add: "+",
     operator.mul: "*",
-    promote_max: "<<max>>",
-    promote_min: "<<min>>",
+    fl_max: "<<max>>",
+    fl_min: "<<min>>",
 }
 ops_to_ignore = [make_tuple]
 
