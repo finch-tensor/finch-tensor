@@ -4,6 +4,7 @@ from typing import Any
 
 import numpy as np
 
+from . import dtypes
 from .julia import jl
 from .typing import JuliaObj, number
 
@@ -47,7 +48,9 @@ class ElementFormat(LevelFormat):
 
     def __init__(self, fill_value: number, element_type: Any | None = None):
         self._fill_value = fill_value
-        self._element_type = type(fill_value) if element_type is None else element_type
+        self._element_type = dtypes.to_fl_dtype(
+            type(fill_value) if element_type is None else element_type
+        )
 
     @property
     def ndim(self) -> np.intp:
@@ -89,7 +92,7 @@ class DenseFormat(NestedLevelFormat):
     """
 
     lvl: NestedLevelFormat
-    dim_type: type = np.intp
+    dim_type: Any = dtypes.int_
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.Dense(self.lvl.create_jl_obj())
@@ -109,7 +112,7 @@ class SparseListFormat(NestedLevelFormat):
     """
 
     lvl: NestedLevelFormat
-    dim_type: type = np.intp
+    dim_type: Any = dtypes.int_
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseList(self.lvl.create_jl_obj())
@@ -131,7 +134,7 @@ class SparseCOOFormat(NestedLevelFormat):
 
     lvl: NestedLevelFormat
     N: int = 2
-    dim_type: tuple | None = np.intp
+    dim_type: tuple | None = dtypes.int_
 
     def create_jl_obj(self) -> JuliaObj:
         coo_type = jl.seval(f"Finch.SparseCOO{{{self.N}}}")
@@ -158,7 +161,7 @@ class SparseByteMapFormat(NestedLevelFormat):
     """
 
     lvl: NestedLevelFormat
-    dim_type: type = np.intp
+    dim_type: Any = dtypes.int_
 
     def create_jl_obj(self) -> JuliaObj:
         return jl.SparseByteMap(self.lvl.create_jl_obj())
@@ -196,15 +199,21 @@ def jlobj_to_format(obj: JuliaObj) -> LevelFormat:
         obj_type = jl.typeof(obj)
         return ElementFormat(
             jl.Finch.level_fill_value(obj_type),
-            jl.Finch.level_eltype(obj_type),
+            dtypes.to_fl_dtype(jl.Finch.level_eltype(obj_type)),
         )
     if jl.isa(obj, jl.Finch.Dense):
-        return DenseFormat(jlobj_to_format(obj.lvl), type(obj.shape))
+        return DenseFormat(
+            jlobj_to_format(obj.lvl), dtypes.to_fl_dtype(type(obj.shape))
+        )
     if jl.isa(obj, jl.Finch.SparseList):
-        return SparseListFormat(jlobj_to_format(obj.lvl), type(obj.shape))
+        return SparseListFormat(
+            jlobj_to_format(obj.lvl), dtypes.to_fl_dtype(type(obj.shape))
+        )
     if jl.isa(obj, jl.Finch.SparseCOO):
         N = jl.seval("Finch.level_ndims")(jl.typeof(obj))
         return SparseCOOFormat(jlobj_to_format(obj.lvl), N, None)
     if jl.isa(obj, jl.Finch.SparseByteMap):
-        return SparseByteMapFormat(jlobj_to_format(obj.lvl), type(obj.shape))
+        return SparseByteMapFormat(
+            jlobj_to_format(obj.lvl), dtypes.to_fl_dtype(type(obj.shape))
+        )
     raise Exception("Unhandled exception!")

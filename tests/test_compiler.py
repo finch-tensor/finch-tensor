@@ -1,9 +1,8 @@
-import operator
-
 import pytest
 
 import numpy as np
 
+from finchlite.algebra.ffuncs import add, mul
 from finchlite.compile import ExtentFType, dimension
 from finchlite.finch_notation.nodes import (
     Access,
@@ -84,7 +83,7 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                 Declare(
                                     Slot("C_", a_format),
                                     Literal(0.0),
-                                    Literal(operator.add),
+                                    Literal(add),
                                     (
                                         Variable(
                                             "m", ExtentFType(finch.int64, finch.int64)
@@ -115,9 +114,7 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                                     Increment(
                                                         Access(
                                                             Slot("C_", a_format),
-                                                            Update(
-                                                                Literal(operator.add)
-                                                            ),
+                                                            Update(Literal(add)),
                                                             (
                                                                 Variable(
                                                                     "i", finch.int64
@@ -128,7 +125,7 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                                             ),
                                                         ),
                                                         Call(
-                                                            Literal(operator.mul),
+                                                            Literal(mul),
                                                             (
                                                                 Unwrap(
                                                                     Access(
@@ -176,7 +173,7 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                                         ),
                                     ),
                                 ),
-                                Freeze(Slot("C_", a_format), Literal(operator.add)),
+                                Freeze(Slot("C_", a_format), Literal(add)),
                                 Repack(Slot("C_", a_format), Variable("C", a_format)),
                                 Return(Variable("C", a_format)),
                             ),

@@ -1,22 +1,19 @@
 import math
-import operator
 
 import finchlite.finch_notation.nodes as ntn
-from finchlite.algebra.ffuncs import make_tuple, overwrite
-from finchlite.algebra.ffuncs import max as fl_max
-from finchlite.algebra.ffuncs import min as fl_min
+from finchlite.algebra.ffuncs import add, eq, make_tuple, max, min, mul, overwrite
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from .julia import jl
 from .tensor import FinchJLTensor
 
-ops_map = {operator.add: "+", operator.mul: "*", operator.eq: "=="}
+ops_map = {add: "+", mul: "*", eq: "=="}
 red_ops_map = {
-    operator.add: "+",
-    operator.mul: "*",
-    fl_max: "<<max>>",
-    fl_min: "<<min>>",
+    add: "+",
+    mul: "*",
+    max: "<<max>>",
+    min: "<<min>>",
 }
 ops_to_ignore = [make_tuple]
 

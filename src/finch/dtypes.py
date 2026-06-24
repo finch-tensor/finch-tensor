@@ -5,6 +5,8 @@ import numpy as np
 import finchlite as fl
 from finchlite.algebra.ftypes import FType
 
+from .julia import jl
+
 int8: FType = fl.int8
 int16: FType = fl.int16
 int32: FType = fl.int32
@@ -52,3 +54,34 @@ def can_cast(from_, to, /) -> builtins.bool:
     if not isinstance(from_, FType) and hasattr(from_, "dtype"):
         from_ = from_.dtype
     return np.can_cast(jl_to_np_dtype[from_], jl_to_np_dtype[to])
+
+
+# Julia DataType -> finchlite FType, used when reading dtypes back out of
+# raw Julia Finch tensor objects (see levels.jlobj_to_format).
+jl_dtype_to_fl = {
+    jl.Int8: int8,
+    jl.Int16: int16,
+    jl.Int32: int32,
+    jl.Int64: int64,
+    jl.UInt8: uint8,
+    jl.UInt16: uint16,
+    jl.UInt32: uint32,
+    jl.UInt64: uint64,
+    jl.Float16: float16,
+    jl.Float32: float32,
+    jl.Float64: float64,
+    jl.ComplexF32: complex64,
+    jl.ComplexF64: complex128,
+    jl.Bool: bool,
+}
+
+
+def to_fl_dtype(x) -> FType:
+    """Normalize a Julia DataType, numpy dtype/scalar type, Python builtin
+    type, or finchlite FType into the corresponding finchlite FType."""
+    if isinstance(x, FType):
+        return x
+    fl_dtype = jl_dtype_to_fl.get(x)
+    if fl_dtype is not None:
+        return fl_dtype
+    return fl.ftype(x)
