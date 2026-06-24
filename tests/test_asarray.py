@@ -345,7 +345,12 @@ class TestAsarrayOptions:
         assert isinstance(result, FinchJLTensor)
 
     def test_asarray_numpy_no_copy(self):
-        """Test asarray on a Fortran-order numpy array with copy=False."""
-        arr = np.asfortranarray([[1.0, 2.0], [3.0, 4.0]])
+        """Test asarray on a C-order numpy array with copy=False.
+
+        Under the reversed-axis storage convention, the buffer is kept in
+        its natural C (row-major) layout (see asarray's Dense branch), so
+        C-contiguous -- not Fortran-order -- is what allows a zero copy.
+        """
+        arr = np.ascontiguousarray([[1.0, 2.0], [3.0, 4.0]])
         result = asarray(arr, copy=False)
         assert isinstance(result, FinchJLTensor)
