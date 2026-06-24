@@ -4,6 +4,7 @@ import pytest
 
 import numpy as np
 
+import finch
 from finch import asarray
 from finch.tensor import FinchJLTensor
 
@@ -51,7 +52,7 @@ class TestAsarrayNumpy:
     def test_asarray_with_dtype(self):
         """Test asarray with explicit dtype."""
         arr = np.array([[1, 2], [3, 4]], dtype=np.int32)
-        result = asarray(arr, dtype=np.int32)
+        result = asarray(arr, dtype=finch.int32)
         assert isinstance(result, FinchJLTensor)
 
     def test_asarray_default_fill_value(self):
@@ -313,9 +314,9 @@ class TestAsarrayErrors:
             asarray("invalid string input")
 
     def test_asarray_invalid_list(self):
-        """Test asarray with plain Python list (should fail)."""
+        """Test asarray with copy=False on a plain Python list (should fail)."""
         with pytest.raises((ValueError, TypeError, AttributeError)):
-            asarray([1, 2, 3])
+            asarray([1, 2, 3], copy=False)
 
     def test_asarray_dict_input(self):
         """Test asarray with dict input."""
@@ -340,11 +341,11 @@ class TestAsarrayOptions:
     def test_asarray_all_options(self):
         """Test asarray with all options specified."""
         arr = np.array([[1.0, 2.0], [3.0, 4.0]])
-        result = asarray(arr, dtype=np.float64, fill_value=0.0, copy=True)
+        result = asarray(arr, dtype=finch.float64, fill_value=0.0, copy=True)
         assert isinstance(result, FinchJLTensor)
 
     def test_asarray_numpy_no_copy(self):
-        """Test asarray on numpy with copy=False."""
-        arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+        """Test asarray on a Fortran-order numpy array with copy=False."""
+        arr = np.asfortranarray([[1.0, 2.0], [3.0, 4.0]])
         result = asarray(arr, copy=False)
         assert isinstance(result, FinchJLTensor)

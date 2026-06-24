@@ -13,7 +13,7 @@ from .levels import (
     SparseCOOFormat,
     jlobj_to_format,
 )
-from .typing import DType, JuliaObj
+from .typing import DType, JuliaObj, number
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 
@@ -294,7 +294,7 @@ def reshape(
 
 def full(
     shape: int | tuple[int, ...],
-    val: jl_dtypes.number,
+    val: number,
     *,
     dtype: DType | None = None,
     format=None,
@@ -327,7 +327,7 @@ def full(
 def full_like(
     x: FinchJLTensor,
     /,
-    fill_value: jl_dtypes.number,
+    fill_value: number,
     *,
     dtype: DType | None = None,
     format=None,
