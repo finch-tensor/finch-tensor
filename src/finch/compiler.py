@@ -12,6 +12,17 @@ from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 from .julia import jl
 from .tensor import FinchJLTensor
 
+
+def _wrap_scalar(val):
+    # A bare jl.Element(val)/raw Julia scalar isn't a valid Finch tensor
+    # access root inside @finch -- build a real rank-0 tensor with an
+    # explicit length-1 buffer (see the matching fix in tensor.py's full()).
+    if isinstance(val, np.generic):
+        val = val.item()
+    buf = np.asarray([val])
+    return jl.Tensor(jl.ElementLevel(buf.item(), buf))
+
+
 _JULIA_NAME_OVERRIDES = {
     "add": "+",
     "mul": "*",
@@ -90,10 +101,14 @@ class FinchJLKernel(AssemblyKernel):
     def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
         finch_fn = getattr(jl, self.func_name)
         # Some args may be finchlite's plain-Python Scalar (rank-0, not
-        # backed by a Julia object) rather than a FinchJLTensor -- pass its
-        # raw value through directly.
+        # backed by a Julia object) rather than a FinchJLTensor. The
+        # generated code accesses every argument with Finch's tensor-access
+        # syntax (tns[]) inside an @finch block, which requires a real
+        # wrapped Finch tensor object -- a bare Julia scalar isn't a valid
+        # access root. So wrap the raw value as a minimal rank-0 tensor.
         raw_args = [
-            arg._obj if isinstance(arg, FinchJLTensor) else arg.val for arg in args
+            arg._obj if isinstance(arg, FinchJLTensor) else _wrap_scalar(arg.val)
+            for arg in args
         ]
         result = finch_fn(*raw_args)
 

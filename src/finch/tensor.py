@@ -182,6 +182,10 @@ class FinchJLTensor(Tensor):
         return jl.sprint(jl.show, self._obj)
 
     def __str__(self):
+        # A 0-d tensor has no axes to permute, and an empty swizzle
+        # permutation crashes Finch's SwizzleArray size/show machinery.
+        if self.ndim == 0:
+            return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
         swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
         return jl.sprint(jl.show, jl.MIME("text/plain"), swiz)
 
@@ -373,7 +377,15 @@ def full(
     # Rank-0 tensors should be represented as a leaf element level.
     # Building them through SparseCOO requires an explicit rank parameter.
     if len(shape) == 0 and format is None:
-        return FinchJLTensor(jl.Tensor(ElementFormat(val, dtype).create_jl_obj()))
+        elt_fmt = ElementFormat(val, dtype)
+        cast_val = elt_fmt.fill_value
+        if isinstance(cast_val, np.generic):
+            cast_val = cast_val.item()
+        # A bare jl.Element(val) treats `val` as the level's default and
+        # allocates an empty buffer, so reading it back gives the type-zero,
+        # not `val`. A rank-0 tensor needs an explicit length-1 buffer.
+        buf = np.asarray([cast_val], dtype=dtype)
+        return FinchJLTensor(jl.Tensor(jl.ElementLevel(cast_val, buf)))
 
     if format is None:
         format = SparseCOOFormat(ElementFormat(val, dtype), len(shape))
@@ -384,7 +396,10 @@ def full(
         # separately), so under the reversed-axis convention the array
         # passed here must itself already be shaped in reverse.
         return FinchJLTensor(
-            jl.Tensor(format.create_jl_obj(), np.full(tuple(reversed(shape)), val))
+            jl.Tensor(
+                format.create_jl_obj(),
+                np.full(tuple(reversed(shape)), val, dtype=dtype),
+            )
         )
     return FinchJLTensor(jl.Tensor(format.create_jl_obj(), *reversed(shape)))
 
