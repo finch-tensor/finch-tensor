@@ -75,7 +75,16 @@ class ElementFormat(LevelFormat):
         return hash((self.__class__.__name__, self._fill_value, self._element_type))
 
     def create_jl_obj(self) -> JuliaObj:
-        return jl.Element(self._fill_value)
+        # Cast through element_type so the real Julia element type matches
+        # the requested dtype, rather than whatever Julia infers from
+        # self._fill_value's own Python/numpy type.
+        val = self.fill_value
+        # PythonCall wraps numpy scalars (e.g. numpy.bool_) as 0-d PyArrays
+        # rather than native Julia values, and Finch's ElementLevel rejects
+        # non-isbits defaults -- unwrap to a native Python scalar first.
+        if isinstance(val, np.generic):
+            val = val.item()
+        return jl.Element(val)
 
     @property
     def shape_type(self) -> tuple:
@@ -147,7 +156,7 @@ class SparseCOOFormat(NestedLevelFormat):
     @property
     def shape_type(self) -> tuple:
         if self.dim_type is None:
-            return self.lvl.shape_type + (np.intp,) * self.N
+            return self.lvl.shape_type + (dtypes.int_,) * self.N
         return self.lvl.shape_type + self.dim_type
 
 

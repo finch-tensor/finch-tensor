@@ -1,14 +1,40 @@
 import math
 
+import numpy as np
+
 import finchlite.finch_notation.nodes as ntn
-from finchlite.algebra.ffuncs import add, eq, make_tuple, max, min, mul, overwrite
+from finchlite.algebra.ffuncs import (
+    add,
+    eq,
+    equal,
+    greater,
+    greater_equal,
+    less,
+    less_equal,
+    make_tuple,
+    max,
+    min,
+    mul,
+    not_equal,
+    overwrite,
+)
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from .julia import jl
 from .tensor import FinchJLTensor
 
-ops_map = {add: "+", mul: "*", eq: "=="}
+ops_map = {
+    add: "+",
+    mul: "*",
+    eq: "==",
+    equal: "==",
+    not_equal: "!=",
+    less: "<",
+    less_equal: "<=",
+    greater: ">",
+    greater_equal: ">=",
+}
 red_ops_map = {
     add: "+",
     mul: "*",
@@ -190,6 +216,11 @@ class FinchJLGenerator:
                 return self.pack_dict[name]
 
             case ntn.Literal(val):
+                # Julia booleans are lowercase, unlike Python's str(bool).
+                # numpy.bool_ is not a subclass of Python's bool, so check
+                # both.
+                if isinstance(val, bool | np.bool_):
+                    return "true" if val else "false"
                 # Julia represents inf differently than how its represented in python
                 if val > 0 and math.isinf(val):
                     return "Inf"
