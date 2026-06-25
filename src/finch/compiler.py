@@ -1,11 +1,9 @@
-import math
-
 import numpy as np
 
 import finchlite.algebra.ffuncs as ffuncs
 import finchlite.finch_notation.nodes as ntn
 from finchlite.algebra.algebra import FinchOperator
-from finchlite.algebra.ffuncs import add, make_tuple, max, min, mul, overwrite
+from finchlite.algebra.ffuncs import make_tuple, overwrite
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
@@ -13,17 +11,21 @@ from .julia import jl
 from .tensor import FinchJLTensor
 
 
-def _wrap_scalar(val):
-    # A bare jl.Element(val)/raw Julia scalar isn't a valid Finch tensor
-    # access root inside @finch -- build a real rank-0 tensor with an
-    # explicit length-1 buffer (see the matching fix in tensor.py's full()).
+def _scalar_to_jl(val):
+    # Fallback for finchlite's plain Scalar (raw Python values that never
+    # went through our tensor system). Build a real rank-0 Finch tensor so
+    # the generated @finch code can access it via tns[] syntax.
     if isinstance(val, np.generic):
         val = val.item()
     buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(buf.item(), buf))
 
 
-_JULIA_NAME_OVERRIDES = {
+# Single source of truth for Python ffunc name → Julia operator/function name.
+# max/min use Finch's <<op>> semiring syntax; they appear only as Aggregate
+# (reduction) nodes, never as plain element-wise Calls, so this is safe.
+_JULIA_NAMES = {
+    # arithmetic
     "add": "+",
     "mul": "*",
     "sub": "-",
@@ -35,6 +37,7 @@ _JULIA_NAME_OVERRIDES = {
     "pow": "^",
     "neg": "-",
     "pos": "+",
+    # comparisons
     "eq": "==",
     "equal": "==",
     "ne": "!=",
@@ -47,17 +50,22 @@ _JULIA_NAME_OVERRIDES = {
     "greater": ">",
     "ge": ">=",
     "greater_equal": ">=",
+    # bitwise / logical
     "and_": "&",
     "or_": "|",
     "not_": "!",
     "invert": "~",
     "lshift": "<<",
     "rshift": ">>",
-    "divmod": "divrem",
     "logical_and": "&",
     "logical_or": "|",
     "logical_not": "!",
     "logical_xor": "xor",
+    # reductions (Finch <<op>>= semiring syntax)
+    "max": "<<max>>",
+    "min": "<<min>>",
+    # misc
+    "divmod": "divrem",
     "square": "abs2",
     "reciprocal": "inv",
     "atan2": "atan",
@@ -67,27 +75,30 @@ _JULIA_NAME_OVERRIDES = {
     "truth": "Bool",
 }
 
-
-def _build_ops_map() -> dict:
-    m = {}
-    for py_name in dir(ffuncs):
-        obj = getattr(ffuncs, py_name)
-        if isinstance(obj, FinchOperator):
-            m[obj] = _JULIA_NAME_OVERRIDES.get(py_name, py_name)
-    return m
-
-
-ops_map = _build_ops_map()
-red_ops_map = {
-    add: "+",
-    mul: "*",
-    max: "<<max>>",
-    min: "<<min>>",
-    ffuncs.and_: "&",
-    ffuncs.or_: "|",
-    ffuncs.logical_and: "&",
-    ffuncs.logical_or: "|",
+# Names of ffuncs that are valid as reduction operators.
+_REDUCTION_OPS = {
+    "add",
+    "mul",
+    "max",
+    "min",
+    "and_",
+    "or_",
+    "logical_and",
+    "logical_or",
 }
+
+
+def _ops_for(names=None) -> dict:
+    """Build a FinchOperator → Julia-name map from _JULIA_NAMES."""
+    return {
+        obj: _JULIA_NAMES.get(n, n)
+        for n in (names if names is not None else dir(ffuncs))
+        if isinstance(obj := getattr(ffuncs, n, None), FinchOperator)
+    }
+
+
+ops_map = _ops_for()
+red_ops_map = _ops_for(_REDUCTION_OPS)
 ops_to_ignore = [make_tuple]
 
 
@@ -100,14 +111,8 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
         finch_fn = getattr(jl, self.func_name)
-        # Some args may be finchlite's plain-Python Scalar (rank-0, not
-        # backed by a Julia object) rather than a FinchJLTensor. The
-        # generated code accesses every argument with Finch's tensor-access
-        # syntax (tns[]) inside an @finch block, which requires a real
-        # wrapped Finch tensor object -- a bare Julia scalar isn't a valid
-        # access root. So wrap the raw value as a minimal rank-0 tensor.
         raw_args = [
-            arg._obj if isinstance(arg, FinchJLTensor) else _wrap_scalar(arg.val)
+            arg._obj if isinstance(arg, FinchJLTensor) else _scalar_to_jl(arg.val)
             for arg in args
         ]
         result = finch_fn(*raw_args)
@@ -157,9 +162,7 @@ class FinchJLGenerator:
                 return body_str
 
             case ntn.Assign(lhs, rhs):
-                # TODO: Can we make this better?
-                # Special condition to ignore all assigns associated with
-                # finding loop bounds
+                # Ignore assigns used only to find loop bounds.
                 if isinstance(rhs, ntn.Dimension) or (
                     isinstance(rhs, ntn.Call) and rhs.op.val == dimension
                 ):
@@ -179,8 +182,7 @@ class FinchJLGenerator:
                     return f"{tab_str}@finch {stmt}"
                 return f"{tab_str}{stmt}"
 
-            case ntn.Declare(tns, init, op, _):
-                # TODO: what is the purpose of op here
+            case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
                 return (
                     f"{tab_str}@finch {self.generate_julia(tns, nestingLvl)} .= "
@@ -193,20 +195,17 @@ class FinchJLGenerator:
 
             case ntn.Loop(idx, _, body):
                 tab_str = "    " * nestingLvl
-                tab_str_1 = "    " * (nestingLvl + 1)
                 idx_str = self.generate_julia(idx, nestingLvl)
-
-                is_outermost_loop = False
-                if self.in_finch_block is False:
-                    is_outermost_loop = True
+                outermost = not self.in_finch_block
+                if outermost:
                     self.in_finch_block = True
-                    loop_body = self.generate_julia(body, nestingLvl + 2)
-                else:
-                    loop_body = self.generate_julia(body, nestingLvl + 1)
-
-                if not is_outermost_loop:
+                loop_body = self.generate_julia(
+                    body, nestingLvl + (2 if outermost else 1)
+                )
+                if not outermost:
                     return f"{tab_str}for {idx_str} = _\n{loop_body}{tab_str}end\n"
                 self.in_finch_block = False
+                tab_str_1 = "    " * (nestingLvl + 1)
                 return (
                     f"{tab_str}@finch begin\n{tab_str_1}for {idx_str} = "
                     f"_\n{loop_body}{tab_str_1}end\n{tab_str}end"
@@ -234,6 +233,7 @@ class FinchJLGenerator:
                 return f"{tab_str}if {cond_str}\n{body_str}\n{tab_str}end"
 
             case ntn.IfElse(cond, then_body, else_body):
+                tab_str = "    " * nestingLvl
                 cond_str = self.generate_julia(cond, nestingLvl)
                 then_body_str = self.generate_julia(then_body, nestingLvl + 1)
                 else_body_str = self.generate_julia(else_body, nestingLvl + 1)
@@ -246,14 +246,6 @@ class FinchJLGenerator:
                 tab_str = "    " * nestingLvl
                 lhs_str = self.generate_julia(lhs, nestingLvl)
                 rhs_str = self.generate_julia(rhs, nestingLvl)
-
-                # TODO: Is this the correct assumption to make
-                if not (
-                    isinstance(lhs, ntn.Access) and isinstance(lhs.mode, ntn.Update)
-                ):
-                    raise Exception("Increment expects the lhs to be an access")
-
-                # If the operation is overwrite just codegen an assignment
                 if lhs.mode.op.val == overwrite:
                     stmt = f"{lhs_str} = {rhs_str}"
                 else:
@@ -269,7 +261,6 @@ class FinchJLGenerator:
                 return self.generate_julia(arg, nestingLvl)
 
             case ntn.Unpack(lhs, rhs):
-                # TODO: Is this the right assumption to make
                 if not isinstance(rhs, ntn.Variable):
                     raise Exception("The unpack was not called with variable as RHS.")
                 self.pack_dict[lhs.name] = self.generate_julia(rhs, nestingLvl)
@@ -288,21 +279,15 @@ class FinchJLGenerator:
                 return self.pack_dict[name]
 
             case ntn.Literal(val):
-                # Julia booleans are lowercase, unlike Python's str(bool).
-                # numpy.bool_ is not a subclass of Python's bool, so check
-                # both.
+                # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"
-                # Julia represents inf differently than how its represented in python
-                if val > 0 and math.isinf(val):
-                    return "Inf"
-                if val < 0 and math.isinf(val):
-                    return "-Inf"
+                if isinstance(val, float | np.floating) and np.isinf(val):
+                    return "Inf" if val > 0 else "-Inf"
                 return str(val)
 
             case ntn.Variable(name, _):
-                # finch tensor lite uses character(#) in the naming of variables
-                # that however is not valid julia syntax
+                # finchlite uses '#' in generated names; not valid Julia syntax.
                 return name.replace("#", "_")
 
             # TODO: Cached, Dimension, Thaw, Stack, Value are unimplemented.

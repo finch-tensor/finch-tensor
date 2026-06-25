@@ -4,6 +4,7 @@ from typing import Any
 import numpy as np
 
 from finchlite import Tensor, TensorFType
+from finchlite.tensor.override_tensor import OverrideTensor
 
 from . import dtypes as jl_dtypes
 from .julia import jc, jl
@@ -67,7 +68,28 @@ class FinchJLTensorFType(TensorFType):
         return hash(("FinchJLTensorFType", self._lvl))
 
 
-class FinchJLTensor(Tensor):
+class FinchJLTensor(OverrideTensor):
+    def override_module(self):
+        import finch
+
+        return finch
+
+    def __array_function__(self, func, types, args, kwargs):
+        # Guard np.asarray specifically: lazy.asarray() calls np.asarray()
+        # internally, and redirecting that back to finch.asarray() creates an
+        # infinite loop (finch.asarray returns FinchJLTensor unchanged, then
+        # lazy.asarray calls np.asarray again, etc.). Returning NotImplemented
+        # lets numpy fall back to the dtype=object path in lazy.asarray, which
+        # correctly returns the tensor as-is for downstream Julia compilation.
+        import finch
+
+        if func.__name__ == "asarray":
+            return NotImplemented
+        override_func = getattr(finch, func.__name__, None)
+        if override_func is None:
+            return NotImplemented
+        return override_func(*args, **kwargs)
+
     def __init__(self, obj: JuliaObj):
         if isinstance(obj, JuliaObj):
             assert jl.isa(obj, jl.Finch.Tensor)

@@ -79,10 +79,11 @@ class ElementFormat(LevelFormat):
         # the requested dtype, rather than whatever Julia infers from
         # self._fill_value's own Python/numpy type.
         val = self.fill_value
-        # PythonCall wraps numpy scalars (e.g. numpy.bool_) as 0-d PyArrays
-        # rather than native Julia values, and Finch's ElementLevel rejects
-        # non-isbits defaults -- unwrap to a native Python scalar first.
-        if isinstance(val, np.generic):
+        # PythonCall wraps numpy.bool_ as a 0-d PyArray (non-isbits), which
+        # Finch's ElementLevel rejects -- unwrap to a native Python bool.
+        # For all other numpy scalar types, pass them through directly so
+        # Julia preserves the right type (e.g. np.uint8(0) → UInt8, not Int64).
+        if isinstance(val, np.bool_):
             val = val.item()
         return jl.Element(val)
 
