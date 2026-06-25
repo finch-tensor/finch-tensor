@@ -2,44 +2,80 @@ import math
 
 import numpy as np
 
+import finchlite.algebra.ffuncs as ffuncs
 import finchlite.finch_notation.nodes as ntn
-from finchlite.algebra.ffuncs import (
-    add,
-    eq,
-    equal,
-    greater,
-    greater_equal,
-    less,
-    less_equal,
-    make_tuple,
-    max,
-    min,
-    mul,
-    not_equal,
-    overwrite,
-)
+from finchlite.algebra.algebra import FinchOperator
+from finchlite.algebra.ffuncs import add, make_tuple, max, min, mul, overwrite
 from finchlite.compile import NotationCompiler, dimension
 from finchlite.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from .julia import jl
 from .tensor import FinchJLTensor
 
-ops_map = {
-    add: "+",
-    mul: "*",
-    eq: "==",
-    equal: "==",
-    not_equal: "!=",
-    less: "<",
-    less_equal: "<=",
-    greater: ">",
-    greater_equal: ">=",
+_JULIA_NAME_OVERRIDES = {
+    "add": "+",
+    "mul": "*",
+    "sub": "-",
+    "truediv": "/",
+    "divide": "/",
+    "floordiv": "div",
+    "mod": "mod",
+    "remainder": "mod",
+    "pow": "^",
+    "neg": "-",
+    "pos": "+",
+    "eq": "==",
+    "equal": "==",
+    "ne": "!=",
+    "not_equal": "!=",
+    "lt": "<",
+    "less": "<",
+    "le": "<=",
+    "less_equal": "<=",
+    "gt": ">",
+    "greater": ">",
+    "ge": ">=",
+    "greater_equal": ">=",
+    "and_": "&",
+    "or_": "|",
+    "not_": "!",
+    "invert": "~",
+    "lshift": "<<",
+    "rshift": ">>",
+    "divmod": "divrem",
+    "logical_and": "&",
+    "logical_or": "|",
+    "logical_not": "!",
+    "logical_xor": "xor",
+    "square": "abs2",
+    "reciprocal": "inv",
+    "atan2": "atan",
+    "conjugate": "conj",
+    "where": "ifelse",
+    "clip": "clamp",
+    "truth": "Bool",
 }
+
+
+def _build_ops_map() -> dict:
+    m = {}
+    for py_name in dir(ffuncs):
+        obj = getattr(ffuncs, py_name)
+        if isinstance(obj, FinchOperator):
+            m[obj] = _JULIA_NAME_OVERRIDES.get(py_name, py_name)
+    return m
+
+
+ops_map = _build_ops_map()
 red_ops_map = {
     add: "+",
     mul: "*",
     max: "<<max>>",
     min: "<<min>>",
+    ffuncs.and_: "&",
+    ffuncs.or_: "|",
+    ffuncs.logical_and: "&",
+    ffuncs.logical_or: "|",
 }
 ops_to_ignore = [make_tuple]
 
@@ -53,7 +89,13 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args: tuple[FinchJLTensor, ...]) -> tuple[FinchJLTensor, ...]:
         finch_fn = getattr(jl, self.func_name)
-        result = finch_fn(*[arg._obj for arg in args])
+        # Some args may be finchlite's plain-Python Scalar (rank-0, not
+        # backed by a Julia object) rather than a FinchJLTensor -- pass its
+        # raw value through directly.
+        raw_args = [
+            arg._obj if isinstance(arg, FinchJLTensor) else arg.val for arg in args
+        ]
+        result = finch_fn(*raw_args)
 
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
@@ -109,10 +151,18 @@ class FinchJLGenerator:
                     return ""
 
                 tab_str = "    " * nestingLvl
-                return (
-                    f"{tab_str}{self.generate_julia(lhs, nestingLvl)} = "
+                stmt = (
+                    f"{self.generate_julia(lhs, nestingLvl)} = "
                     f"{self.generate_julia(rhs, nestingLvl)}"
                 )
+                # A rank-0 (loop-less) Assign falls outside any enclosing
+                # @finch block, so Tensor access would otherwise go through
+                # Finch's generic (non-macro) setindex!/getindex, which has
+                # real bugs for some element types (e.g. Bool). Wrap it the
+                # same way Declare already wraps its single-line form.
+                if not self.in_finch_block:
+                    return f"{tab_str}@finch {stmt}"
+                return f"{tab_str}{stmt}"
 
             case ntn.Declare(tns, init, op, _):
                 # TODO: what is the purpose of op here
@@ -190,8 +240,15 @@ class FinchJLGenerator:
 
                 # If the operation is overwrite just codegen an assignment
                 if lhs.mode.op.val == overwrite:
-                    return f"{tab_str}{lhs_str} = {rhs_str}"
-                return f"{tab_str}{lhs_str} {red_ops_map[lhs.mode.op.val]}= {rhs_str}"
+                    stmt = f"{lhs_str} = {rhs_str}"
+                else:
+                    stmt = f"{lhs_str} {red_ops_map[lhs.mode.op.val]}= {rhs_str}"
+                # A rank-0 (loop-less) Increment falls outside any enclosing
+                # @finch block -- see the matching comment in the Assign
+                # case above for why that needs wrapping.
+                if not self.in_finch_block:
+                    return f"{tab_str}@finch {stmt}"
+                return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):
                 return self.generate_julia(arg, nestingLvl)
