@@ -1,17 +1,15 @@
-from typing import Any, Literal
-
-import numpy as np
+from abc import ABC, abstractmethod
 
 import juliacall as jc
-
-OrderType = Literal["C", "F"] | tuple[int, ...] | None
-
-TupleOf3Arrays = tuple[np.ndarray, np.ndarray, np.ndarray]
+from finchlite.algebra.ftypes import FType
 
 JuliaObj = jc.AnyValue
+DType = FType
+number = int | float | bool | complex
 
-DType = jc.AnyValue  # represents jl.DataType
 
-spmatrix = Any
-
-Device = Literal["cpu"] | None
+class JLFType(FType, ABC):
+    @property
+    @abstractmethod
+    def jl_type(self):
+        pass

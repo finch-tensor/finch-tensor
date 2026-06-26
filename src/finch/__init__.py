@@ -1,99 +1,106 @@
-from operator import (
-    abs as abs,
-)
-from operator import (
-    add as add,
-)
-from operator import (
-    and_ as bitwise_and,
-)
-from operator import (
-    eq as equal,
-)
-from operator import (
-    floordiv as floor_divide,
-)
-from operator import (
-    ge as greater_equal,
-)
-from operator import (
-    gt as greater,
-)
-from operator import (
-    invert as bitwise_invert,
-)
-from operator import (
-    le as less_equal,
-)
-from operator import (
-    lshift as bitwise_left_shift,
-)
-from operator import (
-    lt as less,
-)
-from operator import (
-    matmul as matmul,
-)
-from operator import (
-    mod as remainder,
-)
-from operator import (
-    mul as multiply,
-)
-from operator import (
-    ne as not_equal,
-)
-from operator import (
-    neg as negative,
-)
-from operator import (
-    or_ as bitwise_or,
-)
-from operator import (
-    pos as positive,
-)
-from operator import (
-    pow as pow,
-)
-from operator import (
-    rshift as bitwise_right_shift,
-)
-from operator import (
-    sub as subtract,
-)
-from operator import (
-    truediv as divide,
-)
-from operator import (
-    xor as bitwise_xor,
+import math
+
+from finchlite import (
+    abs,
+    acos,
+    acosh,
+    add,
+    all,
+    any,
+    asin,
+    asinh,
+    atan,
+    atan2,
+    atanh,
+    bitwise_and,
+    bitwise_invert,
+    bitwise_left_shift,
+    bitwise_or,
+    bitwise_right_shift,
+    bitwise_xor,
+    broadcast_arrays,
+    broadcast_to,
+    ceil,
+    clip,
+    combine_dims,
+    concat,
+    copysign,
+    cos,
+    cosh,
+    divide,
+    einop,
+    einsum,
+    elementwise,
+    equal,
+    exp,
+    expand_dims,
+    expm1,
+    flatten,
+    floor,
+    floor_divide,
+    get_default_scheduler,
+    greater,
+    greater_equal,
+    hypot,
+    isfinite,
+    isinf,
+    isnan,
+    less,
+    less_equal,
+    log,
+    log1p,
+    log2,
+    log10,
+    logaddexp,
+    logical_and,
+    logical_not,
+    logical_or,
+    logical_xor,
+    matmul,
+    matrix_transpose,
+    max,
+    maximum,
+    mean,
+    min,
+    minimum,
+    mod,
+    moveaxis,
+    multiply,
+    negative,
+    nextafter,
+    not_equal,
+    permute_dims,
+    positive,
+    pow,
+    power,
+    prod,
+    reciprocal,
+    reduce,
+    remainder,
+    round,
+    set_default_scheduler,
+    sign,
+    signbit,
+    sin,
+    sinh,
+    split_dims,
+    sqrt,
+    square,
+    squeeze,
+    stack,
+    std,
+    subtract,
+    sum,
+    tan,
+    tanh,
+    tensordot,
+    truediv,
+    trunc,
+    var,
+    vecdot,
 )
 
-from numpy import (
-    e as e,
-)
-from numpy import (
-    inf as inf,
-)
-from numpy import (
-    nan as nan,
-)
-from numpy import (
-    newaxis as newaxis,
-)
-from numpy import (
-    pi as pi,
-)
-
-from . import linalg
 from ._array_api_info import __array_namespace_info__
-from .compiled import (
-    DefaultScheduler,
-    GalleyScheduler,
-    compiled,
-    compute,
-    lazy,
-    set_optimizer,
-)
 from .dtypes import (
     bool,
     can_cast,
@@ -115,117 +122,42 @@ from .dtypes import (
     uint32,
     uint64,
 )
-from .io import (
-    read,
-    write,
-)
-from .levels import (
-    Dense,
-    DenseStorage,
-    Element,
-    Pattern,
-    RepeatRLE,
-    SparseByteMap,
-    SparseCOO,
-    SparseHash,
-    SparseList,
-    SparseVBL,
-    Storage,
-)
+from .scheduler import COMPILE_JULIA
 from .tensor import (
-    SparseArray,
-    Tensor,
-    acos,
-    acosh,
-    all,
-    any,
+    FinchJLTensor,
+    FinchJLTensorFType,
     arange,
-    argmax,
-    argmin,
     asarray,
-    asin,
-    asinh,
-    astype,
-    atan,
-    atan2,
-    atanh,
-    ceil,
-    conj,
-    cos,
-    cosh,
-    diagonal,
-    einop,
-    einsum,
     empty,
     empty_like,
-    exp,
-    expand_dims,
-    expm1,
-    eye,
-    floor,
     full,
     full_like,
     imag,
-    isfinite,
-    isinf,
-    isnan,
     linspace,
-    log,
-    log1p,
-    log2,
-    log10,
-    logaddexp,
-    logical_and,
-    logical_or,
-    logical_xor,
-    max,
-    mean,
-    min,
-    moveaxis,
-    nonzero,
     ones,
     ones_like,
-    permute_dims,
-    power,
-    prod,
-    random,
     real,
     reshape,
-    round,
-    sign,
-    sin,
-    sinh,
-    sqrt,
-    square,
-    squeeze,
-    std,
-    sum,
-    tan,
-    tanh,
-    tensordot,
-    trunc,
-    var,
     where,
     zeros,
     zeros_like,
 )
 
+# finch's whole purpose is being the Julia-backed array API implementation,
+# so it should default to executing through Finch.jl rather than finchlite's
+# generic fallback interpreter.
+set_default_scheduler(COMPILE_JULIA)
+
+e = math.e
+pi = math.pi
+inf = math.inf
+nan = math.nan
+newaxis = None
+
 __all__ = [
-    "DefaultScheduler",
-    "Dense",
-    "DenseStorage",
-    "Element",
-    "GalleyScheduler",
-    "Pattern",
-    "RepeatRLE",
-    "SparseArray",
-    "SparseByteMap",
-    "SparseCOO",
-    "SparseHash",
-    "SparseList",
-    "SparseVBL",
-    "Storage",
-    "Tensor",
+    "COMPILE_JULIA",
+    "FinchJLTensor",
+    "FinchJLTensorFType",
     "__array_namespace_info__",
     "abs",
     "acos",
@@ -234,12 +166,9 @@ __all__ = [
     "all",
     "any",
     "arange",
-    "argmax",
-    "argmin",
     "asarray",
     "asin",
     "asinh",
-    "astype",
     "atan",
     "atan2",
     "atanh",
@@ -250,28 +179,32 @@ __all__ = [
     "bitwise_right_shift",
     "bitwise_xor",
     "bool",
+    "broadcast_arrays",
+    "broadcast_to",
     "can_cast",
     "ceil",
-    "compiled",
+    "clip",
+    "combine_dims",
     "complex64",
     "complex128",
     "compute",
-    "conj",
+    "concat",
+    "copysign",
     "cos",
     "cosh",
-    "diagonal",
     "divide",
     "e",
     "einop",
     "einsum",
+    "elementwise",
     "empty",
     "empty_like",
     "equal",
     "exp",
     "expand_dims",
     "expm1",
-    "eye",
     "finfo",
+    "flatten",
     "float16",
     "float32",
     "float64",
@@ -279,8 +212,12 @@ __all__ = [
     "floor_divide",
     "full",
     "full_like",
+    "fuse",
+    "fused",
+    "get_default_scheduler",
     "greater",
     "greater_equal",
+    "hypot",
     "iinfo",
     "imag",
     "inf",
@@ -295,7 +232,6 @@ __all__ = [
     "lazy",
     "less",
     "less_equal",
-    "linalg",
     "linspace",
     "log",
     "log1p",
@@ -303,18 +239,23 @@ __all__ = [
     "log10",
     "logaddexp",
     "logical_and",
+    "logical_not",
     "logical_or",
     "logical_xor",
     "matmul",
+    "matrix_transpose",
     "max",
+    "maximum",
     "mean",
     "min",
+    "minimum",
+    "mod",
     "moveaxis",
     "multiply",
     "nan",
     "negative",
     "newaxis",
-    "nonzero",
+    "nextafter",
     "not_equal",
     "ones",
     "ones_like",
@@ -324,25 +265,29 @@ __all__ = [
     "pow",
     "power",
     "prod",
-    "random",
-    "read",
     "real",
+    "reciprocal",
+    "reduce",
     "remainder",
     "reshape",
     "round",
-    "set_optimizer",
+    "set_default_scheduler",
     "sign",
+    "signbit",
     "sin",
     "sinh",
+    "split_dims",
     "sqrt",
     "square",
     "squeeze",
+    "stack",
     "std",
     "subtract",
     "sum",
     "tan",
     "tanh",
     "tensordot",
+    "truediv",
     "trunc",
     "uint",
     "uint8",
@@ -350,10 +295,8 @@ __all__ = [
     "uint32",
     "uint64",
     "var",
+    "vecdot",
     "where",
-    "write",
     "zeros",
     "zeros_like",
 ]
-
-__array_api_version__: str = "2024.12"

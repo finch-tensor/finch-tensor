@@ -1,396 +1,193 @@
-from __future__ import annotations
-
-import builtins
-import warnings
-from collections.abc import Callable, Iterable
-from typing import Any, Literal
+import operator
+from typing import Any
 
 import numpy as np
-from numpy.core.numeric import normalize_axis_index, normalize_axis_tuple
+
+from finchlite import Tensor, TensorFType
+from finchlite.tensor.override_tensor import OverrideTensor
 
 from . import dtypes as jl_dtypes
-from .compiled import compiled, compute, lazy
-from .einstein import einop_impl, einsum_impl
-from .errors import PerformanceWarning
 from .julia import jc, jl
 from .levels import (
-    Dense,
-    DenseStorage,
-    Element,
-    SparseCOO,
-    SparseList,
-    Storage,
-    _Display,
-    sparse_formats_names,
+    ElementFormat,
+    LevelFormat,
+    SparseCOOFormat,
+    jlobj_to_format,
 )
-from .typing import Device, DType, JuliaObj, OrderType, TupleOf3Arrays, spmatrix
+from .typing import DType, JLFType, JuliaObj, number
+from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 
-class SparseArray:
-    """
-    PyData/Sparse marker class
-    """
+# Tensor Class and associated ftype
+class FinchJLTensorFType(TensorFType, JLFType):
+    def __init__(self, lvl):
+        self._lvl: LevelFormat = lvl
 
+    @property
+    def ndim(self) -> np.intp:
+        return self._lvl.ndim
 
-class Tensor(_Display, SparseArray):
-    """
-    A wrapper class for Finch.Tensor and Finch.SwizzleArray.
+    @property
+    def fill_value(self) -> Any:
+        return self._lvl.fill_value
 
-    Constructors
-    ------------
-    Tensor(scipy.sparse.spmatrix)
-        Construct a Tensor out of a `scipy.sparse` object. Supported formats are: `COO`,
-        `CSC`, and `CSR`.
-    Tensor(numpy.ndarray)
-        Construct a Tensor out of a NumPy array object. This is a no-copy operation.
-    Tensor(Storage)
-        Initialize a Tensor with a `storage` description. `storage` can already hold
-        data.
-    Tensor(julia_object)
-        Tensor created from a compatible raw Julia object. Must be a `SwizzleArray` or
-        `LazyTensor`.
-        This is a no-copy operation.
+    @property
+    def element_type(self) -> Any:
+        return self._lvl.element_type
 
-    Parameters
-    ----------
-    obj : np.ndarray or scipy.sparse or Storage or Finch.SwizzleArray
-        Input to construct a Tensor. It's a no-copy operation of for NumPy and
-        SciPy input. For Storage it's levels' description with order. The order
-        numbers the dimensions from the fastest to slowest.  The leaf nodes have
-        mode `0` and the root node has mode `n-1`. If the tensor was square of
-        size `N`, then `N .^ order == strides`. Available options are "C"
-        (row-major), "F" (column-major), or a custom order. Default: row-major.
-    fill_value : np.number, optional
-        Only used when `numpy.ndarray` or `scipy.sparse` is passed.
-    copy : bool, optional
-        If ``True``, then the object is copied. If ``None`` then the object is
-        copied only if needed.  For ``False`` it raises a ``ValueError`` if a
-        copy cannot be avoided. Default: ``None``.
+    @property
+    def dtype(self) -> Any:
+        return self.element_type
 
-    Returns
-    -------
-    Tensor
-        Python wrapper for Finch Tensor.
+    @property
+    def shape_type(self) -> tuple:
+        return tuple(reversed(self._lvl.shape_type))
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> import finch
-    >>> arr2d = np.arange(6).reshape((2, 3))
-    >>> t1 = finch.Tensor(arr2d)
-    >>> t1.todense()
-    array([[0, 1, 2],
-           [3, 4, 5]])
-    >>> np.shares_memory(t1.todense(), arr2d)
-    True
-    >>> storage = finch.Storage(
-    ...     finch.Dense(finch.SparseList(finch.Element(1))), order="C"
-    ... )
-    >>> t2 = t1.to_storage(storage)
-    >>> t2.todense()
-    array([[0, 1, 2],
-           [3, 4, 5]])
-    """
+    @property
+    def jl_type(self):
+        return jl.Finch.Tensor[self.format.jl_type]
 
-    row_major: str = "C"
-    column_major: str = "F"
+    def construct(self, shape: tuple) -> Tensor:
+        # EXPERIMENTAL reversed-axis convention: jl.size is always kept as
+        # the reverse of the Python-facing shape; FinchJLTensor.shape un-
+        # reverses it back on the way out (see there for the full rationale).
+        return FinchJLTensor(
+            jl.Finch.Tensor(self._lvl.create_jl_obj(), tuple(reversed(shape)))
+        )
 
-    def __init__(
-        self,
-        obj: np.ndarray | spmatrix | Storage | JuliaObj,
-        /,
-        *,
-        fill_value: np.number | None = None,
-        copy: bool | None = None,
-    ):
-        if isinstance(obj, int | float | complex | bool | list):
-            if copy is False:
-                raise ValueError(
-                    "copy=False isn't supported for scalar inputs and Python lists"
-                )
-            obj = np.asarray(obj)
-        if fill_value is None:
-            fill_value = 0.0
+    def from_numpy(self, _) -> Tensor:
+        raise NotImplementedError
 
-        if _is_scipy_sparse_obj(obj):  # scipy constructor
-            jl_data = self._from_scipy_sparse(obj, fill_value=fill_value, copy=copy)
-            self._obj = jl_data
-        elif isinstance(obj, np.ndarray):  # numpy constructor
-            jl_data = self._from_numpy(obj, fill_value=fill_value, copy=copy)
-            self._obj = jl_data
-        elif isinstance(obj, Storage):  # from-storage constructor
-            if copy:
-                self._raise_julia_copy_not_supported()
-            order = self.preprocess_order(
-                obj.order, self.get_lvl_ndim(obj.levels_descr._obj)
-            )
-            self._obj = jl.swizzle(jl.Tensor(obj.levels_descr._obj), *order)
-        elif jl.isa(obj, jl.Finch.Tensor):  # raw-Julia-object constructors
-            if copy:
-                self._raise_julia_copy_not_supported()
-            self._obj = jl.swizzle(obj, *tuple(range(1, jl.ndims(obj) + 1)))
-        elif jl.isa(obj, jl.Finch.SwizzleArray) or jl.isa(obj, jl.Finch.LazyTensor):
-            if copy:
-                self._raise_julia_copy_not_supported()
-            self._obj = obj
-        elif isinstance(obj, Tensor):
-            self._obj = obj._obj
-        else:
-            raise ValueError(
-                "Either scalar, numpy, scipy.sparse or a raw julia object should "
-                f"be provided. Found: {type(obj)}"
-            )
-
-    def __pos__(self):
-        return self._elemwise_op("+")
-
-    def __neg__(self):
-        return self._elemwise_op("-")
-
-    def __add__(self, other):
-        return self._elemwise_op("+", other)
-
-    def __mul__(self, other):
-        return self._elemwise_op("*", other)
-
-    def __sub__(self, other):
-        return self._elemwise_op("-", other)
-
-    def __truediv__(self, other):
-        return self._elemwise_op("/", other)
-
-    def __floordiv__(self, other):
-        return self._elemwise_op("Finch.fld_nothrow", other)
-
-    def __mod__(self, other):
-        return self._elemwise_op("Finch.mod_nothrow", other)
-
-    def __pow__(self, other):
-        return self._elemwise_op("^", other)
-
-    @compiled()
-    def __matmul__(self, other: Tensor) -> Tensor:
-        if self.ndim == 0 or other.ndim == 0:
-            raise ValueError(
-                f"`{self.ndim=}`, `{other.ndim=}`. Both must be greater than `0`."
-            )
-
-        if other.ndim == 1:
-            return sum(self * other, axis=-1)
-
-        if self.ndim == 1:
-            return sum(self * other.mT, axis=-1)
-
-        return sum(self[..., :, None, :] * other.mT[..., None, :, :], axis=-1)
-
-    def __abs__(self):
-        return self._elemwise_op("abs")
-
-    def __invert__(self):
-        return self._elemwise_op("~")
-
-    def __and__(self, other):
-        return self._elemwise_op("&", other)
-
-    def __or__(self, other):
-        return self._elemwise_op("|", other)
-
-    def __xor__(self, other):
-        return self._elemwise_op("xor", other)
-
-    def __lshift__(self, other):
-        return self._elemwise_op("<<", other)
-
-    def __rshift__(self, other):
-        return self._elemwise_op(">>", other)
-
-    def __lt__(self, other):
-        return self._elemwise_op("<", other)
-
-    def __le__(self, other):
-        return self._elemwise_op("<=", other)
-
-    def __gt__(self, other):
-        return self._elemwise_op(">", other)
-
-    def __ge__(self, other):
-        return self._elemwise_op(">=", other)
+    def __call__(self, val: Any) -> Tensor:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
-        return self._elemwise_op("==", other)
+        if not isinstance(other, FinchJLTensorFType):
+            return False
+        return self._lvl == other._lvl
 
-    def __ne__(self, other):
-        return self._elemwise_op("!=", other)
+    def __hash__(self):
+        return hash(("FinchJLTensorFType", self._lvl))
 
-    def _elemwise_op(self, op: str, other: Tensor | None = None) -> Tensor:
-        if other is None:
-            result = jl.broadcast(jl.seval(op), self._obj)
+
+class FinchJLTensor(OverrideTensor):
+    def override_module(self):
+        import finch
+
+        return finch
+
+    def __array_function__(self, func, types, args, kwargs):
+        # Guard np.asarray specifically: lazy.asarray() calls np.asarray()
+        # internally, and redirecting that back to finch.asarray() creates an
+        # infinite loop (finch.asarray returns FinchJLTensor unchanged, then
+        # lazy.asarray calls np.asarray again, etc.). Returning NotImplemented
+        # lets numpy fall back to the dtype=object path in lazy.asarray, which
+        # correctly returns the tensor as-is for downstream Julia compilation.
+        import finch
+
+        if func.__name__ == "asarray":
+            return NotImplemented
+        override_func = getattr(finch, func.__name__, None)
+        if override_func is None:
+            return NotImplemented
+        return override_func(*args, **kwargs)
+
+    def __init__(self, obj: JuliaObj):
+        if isinstance(obj, JuliaObj):
+            assert jl.isa(obj, jl.Finch.Tensor)
+            self._obj = obj
         else:
-            if np.isscalar(other):
-                other = jc.convert(self.dtype, other)
-            else:
-                other = jl.permutedims(other._obj, tuple(range(other.ndim, 0, -1)))
-            # inverse swizzle, so `broadcast` appends new dims to the front
-            result = jl.broadcast(
-                jl.seval(op),
-                jl.permutedims(self._obj, tuple(range(self.ndim, 0, -1))),
-                other,
-            )
-            # swizzle back to the original order
-            result = jl.permutedims(result, tuple(range(jl.ndims(result), 0, -1)))
+            raise ValueError(f"Raw julia object expected. Found: {type(obj)}")
 
-        return Tensor(result)
+    @property
+    def ftype(self) -> TensorFType:
+        """Returns the ftype of the buffer"""
+        return FinchJLTensorFType(jlobj_to_format(self._obj.lvl))
 
-    def __bool__(self):
-        return self._to_scalar(bool)
+    @property
+    def dtype(self) -> Any:
+        return self.element_type
 
-    def __float__(self):
-        return self._to_scalar(float)
+    @property
+    def shape(self) -> tuple:
+        """Shape of the tensor.
 
-    def __int__(self):
-        return self._to_scalar(int)
-
-    def __index__(self):
-        return self._to_scalar(int)
-
-    def __complex__(self):
-        return self._to_scalar(complex)
-
-    def _to_scalar(self, builtin):
-        if self.ndim != 0:
-            raise ValueError(f"{builtin} can be computed for one-element tensors only.")
-        return builtin(self.todense().flatten()[0])
+        EXPERIMENTAL: jl.size is always kept as the reverse of the
+        Python-facing shape (see asarray/full/__getitem__/todense), so this
+        un-reverses it back to Python axis order.
+        """
+        return tuple(reversed(jl.size(self._obj)))
 
     def __getitem__(self, key):
         if not isinstance(key, tuple):
             key = (key,)
 
-        if not self.is_computed():
-            # lazy indexing mode
-            key = _process_lazy_indexing(key, self.ndim)
-        else:
-            # standard indexing mode
-            key = _expand_ellipsis(key, self.shape)
-            key = _add_missing_dims(key, self.shape)
-            key = _add_plus_one(key, self.shape)
+        # Array API behavior: indexing a 0-D array with () is a no-op.
+        if self.shape == () and key == ():
+            return self
 
-        result = self._obj[key]
-        if jl.isa(result, jl.Finch.SwizzleArray) or jl.isa(result, jl.Finch.LazyTensor):
-            return Tensor(result)
-        if jl.isa(result, jl.Finch.Tensor):
-            return Tensor(jl.swizzle(result, *range(1, jl.ndims(result) + 1)))
-        return result
+        # standard indexing mode
+        key = expand_ellipsis(key, self.shape)
+        key = add_missing_dims(key, self.shape)
+        key = add_plus_one(key, self.shape)
 
-    @property
-    def dtype(self) -> DType:
-        return jl.eltype(self._obj.body)
+        if all(isinstance(k, int) for k in key):
+            return jl.getindex(self._obj, *reversed(key))
 
-    @property
-    def ndim(self) -> int:
-        return jl.ndims(self._obj)
+        # Finch's getindex has no notion of `None`/newaxis, so strip those
+        # entries out, index normally, then re-insert size-1 axes into the
+        # result at the positions implied by the original key.
+        real_key = tuple(k for k in key if k is not jl.nothing)
+        newaxis_positions = []
+        axis = 0
+        for k in key:
+            if k is jl.nothing:
+                newaxis_positions.append(axis)
+                axis += 1
+            elif not isinstance(k, int):
+                axis += 1
 
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return jl.size(self._obj)
+        result = jl.getindex(self._obj, *reversed(real_key))
 
-    @property
-    def size(self) -> int:
-        return np.prod(self.shape)
+        if not newaxis_positions:
+            assert jl.isa(result, jl.Finch.Tensor)
+            return FinchJLTensor(result)
 
-    @property
-    def fill_value(self) -> np.number:
-        return jl.fill_value(self._obj)
+        arr = (
+            FinchJLTensor(result).todense()
+            if jl.isa(result, jl.Finch.Tensor)
+            else np.asarray(result)
+        )
+        for pos in newaxis_positions:
+            arr = np.expand_dims(arr, pos)
+        return asarray(arr)
 
-    @property
     def _is_dense(self) -> bool:
-        lvl = self._obj.body.lvl
+        lvl = self._obj.lvl
         for _ in self.shape:
             if not jl.isa(lvl, jl.Finch.Dense):
                 return False
             lvl = lvl.lvl
         return True
 
-    @property
-    def _order(self) -> tuple[int, ...]:
-        return jl.typeof(self._obj).parameters[1]
-
-    @property
-    def mT(self) -> Tensor:
-        axes = list(range(self.ndim))
-        axes[-2], axes[-1] = axes[-1], axes[-2]
-        axes = tuple(axes)
-        return self.permute_dims(axes)
-
-    @property
-    def device(self) -> str:
-        return "cpu"
-
-    def to_device(
-        self, device: Device, /, *, stream: int | Any | None = None
-    ) -> Tensor:
-        if device != "cpu":
-            raise ValueError("Only `device='cpu'` is supported.")
-
-        return self
-
-    def is_computed(self) -> bool:
-        return not jl.isa(self._obj, jl.Finch.LazyTensor)
-
-    @classmethod
-    def preprocess_order(cls, order: OrderType, ndim: int) -> tuple[int, ...]:
-        if order == cls.column_major:
-            permutation = tuple(range(1, ndim + 1))
-        elif order == cls.row_major or order is None:
-            permutation = tuple(range(1, ndim + 1)[::-1])
-        elif isinstance(order, tuple):
-            if builtins.min(order) == 0:
-                order = tuple(i + 1 for i in order)
-            if len(order) == ndim and builtins.all(
-                i in order for i in range(1, ndim + 1)
-            ):
-                permutation = order
-            else:
-                raise ValueError(f"Custom order is not a permutation: {order}.")
-        else:
-            raise ValueError(
-                f"order must be 'C', 'F' or a tuple, but is: {type(order)}."
-            )
-
-        return permutation
-
-    @classmethod
-    def get_lvl_ndim(cls, lvl: JuliaObj) -> int:
-        ndim = 0
-        while True:
-            ndim += 1
-            lvl = lvl.lvl
-            if jl.isa(lvl, jl.Finch.Element):
-                break
-        return ndim
-
-    def get_order(self, zero_indexing: bool = True) -> tuple[int, ...]:
-        order = self._order
-        if zero_indexing:
-            order = tuple(i - 1 for i in order)
-        return order
-
-    def get_inv_order(self, zero_indexing: bool = True) -> tuple[int, ...]:
-        inv_order = jl.invperm(self._order)
-        if zero_indexing:
-            inv_order = tuple(i - 1 for i in inv_order)
-        return inv_order
-
     def todense(self) -> np.ndarray:
         obj = self._obj
 
-        if self._is_dense:
+        if self.ndim == 0:  # early return for 0-D tensor.
+            return np.array(jl.fill_value(obj))
+
+        if self._is_dense():
             # don't materialize a dense finch tensor
-            shape = jl.size(obj.body)
-            dense_tensor = obj.body.lvl
+            shape = jl.size(obj)
+            dense_tensor = obj.lvl
         else:
             # create materialized dense array
             shape = jl.size(obj)
-            dense_lvls = jl.Element(jc.convert(self.dtype, jl.fill_value(obj)))
+            dense_lvls = jl.Element(
+                jc.convert(jl_dtypes.fl_dtype_to_jl[self.dtype], jl.fill_value(obj))
+            )
             for _ in range(self.ndim):
                 dense_lvls = jl.Dense(dense_lvls)
             dense_tensor = jl.Tensor(dense_lvls, obj).lvl  # materialize
@@ -398,252 +195,25 @@ class Tensor(_Display, SparseArray):
         for _ in range(self.ndim):
             dense_tensor = dense_tensor.lvl
 
-        result = np.asarray(jl.reshape(dense_tensor.val, shape))
-        return result.transpose(self.get_order()) if self._is_dense else result
+        # `shape` here is jl.size(obj), i.e. the reversed-axis shape; reshape
+        # into that, then transpose (a cheap stride-only view) back to the
+        # Python-facing axis order.
+        arr = jl.reshape(dense_tensor.val, tuple(shape))
+        return np.asarray(arr).transpose()
 
-    def permute_dims(self, axes: tuple[int, ...]) -> Tensor:
-        axes = tuple(i + 1 for i in axes)
-        new_obj = jl.permutedims(self._obj, axes)
-        return Tensor(new_obj)
+    def __eq__(self, other):
+        return isinstance(other, FinchJLTensor) and self._obj == other._obj
 
-    def to_storage(self, storage: Storage) -> Tensor:
-        return Tensor(self._from_other_tensor(self, storage=storage))
+    def __repr__(self):
+        return jl.sprint(jl.show, self._obj)
 
-    @classmethod
-    def _from_other_tensor(cls, tensor: Tensor, storage: Storage) -> JuliaObj:
-        order = cls.preprocess_order(storage.order, tensor.ndim)
-        result = jl.copyto_b(
-            jl.swizzle(jl.Tensor(storage.levels_descr._obj), *order), tensor._obj
-        )
-        return jl.dropfills(result) if tensor._is_dense else result
-
-    @classmethod
-    def _from_numpy(
-        cls, arr: np.ndarray, fill_value: np.number, copy: bool | None = None
-    ) -> JuliaObj:
-        if copy:
-            arr = arr.copy()
-        order_char = "F" if np.isfortran(arr) else "C"
-        order = cls.preprocess_order(order_char, arr.ndim)
-        inv_order = tuple(i - 1 for i in jl.invperm(order))
-
-        dtype = arr.dtype.type
-        if (
-            dtype == np.bool_
-        ):  # Fails with: Finch currently only supports isbits defaults
-            dtype = jl_dtypes.bool
-        fill_value = dtype(fill_value)
-        lvl = Element(fill_value, arr.reshape(-1, order=order_char))
-        for i in inv_order:
-            lvl = Dense(lvl, arr.shape[i])
-        return jl.swizzle(jl.Tensor(lvl._obj), *order)
-
-    @classmethod
-    def from_scipy_sparse(
-        cls,
-        x,
-        fill_value: np.number | None = None,
-        copy: bool | None = None,
-    ) -> Tensor:
-        if not _is_scipy_sparse_obj(x):
-            raise ValueError("{x} is not a SciPy sparse object.")
-        return Tensor(x, fill_value=fill_value, copy=copy)
-
-    @classmethod
-    def _from_scipy_sparse(
-        cls,
-        x,
-        *,
-        fill_value: np.number | None = None,
-        copy: bool | None = None,
-    ) -> JuliaObj:
-        if copy is False and not (
-            x.format in ("coo", "csr", "csc") and x.has_canonical_format
-        ):
-            raise ValueError(
-                "Unable to avoid copy while creating an array as requested."
-            )
-        if x.format not in ("coo", "csr", "csc"):
-            x = x.asformat("coo")
-        if copy:
-            x = x.copy()
-        if not x.has_canonical_format:
-            x.sum_duplicates()
-            assert x.has_canonical_format
-
-        if x.format == "coo":
-            return cls.construct_coo_jl_object(
-                coords=(x.col, x.row),
-                data=x.data,
-                shape=x.shape[::-1],
-                order=Tensor.row_major,
-                fill_value=fill_value,
-            )
-        if x.format == "csc":
-            return cls.construct_csc_jl_object(
-                arg=(x.data, x.indices, x.indptr),
-                shape=x.shape,
-                fill_value=fill_value,
-            )
-        if x.format == "csr":
-            return cls.construct_csr_jl_object(
-                arg=(x.data, x.indices, x.indptr),
-                shape=x.shape,
-                fill_value=fill_value,
-            )
-        raise ValueError(f"Unsupported SciPy format: {type(x)}")
-
-    @classmethod
-    def construct_coo_jl_object(
-        cls, coords, data, shape, order, fill_value=0.0
-    ) -> JuliaObj:
-        assert len(coords) == 2
-        ndim = len(shape)
-        order = cls.preprocess_order(order, ndim)
-
-        lvl = jl.Element(data.dtype.type(fill_value), data)
-        ptr = jl.Vector[jl.Int]([1, len(data) + 1])
-        tbl = tuple(jl.PlusOneVector(arr) for arr in coords)
-
-        return jl.swizzle(jl.Tensor(jl.SparseCOO[ndim](lvl, shape, ptr, tbl)), *order)
-
-    @classmethod
-    def construct_coo(
-        cls, coords, data, shape, order=row_major, fill_value=0.0
-    ) -> Tensor:
-        return Tensor(
-            cls.construct_coo_jl_object(coords, data, shape, order, fill_value)
-        )
-
-    @staticmethod
-    def _construct_compressed2d_jl_object(
-        arg: TupleOf3Arrays,
-        shape: tuple[int, ...],
-        order: tuple[int, ...],
-        fill_value: np.number = 0.0,
-    ) -> JuliaObj:
-        assert isinstance(arg, tuple) and len(arg) == 3
-        assert len(shape) == 2
-
-        data, indices, indptr = arg
-        dtype = data.dtype.type
-        indices = jl.PlusOneVector(indices)
-        indptr = jl.PlusOneVector(indptr)
-
-        lvl = jl.Element(dtype(fill_value), data)
-        return jl.swizzle(
-            jl.Tensor(
-                jl.Dense(jl.SparseList(lvl, shape[0], indptr, indices), shape[1])
-            ),
-            *order,
-        )
-
-    @classmethod
-    def construct_csc_jl_object(
-        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> JuliaObj:
-        return cls._construct_compressed2d_jl_object(
-            arg=arg, shape=shape, order=(1, 2), fill_value=fill_value
-        )
-
-    @classmethod
-    def construct_csc(
-        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> Tensor:
-        return Tensor(cls.construct_csc_jl_object(arg, shape, fill_value))
-
-    @classmethod
-    def construct_csr_jl_object(
-        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> JuliaObj:
-        return cls._construct_compressed2d_jl_object(
-            arg=arg, shape=shape[::-1], order=(2, 1), fill_value=fill_value
-        )
-
-    @classmethod
-    def construct_csr(
-        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> Tensor:
-        return Tensor(cls.construct_csr_jl_object(arg, shape, fill_value))
-
-    @staticmethod
-    def construct_csf_jl_object(
-        arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> JuliaObj:
-        assert isinstance(arg, tuple) and len(arg) == 3
-
-        data, indices_list, indptr_list = arg
-        dtype = data.dtype.type
-
-        assert len(indices_list) == len(shape) - 1
-        assert len(indptr_list) == len(shape) - 1
-
-        indices_list = [jl.PlusOneVector(i) for i in indices_list]
-        indptr_list = [jl.PlusOneVector(i) for i in indptr_list]
-
-        lvl = jl.Element(dtype(fill_value), data)
-        for size, indices, indptr in zip(
-            shape[:-1], indices_list, indptr_list, strict=False
-        ):
-            lvl = jl.SparseList(lvl, size, indptr, indices)
-
-        return jl.swizzle(
-            jl.Tensor(jl.Dense(lvl, shape[-1])), *range(1, len(shape) + 1)
-        )
-
-    @classmethod
-    def construct_csf(
-        cls, arg: TupleOf3Arrays, shape: tuple[int, ...], fill_value: np.number = 0.0
-    ) -> Tensor:
-        return Tensor(cls.construct_csf_jl_object(arg, shape, fill_value))
-
-    def to_scipy_sparse(self, accept_fv=None):
-        import scipy.sparse as sp
-
-        if accept_fv is None:
-            accept_fv = [0]
-        elif not isinstance(accept_fv, Iterable):
-            accept_fv = [accept_fv]
-
-        if self.ndim != 2:
-            raise ValueError(
-                "Can only convert a 2-dimensional array to a Scipy sparse matrix."
-            )
-        if not builtins.any(_eq_scalars(self.fill_value, fv) for fv in accept_fv):
-            raise ValueError(
-                f"Can only convert arrays with {accept_fv} fill-values "
-                "to a Scipy sparse matrix."
-            )
-        order = self.get_order()
-        body = self._obj.body
-
-        if str(jl.typeof(body.lvl).name.name) == "SparseCOOLevel":
-            data = np.asarray(body.lvl.lvl.val)
-            coords = body.lvl.tbl
-            row, col = coords[::-1] if order == (1, 0) else coords
-            row, col = np.asarray(row) - 1, np.asarray(col) - 1
-            return sp.coo_matrix((data, (row, col)), shape=self.shape)
-
-        if (
-            str(jl.typeof(body.lvl).name.name) == "DenseLevel"
-            and str(jl.typeof(body.lvl.lvl).name.name) == "SparseListLevel"
-        ):
-            data = np.asarray(body.lvl.lvl.lvl.val)
-            indices = np.asarray(body.lvl.lvl.idx) - 1
-            indptr = np.asarray(body.lvl.lvl.ptr) - 1
-            sp_class = sp.csr_matrix if order == (1, 0) else sp.csc_matrix
-            return sp_class((data, indices, indptr), shape=self.shape)
-        if (
-            jl.typeof(body.lvl).name.name in sparse_formats_names
-            or jl.typeof(body.lvl.lvl).name.name in sparse_formats_names
-        ):
-            storage = Storage(SparseCOO(self.ndim, Element(self.fill_value)), order)
-            return self.to_storage(storage).to_scipy_sparse()
-        raise ValueError("Tensor can't be converted to scipy.sparse object.")
-
-    @staticmethod
-    def _raise_julia_copy_not_supported() -> None:
-        raise ValueError("copy=True isn't supported for Julia object inputs")
+    def __str__(self):
+        # A 0-d tensor has no axes to permute, and an empty swizzle
+        # permutation crashes Finch's SwizzleArray size/show machinery.
+        if self.ndim == 0:
+            return jl.sprint(jl.show, jl.MIME("text/plain"), self._obj)
+        swiz = jl.swizzle(self._obj, tuple(reversed(range(self.ndim, 1, -1))))
+        return jl.sprint(jl.show, jl.MIME("text/plain"), swiz)
 
     def __array_namespace__(self, *, api_version: str | None = None) -> Any:
         if api_version is None:
@@ -655,18 +225,32 @@ class Tensor(_Display, SparseArray):
 
         return finch
 
+    def copy(self) -> "FinchJLTensor":
+        return FinchJLTensor(jl.deepcopy(self._obj))
 
-def random(shape, density=0.01, random_state=None):
-    args = [*shape, density]
-    if random_state is not None:
-        if isinstance(random_state, np.random.Generator):
-            seed = random_state.integers(np.iinfo(np.int32).max)
-        else:
-            seed = random_state
-        rng = jl.Random.default_rng()
-        jl.Random.seed_b(rng, seed)
-        args = [rng] + args
-    return Tensor(jl.fsprand(*args))
+    def _scalar_value(self):
+        if self.shape != ():
+            raise TypeError(
+                "only 0-dimensional arrays can be converted to Python scalars"
+            )
+        return jl.getindex(self._obj)
+
+    def __bool__(self) -> bool:
+        return bool(self._scalar_value())
+
+    def __int__(self) -> int:
+        return int(self._scalar_value())
+
+    def __float__(self) -> float:
+        return float(self._scalar_value())
+
+    def __index__(self) -> int:
+        try:
+            return operator.index(self._scalar_value())
+        except TypeError as exc:
+            raise TypeError(
+                "only integer scalar arrays can be converted to an index"
+            ) from exc
 
 
 def asarray(
@@ -674,168 +258,247 @@ def asarray(
     /,
     *,
     dtype: DType | None = None,
-    format: str | None = None,
     fill_value: np.number | None = None,
-    device: Device | None = None,
     copy: bool | None = None,
-) -> Tensor:
-    if format not in {"coo", "csr", "csc", "csf", "dense", None}:
-        raise ValueError(f"{format} format not supported.")
-    _validate_device(device)
-    tensor = (
-        obj
-        if isinstance(obj, Tensor)
-        else Tensor(obj, fill_value=fill_value, copy=copy)
-    )
-    if format is not None:
+) -> FinchJLTensor:
+    if fill_value is None:
+        fill_value = 0.0
+    if isinstance(obj, FinchJLTensor):
+        if copy:
+            return obj.copy()
+        return obj
+    if copy is None:
+        copy = True
+    if isinstance(obj, int | float | complex | bool | list):
         if copy is False:
+            raise ValueError(
+                "copy=False isn't supported for scalar inputs and Python lists"
+            )
+        obj = np.asarray(obj)
+    if isinstance(obj, np.ndarray):
+        if dtype is not None:
+            obj = np.asarray(obj, dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+        if obj.ndim == 0:
+            return full((), obj.item(), dtype=dtype)
+
+        # EXPERIMENTAL reversed-axis convention: keep the buffer in its
+        # natural C (row-major) layout -- which is exactly the column-major
+        # layout of the *reversed*-shape tensor -- instead of permuting data
+        # to Fortran order, and build the DenseLevel nest in reverse axis
+        # order so jl.size ends up as reversed(obj.shape).
+        if copy:
+            obj = obj.copy() if obj.flags["C_CONTIGUOUS"] else np.ascontiguousarray(obj)
+        else:
+            if not obj.flags["C_CONTIGUOUS"]:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+        buf = np.reshape(obj, -1)
+
+        lvl = jl.ElementLevel(np.asarray(fill_value, dtype=obj.dtype).item(), buf)
+        for i in reversed(obj.shape):
+            lvl = jl.DenseLevel(lvl, i)
+        return FinchJLTensor(jl.Tensor(lvl))
+    if hasattr(obj, "__module__") and obj.__module__.startswith("scipy.sparse"):
+        if copy:
+            if obj.format == "csr":
+                obj = obj.copy() if obj.has_sorted_indices else obj.sorted_indices()
+                if not obj.has_canonical_format:
+                    obj.sum_duplicates()
+            elif obj.format == "coo":
+                obj = obj.copy()
+                obj.sum_duplicates()
+            else:
+                obj = obj.asformat("csr")
+        if (
+            copy is False
+            and obj.format not in ("coo", "csr")
+            and not obj.has_canonical_format
+        ):
             raise ValueError(
                 "Unable to avoid copy while creating an array as requested."
             )
-        order = tensor.get_order()
-        if format == "coo":
-            storage = Storage(SparseCOO(tensor.ndim, Element(tensor.fill_value)), order)
-        elif format == "csr":
-            storage = Storage(Dense(SparseList(Element(tensor.fill_value))), (2, 1))
-        elif format == "csc":
-            storage = Storage(Dense(SparseList(Element(tensor.fill_value))), (1, 2))
-        elif format == "csf":
-            storage = Element(tensor.fill_value)
-            for _ in range(tensor.ndim - 1):
-                storage = SparseList(storage)
-            storage = Storage(Dense(storage), order)
-        elif format == "dense":
-            storage = DenseStorage(tensor.ndim, tensor.dtype, order)
-        tensor = tensor.to_storage(storage)
-
-    if dtype is not None:
-        return astype(tensor, dtype, copy=copy)
-    return tensor
+        m, n = obj.shape
+        if dtype is not None:
+            fill_value = np.asarray(
+                fill_value, dtype=jl_dtypes.jl_to_np_dtype[dtype]
+            ).item()
+        if obj.format == "coo":
+            # EXPERIMENTAL reversed-axis convention: shape and coordinate
+            # order are both given reversed ((n, m) and (col, row)), so axis
+            # 0 of the SparseCOOLevel is "col". Sorting must vary axis 0
+            # (col) fastest -- i.e. row primary, col secondary -- so col is
+            # lexsort's secondary (first) key and row its primary (last) key.
+            order = np.lexsort((obj.col, obj.row))
+            row_s = obj.row[order]
+            col_s = obj.col[order]
+            data_s = obj.data[order]
+            nnz = len(data_s)
+            return FinchJLTensor(
+                jl.Tensor(
+                    jl.SparseCOOLevel(
+                        jl.ElementLevel(fill_value, data_s),
+                        (n, m),
+                        # ptr marks the single coordinate block [1, nnz+1);
+                        # it's a plain Python list, so it needs an explicit
+                        # jl.Vector to become a real Julia array (numpy arrays
+                        # get this automatically via PythonCall's zero-copy
+                        # PyArray wrapping).
+                        jl.Vector([1, nnz + 1]),
+                        (
+                            jl.Finch.PlusOneVector(col_s),
+                            jl.Finch.PlusOneVector(row_s),
+                        ),
+                    )
+                )
+            )
+        if obj.format == "csr":
+            return FinchJLTensor(
+                jl.Tensor(
+                    jl.DenseLevel(
+                        jl.SparseListLevel(
+                            jl.ElementLevel(fill_value, obj.data),
+                            m,
+                            jl.Finch.PlusOneVector(obj.indptr),
+                            jl.Finch.PlusOneVector(obj.indices),
+                        ),
+                        n,
+                    )
+                )
+            )
+        raise ValueError(f"Unsupported SciPy format: {type(obj)}")
+    raise ValueError(
+        f"Either numpy array or a Finch tensor should be provided. Found: {type(obj)}"
+    )
 
 
 def reshape(
-    x: Tensor, /, shape: tuple[int, ...], *, copy: bool | None = None
-) -> Tensor:
+    x: FinchJLTensor, /, shape: tuple[int, ...], *, copy: bool | None = None
+) -> FinchJLTensor:
     if copy is False:
         raise ValueError("Unable to avoid copy during reshape.")
-    # TODO: https://github.com/finch-tensor/Finch.jl/issues/743
-    #       Revert to `jl.reshape` implementation once aforementioned
-    #       issue is solved.
-    warnings.warn(
-        "`reshape` densified the input tensor.", PerformanceWarning, stacklevel=2
-    )
-    arr = x.todense()
-    arr = arr.reshape(shape)
-    return Tensor(arr)
+    if all(i == 1 for i in x.shape):
+        return full(shape, x[tuple(i - 1 for i in x.shape)], dtype=x.dtype)
+    return FinchJLTensor(jl.reshape(x._obj, tuple(reversed(shape))))
 
 
 def full(
     shape: int | tuple[int, ...],
-    fill_value: jl_dtypes.number,
+    val: number,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
-    _validate_device(device)
-    if not np.isscalar(fill_value):
+    format=None,
+) -> FinchJLTensor:
+    if not np.isscalar(val):
         raise ValueError("`fill_value` must be a scalar")
-    if format not in ("coo", "dense"):
-        raise ValueError(f"{format} format not supported.")
     if isinstance(shape, int):
         shape = (shape,)
     dtype = (
-        np.asarray(fill_value).dtype.type
-        if dtype is None
-        else jl_dtypes.jl_to_np_dtype[dtype]
+        np.asarray(val).dtype.type if dtype is None else jl_dtypes.jl_to_np_dtype[dtype]
     )
     if dtype == np.bool_:  # Fails with: Finch currently only supports isbits defaults
         dtype = bool
 
-    if format == "coo" and shape != ():
-        return Tensor(
-            jl.Tensor(jl.SparseCOO[len(shape)](jl.Element(dtype(fill_value))), *shape)
+    # Rank-0 tensors should be represented as a leaf element level.
+    # Building them through SparseCOO requires an explicit rank parameter.
+    if len(shape) == 0 and format is None:
+        elt_fmt = ElementFormat(val, dtype)
+        cast_val = elt_fmt.fill_value
+        if isinstance(cast_val, np.generic):
+            cast_val = cast_val.item()
+        # A bare jl.Element(val) treats `val` as the level's default and
+        # allocates an empty buffer, so reading it back gives the type-zero,
+        # not `val`. A rank-0 tensor needs an explicit length-1 buffer.
+        buf = np.asarray([cast_val], dtype=dtype)
+        return FinchJLTensor(jl.Tensor(jl.ElementLevel(cast_val, buf)))
+
+    if format is None:
+        format = SparseCOOFormat(ElementFormat(val, dtype), len(shape))
+
+    if format.fill_value != val:
+        # jl.Tensor(lvl, real_array) infers jl.size literally from the
+        # array's own .shape (no implicit reversal on that path -- proven
+        # separately), so under the reversed-axis convention the array
+        # passed here must itself already be shaped in reverse.
+        return FinchJLTensor(
+            jl.Tensor(
+                format.create_jl_obj(),
+                np.full(tuple(reversed(shape)), val, dtype=dtype),
+            )
         )
-    # for dense format or () shape
-    return Tensor(np.full(shape, fill_value, dtype=dtype))
+    return FinchJLTensor(jl.Tensor(format.create_jl_obj(), *reversed(shape)))
 
 
 def full_like(
-    x: Tensor,
+    x: FinchJLTensor,
     /,
-    fill_value: jl_dtypes.number,
+    fill_value: number,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
-    return full(x.shape, fill_value, dtype=dtype, format=format, device=device)
+    format=None,
+) -> FinchJLTensor:
+    return full(x.shape, fill_value, dtype=dtype, format=format)
 
 
 def ones(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
-    return full(shape, np.float64(1), dtype=dtype, format=format, device=device)
+    format=None,
+) -> FinchJLTensor:
+    return full(shape, np.float64(1), dtype=dtype, format=format)
 
 
 def ones_like(
-    x: Tensor,
+    x: FinchJLTensor,
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
+    format=None,
+) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
-    return ones(x.shape, dtype=dtype, format=format, device=device)
+    return ones(x.shape, dtype=dtype, format=format)
 
 
 def zeros(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
-    return full(shape, np.float64(0), dtype=dtype, format=format, device=device)
+    format=None,
+) -> FinchJLTensor:
+    return full(shape, np.float64(0), dtype=dtype, format=format)
 
 
 def zeros_like(
-    x: Tensor,
+    x: FinchJLTensor,
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
+    format=None,
+) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
-    return zeros(x.shape, dtype=dtype, format=format, device=device)
+    return zeros(x.shape, dtype=dtype, format=format)
 
 
 def empty(
     shape: int | tuple[int, ...],
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
-    return full(shape, np.float64(0), dtype=dtype, format=format, device=device)
+    format=None,
+) -> FinchJLTensor:
+    return full(shape, np.float64(0), dtype=dtype, format=format)
 
 
 def empty_like(
-    x: Tensor,
+    x: FinchJLTensor,
     /,
     *,
     dtype: DType | None = None,
-    format: str = "coo",
-    device: Device = None,
-) -> Tensor:
+    format=None,
+) -> FinchJLTensor:
     dtype = x.dtype if dtype is None else dtype
-    return empty(x.shape, dtype=dtype, format=format, device=device)
+    return empty(x.shape, dtype=dtype, format=format)
 
 
 def arange(
@@ -845,10 +508,41 @@ def arange(
     step: float = 1,
     *,
     dtype: DType | None = None,
-    device: Device = None,
-) -> Tensor:
-    _validate_device(device)
-    return Tensor(np.arange(start, stop, step, jl_dtypes.jl_to_np_dtype[dtype]))
+) -> FinchJLTensor:
+    return asarray(np.arange(start, stop, step, jl_dtypes.jl_to_np_dtype[dtype]))
+
+
+def real(  # finchlite versions caused infinite recursion.
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+) -> FinchJLTensor:
+    return asarray(np.real(x.todense()), dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+
+def imag(  # finchlite versions caused infinite recursion.
+    x: FinchJLTensor,
+    /,
+    *,
+    dtype: DType | None = None,
+) -> FinchJLTensor:
+    return asarray(np.imag(x.todense()), dtype=jl_dtypes.jl_to_np_dtype[dtype])
+
+
+def _to_numpy(x):
+    if isinstance(x, FinchJLTensor):
+        return x.todense()
+    return np.asarray(x)
+
+
+def where(
+    condition,
+    x1,
+    x2,
+    /,
+) -> FinchJLTensor:
+    return asarray(np.where(_to_numpy(condition), _to_numpy(x1), _to_numpy(x2)))
 
 
 def linspace(
@@ -858,11 +552,9 @@ def linspace(
     num: int,
     *,
     dtype: DType | None = None,
-    device: Device = None,
     endpoint: bool = True,
-) -> Tensor:
-    _validate_device(device)
-    return Tensor(
+) -> FinchJLTensor:
+    return asarray(
         np.linspace(
             start,
             stop,
@@ -871,863 +563,3 @@ def linspace(
             endpoint=endpoint,
         )
     )
-
-
-def permute_dims(x: Tensor, axes: tuple[int, ...]) -> Tensor:
-    return x.permute_dims(axes)
-
-
-def moveaxis(x: Tensor, source: int, destination: int) -> Tensor:
-    axes = list(range(x.ndim))
-    norm_source = normalize_axis_index(source, x.ndim)
-    norm_dest = normalize_axis_index(destination, x.ndim)
-    axes.insert(norm_dest, axes.pop(norm_source))
-    return x.permute_dims(tuple(axes))
-
-
-def astype(x: Tensor, dtype: DType, /, *, copy: bool = True) -> Tensor:
-    if not copy:
-        if x.dtype == dtype:
-            return x
-        if copy is False:
-            raise ValueError("Unable to avoid a copy while casting in no-copy mode.")
-
-    finch_tns = x._obj.body
-    result = jl.copyto_b(
-        jl.similar(finch_tns, jc.convert(dtype, jl.fill_value(finch_tns)), dtype),
-        finch_tns,
-    )
-    return Tensor(jl.swizzle(result, *x.get_order(zero_indexing=False)))
-
-
-def where(condition: Tensor, x1: Tensor, x2: Tensor, /) -> Tensor:
-    axis_cond, axis_x1, axis_x2 = (
-        range(condition.ndim, 0, -1),
-        range(x1.ndim, 0, -1),
-        range(x2.ndim, 0, -1),
-    )
-    # inverse swizzle, so `broadcast` appends new dims to the front
-    result = jl.broadcast(
-        jl.ifelse,
-        jl.permutedims(condition._obj, tuple(axis_cond)),
-        jl.permutedims(x1._obj, tuple(axis_x1)),
-        jl.permutedims(x2._obj, tuple(axis_x2)),
-    )
-    # swizzle back to the original order
-    result = jl.permutedims(result, tuple(range(jl.ndims(result), 0, -1)))
-    return Tensor(result)
-
-
-def nonzero(x: Tensor, /) -> tuple[np.ndarray, ...]:
-    indices = jl.ffindnz(x._obj)[:-1]  # return only indices, skip values
-    indices = tuple(np.asarray(i) - 1 for i in indices)
-    sort_order = np.lexsort(indices[::-1])  # sort to row-major, C-style order
-    return tuple(Tensor(i[sort_order]) for i in indices)
-
-
-def _reduce_core(
-    x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False
-):
-    if axis is None:
-        axis = tuple(range(x.ndim))
-    axis = normalize_axis_tuple(axis, x.ndim)
-    axis = tuple(i + 1 for i in axis)
-    if keepdims:
-        return fn(x._obj, dims=axis)
-    if x.is_computed():
-        return jl.compute(jl.dropdims(fn(jl.lazy(x._obj), dims=axis), dims=axis))
-    return jl.dropdims(fn(x._obj, dims=axis), dims=axis)
-
-
-def _reduce_sum_prod(
-    x: Tensor,
-    fn: Callable,
-    axis: int | tuple[int, ...] | None,
-    dtype: DType | None,
-    keepdims: bool = False,
-) -> Tensor:
-    result = _reduce_core(x, fn, axis, keepdims)
-
-    if np.isscalar(result):
-        tmp_dtype = jl_dtypes.int_ if jl.seval(f"{x.dtype} <: Integer") else x.dtype
-        result = jl.Tensor(
-            jl.Element(
-                jc.convert(tmp_dtype, 0),
-                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[tmp_dtype]),
-            )
-        )
-
-    result = Tensor(result)
-
-    if jl.isa(result._obj, jl.Finch.LazyTensor):
-        if dtype is not None:
-            raise ValueError(
-                "`dtype` keyword for `sum` and `prod` in the lazy mode isn't supported"
-            )
-    # dtype casting rules
-    elif dtype is not None:
-        result = astype(result, dtype, copy=None)
-    elif jl.seval(f"{x.dtype} <: Unsigned"):
-        result = astype(result, jl_dtypes.uint, copy=None)
-    elif jl.seval(f"{x.dtype} <: Signed"):
-        result = astype(result, jl_dtypes.int_, copy=None)
-
-    return result
-
-
-def _reduce(
-    x: Tensor, fn: Callable, axis: int | tuple[int, ...] | None, keepdims: bool = False
-) -> Tensor:
-    result = _reduce_core(x, fn, axis, keepdims)
-    if np.isscalar(result):
-        result = jl.Tensor(
-            jl.Element(
-                jc.convert(x.dtype, 0),
-                np.array(result, dtype=jl_dtypes.jl_to_np_dtype[x.dtype]),
-            )
-        )
-    return Tensor(result)
-
-
-def sum(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    dtype: DType | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce_sum_prod(x, jl.sum, axis, dtype, keepdims)
-
-
-def prod(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    dtype: DType | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce_sum_prod(x, jl.prod, axis, dtype, keepdims)
-
-
-def max(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x, jl.maximum, axis, keepdims)
-
-
-def min(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x, jl.minimum, axis, keepdims)
-
-
-def any(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x != 0, jl.any, axis, keepdims)
-
-
-def all(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x != 0, jl.all, axis, keepdims)
-
-
-def mean(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x, jl.mean, axis, keepdims)
-
-
-def std(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    correction: float = 0.0,
-    keepdims: bool = False,
-) -> Tensor:
-    def _std(x, dims):
-        return jl.std(x, correction=correction, dims=dims)
-
-    return _reduce(x, _std, axis, keepdims)
-
-
-def var(
-    x: Tensor,
-    /,
-    *,
-    axis: int | tuple[int, ...] | None = None,
-    correction: float = 0.0,
-    keepdims: bool = False,
-) -> Tensor:
-    def _var(x, dims):
-        return jl.var(x, correction=correction, dims=dims)
-
-    return _reduce(x, _var, axis, keepdims)
-
-
-def argmin(
-    x: Tensor,
-    /,
-    *,
-    axis: int | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x, jl.Finch.argmin_python, axis, keepdims)
-
-
-def argmax(
-    x: Tensor,
-    /,
-    *,
-    axis: int | None = None,
-    keepdims: bool = False,
-) -> Tensor:
-    return _reduce(x, jl.Finch.argmax_python, axis, keepdims)
-
-
-def squeeze(
-    x: Tensor,
-    /,
-    axis: int | tuple[int, ...],
-) -> Tensor:
-    if isinstance(axis, int):
-        axis = (axis,)
-    axis = normalize_axis_tuple(axis, x.ndim)
-    axis = tuple(i + 1 for i in axis)
-    result = jl.dropdims(x._obj, dims=axis)
-    return Tensor(result)
-
-
-def expand_dims(
-    x: Tensor,
-    /,
-    axis: int | tuple[int, ...] = 0,
-) -> Tensor:
-    if isinstance(axis, int):
-        axis = (axis,)
-    axis = normalize_axis_tuple(axis, x.ndim + len(axis))
-    axis = tuple(i + 1 for i in axis)
-    result = jl.expanddims(x._obj, dims=axis)
-    return Tensor(result)
-
-
-def diagonal(x: Tensor, /, *, offset: int = 0) -> Tensor:
-    m = x.shape[-2]
-    n = x.shape[-1]
-    mask = eye(m, n, k=offset, format="coo", dtype=bool)
-    res = compute(sum(where(mask, lazy(x), zeros(x.shape)), axis=-1))
-    return res[..., 0 : builtins.min(m, n, m + offset, n - offset)]
-
-
-def eye(
-    n_rows: int,
-    n_cols: int | None = None,
-    /,
-    *,
-    k: int = 0,
-    dtype: DType | None = None,
-    format: Literal["coo", "dense"] = "coo",
-    device: Device = None,
-) -> Tensor:
-    _validate_device(device)
-    n_cols = n_rows if n_cols is None else n_cols
-    dtype = jl_dtypes.float64 if dtype is None else dtype
-    tns = jl.Finch.eye_python(n_rows, n_cols, k, dtype(False))
-    if format == "coo":
-        return Tensor(tns)
-    if format == "dense":
-        return Tensor(jl.Tensor(jl.DenseFormat(2, dtype(False)), tns))
-    raise ValueError(f"{format} not supported, only 'coo' and 'dense' is allowed.")
-
-
-def tensordot(x1: Tensor, x2: Tensor, /, *, axes=2) -> Tensor:
-    if not isinstance(x1, Tensor):
-        x1 = Tensor(x1)
-    if not isinstance(x2, Tensor):
-        x2 = Tensor(x2)
-    if isinstance(axes, Iterable):
-        self_axes = normalize_axis_tuple(axes[0], x1.ndim)
-        other_axes = normalize_axis_tuple(axes[1], x2.ndim)
-        axes = (tuple(i + 1 for i in self_axes), tuple(i + 1 for i in other_axes))
-
-    result = jl.tensordot(x1._obj, x2._obj, axes)
-    return Tensor(result)
-
-
-def log(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("log")
-
-
-def log10(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("log10")
-
-
-def log1p(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("log1p")
-
-
-def log2(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("log2")
-
-
-def sqrt(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("sqrt")
-
-
-def sign(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("sign")
-
-
-def round(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("round")
-
-
-def isnan(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("isnan")
-
-
-def isinf(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("isinf")
-
-
-def isfinite(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("isfinite")
-
-
-def exp(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("exp")
-
-
-def expm1(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("expm1")
-
-
-def floor(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("floor")
-
-
-def ceil(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("ceil")
-
-
-def cos(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("cos")
-
-
-def cosh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("cosh")
-
-
-def acos(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("acos")
-
-
-def acosh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("acosh")
-
-
-def sin(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("sin")
-
-
-def sinh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("sinh")
-
-
-def asin(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("asin")
-
-
-def asinh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("asinh")
-
-
-def tan(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("tan")
-
-
-def tanh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("tanh")
-
-
-def atan(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("atan")
-
-
-def atanh(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("atanh")
-
-
-def atan2(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return x1._elemwise_op("atand", x2)
-
-
-def trunc(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("trunc")
-
-
-def real(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("real")
-
-
-def imag(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("imag")
-
-
-def conj(x: Tensor, /) -> Tensor:
-    return x._elemwise_op("conj")
-
-
-def square(x: Tensor, /) -> Tensor:
-    return x ** Tensor(2)
-
-
-def logaddexp(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return log(exp(x1) + exp(x2))
-
-
-def logical_and(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return x1._elemwise_op("Finch.and", x2)
-
-
-def logical_or(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return x1._elemwise_op("Finch.or", x2)
-
-
-def logical_xor(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return x1._elemwise_op("Finch.xor", x2)
-
-
-def power(x1: Tensor, x2: Tensor, /) -> Tensor:
-    return x1._elemwise_op("^", x2)
-
-
-def einop(prgm, **kwargs):
-    """Execute an einsum-like expression
-
-    This function parses and executes einsum-like expressions with extended syntax
-    that supports various operations beyond traditional Einstein summation notation.
-
-    Args:
-        prgm (str): Einsum program string specifying the computation. The syntax
-            supports:
-            - Assignment: "C[i,j] = A[i,j] + B[j,i]"
-            - Increment: "C[i,j] += A[i,k] * B[k,j]"
-            - Reductions: "C[i] += A[i,j]", "C[i] max= A[i,j]", "C[i] &= A[i,j]"
-            - Arithmetic operations: +, -, *, /, //, %, **
-            - Comparison operations: ==, !=, <, <=, >, >=
-            - Logical operations: and, or, not
-            - Bitwise operations: &, |, ^, <<, >>
-            - Function calls and complex expressions with parentheses
-            - Mathematical functions: abs, sqrt, exp, log, sin, cos, tan, etc.
-            - Literal values: integers, floats, booleans, and complex numbers
-            - Python operator precedence and parentheses for grouping
-        **kwargs: Named arrays referenced in the einsum expression. The keys
-            should match the tensor names used in the program string.
-
-    Returns:
-        The result array from executing the einsum expression.
-
-    Examples:
-        >>> A = finch.random.rand(3, 4)
-        >>> B = finch.random.rand(4, 3)
-        >>> # Matrix addition with transpose
-        >>> C = finch.einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
-        >>> # Matrix multiplication
-        >>> D = finch.einop("D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
-        >>> # Min-Plus multiplication with shift
-        >>> E = finch.einop("E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
-    """
-    import finch
-
-    return einop_impl(finch, prgm, **kwargs)
-
-
-def einsum(*args, **kwargs):
-    """
-    einsum(subscripts, *operands)
-
-    Evaluates the Einstein summation convention on the operands.
-
-    Using the Einstein summation convention, many common multi-dimensional,
-    linear algebraic array operations can be represented in a simple fashion.
-    In *implicit* mode `einsum` computes these values.
-
-    In *explicit* mode, `einsum` provides further flexibility to compute
-    other array operations that might not be considered classical Einstein
-    summation operations, by disabling, or forcing summation over specified
-    subscript labels.
-
-    See the notes and examples for clarification.
-
-    Parameters
-    ----------
-    subscripts : str
-        Specifies the subscripts for summation as comma separated list of
-        subscript labels. An implicit (classical Einstein summation)
-        calculation is performed unless the explicit indicator '->' is
-        included as well as subscript labels of the precise output form.
-    operands : list of array_like
-        These are the arrays for the operation.
-
-    Returns
-    -------
-    output : ndarray
-        The calculation based on the Einstein summation convention.
-
-    Notes
-    -----
-    The Einstein summation convention can be used to compute
-    many multi-dimensional, linear algebraic array operations. `einsum`
-    provides a succinct way of representing these.
-
-    A non-exhaustive list of these operations,
-    which can be computed by `einsum`, is shown below along with examples:
-
-    * Trace of an array, :py:func:`numpy.trace`.
-    * Return a diagonal, :py:func:`numpy.diag`.
-    * Array axis summations, :py:func:`numpy.sum`.
-    * Transpositions and permutations, :py:func:`numpy.transpose`.
-    * Matrix multiplication and dot product, :py:func:`numpy.matmul`
-        :py:func:`numpy.dot`.
-    * Vector inner and outer products, :py:func:`numpy.inner`
-        :py:func:`numpy.outer`.
-    * Broadcasting, element-wise and scalar multiplication,
-        :py:func:`numpy.multiply`.
-    * Tensor contractions, :py:func:`numpy.tensordot`.
-    * Chained array operations, in efficient calculation order,
-        :py:func:`numpy.einsum_path`.
-
-    The subscripts string is a comma-separated list of subscript labels,
-    where each label refers to a dimension of the corresponding operand.
-    Whenever a label is repeated it is summed, so ``np.einsum('i,i', a, b)``
-    is equivalent to :py:func:`np.inner(a,b) <numpy.inner>`. If a label
-    appears only once, it is not summed, so ``np.einsum('i', a)``
-    produces a view of ``a`` with no changes. A further example
-    ``np.einsum('ij,jk', a, b)`` describes traditional matrix multiplication
-    and is equivalent to :py:func:`np.matmul(a,b) <numpy.matmul>`.
-    Repeated subscript labels in one operand take the diagonal.
-    For example, ``np.einsum('ii', a)`` is equivalent to
-    :py:func:`np.trace(a) <numpy.trace>`.
-
-    In *implicit mode*, the chosen subscripts are important
-    since the axes of the output are reordered alphabetically.  This
-    means that ``np.einsum('ij', a)`` doesn't affect a 2D array, while
-    ``np.einsum('ji', a)`` takes its transpose. Additionally,
-    ``np.einsum('ij,jk', a, b)`` returns a matrix multiplication, while,
-    ``np.einsum('ij,jh', a, b)`` returns the transpose of the
-    multiplication since subscript 'h' precedes subscript 'i'.
-
-    In *explicit mode* the output can be directly controlled by
-    specifying output subscript labels.  This requires the
-    identifier '->' as well as the list of output subscript labels.
-    This feature increases the flexibility of the function since
-    summing can be disabled or forced when required. The call
-    ``np.einsum('i->', a)`` is like :py:func:`np.sum(a) <numpy.sum>`
-    if ``a`` is a 1-D array, and ``np.einsum('ii->i', a)``
-    is like :py:func:`np.diag(a) <numpy.diag>` if ``a`` is a square 2-D array.
-    The difference is that `einsum` does not allow broadcasting by default.
-    Additionally ``np.einsum('ij,jh->ih', a, b)`` directly specifies the
-    order of the output subscript labels and therefore returns matrix
-    multiplication, unlike the example above in implicit mode.
-
-    To enable and control broadcasting, use an ellipsis.  Default
-    NumPy-style broadcasting is done by adding an ellipsis
-    to the left of each term, like ``np.einsum('...ii->...i', a)``.
-    ``np.einsum('...i->...', a)`` is like
-    :py:func:`np.sum(a, axis=-1) <numpy.sum>` for array ``a`` of any shape.
-    To take the trace along the first and last axes,
-    you can do ``np.einsum('i...i', a)``, or to do a matrix-matrix
-    product with the left-most indices instead of rightmost, one can do
-    ``np.einsum('ij...,jk...->ik...', a, b)``.
-
-    `einsum` also provides an alternative way to provide the subscripts and
-    operands as ``einsum(op0, sublist0, op1, sublist1, ..., [sublistout])``.
-    If the output shape is not provided in this format `einsum` will be
-    calculated in implicit mode, otherwise it will be performed explicitly.
-    The examples below have corresponding `einsum` calls with the two
-    parameter methods.
-
-    Examples
-    --------
-    >>> a = np.arange(25).reshape(5, 5)
-    >>> b = np.arange(5)
-    >>> c = np.arange(6).reshape(2, 3)
-
-    Trace of a matrix:
-
-    >>> np.einsum("ii", a)
-    60
-    >>> np.einsum(a, [0, 0])
-    60
-    >>> np.trace(a)
-    60
-
-    Extract the diagonal (requires explicit form):
-
-    >>> np.einsum("ii->i", a)
-    array([ 0,  6, 12, 18, 24])
-    >>> np.einsum(a, [0, 0], [0])
-    array([ 0,  6, 12, 18, 24])
-    >>> np.diag(a)
-    array([ 0,  6, 12, 18, 24])
-
-    Sum over an axis (requires explicit form):
-
-    >>> np.einsum("ij->i", a)
-    array([ 10,  35,  60,  85, 110])
-    >>> np.einsum(a, [0, 1], [0])
-    array([ 10,  35,  60,  85, 110])
-    >>> np.sum(a, axis=1)
-    array([ 10,  35,  60,  85, 110])
-
-    For higher dimensional arrays summing a single axis can be done
-    with ellipsis:
-
-    >>> np.einsum("...j->...", a)
-    array([ 10,  35,  60,  85, 110])
-    >>> np.einsum(a, [Ellipsis, 1], [Ellipsis])
-    array([ 10,  35,  60,  85, 110])
-
-    Compute a matrix transpose, or reorder any number of axes:
-
-    >>> np.einsum("ji", c)
-    array([[0, 3],
-           [1, 4],
-           [2, 5]])
-    >>> np.einsum("ij->ji", c)
-    array([[0, 3],
-           [1, 4],
-           [2, 5]])
-    >>> np.einsum(c, [1, 0])
-    array([[0, 3],
-           [1, 4],
-           [2, 5]])
-    >>> np.transpose(c)
-    array([[0, 3],
-           [1, 4],
-           [2, 5]])
-
-    Vector inner products:
-
-    >>> np.einsum("i,i", b, b)
-    30
-    >>> np.einsum(b, [0], b, [0])
-    30
-    >>> np.inner(b, b)
-    30
-
-    Matrix vector multiplication:
-
-    >>> np.einsum("ij,j", a, b)
-    array([ 30,  80, 130, 180, 230])
-    >>> np.einsum(a, [0, 1], b, [1])
-    array([ 30,  80, 130, 180, 230])
-    >>> np.dot(a, b)
-    array([ 30,  80, 130, 180, 230])
-    >>> np.einsum("...j,j", a, b)
-    array([ 30,  80, 130, 180, 230])
-
-    Broadcasting and scalar multiplication:
-
-    >>> np.einsum("..., ...", 3, c)
-    array([[ 0,  3,  6],
-           [ 9, 12, 15]])
-    >>> np.einsum(",ij", 3, c)
-    array([[ 0,  3,  6],
-           [ 9, 12, 15]])
-    >>> np.einsum(3, [Ellipsis], c, [Ellipsis])
-    array([[ 0,  3,  6],
-           [ 9, 12, 15]])
-    >>> np.multiply(3, c)
-    array([[ 0,  3,  6],
-           [ 9, 12, 15]])
-
-    Vector outer product:
-
-    >>> np.einsum("i,j", np.arange(2) + 1, b)
-    array([[0, 1, 2, 3, 4],
-           [0, 2, 4, 6, 8]])
-    >>> np.einsum(np.arange(2) + 1, [0], b, [1])
-    array([[0, 1, 2, 3, 4],
-           [0, 2, 4, 6, 8]])
-    >>> np.outer(np.arange(2) + 1, b)
-    array([[0, 1, 2, 3, 4],
-           [0, 2, 4, 6, 8]])
-
-    Tensor contraction:
-
-    >>> a = np.arange(60.0).reshape(3, 4, 5)
-    >>> b = np.arange(24.0).reshape(4, 3, 2)
-    >>> np.einsum("ijk,jil->kl", a, b)
-    array([[4400., 4730.],
-           [4532., 4874.],
-           [4664., 5018.],
-           [4796., 5162.],
-           [4928., 5306.]])
-    >>> np.einsum(a, [0, 1, 2], b, [1, 0, 3], [2, 3])
-    array([[4400., 4730.],
-           [4532., 4874.],
-           [4664., 5018.],
-           [4796., 5162.],
-           [4928., 5306.]])
-    >>> np.tensordot(a, b, axes=([1, 0], [0, 1]))
-    array([[4400., 4730.],
-           [4532., 4874.],
-           [4664., 5018.],
-           [4796., 5162.],
-           [4928., 5306.]])
-
-    Example of ellipsis use:
-
-    >>> a = np.arange(6).reshape((3, 2))
-    >>> b = np.arange(12).reshape((4, 3))
-    >>> np.einsum("ki,jk->ij", a, b)
-    array([[10, 28, 46, 64],
-           [13, 40, 67, 94]])
-    >>> np.einsum("ki,...k->i...", a, b)
-    array([[10, 28, 46, 64],
-           [13, 40, 67, 94]])
-    >>> np.einsum("k...,jk", a, b)
-    array([[10, 28, 46, 64],
-           [13, 40, 67, 94]])
-    """
-    import finch
-
-    return einsum_impl(finch, *args)
-
-
-def _is_scipy_sparse_obj(x):
-    return hasattr(x, "__module__") and x.__module__.startswith("scipy.sparse")
-
-
-def _slice_plus_one(s: slice, size: int) -> range:
-    step = s.step if s.step is not None else 1
-    start_default = size if step < 0 else 1
-    stop_default = 1 if step < 0 else size
-
-    if s.start is not None:
-        start = normalize_axis_index(s.start, size) + 1 if s.start < size else size
-    else:
-        start = start_default
-
-    if s.stop is not None:
-        stop_offset = 2 if step < 0 else 0
-        stop = (
-            normalize_axis_index(s.stop, size) + stop_offset if s.stop < size else size
-        )
-    else:
-        stop = stop_default
-
-    if (start, stop, step) == (1, size, 1):
-        return jl.Colon()
-
-    return jl.range(start=start, step=step, stop=stop)
-
-
-def _add_plus_one(key: tuple, shape: tuple[int, ...]) -> tuple:
-    new_key = []
-    sizes = iter(shape)
-    for idx in key:
-        if idx is None:
-            new_key.append(jl.nothing)
-            continue
-
-        size = next(sizes)
-        if isinstance(idx, int):
-            new_key.append(normalize_axis_index(idx, size) + 1)
-        elif isinstance(idx, slice):
-            new_key.append(_slice_plus_one(idx, size))
-        elif isinstance(idx, list | np.ndarray | tuple):
-            idx = normalize_axis_tuple(idx, size)
-            new_key.append(jl.Vector([i + 1 for i in idx]))
-        else:
-            new_key.append(idx)
-
-    return tuple(new_key)
-
-
-def _expand_ellipsis(key: tuple, shape: tuple[int, ...]) -> tuple:
-    ellipsis_pos = None
-    key_without_ellipsis = []
-    # first we need to find the ellipsis and confirm it's the only one
-    for pos, idx in enumerate(key):
-        if idx is Ellipsis:
-            if ellipsis_pos is None:
-                ellipsis_pos = pos
-            else:
-                raise IndexError("an index can only have a single ellipsis ('...')")
-        else:
-            key_without_ellipsis.append(idx)
-    key = key_without_ellipsis
-
-    # then we expand ellipsis with a full range
-    if ellipsis_pos is not None:
-        n_missing_idxs = len(shape) - builtins.sum(1 for k in key if k is not None)
-        key = key[:ellipsis_pos] + [slice(None)] * n_missing_idxs + key[ellipsis_pos:]
-
-    return tuple(key)
-
-
-def _add_missing_dims(key: tuple, shape: tuple[int, ...]) -> tuple:
-    missing_dims = len(shape) - builtins.sum(1 for k in key if k is not None)
-    return key + (slice(None),) * missing_dims
-
-
-def _process_lazy_indexing(key: tuple, ndim: int) -> tuple:
-    new_key = ()
-    ellipsis_found = False
-    for idx in key:
-        if idx == slice(None):
-            new_key += (jl.Colon(),)
-        elif idx is None:
-            new_key += (jl.nothing,)
-        elif idx is Ellipsis:
-            num_of_colons = ndim - builtins.sum(1 for k in key if k is not None) + 1
-            new_key += (jl.Colon(),) * num_of_colons
-            if ellipsis_found:
-                raise IndexError("an index can only have a single ellipsis ('...')")
-
-            ellipsis_found = True
-        else:
-            raise ValueError(f"Invalid lazy index member: {idx}")
-    return new_key
-
-
-def _eq_scalars(x, y):
-    if x is None or y is None:
-        return x == y
-    if jl.isnan(x) or jl.isnan(y):
-        return jl.isnan(x) and jl.isnan(y)
-    return x == y
-
-
-def _validate_device(device: Device) -> None:
-    if device not in {"cpu", None}:
-        raise ValueError(
-            f'Device not understood. Only "cpu" is allowed, but received: {device}'
-        )
