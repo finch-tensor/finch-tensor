@@ -184,8 +184,8 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
             # Access index order is reversed in codegen to match the
             # reversed-axis storage convention (see compiler.py).
             """function matmul(C,A,B)
-    @finch C .= 0.0
     @finch begin
+        C .= 0.0
         for i = _
             for k = _
                 for j = _
@@ -193,8 +193,8 @@ a_format = FinchJLTensorFType(DenseFormat(DenseFormat(ElementFormat(0))))
                 end
             end
         end
+        return C
     end
-    return C
 end""",
         )
     ],

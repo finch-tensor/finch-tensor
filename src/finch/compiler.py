@@ -137,29 +137,30 @@ class FinchJLLibrary(AssemblyLibrary):
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
-        self.in_finch_block = False
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         self.pack_dict.clear()
-        self.in_finch_block = False
         return self.generate_julia(prgm)
 
     def generate_julia(self, prgm, nestingLvl=0):
         match prgm:
             case ntn.Function(name, args, body):
-                body_str = self.generate_julia(body, nestingLvl + 1)
-                arg_str = ",".join(
-                    [self.generate_julia(arg, nestingLvl) for arg in args]
-                )
-                return f"function {name}({arg_str})\n{body_str}end"
+                body_str = self.generate_julia(body, nestingLvl + 2)
+                arg_strs = []
+                for arg in args:
+                    match(arg):
+                        case ntn.Variable(sym, type):
+                            arg_strs.append(f"{sym}") #TODO later use finch_kernel and type the args
+                        case _:
+                            raise NotImplementedError
+                arg_str = ",".join(arg_strs)
+                return f"function {name}({arg_str})\n    @finch begin\n{body_str}\n    end\nend"
 
             case ntn.Block(bodies):
                 body_str = ""
-                for body in bodies:
-                    curr_body_str = self.generate_julia(body, nestingLvl)
-                    if curr_body_str != "":
-                        body_str += f"{curr_body_str}\n"
-                return body_str
+                body_strs = [self.generate_julia(body, nestingLvl) for body in bodies]
+                body_strs = [body_str for body_str in body_strs if body_str != ""]
+                return "\n".join(body_strs)
 
             case ntn.Assign(lhs, rhs):
                 # Ignore assigns used only to find loop bounds.
@@ -173,19 +174,12 @@ class FinchJLGenerator:
                     f"{self.generate_julia(lhs, nestingLvl)} = "
                     f"{self.generate_julia(rhs, nestingLvl)}"
                 )
-                # A rank-0 (loop-less) Assign falls outside any enclosing
-                # @finch block, so Tensor access would otherwise go through
-                # Finch's generic (non-macro) setindex!/getindex, which has
-                # real bugs for some element types (e.g. Bool). Wrap it the
-                # same way Declare already wraps its single-line form.
-                if not self.in_finch_block:
-                    return f"{tab_str}@finch {stmt}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
                 return (
-                    f"{tab_str}@finch {self.generate_julia(tns, nestingLvl)} .= "
+                    f"{tab_str}{self.generate_julia(tns, nestingLvl)} .= "
                     f"{self.generate_julia(init, nestingLvl)}"
                 )
 
@@ -196,19 +190,13 @@ class FinchJLGenerator:
             case ntn.Loop(idx, _, body):
                 tab_str = "    " * nestingLvl
                 idx_str = self.generate_julia(idx, nestingLvl)
-                outermost = not self.in_finch_block
-                if outermost:
-                    self.in_finch_block = True
                 loop_body = self.generate_julia(
-                    body, nestingLvl + (2 if outermost else 1)
+                    body, nestingLvl + 1
                 )
-                if not outermost:
-                    return f"{tab_str}for {idx_str} = _\n{loop_body}{tab_str}end\n"
-                self.in_finch_block = False
                 tab_str_1 = "    " * (nestingLvl + 1)
                 return (
-                    f"{tab_str}@finch begin\n{tab_str_1}for {idx_str} = "
-                    f"_\n{loop_body}{tab_str_1}end\n{tab_str}end"
+                    f"{tab_str}for {idx_str} = _\n"
+                    f"{loop_body}\n{tab_str}end"
                 )
 
             case ntn.Access(tns, _, idxs):
@@ -250,11 +238,6 @@ class FinchJLGenerator:
                     stmt = f"{lhs_str} = {rhs_str}"
                 else:
                     stmt = f"{lhs_str} {red_ops_map[lhs.mode.op.val]}= {rhs_str}"
-                # A rank-0 (loop-less) Increment falls outside any enclosing
-                # @finch block -- see the matching comment in the Assign
-                # case above for why that needs wrapping.
-                if not self.in_finch_block:
-                    return f"{tab_str}@finch {stmt}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):
@@ -271,6 +254,12 @@ class FinchJLGenerator:
                 return ""
 
             case ntn.Freeze(_, _):
+                return ""
+
+            case ntn.Thaw(_, _):
+                return ""
+
+            case ntn.Cached(_, _):
                 return ""
 
             case ntn.Slot(name):
@@ -290,8 +279,8 @@ class FinchJLGenerator:
                 # finchlite uses '#' in generated names; not valid Julia syntax.
                 return name.replace("#", "_")
 
-            # TODO: Cached, Dimension, Thaw, Stack, Value are unimplemented.
             case _:
+                # Dimension, Stack, Value are deliberately unimplemented.
                 raise Exception(f"Unhandled node type: {type(prgm)}")
 
 
@@ -302,6 +291,8 @@ class FinchJLCompiler(NotationCompiler):
         kernel_dict = {}
         for func in prgm.children:
             generated_prgm = generator(func)
+            print("-"*80)
+            print(generated_prgm)
             kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generated_prgm)
 
         return FinchJLLibrary(kernel_dict)

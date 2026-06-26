@@ -51,7 +51,7 @@ class ElementFormat(LevelFormat):
         self._element_type = dtypes.to_fl_dtype(
             type(fill_value) if element_type is None else element_type
         )
-
+    
     @property
     def ndim(self) -> np.intp:
         return np.intp(0)
