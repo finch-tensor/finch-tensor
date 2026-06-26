@@ -14,7 +14,7 @@ from .levels import (
     SparseCOOFormat,
     jlobj_to_format,
 )
-from .typing import DType, JuliaObj, number, JLFType
+from .typing import DType, JLFType, JuliaObj, number
 from .utils import add_missing_dims, add_plus_one, expand_ellipsis
 
 
@@ -42,7 +42,7 @@ class FinchJLTensorFType(TensorFType, JLFType):
     @property
     def shape_type(self) -> tuple:
         return tuple(reversed(self._lvl.shape_type))
-    
+
     @property
     def jl_type(self):
         return jl.Finch.Tensor[self.format.jl_type]

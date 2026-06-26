@@ -148,13 +148,18 @@ class FinchJLGenerator:
                 body_str = self.generate_julia(body, nestingLvl + 2)
                 arg_strs = []
                 for arg in args:
-                    match(arg):
+                    match arg:
                         case ntn.Variable(sym, type):
-                            arg_strs.append(f"{sym}") #TODO later use finch_kernel and type the args
+                            arg_strs.append(
+                                f"{sym}"
+                            )  # TODO later use finch_kernel and type the args
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
-                return f"function {name}({arg_str})\n    @finch begin\n{body_str}\n    end\nend"
+                return (
+                    f"function {name}({arg_str})\n    @finch begin\n"
+                    f"{body_str}\n    end\nend"
+                )
 
             case ntn.Block(bodies):
                 body_str = ""
@@ -190,14 +195,8 @@ class FinchJLGenerator:
             case ntn.Loop(idx, _, body):
                 tab_str = "    " * nestingLvl
                 idx_str = self.generate_julia(idx, nestingLvl)
-                loop_body = self.generate_julia(
-                    body, nestingLvl + 1
-                )
-                tab_str_1 = "    " * (nestingLvl + 1)
-                return (
-                    f"{tab_str}for {idx_str} = _\n"
-                    f"{loop_body}\n{tab_str}end"
-                )
+                loop_body = self.generate_julia(body, nestingLvl + 1)
+                return f"{tab_str}for {idx_str} = _\n{loop_body}\n{tab_str}end"
 
             case ntn.Access(tns, _, idxs):
                 tns_str = self.generate_julia(tns, nestingLvl)
@@ -291,7 +290,7 @@ class FinchJLCompiler(NotationCompiler):
         kernel_dict = {}
         for func in prgm.children:
             generated_prgm = generator(func)
-            print("-"*80)
+            print("-" * 80)
             print(generated_prgm)
             kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generated_prgm)
 

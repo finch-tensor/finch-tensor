@@ -53,7 +53,6 @@ def _slice_plus_one(s: slice, size: int) -> range:
     else:
         stop = stop_default
 
-
     return jl.range(start=start, step=step, stop=stop)
 
 

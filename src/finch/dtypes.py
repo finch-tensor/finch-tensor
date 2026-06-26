@@ -4,9 +4,9 @@ import numpy as np
 
 import finchlite as fl
 from finchlite.algebra.ftypes import FType
-from .typing import JLFType
 
 from .julia import jl
+from .typing import JLFType
 
 int8: FType = fl.int8
 int16: FType = fl.int16
@@ -93,8 +93,10 @@ def to_fl_dtype(x) -> FType:
 # from a tensor's dtype/element_type.
 fl_dtype_to_jl = {v: k for k, v in jl_dtype_to_fl.items()}
 
-def to_jl_type(T:FType):
+
+def to_jl_type(T: FType):
     if T in fl_dtype_to_jl:
         return fl_dtype_to_jl[T]
-    elif isinstance(T, JLFType):
+    if isinstance(T, JLFType):
         return T.to_jl_type()
+    raise NotImplementedError
