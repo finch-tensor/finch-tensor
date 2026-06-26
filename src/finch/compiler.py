@@ -119,8 +119,8 @@ class FinchJLKernel(AssemblyKernel):
 
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
-        if not isinstance(result, tuple):
-            result = (result,)
+        if jl.isa(result, jl.Finch.Tensor):
+            return (FinchJLTensor(result),)
         return tuple(FinchJLTensor(res) for res in result)
 
 
@@ -151,7 +151,7 @@ class FinchJLGenerator:
                     match arg:
                         case ntn.Variable(sym, type):
                             arg_strs.append(
-                                f"{sym}"
+                                f"{sym.replace('#', '_')}"
                             )  # TODO later use finch_kernel and type the args
                         case _:
                             raise NotImplementedError
@@ -290,8 +290,6 @@ class FinchJLCompiler(NotationCompiler):
         kernel_dict = {}
         for func in prgm.children:
             generated_prgm = generator(func)
-            print("-" * 80)
-            print(generated_prgm)
             kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generated_prgm)
 
         return FinchJLLibrary(kernel_dict)
