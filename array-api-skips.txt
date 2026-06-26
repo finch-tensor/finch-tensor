@@ -108,6 +108,11 @@ array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_2[None]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_2[1]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[None]
 array_api_tests/test_array_object.py::test_getitem_arrays_and_ints_1[1]
+# fail on Windows
+array_api_tests/test_array_object.py::test_scalar_casting[__int__(uint32)]
+array_api_tests/test_array_object.py::test_scalar_casting[__int__(int32)]
+array_api_tests/test_array_object.py::test_scalar_casting[__index__(uint32)]
+array_api_tests/test_array_object.py::test_scalar_casting[__index__(int32)]
 
 # test_operators_and_elementwise_functions
 
@@ -123,10 +128,11 @@ array_api_tests/test_operators_and_elementwise_functions.py::test_clip
 array_api_tests/test_operators_and_elementwise_functions.py::test_hypot
 array_api_tests/test_operators_and_elementwise_functions.py::test_maximum
 array_api_tests/test_operators_and_elementwise_functions.py::test_minimum
-array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__ifloordiv__(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[floor_divide(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__ifloordiv__(x, s)]
+array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__ifloordiv__(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__floordiv__(x, s)]
+array_api_tests/test_operators_and_elementwise_functions.py::test_floor_divide[__floordiv__(x1, x2)]
 array_api_tests/test_operators_and_elementwise_functions.py::test_reciprocal
 array_api_tests/test_operators_and_elementwise_functions.py::test_binary_with_scalars_real[copysign]
 array_api_tests/test_operators_and_elementwise_functions.py::test_binary_with_scalars_real[hypot]
