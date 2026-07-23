@@ -131,7 +131,6 @@ def get_loop_lookups(
 
 
 # Transpose penalty funcs more like Julia version
-# TODO: used in bnb
 def cost_of_reformat(stats: TensorStats) -> float:
     if not isinstance(stats, NumericStats):
         return 0.0
