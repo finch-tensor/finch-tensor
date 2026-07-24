@@ -1037,21 +1037,18 @@ class MLIRContext(Context):
                     new_type = [changed[i][1] for i in names]
                     old_vals = [before[i][0] for i in names]
 
-                    result = ", ".join(new_result)
-                    result_types = ", ".join(new_type)
-                    changed_result = ", ".join(new_vals)
-                    old_result = ", ".join(old_vals)
-
                     new_ctx.exec(
                         f"{new_ctx.feed}scf.yield "
                         f"{', '.join(new_vals)} : {', '.join(new_type)}"
                     )
 
                     self.exec(
-                        f"{feed}{result} = scf.if {cond} -> ({result_types}) {{\n"
+                        f"{feed}{', '.join(new_result)} = scf.if {cond} "
+                        f"-> ({', '.join(new_type)}) {{\n"
                         f"{new_ctx.emit()}\n"
                         f"{feed}}} else {{\n"
-                        f"{new_ctx.feed}scf.yield {old_result} : {result_types}\n"
+                        f"{new_ctx.feed}scf.yield {', '.join(old_vals)} : "
+                        f"{', '.join(new_type)}\n"
                         f"{feed}}}"
                     )
 
@@ -1107,14 +1104,9 @@ class MLIRContext(Context):
                 else:
                     new_result = [self.new_ssa() for _ in names]
 
-                    new_vals = [after[i][0] for i in names]
-                    else_vals = [else_after[i][0] for i in names]
-                    new_type = [after[i][1] for i in names]
-
-                    result = ", ".join(new_result)
-                    result_types = ", ".join(new_type)
-                    changed_result = ", ".join(new_vals)
-                    else_result = ", ".join(else_vals)
+                    new_vals = [new_ctx.bindings.bindings[i][0] for i in names]
+                    else_vals = [else_ctx.bindings.bindings[i][0] for i in names]
+                    new_type = [new_ctx.bindings.bindings[i][1] for i in names]
 
                     new_ctx.exec(
                         f"{new_ctx.feed}scf.yield {', '.join(new_vals)} "
@@ -1126,8 +1118,8 @@ class MLIRContext(Context):
                     )
 
                     self.exec(
-                        f"{feed}{result} = "
-                        f"scf.if {cond} -> ({result_types}) {{\n"
+                        f"{feed}{', '.join(new_result)} = "
+                        f"scf.if {cond} -> ({', '.join(new_type)}) {{\n"
                         f"{new_ctx.emit()}\n"
                         f"{feed}}} else {{\n"
                         f"{else_ctx.emit()}\n"
