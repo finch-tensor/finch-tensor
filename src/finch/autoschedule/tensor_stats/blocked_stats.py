@@ -11,8 +11,10 @@ from finch.algebra import FinchOperator
 from finch.finch_logic import Field
 from finch.finch_logic.tensor_stats import StatsFactory
 
+from .blocked_uniform import build_grid_uniform
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .uniform_stats import UniformStatsFactory
 
 
 class BlockedStatsFactory(
@@ -229,6 +231,9 @@ class BlockedStats(NumericStats):
         stats_factory: StatsFactory[NumericStats],
         data: Any,
     ) -> np.ndarray:
+
+        if isinstance(stats_factory, UniformStatsFactory):
+            return build_grid_uniform(d, blocks_per_dim, data)
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
         blocks_grid = np.empty(grid_dim, dtype=object)
 
