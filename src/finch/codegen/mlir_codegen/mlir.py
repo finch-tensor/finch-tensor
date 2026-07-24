@@ -1036,22 +1036,22 @@ class MLIRContext(Context):
                     new_vals = [changed[i][0] for i in names]
                     new_type = [changed[i][1] for i in names]
                     old_vals = [before[i][0] for i in names]
-                    results = ", ".join(new_result)
+
+                    result = ", ".join(new_result)
                     result_types = ", ".join(new_type)
                     changed_result = ", ".join(new_vals)
                     old_result = ", ".join(old_vals)
 
                     new_ctx.exec(
-                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                        f"{new_ctx.feed}scf.yield "
+                        f"{', '.join(new_vals)} : {', '.join(new_type)}"
                     )
 
                     self.exec(
-                        f"{feed}{results} = "
-                        f"scf.if {cond} -> ({result_types}) {{\n"
+                        f"{feed}{result} = scf.if {cond} -> ({result_types}) {{\n"
                         f"{new_ctx.emit()}\n"
                         f"{feed}}} else {{\n"
-                        f"{new_ctx.feed}scf.yield "
-                        f"{old_result} : {result_types}\n"
+                        f"{new_ctx.feed}scf.yield {old_result} : {result_types}\n"
                         f"{feed}}}"
                     )
 
@@ -1107,22 +1107,26 @@ class MLIRContext(Context):
                 else:
                     new_result = [self.new_ssa() for _ in names]
 
-                    new_vals = [new_ctx.bindings.bindings[i][0] for i in names]
-                    else_vals = [else_ctx.bindings.bindings[i][0] for i in names]
-                    new_type = [new_ctx.bindings.bindings[i][1] for i in names]
+                    new_vals = [after[i][0] for i in names]
+                    else_vals = [else_after[i][0] for i in names]
+                    new_type = [after[i][1] for i in names]
+
+                    result = ", ".join(new_result)
                     result_types = ", ".join(new_type)
                     changed_result = ", ".join(new_vals)
                     else_result = ", ".join(else_vals)
 
                     new_ctx.exec(
-                        f"{new_ctx.feed}scf.yield {changed_result} : {result_types}"
+                        f"{new_ctx.feed}scf.yield {', '.join(new_vals)} "
+                        f": {', '.join(new_type)}"
                     )
                     else_ctx.exec(
-                        f"{else_ctx.feed}scf.yield {else_result} : {result_types}"
+                        f"{else_ctx.feed}scf.yield {', '.join(else_vals)} "
+                        f": {', '.join(new_type)}"
                     )
 
                     self.exec(
-                        f"{feed}{', '.join(new_result)} = "
+                        f"{feed}{result} = "
                         f"scf.if {cond} -> ({result_types}) {{\n"
                         f"{new_ctx.emit()}\n"
                         f"{feed}}} else {{\n"
