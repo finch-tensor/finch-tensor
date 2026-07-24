@@ -9,10 +9,11 @@ from pathlib import Path
 import pytest
 
 import numpy as np
+import scipy.sparse
 
 import finch
 import finch.finch_assembly as asm
-from finch import dense, element, ffuncs, fiber_tensor, ftype
+from finch import dense, element, ffuncs, fiber_tensor, ftype, sparse_list
 from finch.algebra import ftypes
 from finch.codegen import (
     CCompiler,
@@ -1211,3 +1212,133 @@ def test_mlir_resize_not_supported():
     )
     with pytest.raises(NotImplementedError, match="Resize"):
         MLIRCompiler()(prgm)
+
+
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sparse_sparse_multiply_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    sparse_mat = []
+    for arr in (a, b):
+        csr = scipy.sparse.csr_array(arr)
+        sparse_mat.append(
+            fmt.from_fields(
+                fmt.lvl_t.from_fields(
+                    fmt.lvl_t.lvl_t.from_fields(
+                        fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                        np.intp(arr.shape[1]),
+                        NumpyBuffer(csr.indptr.astype(np.intp)),
+                        NumpyBuffer(csr.indices.astype(np.intp)),
+                    ),
+                    np.intp(arr.shape[0]),
+                    np.intp(arr.shape[1]),
+                ),
+                arr.shape,
+                np.intp(0),
+                False,
+            )
+        )
+
+    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+        result = finch.compute(
+            finch.multiply(
+                finch.lazy(sparse_mat[0]),
+                finch.lazy(sparse_mat[1]),
+            )
+        )
+
+    finch_assert_equal(result, a * b)
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
+
+
+@pytest.mark.mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sddmm_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+    s = np.array(
+        [[1, 0, 1], [0, 1, 0], [1, 0, 1]],
+        dtype=dtype,
+    )
+
+    dense_fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+    sparse_fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    csr = scipy.sparse.csr_array(s)
+    sparse_s = sparse_fmt.from_fields(
+        sparse_fmt.lvl_t.from_fields(
+            sparse_fmt.lvl_t.lvl_t.from_fields(
+                sparse_fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                np.intp(s.shape[1]),
+                NumpyBuffer(csr.indptr.astype(np.intp)),
+                NumpyBuffer(csr.indices.astype(np.intp)),
+            ),
+            np.intp(s.shape[0]),
+            np.intp(s.shape[1]),
+        ),
+        s.shape,
+        np.intp(0),
+        False,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+        result = finch.compute(
+            finch.multiply(
+                finch.lazy(sparse_s),
+                finch.matmul(
+                    finch.lazy(finch.asarray(a, format=dense_fmt)),
+                    finch.lazy(finch.asarray(b, format=dense_fmt)),
+                ),
+            )
+        )
+
+    finch_assert_equal(result, s * (a @ b))
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
