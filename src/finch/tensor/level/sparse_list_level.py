@@ -8,11 +8,7 @@ from finch import finch_notation as ntn
 from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
-from finch.tensor.fiber_tensor import (
-    FiberTensorFType,
-    Level,
-    LevelFType,
-)
+from finch.tensor.base import Level, LevelFType
 from finch.tensor.scalar import Scalar
 
 
@@ -185,6 +181,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
+        from finch.tensor.fiber_tensor import FiberTensorFType
+
         if not isinstance(fiber.type, FiberTensorFType):
             raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
         tns = fiber

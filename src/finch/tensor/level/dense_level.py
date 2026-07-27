@@ -9,11 +9,7 @@ from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.fiber_tensor import (
-    FiberTensorFType,
-    Level,
-    LevelFType,
-)
+from finch.tensor.base import Level, LevelFType
 from finch.tensor.traits import Dense
 
 
@@ -170,6 +166,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         proto,
         pos: asm.AssemblyExpression,
     ):
+        from finch.tensor.fiber_tensor import FiberTensorFType
+
         tns = fiber
         ft_ftype: FiberTensorFType = fiber.type
         lvl = ctx.fiber_level(tns)
