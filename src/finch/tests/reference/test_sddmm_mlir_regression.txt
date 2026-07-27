@@ -1,0 +1,77 @@
+def main(#A_19#34: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))), #A_20#38: FiberTensorFType(DenseLevelFType(DenseLevelFType(ElementLevelFType(fv=0.0)))), #A_21#42: FiberTensorFType(DenseLevelFType(DenseLevelFType(ElementLevelFType(fv=0.0)))), ##A#33: BufferizedNDArray, #A_9#50: BufferizedNDArray) -> tuple(element_0: BufferizedNDArray):
+    #_A_19#35: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLevelFType(fv=0.0)))) = #A_19#34
+    #_A_19#35_lvl_lvl_lvl_val_slot: np_buf_t(float64) = unpack(#_A_19#35.lvl.lvl.lvl.val)
+    #_A_19#35_lvl_lvl_ptr_slot: np_buf_t(int64) = unpack(#_A_19#35.lvl.lvl.ptr)
+    #_A_19#35_lvl_lvl_idx_slot: np_buf_t(int64) = unpack(#_A_19#35.lvl.lvl.idx)
+    #A_19_dim_0#36: finch.int64 = #_A_19#35.lvl.dimension
+    #A_19_dim_1#37: finch.int64 = #_A_19#35.lvl.lvl.dimension
+    #_A_20#39: FiberTensorFType(DenseLevelFType(DenseLevelFType(ElementLevelFType(fv=0.0)))) = #A_20#38
+    #_A_20#39_lvl_lvl_lvl_val_slot: np_buf_t(float64) = unpack(#_A_20#39.lvl.lvl.lvl.val)
+    #A_20_dim_0#40: finch.int64 = #_A_20#39.lvl.dimension
+    #A_20_dim_1#41: finch.int64 = #_A_20#39.lvl.lvl.dimension
+    #_A_21#43: FiberTensorFType(DenseLevelFType(DenseLevelFType(ElementLevelFType(fv=0.0)))) = #A_21#42
+    #_A_21#43_lvl_lvl_lvl_val_slot: np_buf_t(float64) = unpack(#_A_21#43.lvl.lvl.lvl.val)
+    #A_21_dim_0#44: finch.int64 = #_A_21#43.lvl.dimension
+    #A_21_dim_1#45: finch.int64 = #_A_21#43.lvl.lvl.dimension
+    #_#A#33: BufferizedNDArray = ##A#33
+    #_#A#33_val_slot: np_buf_t(float64) = unpack(#_#A#33.val)
+    ##A#33_dim_0: finch.int64 = #_#A#33.shape.element_0
+    ##A#33_dim_1: finch.int64 = #_#A#33.shape.element_1
+    #_A_9#51: BufferizedNDArray = #A_9#50
+    #_A_9#51_val_slot: np_buf_t(float64) = unpack(#_A_9#51.val)
+    #A_9_dim_0#52: finch.int64 = #_A_9#51.shape.element_0
+    #A_9_dim_1#53: finch.int64 = #_A_9#51.shape.element_1
+    for i in range(0, length(slot(#_#A#33_val_slot, np_buf_t(float64)))):
+        store(slot(#_#A#33_val_slot, np_buf_t(float64)), i, 0.0)
+    for #i_23#54 in range(0, #A_20_dim_0#40):
+        #i_23#54__pos: finch.int64 = add(0, mul(#_#A#33.strides.element_0, #i_23#54))
+        #i_23#54__pos_2: finch.int64 = add(0, mul(#_A_20#39.lvl.stride, #i_23#54))
+        for #i_19#55 in range(0, #A_20_dim_1#41):
+            #i_19#55__pos: finch.int64 = add(#i_23#54__pos_2, mul(#_A_20#39.lvl.lvl.stride, #i_19#55))
+            #i_19#55__pos_2: finch.int64 = add(0, mul(#_A_21#43.lvl.stride, #i_19#55))
+            for #i_24#56 in range(0, #A_21_dim_1#45):
+                #i_24#56__pos: finch.int64 = add(#i_23#54__pos, mul(#_#A#33.strides.element_1, #i_24#56))
+                #i_24#56__pos_2: finch.int64 = add(#i_19#55__pos_2, mul(#_A_21#43.lvl.lvl.stride, #i_24#56))
+                store(slot(#_#A#33_val_slot, np_buf_t(float64)), #i_24#56__pos, add(load(slot(#_#A#33_val_slot, np_buf_t(float64)), #i_24#56__pos), mul(load(slot(#_A_20#39_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_19#55__pos), load(slot(#_A_21#43_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_24#56__pos_2))))
+    for i in range(0, length(slot(#_A_9#51_val_slot, np_buf_t(float64)))):
+        store(slot(#_A_9#51_val_slot, np_buf_t(float64)), i, 0.0)
+    for #i_23#57 in range(0, ##A#33_dim_0):
+        #i_23#57__pos: finch.int64 = add(0, mul(#_A_9#51.strides.element_0, #i_23#57))
+        #i_23#57__pos_2: finch.int64 = add(0, mul(#_A_19#35.lvl.stride, #i_23#57))
+        #i_23#57__pos_3: finch.int64 = add(0, mul(#_#A#33.strides.element_0, #i_23#57))
+        q: finch.int64 = load(slot(#_A_19#35_lvl_lvl_ptr_slot, np_buf_t(int64)), #i_23#57__pos_2)
+        q_stop: finch.int64 = load(slot(#_A_19#35_lvl_lvl_ptr_slot, np_buf_t(int64)), add(#i_23#57__pos_2, 1))
+        if lt(q, q_stop):
+            i_stop: finch.int64 = load(slot(#_A_19#35_lvl_lvl_idx_slot, np_buf_t(int64)), q)
+            i_last: finch.int64 = load(slot(#_A_19#35_lvl_lvl_idx_slot, np_buf_t(int64)), sub(q_stop, 1))
+        else:
+            i_stop: finch.int64 = 1
+            i_last: finch.int64 = 0
+        if lt(load(slot(#_A_19#35_lvl_lvl_idx_slot, np_buf_t(int64)), q), 0):
+            q: finch.int64 = scansearch(slot(#_A_19#35_lvl_lvl_idx_slot, np_buf_t(int64)), 0, q, sub(q_stop, 1))
+        i_start: finch.int64 = 0
+        while lt(i_stop, min(##A#33_dim_1, add(i_last, 1))):
+            #i_24#58__pos_2: finch.int64 = q
+            for #i_24#58 in range(i_start, min(add(i_stop, 1), i_stop)):
+                #i_24#58__pos: finch.int64 = add(#i_23#57__pos, mul(#_A_9#51.strides.element_1, #i_24#58))
+            for #i_24#58 in range(max(i_start, i_stop), add(i_stop, 1)):
+                #i_24#58__pos_3: finch.int64 = add(#i_23#57__pos, mul(#_A_9#51.strides.element_1, #i_24#58))
+                #i_24#58__pos_4: finch.int64 = add(#i_23#57__pos_3, mul(#_#A#33.strides.element_1, #i_24#58))
+                store(slot(#_A_9#51_val_slot, np_buf_t(float64)), #i_24#58__pos_3, _initwrite(load(slot(#_A_9#51_val_slot, np_buf_t(float64)), #i_24#58__pos_3), mul(load(slot(#_A_19#35_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_24#58__pos_2), load(slot(#_#A#33_val_slot, np_buf_t(float64)), #i_24#58__pos_4))))
+            i_start: finch.int64 = add(i_stop, 1)
+            q: finch.int64 = add(q, 1)
+            if lt(q, q_stop):
+                i_stop: finch.int64 = load(slot(#_A_19#35_lvl_lvl_idx_slot, np_buf_t(int64)), q)
+            else:
+                i_stop: finch.int64 = #_A_19#35.lvl.lvl.dimension
+        for #i_24#58 in range(max(0, add(i_last, 1)), ##A#33_dim_1):
+            #i_24#58__pos_5: finch.int64 = add(#i_23#57__pos, mul(#_A_9#51.strides.element_1, #i_24#58))
+    repack(#_A_19#35_lvl_lvl_lvl_val_slot)
+    repack(#_A_19#35_lvl_lvl_ptr_slot)
+    repack(#_A_19#35_lvl_lvl_idx_slot)
+    repack(#_A_20#39_lvl_lvl_lvl_val_slot)
+    repack(#_A_21#43_lvl_lvl_lvl_val_slot)
+    repack(#_#A#33_val_slot)
+    repack(#_A_9#51_val_slot)
+    main_return: tuple(element_0: BufferizedNDArray) = make_tuple(#A_9#50)
+    return main_return

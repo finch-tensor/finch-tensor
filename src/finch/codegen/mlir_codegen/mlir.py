@@ -1356,8 +1356,5 @@ class MLIRContext(Context):
                     self(func)
                 return None
 
-            case asm.Break():
-                raise NotImplementedError("MLIR backend does not yet support Break")
-
             case node:
                 raise NotImplementedError(f"Unrecognized node: {node}")
