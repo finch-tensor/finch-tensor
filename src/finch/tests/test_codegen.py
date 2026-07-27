@@ -1172,7 +1172,7 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
         dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
     )
 
-    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+    with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.matmul(
                 finch.lazy(finch.asarray(a, format=fmt)),
@@ -1217,7 +1217,7 @@ def test_mlir_resize_not_supported():
 
 @pytest.mark.mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
-def test_sparse_sparse_multiply_mlir_regression(file_regression, caplog):
+def test_sparse_matmul_mlir_regression(file_regression, caplog):
     dtype = np.float64
     a = np.array(
         [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
@@ -1258,15 +1258,16 @@ def test_sparse_sparse_multiply_mlir_regression(file_regression, caplog):
             )
         )
 
-    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+    with caplog.at_level(logging.DEBUG):
         result = finch.compute(
-            finch.multiply(
+            finch.matmul(
                 finch.lazy(sparse_mat[0]),
                 finch.lazy(sparse_mat[1]),
             )
         )
 
-    finch_assert_equal(result, a * b)
+    finch_assert_equal(result, a @ b)
+
     mlir_code = next(
         record.message
         for record in caplog.records
@@ -1323,7 +1324,7 @@ def test_sddmm_mlir_regression(file_regression, caplog):
         False,
     )
 
-    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+    with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.multiply(
                 finch.lazy(sparse_s),
@@ -1335,11 +1336,12 @@ def test_sddmm_mlir_regression(file_regression, caplog):
         )
 
     finch_assert_equal(result, s * (a @ b))
+
     mlir_code = next(
         record.message
         for record in caplog.records
         if record.name == "finch.codegen.mlir_codegen.mlir"
         and record.message.startswith("Compiling MLIR code:\n")
     )
-    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    mlir_code = re.sub(r"%(_A_\d+|__A)(?:_\d+)+", r"%\1", mlir_code)
     file_regression.check(mlir_code, extension=".mlir")

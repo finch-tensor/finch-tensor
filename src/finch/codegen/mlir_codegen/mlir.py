@@ -71,6 +71,12 @@ class MLIRBinaryOperator(MLIROperator):
 
 
 class MLIRKernel(asm.AssemblyKernel):
+    """
+    A class to represent MLIR kernel. It validates and serializes arguments,
+    invokes the compiled function, and reconstructs the result.
+
+    """
+
     def __init__(self, engine, func_name, ret_type, argtypes):
         self.engine = engine
         self.func_name = func_name
@@ -117,6 +123,11 @@ class MLIRKernel(asm.AssemblyKernel):
 
 
 class MLIRLibrary(asm.AssemblyLibrary):
+    """
+    A class to represent MLIR module.
+
+    """
+
     def __init__(self, mlir_module, kernels):
         self.mlir_module = mlir_module
         self.kernels = kernels
@@ -245,6 +256,11 @@ class MLIRForm(Form):
 
 
 class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
+    """
+    A class to compile and run FinchAssembly.
+
+    """
+
     def __init__(self, ctx: MLIRLowerer | None = None):
         self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
 
@@ -777,6 +793,14 @@ class MLIRStackFType(ABC):
 
 
 class MLIRContext(Context):
+    """
+    A context for generating MLIR code.
+
+    The context tracks SSA values, variable and slot bindings, indentation,
+    nested blocks, constants, and operations emitted into the MLIR module.
+
+    """
+
     def __init__(
         self,
         tab="  ",
@@ -824,8 +848,18 @@ class MLIRContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def emit_global(self):
-        globals_ = "\n".join(mlir_globals.values())
-        return f"module {{\n{globals_}\n{self.emit()}\n}}\n"
+        body = self.emit()
+        new_funcs = []
+
+        for name, value in mlir_globals.items():
+            if f"func.call @{name}(" in body:
+                new_funcs.append(value)
+
+        funcs = "\n".join(new_funcs)
+        if funcs:
+            funcs += "\n"
+
+        return f"module {{\n{funcs}{body}\n}}\n"
 
     def block(self) -> MLIRContext:
         blk = super().block()
@@ -937,7 +971,8 @@ class MLIRContext(Context):
                 ctx_2 = self.block()
                 for body in bodies:
                     ctx_2(body)
-                self.exec(ctx_2.emit())
+                if block := ctx_2.emit():
+                    self.exec(block)
                 return None
 
             case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
@@ -1136,9 +1171,9 @@ class MLIRContext(Context):
 
                 return None
 
-            case asm.WhileLoop(condition, body):
+            case asm.WhileLoop(condition, loop_body):
                 loop_names = []
-                nodes: list[Any] = [body]
+                nodes: list[Any] = [loop_body]
 
                 while nodes:
                     node = nodes.pop()
@@ -1149,16 +1184,15 @@ class MLIRContext(Context):
                                 loop_names.append(i)
                         case asm.Block(bodies):
                             nodes.extend(reversed(bodies))
-                        case asm.If(_, nested_body):
-                            nodes.append(nested_body)
-                        case asm.IfElse(_, nested_body, else_body):
-                            nodes.extend((else_body, nested_body))
+                        case asm.IfElse(_, body, else_body):
+                            nodes.extend((else_body, body))
                         case (
-                            asm.ForLoop(_, _, _, nested_body)
-                            | asm.BufferLoop(_, _, nested_body)
-                            | asm.WhileLoop(_, nested_body)
+                            asm.If(_, body)
+                            | asm.ForLoop(_, _, _, body)
+                            | asm.BufferLoop(_, _, body)
+                            | asm.WhileLoop(_, body)
                         ):
-                            nodes.append(nested_body)
+                            nodes.append(body)
 
                 if not loop_names:
                     condition_ctx = self.subblock()
@@ -1166,7 +1200,7 @@ class MLIRContext(Context):
                     condition_ctx.exec(f"{condition_ctx.feed}scf.condition({cond})")
 
                     body_ctx = self.subblock()
-                    body_ctx(body)
+                    body_ctx(loop_body)
                     body_ctx.exec(f"{body_ctx.feed}scf.yield")
 
                     self.exec(
@@ -1206,7 +1240,7 @@ class MLIRContext(Context):
                 ):
                     body_ctx.bindings.bindings[i] = (j, k)
 
-                body_ctx(body)
+                body_ctx(loop_body)
 
                 new_vals = [body_ctx.bindings[i][0] for i in loop_names]
                 new_type = [body_ctx.bindings[i][1] for i in loop_names]
