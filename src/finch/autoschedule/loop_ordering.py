@@ -1,7 +1,7 @@
 import logging
+from collections.abc import Callable
 from functools import reduce
 from itertools import chain as join_chains
-from typing import Callable
 
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, with_subsequence
@@ -30,7 +30,7 @@ from .loop_order_cost import (
     get_conjunctive_and_disjunctive_inputs,
     get_loop_lookups,
 )
-from .optimize import propagate_copy_queries, with_unique_lhs
+from .optimize import with_unique_lhs
 from .stages import LogicLoopOrderOptimizer
 from .util import flatten_plans, propagate_copy_queries, push_fields
 

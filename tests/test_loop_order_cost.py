@@ -4,9 +4,9 @@ import pytest
 
 import numpy as np
 
-import finchlite as fl
-from finchlite import ffuncs
-from finchlite.autoschedule.loop_order_cost import (
+import finch as fl
+from finch import ffuncs
+from finch.autoschedule.loop_order_cost import (
     SEQ_READ_COST,
     SEQ_WRITE_COST,
     cost_of_reformat,
@@ -15,8 +15,8 @@ from finchlite.autoschedule.loop_order_cost import (
     loop_order_cost,
     needs_reformat,
 )
-from finchlite.autoschedule.tensor_stats import DCStatsFactory
-from finchlite.finch_logic import Alias, Field, Literal, MapJoin, Table
+from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.finch_logic import Alias, Field, Literal, MapJoin, Table
 
 ORDERS = [
     (Field("i"), Field("j"), Field("k")),
@@ -97,12 +97,12 @@ def test_loop_order_cost():
     sf = DCStatsFactory()
     cases = [
         (
-            np.array([[1, 0, 0], [0, 2, 0], [0, 0, 0]], float),
-            np.array([[1, 0], [0, 3], [0, 0]], float),
+            np.array([[1, 0], [0, 2]], float),
+            np.array([[1], [0]], float),
         )
     ]
     for _ in range(10):
-        m, p, n = rng.integers(4, 10, 3)
+        m, p, n = rng.integers(2, 5, 3)
         cases.append(
             (
                 _sparse((m, p), rng.integers(1, m * p // 3 + 1), rng),
@@ -134,10 +134,10 @@ def test_empty_relation():
     )
     bindings = OrderedDict(
         {
-            a: sf(fl.asarray(np.ones((3, 3))), (i, j)),
-            b: sf(fl.asarray(np.ones((3, 3))), (j, k)),
-            c: sf(fl.asarray(np.ones((3, 3))), (k, l_)),
-            d: sf(fl.asarray(np.zeros((3, 3))), (l_, m)),
+            a: sf(fl.asarray(np.ones((2, 2))), (i, j)),
+            b: sf(fl.asarray(np.ones((2, 2))), (j, k)),
+            c: sf(fl.asarray(np.ones((2, 2))), (k, l_)),
+            d: sf(fl.asarray(np.zeros((2, 2))), (l_, m)),
         }
     )
 

@@ -1,7 +1,7 @@
-from finchlite.algebra import ffuncs
-from finchlite.autoschedule.galley.logical_optimizer import insert_statistics
-from finchlite.autoschedule.tensor_stats.numeric_stats import NumericStats
-from finchlite.finch_logic import (
+from finch.algebra import ffuncs
+from finch.autoschedule.galley.logical_optimizer import insert_statistics
+from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
+from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
@@ -12,7 +12,7 @@ from finchlite.finch_logic import (
     Table,
     TensorStats,
 )
-from finchlite.finch_logic.nodes import MapJoin
+from finch.finch_logic.nodes import MapJoin
 
 # Cost parameters ported from Julia
 # TODO: Julia comments says these need to be adjusted.
