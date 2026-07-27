@@ -422,15 +422,10 @@ def asarray(
                     transposed = asarray(obj.T, device=device, copy=False)
                     return permute_dims(transposed, (1, 0))
                 case "csr":
-                    pass
-                case "coo":
-                    raise NotImplementedError("SciPy COO format is not supported.")
-                case format_name:
-                    raise NotImplementedError(
-                        f"SciPy sparse format {format_name!r} is not supported."
-                    )
+                    return FiberTensorFType.from_scipy_csr(obj, device=device)
+                case _:
+                    return asarray(obj.tocsc(), device=device)
 
-            return FiberTensorFType.from_scipy_csr(obj, device=device)
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
