@@ -1,6 +1,7 @@
 import logging
 from functools import reduce
 from itertools import chain as join_chains
+from typing import Callable
 
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, with_subsequence
@@ -224,7 +225,11 @@ def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
     return tuple(perm)
 
 
-def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
+def _heuristic_loop_order(
+    root: LogicExpression,
+    _stats_factory: StatsFactory,
+    _stats: dict[Alias, TensorStats],
+) -> tuple[Field, ...]:
     chains = []
     for node in PostOrderDFS(root):
         match node:
@@ -308,19 +313,30 @@ def greedy_loop_order(
     return tuple(prefix)
 
 
-def set_loop_order(plan: Plan) -> Plan:
+LoopOrderAlgorithm = Callable[
+    [LogicExpression, StatsFactory, dict[Alias, TensorStats]],
+    tuple[Field, ...],
+]
+
+
+def set_loop_order(
+    plan: Plan,
+    *,
+    loop_order: LoopOrderAlgorithm = _heuristic_loop_order,
+    stats_factory: StatsFactory,
+    stats: dict[Alias, TensorStats],
+) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
 
         def rule_1(query):
             match query:
                 case Query(lhs, Aggregate(op, init, arg, idxs)):
-                    assert isinstance(arg, LogicExpression)
-                    idxs_2 = _heuristic_loop_order(arg)
+                    idxs_2 = loop_order(arg, stats_factory, stats)
                     rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
-                    idxs_2 = _heuristic_loop_order(arg)
+                    idxs_2 = loop_order(arg, stats_factory, stats)
                     rhs_2 = Reorder(
                         Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
                     )
@@ -335,10 +351,16 @@ def set_loop_order(plan: Plan) -> Plan:
 
 
 class DefaultLoopOrderer(LogicLoopOrderOptimizer):
-    def __init__(self, ctx: LogicLoader | None = None):
+    def __init__(
+        self,
+        ctx: LogicLoader | None = None,
+        *,
+        loop_order: LoopOrderAlgorithm = _heuristic_loop_order,
+    ):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
+        self.loop_order = loop_order
 
     def lower(
         self,
@@ -350,7 +372,12 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = set_loop_order(prgm)
+            prgm = set_loop_order(
+                prgm,
+                loop_order=self.loop_order,
+                stats_factory=stats_factory,
+                stats=stats,
+            )
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
