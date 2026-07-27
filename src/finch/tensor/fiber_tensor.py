@@ -18,6 +18,7 @@ from .base import Level, LevelFType
 from .level import (
     DenseLevel,
     ElementLevel,
+    SparseCOOLevel,
     SparseListLevel,
     dense,
     element,
@@ -114,6 +115,16 @@ class FiberTensor(OverrideTensor):
             raise ValueError("SciPy CSR conversion requires a zero fill value.")
 
         match self.lvl:
+            case SparseCOOLevel(
+                lvl=ElementLevel() as element,
+                tbl=(row, col),
+            ):
+                return scipy_sparse.coo_array(
+                    (element.val.arr, (row.arr, col.arr)),
+                    shape=self.shape,
+                    copy=False,
+                )
+
             case DenseLevel(
                 lvl=SparseListLevel(
                     lvl=ElementLevel() as element,
@@ -126,6 +137,12 @@ class FiberTensor(OverrideTensor):
                     shape=self.shape,
                     copy=False,
                 )
+            case DenseLevel(
+                lvl=DenseLevel(
+                    lvl=ElementLevel() as element,
+                )
+            ):
+                return scipy_sparse.csr_array(self.to_numpy())
             case _:
                 raise NotImplementedError(
                     f"Finch format {self.ftype} is not supported by SciPy conversion."
@@ -266,7 +283,12 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         )
 
     @staticmethod
-    def from_scipy(obj, device=None):
+    def from_scipy_csr(
+        obj,
+        /,
+        *,
+        device=None,
+    ):
         data = obj.data
         indices = obj.indices
         indptr = obj.indptr

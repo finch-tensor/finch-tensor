@@ -398,17 +398,12 @@ def asarray(
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
         if scipy_sparse.issparse(obj):
-            match obj.format:
-                case "csr":
-                    pass
-                case "coo":
-                    raise NotImplementedError("SciPy COO format is not supported.")
-                case "csc":
-                    raise NotImplementedError("SciPy CSC format is not supported.")
-                case format_name:
-                    raise NotImplementedError(
-                        f"SciPy sparse format {format_name!r} is not supported."
-                    )
+            if copy is False and (
+                obj.format not in ("csr", "csc") or not obj.has_canonical_format
+            ):
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
 
             if dtype is not None:
                 if copy is False:
@@ -418,7 +413,24 @@ def asarray(
             elif copy is True:
                 obj = obj.copy()
 
-            return FiberTensorFType.from_scipy(obj, device)
+            if not obj.has_canonical_format:
+                obj = obj.copy()
+                obj.sum_duplicates()
+
+            match obj.format:
+                case "csc":
+                    transposed = asarray(obj.T, device=device, copy=False)
+                    return permute_dims(transposed, (1, 0))
+                case "csr":
+                    pass
+                case "coo":
+                    raise NotImplementedError("SciPy COO format is not supported.")
+                case format_name:
+                    raise NotImplementedError(
+                        f"SciPy sparse format {format_name!r} is not supported."
+                    )
+
+            return FiberTensorFType.from_scipy_csr(obj, device=device)
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
