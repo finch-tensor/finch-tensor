@@ -154,6 +154,41 @@ class FiberTensor(OverrideTensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.to_numpy().item()
 
+    @classmethod
+    def from_scipy_csr(
+        cls,
+        obj,
+        /,
+        *,
+        device=None,
+    ):
+        data = obj.data
+        indices = obj.indices
+        indptr = obj.indptr
+        element_lvl = element(
+            fill_value=np.zeros((), dtype=data.dtype)[()],
+            element_type=ftype(data.dtype),
+            position_type=ftype(indices.dtype),
+        )
+        sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indices.dtype))
+        dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
+
+        return cls(
+            DenseLevel(
+                SparseListLevel(
+                    ElementLevel(
+                        _format=element_lvl,
+                        _val=NumpyBuffer(data),
+                    ),
+                    dimension=sparse_lvl.dimension_type(obj.shape[1]),
+                    ptr=NumpyBuffer(indptr),
+                    idx=NumpyBuffer(indices),
+                ),
+                dimension=dense_lvl.dimension_type(obj.shape[0]),
+            ),
+            _device=device,
+        )
+
 
 @dataclass(unsafe_hash=True)
 class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
@@ -281,40 +316,6 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             pos=self.position_type(0),
             dirty_bit=False,
             _device=self.device,
-        )
-
-    @staticmethod
-    def from_scipy_csr(
-        obj,
-        /,
-        *,
-        device=None,
-    ):
-        data = obj.data
-        indices = obj.indices
-        indptr = obj.indptr
-        element_lvl = element(
-            fill_value=np.zeros((), dtype=data.dtype)[()],
-            element_type=ftype(data.dtype),
-            position_type=ftype(indices.dtype),
-        )
-        sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indices.dtype))
-        dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
-
-        return FiberTensor(
-            DenseLevel(
-                SparseListLevel(
-                    ElementLevel(
-                        _format=element_lvl,
-                        _val=NumpyBuffer(data),
-                    ),
-                    dimension=sparse_lvl.dimension_type(obj.shape[1]),
-                    ptr=NumpyBuffer(indptr),
-                    idx=NumpyBuffer(indices),
-                ),
-                dimension=dense_lvl.dimension_type(obj.shape[0]),
-            ),
-            _device=device,
         )
 
 
