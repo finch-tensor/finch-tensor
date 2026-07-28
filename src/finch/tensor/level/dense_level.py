@@ -9,7 +9,7 @@ from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.base import Level, LevelFType
+from finch.tensor.abstract_level import Level, LevelFType
 from finch.tensor.traits import Dense
 
 

@@ -8,7 +8,7 @@ from finch import finch_notation as ntn
 from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
-from finch.tensor.base import Level, LevelFType
+from finch.tensor.abstract_level import Level, LevelFType
 from finch.tensor.scalar import Scalar
 
 

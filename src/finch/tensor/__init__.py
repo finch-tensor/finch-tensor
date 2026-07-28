@@ -1,4 +1,3 @@
-from .base import Level, LevelFType
 from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
 from .fiber_tensor import FiberTensor, FiberTensorFType, fiber_tensor
 from .level import (
@@ -6,6 +5,8 @@ from .level import (
     DenseLevelFType,
     ElementLevel,
     ElementLevelFType,
+    Level,
+    LevelFType,
     SparseByteMapLevel,
     SparseByteMapLevelFType,
     SparseCOOLevel,

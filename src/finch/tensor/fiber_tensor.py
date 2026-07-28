@@ -14,10 +14,11 @@ from finch.algebra import (
 from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
-from .base import Level, LevelFType
 from .level import (
     DenseLevel,
     ElementLevel,
+    Level,
+    LevelFType,
     SparseCOOLevel,
     SparseListLevel,
     dense,
