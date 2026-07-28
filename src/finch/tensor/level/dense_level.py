@@ -166,10 +166,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         proto,
         pos: asm.AssemblyExpression,
     ):
-        from finch.tensor.fiber_tensor import FiberTensorFType
-
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
+        ft_ftype = fiber.type
         lvl = ctx.fiber_level(tns)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
@@ -198,7 +196,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                     ),
                 )
             )
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
+            child_type = type(ft_ftype)(ft_ftype.lvl_t.lvl_t)
             return ntn.Fiber(
                 tns.root,
                 ntn.Child(tns.lvl),

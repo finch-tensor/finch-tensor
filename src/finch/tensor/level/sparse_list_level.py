@@ -181,12 +181,10 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        from finch.tensor.fiber_tensor import FiberTensorFType
-
-        if not isinstance(fiber.type, FiberTensorFType):
+        if not hasattr(fiber.type, "lvl_t"):
             raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
+        ft_ftype = fiber.type
         lvl_asm = ctx.fiber_level(tns)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
@@ -230,7 +228,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(asm.Assign(pos_2, q))
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
+            child_type = type(ft_ftype)(ft_ftype.lvl_t.lvl_t)
             return lplt.Leaf(
                 lambda ctx: ntn.Fiber(
                     tns.root,
