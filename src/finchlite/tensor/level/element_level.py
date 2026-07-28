@@ -28,17 +28,17 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         return [
             ("val", self.buffer_type),
         ]
-    
-    def level_iter_cost(self, fields, stats, stats_factory, num_pos, l):
-        #no iteration here
-        return 0
-    
-    def level_cost(self,fields,stats,stats_factory,num_pos,l)->float:
-        #no inner level
-        #cost = num_pos * bytes per value
-        val_size = np.dtype(self.element_type.dtype).itemsize
-        return num_pos*val_size
 
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        # no iteration here
+        return 0
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        # no inner level
+        # cost = num_pos * bytes per value
+        elem_type = getattr(self.element_type, "dtype", np.float64)
+        val_size = np.dtype(elem_type).itemsize
+        return num_pos * val_size
 
     def __post_init__(self):
         # Ensure element_type is an FType

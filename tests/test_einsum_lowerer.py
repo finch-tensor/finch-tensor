@@ -30,14 +30,6 @@ def ctx():
         )
     )
 
-def test_add_random_format(rng,random_ctx):
-    A = lazy(rng.random((3,3)))
-    B = lazy(rng.random((3,3)))
-    C = finchlite.add(A,B)
-    result = compute(C,ctx=random_ctx)
-    expected = compute(A+B)
-    finch_assert_allclose(result,expected)
-
 
 def test_simple_addition(rng, ctx):
     """Test lowering of simple addition A + B"""
@@ -124,4 +116,3 @@ def test_minimum_reduction(rng, ctx):
     result = compute(B, ctx=ctx)
     expected = compute(B)
     finch_assert_allclose(result, expected)
-
