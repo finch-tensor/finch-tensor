@@ -105,6 +105,10 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def lvl_t(self) -> LevelFType:
         return self.lvl_type
 
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl): ...
+
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl): ...
+
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n)
 

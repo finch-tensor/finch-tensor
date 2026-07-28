@@ -84,6 +84,31 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        """
+        Returns the cost of iterating this level.
+        fields : tuple of fields for each dimension
+        stats : stats object for the tensor
+        stats_factory : to compute using stats
+        num_pos : positions recieved from parent level
+        l : current level index
+        """
+        ...
+
+    @abstractmethod
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        """
+        Returns estimated memory cost of this level and all inner levels
+        fields : tuple of fields for each dimension
+        stats : stats object for the tensor
+        stats_factory : to compute using stats
+        num_pos : positions recieved from parent level
+        l : current dimension index
+        """
+
+        ...
+
+    @abstractmethod
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.

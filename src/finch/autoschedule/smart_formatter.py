@@ -13,6 +13,7 @@ from finch.tensor import dense, element, fiber_tensor, sparse_hash
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
+from .stats_format_selector import optimize_format
 from .tensor_stats import FDStats, StatsInterpreter
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -118,3 +119,54 @@ class FDFormatter(SmartFormatter):
                 lvl = sparse_hash(lvl, shape_type[dim], single_writer=False)
 
         return fiber_tensor(lvl)
+
+
+class CostFormatter(SmartFormatter):
+    def __init__(self, loader: LogicLoader | None = None):
+        super().__init__(loader)
+        self._stats_factory = None
+
+    @abstractmethod
+    def cost_fn(self, name, num_pos, n_l, nnz_l, val_size, pos_size):
+        """Define cost using different methods like storage
+        based or iteration based cost"""
+        ...
+
+    def lower(self, prgm, bindings, stats, stats_factory):
+        """
+        get_tensor_ftype is called by lower which needs stats_factory which
+        isn't passed by smart formatter lower
+        """
+        self._stats_factory = stats_factory
+        return super().lower(prgm, bindings, stats, stats_factory)
+
+    def get_tensor_ftype(self, fill_value, shape_type, stats):
+        if self._stats_factory is None:
+            raise ValueError("CostFormatter requires StatsFactory")
+        lvl = optimize_format(
+            stats.index_order,
+            shape_type,
+            stats,
+            self._stats_factory,
+            fill_value,
+            self.cost_fn,
+        )
+        return fiber_tensor(lvl)
+
+
+class StorageCostFormatter(CostFormatter):
+    def cost_fn(self, name, num_pos, n_l, nnz_l, val_size, pos_size):
+        if name == "leaf":
+            return num_pos * val_size
+        if name == "dense":
+            return 0.0
+        return (num_pos + 1) * pos_size + nnz_l * pos_size
+
+
+class IterCostFormatter(CostFormatter):
+    def cost_fn(self, name, num_pos, n_l, nnz_l, val_size, pos_size):
+        if name == "leaf":
+            return 0.0
+        if name == "dense":
+            return num_pos * n_l
+        return num_pos + nnz_l

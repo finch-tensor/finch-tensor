@@ -1,4 +1,5 @@
 import logging
+import random
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -15,6 +16,8 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.tensor import BufferizedNDArrayFType
+from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.level import DenseLevelFType, ElementLevelFType, SparseListLevelFType
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -99,6 +102,26 @@ class BufferizedNDArrayFormatter(MonoLogicFormatter):
             dimension_type=TupleFType.from_tuple(shape_type),
             fill_value=fill_value,
         )
+
+
+class RandomLogicFormatter(LogicFormatter):
+    def get_output_tns_ftype(self, fill_value, shape_type):
+        fill_ftype = ftype(
+            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        )
+        elem = ElementLevelFType(
+            fill_value=fill_value,
+            element_type=fill_ftype,
+            buffer_type=NumpyBufferFType(fill_ftype),
+        )
+        fmt = elem
+        for _ in reversed(shape_type):
+            if random.random() < 0.5:
+                fmt = DenseLevelFType(_lvl_t=fmt)
+            else:
+                fmt = SparseListLevelFType(_lvl_t=fmt)
+
+        return FiberTensorFType(fmt)
 
 
 class DefaultLogicFormatter(BufferizedNDArrayFormatter):
