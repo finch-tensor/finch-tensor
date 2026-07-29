@@ -154,17 +154,38 @@ class FiberTensor(OverrideTensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.to_numpy().item()
 
+    def transpose(self): ...
+
     @classmethod
     def from_scipy_csr(
         cls,
-        obj,
+        obj: Any,
         /,
         *,
+        dtype=None,
         device=None,
+        copy=None,
     ):
+        if dtype is not None:
+            if copy is False:
+                obj = obj.astype(dtype, copy=False)
+            else:
+                obj = obj.astype(dtype, copy=True)
+        elif copy is True:
+            obj = obj.copy()
+
+        if not obj.has_canonical_format:
+            if copy is False:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            obj = obj.copy()
+            obj.sum_duplicates()
+
         data = obj.data
         indices = obj.indices
         indptr = obj.indptr
+
         element_lvl = element(
             fill_value=np.zeros((), dtype=data.dtype)[()],
             element_type=ftype(data.dtype),
