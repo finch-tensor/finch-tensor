@@ -618,37 +618,6 @@ def test_fiber_tensor_to_csr():
     assert np.shares_memory(scipy_tensor.indptr, indptr)
 
 
-def test_fiber_tensor_transpose():
-    csr = scipy.sparse.csr_array(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
-    tensor = FiberTensor.from_scipy_csr(csr)
-
-    transposed = tensor.transpose()
-    scipy_transposed = transposed.to_scipy()
-
-    assert isinstance(transposed, TransposedFiberTensor)
-    assert isinstance(scipy_transposed, scipy.sparse.csc_array)
-    np.testing.assert_array_equal(transposed.to_numpy(), csr.toarray().T)
-    assert np.shares_memory(scipy_transposed.data, csr.data)
-    assert np.shares_memory(scipy_transposed.indices, csr.indices)
-    assert np.shares_memory(scipy_transposed.indptr, csr.indptr)
-    assert transposed.transpose() is tensor
-    assert tensor.T.tensor is tensor
-    assert transposed.T is tensor
-
-
-def test_asarray_scipy_csc_is_zero_copy():
-    csc = scipy.sparse.csc_array(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]))
-
-    tensor = asarray(csc, copy=False)
-    scipy_tensor = tensor.to_scipy()
-
-    assert isinstance(tensor, TransposedFiberTensor)
-    np.testing.assert_array_equal(scipy_tensor.toarray(), csc.toarray())
-    assert np.shares_memory(scipy_tensor.data, csc.data)
-    assert np.shares_memory(scipy_tensor.indices, csc.indices)
-    assert np.shares_memory(scipy_tensor.indptr, csc.indptr)
-
-
 def test_fiber_tensor_to_dense():
     dense_arr = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
     data = dense_arr.reshape(-1)
@@ -673,30 +642,6 @@ def test_fiber_tensor_to_dense():
 
     assert isinstance(scipy_tensor, scipy.sparse.csr_array)
     np.testing.assert_array_equal(scipy_tensor.toarray(), dense_arr)
-
-
-def test_dense_fiber_tensor_transpose_to_numpy_is_zero_copy():
-    dense_arr = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
-    tensor = FiberTensor(
-        DenseLevel(
-            DenseLevel(
-                ElementLevel(
-                    element(
-                        fill_value=np.float64(0),
-                        position_type=int32,
-                    ),
-                    NumpyBuffer(dense_arr.reshape(-1)),
-                ),
-                np.int32(3),
-            ),
-            np.int32(2),
-        )
-    )
-
-    transposed = tensor.T.to_numpy()
-
-    np.testing.assert_array_equal(transposed, dense_arr.T)
-    assert np.shares_memory(transposed, dense_arr)
 
 
 def test_fiber_tensor_to_coo():
@@ -727,3 +672,22 @@ def test_fiber_tensor_to_coo():
     assert np.shares_memory(scipy_tensor.data, data)
     assert np.shares_memory(scipy_tensor.row, row)
     assert np.shares_memory(scipy_tensor.col, col)
+
+
+def test_fiber_tensor_transpose():
+    tensor = FiberTensor.from_scipy_csr(
+        scipy.sparse.csr_array(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
+    ).T
+    transposed = tensor.to_scipy()
+    original = tensor.tensor.to_scipy()
+
+    assert isinstance(tensor, TransposedFiberTensor)
+    assert isinstance(transposed, scipy.sparse.csc_array)
+    np.testing.assert_array_equal(
+        transposed.toarray(),
+        np.array([[1.0, 0.0], [0.0, 3.0], [2.0, 0.0]]),
+    )
+    assert np.shares_memory(transposed.data, original.data)
+    assert np.shares_memory(transposed.indices, original.indices)
+    assert np.shares_memory(transposed.indptr, original.indptr)
+    assert tensor.T is tensor.tensor

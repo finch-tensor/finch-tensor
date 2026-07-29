@@ -382,6 +382,26 @@ def test_asarray_existing_finch_tensors_pass_through():
     assert scalar.dtype == finch.int64
 
 
+def test_asarray_scipy_csr_matrix():
+    source = scipy_sparse.csr_matrix(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
+    result = finch.asarray(source, copy=False).to_scipy()
+
+    np.testing.assert_array_equal(result.toarray(), source.toarray())
+    assert np.shares_memory(result.data, source.data)
+    assert np.shares_memory(result.indices, source.indices)
+    assert np.shares_memory(result.indptr, source.indptr)
+
+
+def test_asarray_scipy_csc_matrix():
+    source = scipy_sparse.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]))
+    result = finch.asarray(source, copy=False).to_scipy()
+
+    np.testing.assert_array_equal(result.toarray(), source.toarray())
+    assert np.shares_memory(result.data, source.data)
+    assert np.shares_memory(result.indices, source.indices)
+    assert np.shares_memory(result.indptr, source.indptr)
+
+
 def test_array_namespace_info():
     info = finch.__array_namespace_info__()
 
