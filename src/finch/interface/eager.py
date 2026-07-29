@@ -516,7 +516,7 @@ def det(x, /):
 def lu(x, /, *, permute_l=False, p_indices=False):
     x = _warn_compute(x, "lu")
     try:
-        return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
+        return scipy_sparse_linalg.splu(to_scipy(compute(lazy.asarray(x))).tocsc())
     except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))
