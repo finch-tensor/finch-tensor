@@ -53,7 +53,7 @@ from finch.symbolic import gensym
 from finch.tensor import (
     BufferizedNDArray,
     EyeTensor,
-    FiberTensorFType,
+    FiberTensor,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -422,7 +422,7 @@ def asarray(
                     transposed = asarray(obj.T, device=device, copy=False)
                     return permute_dims(transposed, (1, 0))
                 case "csr":
-                    return FiberTensorFType.from_scipy_csr(obj, device=device)
+                    return FiberTensor.from_scipy_csr(obj, device=device)
                 case _:
                     return asarray(obj.tocsc(), device=device)
 
