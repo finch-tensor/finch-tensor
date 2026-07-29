@@ -1,5 +1,10 @@
 from .bufferized_ndarray import BufferizedNDArray, BufferizedNDArrayFType
-from .fiber_tensor import FiberTensor, FiberTensorFType, fiber_tensor
+from .fiber_tensor import (
+    FiberTensor,
+    FiberTensorFType,
+    TransposedFiberTensor,
+    fiber_tensor,
+)
 from .level import (
     DenseLevel,
     DenseLevelFType,
@@ -80,6 +85,7 @@ __all__ = [
     "SparseHashLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
+    "TransposedFiberTensor",
     "UpperTriangleTensor",
     "dense",
     "element",

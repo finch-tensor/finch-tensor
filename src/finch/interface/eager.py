@@ -502,7 +502,7 @@ def det(x, /):
     # https://stackoverflow.com/questions/19107617/how-to-compute-scipy-sparse-matrix-determinant-without-turning-it-to-dense
     x = _warn_compute(x, "det")
     try:
-        x_sp = to_scipy(compute(lazy.asarray(x)))
+        x_sp = to_scipy(lazy.asarray(x))
         lu = scipy_sparse_linalg.splu(x_sp.tocsc())
         diag_u = lu.U.diagonal()
         swap_sign = (-1) ** (_min_perm_swaps(lu.perm_r) + _min_perm_swaps(lu.perm_c))
@@ -516,7 +516,7 @@ def det(x, /):
 def lu(x, /, *, permute_l=False, p_indices=False):
     x = _warn_compute(x, "lu")
     try:
-        return scipy_sparse_linalg.splu(to_scipy(compute(lazy.asarray(x))).tocsc())
+        return scipy_sparse_linalg.splu(to_scipy(lazy.asarray(x)).tocsc())
     except NotImplementedError:
         pass
     x = to_numpy(lazy.asarray(x))

@@ -419,8 +419,11 @@ def asarray(
 
             match obj.format:
                 case "csc":
-                    transposed = asarray(obj.T, device=device, copy=False)
-                    return permute_dims(transposed, (1, 0))
+                    return asarray(
+                        obj.transpose(copy=False),
+                        device=device,
+                        copy=False,
+                    ).T
                 case "csr":
                     return FiberTensor.from_scipy_csr(obj, device=device)
                 case _:
