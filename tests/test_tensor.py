@@ -577,11 +577,42 @@ def test_asarray_scipy_sparse(csr_type):
     assert isinstance(tensor.lvl, DenseLevel)
     assert isinstance(tensor.lvl.lvl, SparseListLevel)
     assert isinstance(tensor.lvl.lvl.lvl, ElementLevel)
+    np.testing.assert_array_equal(tensor.lvl.lvl.lvl.val.arr, csr.data)
+    np.testing.assert_array_equal(tensor.lvl.lvl.idx.arr, csr.indices)
+    np.testing.assert_array_equal(tensor.lvl.lvl.ptr.arr, csr.indptr)
 
     scipy_tensor = tensor.to_scipy()
     np.testing.assert_array_equal(scipy_tensor.data, csr.data)
     np.testing.assert_array_equal(scipy_tensor.indices, csr.indices)
     np.testing.assert_array_equal(scipy_tensor.indptr, csr.indptr)
+
+
+@pytest.mark.parametrize("coo_type", [scipy.sparse.coo_matrix, scipy.sparse.coo_array])
+def test_asarray_scipy_coo(coo_type):
+    coo = coo_type(
+        (
+            np.array([1.0, 2.0, 3.0]),
+            (
+                np.array([0, 0, 1], dtype=np.int32),
+                np.array([0, 2, 1], dtype=np.int32),
+            ),
+        ),
+        shape=(2, 3),
+    )
+
+    tensor = asarray(coo)
+
+    assert isinstance(tensor, FiberTensor)
+    assert isinstance(tensor.lvl, SparseCOOLevel)
+    assert isinstance(tensor.lvl.lvl, ElementLevel)
+    np.testing.assert_array_equal(tensor.lvl.lvl.val.arr, coo.data)
+    np.testing.assert_array_equal(tensor.lvl.tbl[0].arr, coo.row)
+    np.testing.assert_array_equal(tensor.lvl.tbl[1].arr, coo.col)
+
+    scipy_tensor = tensor.to_scipy()
+    np.testing.assert_array_equal(scipy_tensor.data, coo.data)
+    np.testing.assert_array_equal(scipy_tensor.row, coo.row)
+    np.testing.assert_array_equal(scipy_tensor.col, coo.col)
 
 
 def test_fiber_tensor_to_csr():

@@ -212,6 +212,55 @@ class FiberTensor(OverrideTensor):
             _device=device,
         )
 
+    @classmethod
+    def from_scipy_coo(
+        cls,
+        obj: Any,
+        /,
+        *,
+        dtype=None,
+        device=None,
+        copy=None,
+    ):
+        if dtype is not None:
+            if copy is False:
+                obj = obj.astype(dtype, copy=False)
+            else:
+                obj = obj.astype(dtype, copy=True)
+        elif copy is True:
+            obj = obj.copy()
+
+        if not obj.has_canonical_format:
+            if copy is False:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            obj = obj.copy()
+            obj.sum_duplicates()
+
+        data = obj.data
+        row = obj.row
+        col = obj.col
+        index_type = ftype(row.dtype)
+
+        element_lvl = element(
+            fill_value=np.zeros((), dtype=data.dtype)[()],
+            element_type=ftype(data.dtype),
+            position_type=index_type,
+        )
+
+        return cls(
+            SparseCOOLevel(
+                ElementLevel(
+                    _format=element_lvl,
+                    _val=NumpyBuffer(data),
+                ),
+                shape=obj.shape,
+                tbl=(NumpyBuffer(row), NumpyBuffer(col)),
+            ),
+            _device=device,
+        )
+
 
 @dataclass(unsafe_hash=True)
 class FiberTensorFType(FinchTensorFType, ImmutableStructFType):

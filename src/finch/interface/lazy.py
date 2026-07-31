@@ -398,12 +398,14 @@ def asarray(
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
         if sps.issparse(obj):
-            if copy is False and (
-                obj.format not in ("csr", "csc") or not obj.has_canonical_format
+            if copy is False and not (
+                obj.format in ("coo", "csr", "csc") and obj.has_canonical_format
             ):
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
+            if obj.format not in ("coo", "csr", "csc"):
+                obj = obj.asformat("coo")
 
             if dtype is not None:
                 if copy is False:
@@ -426,6 +428,8 @@ def asarray(
                     ).T
                 case "csr":
                     return FiberTensor.from_scipy_csr(obj, device=device)
+                case "coo":
+                    return FiberTensor.from_scipy_coo(obj, device=device)
                 case _:
                     return asarray(obj.tocsc(), device=device)
 
