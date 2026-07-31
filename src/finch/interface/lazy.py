@@ -10,7 +10,7 @@ from itertools import accumulate, zip_longest
 from typing import Any, cast, overload
 
 import numpy as np
-import scipy.sparse as scipy_sparse
+import scipy.sparse as sps
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finch import finch_einsum as ein
@@ -397,7 +397,7 @@ def asarray(
             if copy is True:
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
-        if scipy_sparse.issparse(obj):
+        if sps.issparse(obj):
             if copy is False and (
                 obj.format not in ("csr", "csc") or not obj.has_canonical_format
             ):

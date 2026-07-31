@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import scipy.sparse as scipy_sparse
+import scipy.sparse as sps
 
 from finch.algebra import (
     ImmutableStructFType,
@@ -120,7 +120,7 @@ class FiberTensor(OverrideTensor):
                 lvl=ElementLevel() as element,
                 tbl=(row, col),
             ):
-                return scipy_sparse.coo_array(
+                return sps.coo_array(
                     (element.val.arr, (row.arr, col.arr)),
                     shape=self.shape,
                     copy=False,
@@ -133,7 +133,7 @@ class FiberTensor(OverrideTensor):
                     idx=idx,
                 )
             ):
-                return scipy_sparse.csr_array(
+                return sps.csr_array(
                     (element.val.arr, idx.arr, ptr.arr),
                     shape=self.shape,
                     copy=False,
@@ -143,7 +143,7 @@ class FiberTensor(OverrideTensor):
                     lvl=ElementLevel() as element,
                 )
             ):
-                return scipy_sparse.csr_array(self.to_numpy())
+                return sps.csr_array(self.to_numpy())
             case _:
                 raise NotImplementedError(
                     f"Finch format {self.ftype} is not supported by SciPy conversion."

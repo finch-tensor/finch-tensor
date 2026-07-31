@@ -6,7 +6,7 @@ import warnings
 import pytest
 
 import numpy as np
-import scipy.sparse as scipy_sparse
+import scipy.sparse as sps
 
 import finch
 from finch import ffuncs
@@ -383,7 +383,7 @@ def test_asarray_existing_finch_tensors_pass_through():
 
 
 def test_asarray_scipy_csr_matrix():
-    source = scipy_sparse.csr_matrix(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
+    source = sps.csr_matrix(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
     result = finch.asarray(source, copy=False).to_scipy()
 
     np.testing.assert_array_equal(result.toarray(), source.toarray())
@@ -393,7 +393,7 @@ def test_asarray_scipy_csr_matrix():
 
 
 def test_asarray_scipy_csc_matrix():
-    source = scipy_sparse.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]))
+    source = sps.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]))
     result = finch.asarray(source, copy=False).to_scipy()
 
     np.testing.assert_array_equal(result.toarray(), source.toarray())
@@ -1705,7 +1705,7 @@ def test_linalg_cross_supports_axis_lazy_formula():
 
 
 def test_linalg_sparse_det_uses_superlu():
-    x = scipy_sparse.csc_matrix(
+    x = sps.csc_matrix(
         np.array(
             [
                 [0.0, 2.0, 0.0],
@@ -1729,9 +1729,7 @@ def test_linalg_lu_uses_dense_fallback():
 
 
 def test_linalg_lu_uses_sparse_superlu():
-    x = scipy_sparse.csc_matrix(
-        np.array([[4.0, 0.0, 1.0], [0.0, 3.0, 2.0], [1.0, 0.0, 5.0]])
-    )
+    x = sps.csc_matrix(np.array([[4.0, 0.0, 1.0], [0.0, 3.0, 2.0], [1.0, 0.0, 5.0]]))
     b = np.array([1.0, 2.0, 3.0])
 
     result = finch.linalg.lu(x)
@@ -1740,7 +1738,7 @@ def test_linalg_lu_uses_sparse_superlu():
 
 
 def test_linalg_partial_sparse_eigen_kwargs():
-    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+    x = sps.diags([1.0, 2.0, 3.0, 4.0], format="csr")
 
     vals = finch.linalg.eigvalsh(x, k=2, rtol=1e-12)
     eig_vals, eig_vecs = finch.linalg.eigh(x, k=2, atol=1e-12)
@@ -1751,7 +1749,7 @@ def test_linalg_partial_sparse_eigen_kwargs():
 
 
 def test_linalg_partial_sparse_svd_kwargs():
-    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+    x = sps.diags([1.0, 2.0, 3.0, 4.0], format="csr")
 
     vals = finch.linalg.svdvals(x, k=2, rtol=1e-12)
     u, s, vh = finch.linalg.svd(x, k=2, atol=1e-12)
@@ -1775,7 +1773,7 @@ def test_linalg_partial_sparse_kwargs_dense_fallback_returns_full_results():
 
 
 def test_linalg_partial_sparse_warns_when_combining_tolerances():
-    x = scipy_sparse.diags([1.0, 2.0, 3.0, 4.0], format="csr")
+    x = sps.diags([1.0, 2.0, 3.0, 4.0], format="csr")
 
     with pytest.warns(RuntimeWarning, match="eigvalsh sparse fallback"):
         eig_vals = finch.linalg.eigvalsh(x, k=2, rtol=1e-12, atol=1e-12)
