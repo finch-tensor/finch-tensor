@@ -1,4 +1,5 @@
 import importlib.util
+import time
 from pathlib import Path
 
 import pytest
@@ -168,13 +169,39 @@ def test_full_pipeline_through_julia_backend(boeing_slice):
     scheduler = fd_scheduler(formatter)
     ft.set_default_scheduler(ctx=scheduler)
 
-    with with_default_scheduler:
+    with with_default_scheduler(scheduler):
         result = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
 
     finch_assert_allclose(
         result.to_numpy(), (boeing_slice @ boeing_slice).toarray(), rtol=1e-5, atol=1e-3
     )
     assert describe_format(formatter.output_ftypes[-1]) == ["sparse", "sparse"]
+
+
+def run_full_boeing():
+    t0 = time.time()
+    M = scipy.io.mmread(BOEING_PATH).tocsr()
+    print(
+        f"[{time.time() - t0:6.2f}s] for loading matrix:\n shape={M.shape}, nnz={M.nnz}"
+    )
+
+    tensor = csr_tensor_from_scipy(M)
+    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    scheduler = fd_scheduler(formatter)
+    ft.set_default_scheduler(ctx=scheduler)
+
+    with with_default_scheduler(scheduler):
+        result = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
+    print(f"[{time.time() - t0:6.2f}s] for complte boeing julia matmul")
+    print(
+        "output format decided by FDFormatter:",
+        describe_format(formatter.output_ftypes[-1]),
+    )
+    print("type of result Python received finally:", type(result).__name__)
+
+
+if __name__ == "__main__":
+    run_full_boeing()
 
 
 """
