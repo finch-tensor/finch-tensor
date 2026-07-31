@@ -149,15 +149,6 @@ class FiberTensor(OverrideTensor):
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.to_numpy().item()
 
-    def transpose(self):
-        return TransposedFiberTensor(self)
-
-    @property
-    def T(self):
-        if self.ndim != 2:
-            raise ValueError("FiberTensor transpose requires a two-dimensional tensor.")
-        return self.transpose()
-
     @classmethod
     def from_scipy_csr(
         cls,
@@ -389,53 +380,6 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             dirty_bit=False,
             _device=self.device,
         )
-
-
-@dataclass
-class TransposedFiberTensor(OverrideTensor):
-    """A zero-copy used to represent a transposed FiberTensor."""
-
-    tensor: FiberTensor
-
-    @property
-    def ftype(self):
-        return self.tensor.ftype
-
-    @property
-    def shape(self):
-        return self.tensor.shape[::-1]
-
-    @property
-    def shape_type(self):
-        return self.tensor.shape_type[::-1]
-
-    @property
-    def T(self):
-        return self.transpose()
-
-    def item(self):
-        if self.ndim != 0:
-            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-        return self.to_numpy().item()
-
-    def to_numpy(self):
-        match self.tensor.lvl:
-            case DenseLevel(lvl=DenseLevel(lvl=ElementLevel())):
-                return self.tensor.to_numpy().transpose()
-            case _:
-                raise NotImplementedError(
-                    "NumPy conversion is only supported for dense "
-                    "transposed FiberTensor."
-                )
-
-    def to_scipy(self):
-        """
-        Return a zero-copy Scipy CSC of the transposed matrix
-        """
-        return self.tensor.to_scipy().transpose(copy=False)
-
-    def transpose(self):
-        return self.tensor
 
 
 def fiber_tensor(lvl: LevelFType):

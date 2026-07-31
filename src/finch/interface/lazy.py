@@ -421,11 +421,10 @@ def asarray(
 
             match obj.format:
                 case "csc":
-                    return asarray(
-                        obj.transpose(copy=False),
-                        device=device,
-                        copy=False,
-                    ).T
+                    from . import eager
+
+                    mat = asarray(obj.transpose(copy=False), copy=False)
+                    return eager.matrix_transpose(mat)
                 case "csr":
                     return FiberTensor.from_scipy_csr(obj, device=device)
                 case "coo":

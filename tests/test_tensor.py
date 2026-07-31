@@ -36,7 +36,6 @@ from finch.tensor import (
     RollTensor,
     SparseCOOLevel,
     SparseListLevel,
-    TransposedFiberTensor,
     UpperTriangleTensor,
 )
 from finch.tensor.traits import (
@@ -677,22 +676,3 @@ def test_fiber_tensor_to_coo():
     assert np.shares_memory(scipy_tensor.data, data)
     assert np.shares_memory(scipy_tensor.row, row)
     assert np.shares_memory(scipy_tensor.col, col)
-
-
-def test_fiber_tensor_transpose():
-    tensor = FiberTensor.from_scipy_csr(
-        scipy.sparse.csr_array(np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]]))
-    ).T
-    transposed = tensor.to_scipy()
-    original = tensor.tensor.to_scipy()
-
-    assert isinstance(tensor, TransposedFiberTensor)
-    assert isinstance(transposed, scipy.sparse.csc_array)
-    np.testing.assert_array_equal(
-        transposed.toarray(),
-        np.array([[1.0, 0.0], [0.0, 3.0], [2.0, 0.0]]),
-    )
-    assert np.shares_memory(transposed.data, original.data)
-    assert np.shares_memory(transposed.indices, original.indices)
-    assert np.shares_memory(transposed.indptr, original.indptr)
-    assert tensor.T is tensor.tensor
