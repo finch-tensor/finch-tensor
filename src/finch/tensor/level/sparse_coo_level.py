@@ -247,5 +247,10 @@ class SparseCOOLevel(Level):
     def val(self):
         return self.lvl.val
 
+    def iter_entries(self, pos: int):
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support iter_entries."
+        )
+
     def __str__(self) -> str:
         return f"SparseCOOLevel(lvl={self.lvl}, coo_shape={self.coo_shape})"
