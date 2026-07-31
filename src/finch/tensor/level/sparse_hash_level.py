@@ -247,6 +247,9 @@ class SparseHashLevel(Level):
         return self.lvl.val
 
     def iter_entries(self, pos: int):
+        assert self.ptr is not None
+        assert self.perm is not None
+        assert self.tbl is not None
         ptr = self.ptr.arr
         perm = self.perm.arr
         tbl = self.tbl.arr

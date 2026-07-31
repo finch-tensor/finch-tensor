@@ -205,6 +205,7 @@ class ElementLevel(Level):
         return self._val
 
     def iter_entries(self, pos: int):
+        assert self._val is not None
         yield (), self._val.arr[pos]
 
     def __str__(self):

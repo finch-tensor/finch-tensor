@@ -329,6 +329,8 @@ class SparseListLevel(Level):
         return self.lvl.val
 
     def iter_entries(self, pos: int):
+        assert self.ptr is not None
+        assert self.idx is not None
         ptr = self.ptr.arr
         idx_arr = self.idx.arr
         for j in range(int(ptr[pos]), int(ptr[pos + 1])):
