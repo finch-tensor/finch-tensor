@@ -353,5 +353,8 @@ class OverrideTensor(Tensor):
     def __eq__(self, other):
         return self.mod.equal(self, other)
 
+    def __hash__(self):
+        return object.__hash__(self)
+
     def __ne__(self, other):
         return self.mod.not_equal(self, other)
