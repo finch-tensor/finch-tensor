@@ -1,5 +1,5 @@
-import importlib.util  # -------> Check
-from pathlib import Path  # -----> check
+import importlib.util
+from pathlib import Path
 
 import pytest
 
