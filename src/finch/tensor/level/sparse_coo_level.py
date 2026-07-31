@@ -4,7 +4,7 @@ from typing import Any, cast
 import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
-from finch.tensor.level.level import Level, LevelFType
+from finch.tensor.level.abstract_level import Level, LevelFType
 
 
 class SparseCOOLevelFType(ImmutableStructFType, LevelFType):

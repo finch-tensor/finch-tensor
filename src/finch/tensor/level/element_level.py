@@ -8,7 +8,7 @@ from finch import finch_notation as ntn
 from finch.algebra import FType, ImmutableStructFType, ftype
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
-from finch.tensor.level.level import Level, LevelFType
+from finch.tensor.level.abstract_level import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
