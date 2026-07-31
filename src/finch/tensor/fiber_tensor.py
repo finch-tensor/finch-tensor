@@ -138,12 +138,7 @@ class FiberTensor(OverrideTensor):
                     shape=self.shape,
                     copy=False,
                 )
-            case DenseLevel(
-                lvl=DenseLevel(
-                    lvl=ElementLevel() as element,
-                )
-            ):
-                return sps.csr_array(self.to_numpy())
+
             case _:
                 raise NotImplementedError(
                     f"Finch format {self.ftype} is not supported by SciPy conversion."

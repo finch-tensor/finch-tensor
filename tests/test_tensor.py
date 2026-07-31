@@ -618,32 +618,6 @@ def test_fiber_tensor_to_csr():
     assert np.shares_memory(scipy_tensor.indptr, indptr)
 
 
-def test_fiber_tensor_to_dense():
-    dense_arr = np.array([[1.0, 0.0, 2.0], [0.0, 3.0, 0.0]])
-    data = dense_arr.reshape(-1)
-
-    tensor = FiberTensor(
-        DenseLevel(
-            DenseLevel(
-                ElementLevel(
-                    element(
-                        fill_value=np.float64(0),
-                        position_type=int32,
-                    ),
-                    NumpyBuffer(data),
-                ),
-                np.int32(3),
-            ),
-            np.int32(2),
-        )
-    )
-
-    scipy_tensor = tensor.to_scipy()
-
-    assert isinstance(scipy_tensor, scipy.sparse.csr_array)
-    np.testing.assert_array_equal(scipy_tensor.toarray(), dense_arr)
-
-
 def test_fiber_tensor_to_coo():
     data = np.array([1.0, 2.0, 3.0])
     row = np.array([0, 1, 1], dtype=np.int32)
