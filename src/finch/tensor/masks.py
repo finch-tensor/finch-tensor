@@ -8,7 +8,7 @@ from finch.algebra import ImmutableStructFType, ffuncs
 from finch.compile import looplets as lplt
 
 from .fiber_tensor import FiberTensor, FiberTensorFType
-from .level.level import Level, LevelFType
+from .level import Level, LevelFType
 from .scalar import Scalar
 
 
