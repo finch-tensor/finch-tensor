@@ -1215,7 +1215,7 @@ def test_mlir_resize_not_supported():
         MLIRCompiler()(prgm)
 
 
-@pytest.mark.mlir_backend
+@mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 def test_sparse_matmul_mlir_regression(file_regression, caplog):
     dtype = np.float64
@@ -1278,7 +1278,7 @@ def test_sparse_matmul_mlir_regression(file_regression, caplog):
     file_regression.check(mlir_code, extension=".mlir")
 
 
-@pytest.mark.mlir_backend
+@mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 def test_sddmm_mlir_regression(file_regression, caplog):
     dtype = np.float64

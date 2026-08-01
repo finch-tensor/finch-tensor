@@ -971,7 +971,9 @@ class MLIRContext(Context):
                 ctx_2 = self.block()
                 for body in bodies:
                     ctx_2(body)
-                if block := ctx_2.emit():
+
+                block = ctx_2.emit()
+                if block:
                     self.exec(block)
                 return None
 
