@@ -32,6 +32,11 @@ from finch.codegen.c_codegen import (
     deserialize_from_c,
     serialize_to_c,
 )
+from finch.codegen.mlir_codegen import (
+    construct_from_mlir,
+    deserialize_from_mlir,
+    serialize_to_mlir,
+)
 from finch.codegen.numba_codegen import (
     construct_from_numba,
     deserialize_from_numba,
@@ -1345,3 +1350,58 @@ def test_sddmm_mlir_regression(file_regression, caplog):
     )
     mlir_code = re.sub(r"%(_A_\d+|__A)(?:_\d+)+", r"%\1", mlir_code)
     file_regression.check(mlir_code, extension=".mlir")
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (1, np.float32, ctypes.c_float),
+        (1.2, np.float64, ctypes.c_double),
+    ],
+)
+def test_np_mlir_serialization(value, np_type, c_type):
+    fmt = ftype(np_type)
+    serialized = serialize_to_mlir(fmt, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,fmt,c_type",
+    [
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
+    ],
+)
+def test_ctypes_mlir_serialization(value, fmt, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_mlir(fmt, cvalue.value)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_mlir(a, dtype):
+    a = a.astype(dtype)
+    wa = finch.lazy(finch.asarray(a))
+    result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
