@@ -12,8 +12,8 @@ import numpy as np
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs, ftype, int64
 from finch.codegen.numba_codegen.numba import NumbaCompiler
+from finch.compile import NotationCompiler, make_extent
 from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
-from finch.compile import make_extent, NotationCompiler
 from finch.finch_logic import Field
 from finch.tensor import BufferizedNDArray
 
@@ -150,12 +150,13 @@ def degree_count_scan(
             ),
         )
     )
-    mod = NotationCompiler(NumbaCompiler(),
-                            ctx_transforms=(
-                                LowerPackedStructSlots(),
-                                AssemblySimplify(),
-                            ),
-                        )(prgm)
+    mod = NotationCompiler(
+        NumbaCompiler(),
+        ctx_transforms=(
+            LowerPackedStructSlots(),
+            AssemblySimplify(),
+        ),
+    )(prgm)
 
     dim_array_instances = [
         BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64))
