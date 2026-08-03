@@ -139,7 +139,7 @@ def cost_of_reformat(stats: TensorStats) -> float:
     if space == 0 or space == float("inf"):
         return nnz * SPARSE_ALLOCATE_COST
     if nnz / space > 0.1:
-        return nnz * DENSE_ALLOCATE_COST * 0.01
+        return nnz * DENSE_ALLOCATE_COST
     return nnz * SPARSE_ALLOCATE_COST
 
 
@@ -252,13 +252,7 @@ def loop_order_cost(
             output_vars,
         )
 
-    seen: list[TensorStats] = []
     for stat in conjunct_stats + disjunct_stats:
-        if any(stat is s for s in seen):
-            continue
-        seen.append(stat)
-
-    for stat in seen:
         if needs_reformat(stat, loop_order):
             cost += cost_of_reformat(stat)
     return cost
