@@ -11,7 +11,9 @@ import numpy as np
 
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs, ftype, int64
-from finch.compile import make_extent
+from finch.codegen.numba_codegen.numba import NumbaCompiler
+from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
+from finch.compile import make_extent, NotationCompiler
 from finch.finch_logic import Field
 from finch.tensor import BufferizedNDArray
 
@@ -102,7 +104,10 @@ def degree_count_scan(
             ),
         )
     )
-    for i in range(ndims):
+    # Wrap from the innermost dimension outward so that dimension 0 is the
+    # outermost loop: the compiler unfurls tensor accesses left-to-right, so the
+    # loop nest order must match the index order of `A_access`.
+    for i in reversed(range(ndims)):
         array_build_loop = ntn.Loop(
             dim_loop_variables[i],
             ntn.Call(
@@ -119,10 +124,9 @@ def degree_count_scan(
         ntn.Repack(dim_array_slots[i], dim_array_variables[i]) for i in range(ndims)
     ]
 
-    def to_tuple(*args):
-        return (*args,)
-
-    return_expr = ntn.Return(ntn.Call(ntn.Literal(to_tuple), (A_nnz_variable,)))
+    return_expr = ntn.Return(
+        ntn.Call(ntn.Literal(ffuncs.make_tuple), (A_nnz_variable,))
+    )
 
     prgm = ntn.Module(
         (
@@ -146,7 +150,12 @@ def degree_count_scan(
             ),
         )
     )
-    mod = ntn.NotationInterpreter()(prgm)
+    mod = NotationCompiler(NumbaCompiler(),
+                            ctx_transforms=(
+                                LowerPackedStructSlots(),
+                                AssemblySimplify(),
+                            ),
+                        )(prgm)
 
     dim_array_instances = [
         BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64))
