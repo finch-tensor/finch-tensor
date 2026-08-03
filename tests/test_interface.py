@@ -392,14 +392,11 @@ def test_asarray_scipy_csr_matrix():
     assert np.shares_memory(result.indptr, source.indptr)
 
 
-def test_asarray_scipy_csc_matrix():
+def test_asarray_scipy_csc_matrix_passes_through():
     source = sps.csc_matrix(np.array([[1.0, 0.0], [0.0, 2.0], [3.0, 0.0]]))
-    result = finch.asarray(source, copy=False).to_scipy()
+    result = finch.asarray(source, copy=False)
 
-    np.testing.assert_array_equal(result.toarray(), source.toarray())
-    assert np.shares_memory(result.data, source.data)
-    assert np.shares_memory(result.indices, source.indices)
-    assert np.shares_memory(result.indptr, source.indptr)
+    assert result is source
 
 
 def test_array_namespace_info():

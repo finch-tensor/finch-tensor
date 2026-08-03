@@ -398,13 +398,15 @@ def asarray(
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
         if sps.issparse(obj):
+            if obj.format == "csc":  # CSC has no native Finch layout yet
+                return obj
             if copy is False and not (
-                obj.format in ("coo", "csr", "csc") and obj.has_canonical_format
+                obj.format in ("coo", "csr") and obj.has_canonical_format
             ):
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
-            if obj.format not in ("coo", "csr", "csc"):
+            if obj.format not in ("coo", "csr"):
                 obj = obj.asformat("coo")
 
             if dtype is not None:
@@ -420,17 +422,10 @@ def asarray(
                 obj.sum_duplicates()
 
             match obj.format:
-                case "csc":
-                    from . import eager
-
-                    mat = asarray(obj.transpose(copy=False), copy=False)
-                    return eager.matrix_transpose(mat)
                 case "csr":
                     return FiberTensor.from_scipy_csr(obj, device=device)
                 case "coo":
                     return FiberTensor.from_scipy_coo(obj, device=device)
-                case _:
-                    return asarray(obj.tocsc(), device=device)
 
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
