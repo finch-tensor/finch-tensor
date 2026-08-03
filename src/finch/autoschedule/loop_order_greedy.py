@@ -15,7 +15,7 @@ from .galley.logical_optimizer import insert_statistics
 from .loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
-    get_loop_lookups,
+    get_prefix_cost,
     get_reformat_set,
 )
 from .loop_ordering import DefaultLoopOrderer
@@ -71,7 +71,15 @@ def greedy_loop_order(
     expr: LogicExpression,
     stats_factory: StatsFactory,
     stats_bindings: dict[Alias, TensorStats],
+    output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
+    """Build a loop order one index at a time, appending the cheapest candidate.
+
+    Each step is scored with the same terms ``loop_order_cost`` charges for that
+    prefix -- ``get_prefix_cost`` for the reads and writes, plus the reformats
+    the new index forces -- so the summed score of the returned order equals its
+    ``loop_order_cost``.
+    """
     all_vars = tuple(dict.fromkeys(expr.fields()))
     if not all_vars:
         return ()
@@ -94,10 +102,10 @@ def greedy_loop_order(
 
     def candidate_cost(field: Field) -> float:
         new_prefix = tuple(prefix) + (field,)
-        lookups = get_loop_lookups(
-            new_prefix, conjunct_stats, disjunct_stats, stats_factory
+        prefix_cost = get_prefix_cost(
+            new_prefix, conjunct_stats, disjunct_stats, stats_factory, output_vars
         )
-        return lookups + transpose_penalty(input_stats, new_prefix, charged)
+        return prefix_cost + transpose_penalty(input_stats, new_prefix, charged)
 
     while remaining:
         candidates = connected_loop_candidates(
@@ -111,27 +119,29 @@ def greedy_loop_order(
     return tuple(prefix)
 
 
-# Same as set_loop_order in loop_ordering.py
 def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory,
     stats: dict[Alias, TensorStats],
 ) -> Plan:
-    # `stats` only binds the plan's input aliases. Each query's result is bound
-    # as we go so that later queries reading an earlier query's alias can be
-    # costed; without this, greedy_loop_order raises on any multi-query plan.
     stats_bindings = dict(stats)
     cache: dict[object, TensorStats] = {}
 
     new_queries = []
     for query in plan.bodies[:-1]:
+        # The query's result layout decides whether writing an index is
+        # sequential or random, so pass it to the cost model.
         match query:
-            case Query(lhs, Aggregate(op, init, arg, idxs)):
-                idxs_2 = greedy_loop_order(arg, stats_factory, stats_bindings)
+            case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                idxs_2 = greedy_loop_order(
+                    arg, stats_factory, stats_bindings, rhs.fields()
+                )
                 aggregate_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
                 new_queries.append(Query(lhs, aggregate_2))
-            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
-                idxs_2 = greedy_loop_order(arg, stats_factory, stats_bindings)
+            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                idxs_2 = greedy_loop_order(
+                    arg, stats_factory, stats_bindings, rhs.fields()
+                )
                 reorder_2 = Reorder(
                     Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
                 )
