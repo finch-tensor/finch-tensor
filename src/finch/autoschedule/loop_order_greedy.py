@@ -86,14 +86,14 @@ def set_greedy_loop_order(
         match query:
             case Query(lhs, Aggregate(op, init, arg, idxs)):
                 idxs_2 = greedy_loop_order(arg, stats_factory, stats)
-                rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-                new_queries.append(Query(lhs, rhs_2))
+                aggregate_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+                new_queries.append(Query(lhs, aggregate_2))
             case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
                 idxs_2 = greedy_loop_order(arg, stats_factory, stats)
-                rhs_2 = Reorder(
+                reorder_2 = Reorder(
                     Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
                 )
-                new_queries.append(Query(lhs, rhs_2))
+                new_queries.append(Query(lhs, reorder_2))
             case Query(_, Reorder(Table(Alias(), _), _)) as q:
                 new_queries.append(q)
             case _:
