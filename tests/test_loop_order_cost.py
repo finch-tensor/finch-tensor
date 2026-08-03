@@ -14,7 +14,6 @@ from finch.autoschedule.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
-    get_loop_lookups,
     get_prefix_cost,
     get_reformat_set,
     loop_order_cost,
@@ -23,21 +22,15 @@ from finch.autoschedule.loop_order_greedy import (
     GreedyLoopOrderer,
     connected_loop_candidates,
     greedy_loop_order,
-    set_greedy_loop_order,
     transpose_penalty,
 )
 from finch.autoschedule.normalize import LogicNormalizer
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import (
-    Aggregate,
     Alias,
     Field,
     Literal,
     MapJoin,
-    Plan,
-    Produces,
-    Query,
-    Reorder,
     Table,
 )
 from finch.finch_notation.interpreter import NotationInterpreter
