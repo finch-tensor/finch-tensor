@@ -11,8 +11,6 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):
-        from finch.tensor.scalar import Scalar
-
         match term:
             # overwrite(x, y) => y
             case asm.Call(asm.Literal(fn), (_, y)) if fn is ffuncs.overwrite:
@@ -29,9 +27,7 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
             case asm.Call(asm.Literal(_) as op, args):
                 for arg in args:
                     match arg:
-                        case asm.Literal(val) if isinstance(
-                            val, Scalar
-                        ) and is_annihilator(op.val, val.val):
+                        case asm.Literal(val) if is_annihilator(op.val, val):
                             return arg
                 return None
             # slot(a, idx) = op(slot(a, idx), arg) where RHS is:
@@ -51,9 +47,9 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
                     ),
                 ) as bodies
             ) if s1 == s2 and idx1 == idx2:
-                if op == ffuncs.init_write(arg.val):
+                if op == ffuncs.init_write(arg):
                     return asm.Block(bodies[:-1])
-                if is_identity(op, arg.val):
+                if is_identity(op, arg):
                     return asm.Block(bodies[:-1])
             # loop(...) {} is removed
             case asm.ForLoop(_, _, _, asm.Block(())):

@@ -104,9 +104,6 @@ def degree_count_scan(
             ),
         )
     )
-    # Wrap from the innermost dimension outward so that dimension 0 is the
-    # outermost loop: the compiler unfurls tensor accesses left-to-right, so the
-    # loop nest order must match the index order of `A_access`.
     for i in reversed(range(ndims)):
         array_build_loop = ntn.Loop(
             dim_loop_variables[i],

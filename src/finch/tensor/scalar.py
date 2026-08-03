@@ -69,9 +69,6 @@ class ScalarFType(TensorFType):
 
     def lower_unwrap(self, ctx, obj):
         res = ctx(obj)
-        # A compiled `Run` looplet carries its body as a literal `Scalar` tensor.
-        # Unwrapping must yield the element value, not the tensor object, so that
-        # the result has the scalar's element type in generated code.
         match res:
             case asm.Literal(Scalar() as scalar):
                 return asm.Literal(scalar.val)
