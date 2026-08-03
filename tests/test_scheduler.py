@@ -587,7 +587,7 @@ def test_set_loop_order():
         )
     )
 
-    result = set_loop_order(plan, stats_factory=DenseStatsFactory(), stats={})
+    result = set_loop_order(plan)
     assert result == expected
 
 
