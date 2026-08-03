@@ -7,7 +7,7 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule import DefaultLogicOptimizer
+from finch.autoschedule import DefaultLogicOptimizer, loop_order_greedy
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter import DefaultLogicFormatter
@@ -15,6 +15,7 @@ from finch.autoschedule.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
     get_loop_lookups,
+    get_prefix_cost,
     get_reformat_set,
     loop_order_cost,
 )
@@ -22,11 +23,23 @@ from finch.autoschedule.loop_order_greedy import (
     GreedyLoopOrderer,
     connected_loop_candidates,
     greedy_loop_order,
+    set_greedy_loop_order,
     transpose_penalty,
 )
 from finch.autoschedule.normalize import LogicNormalizer
 from finch.autoschedule.tensor_stats import DCStatsFactory
-from finch.finch_logic import Alias, Field, Literal, MapJoin, Table
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Reorder,
+    Table,
+)
 from finch.finch_notation.interpreter import NotationInterpreter
 
 
@@ -147,23 +160,40 @@ def test_candidates_preserve_remaining_order():
 
 
 def test_greedy_order_breaks_ties_by_field_order():
-    """On a symmetric chain every candidate costs the same, so the order is
-    decided purely by the tie-break and must equal the expression's field order.
+    """The two ends of a symmetric chain cost exactly the same, so which one
+    greedy starts from is decided purely by the tie-break. Mirroring the chain
+    must mirror the answer -- if candidates were held in a set, the winner would
+    instead depend on ``Field`` hashes, which vary between processes.
     """
     sf = DCStatsFactory()
     i, j, k, m = (Field(name) for name in "ijkm")
     a, b, c = Alias("A"), Alias("B"), Alias("C")
-    expr = MapJoin(
+    ones = fl.asarray(np.ones((4, 4)))
+
+    forward = MapJoin(
         Literal(ffuncs.mul),
         (Table(a, (i, j)), Table(b, (j, k)), Table(c, (k, m))),
     )
-    ones = fl.asarray(np.ones((4, 4)))
-    bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k)), c: sf(ones, (k, m))}
+    forward_bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k)), c: sf(ones, (k, m))}
+    conjuncts, disjuncts, _ = _dedup_stats(forward, sf, forward_bindings)
 
-    order = greedy_loop_order(expr, sf, bindings)
-    assert order == tuple(dict.fromkeys(expr.fields()))
+    # The chain's endpoints tie, so only the tie-break separates them.
+    assert get_prefix_cost((i,), conjuncts, disjuncts, sf) == get_prefix_cost(
+        (m,), conjuncts, disjuncts, sf
+    )
+
+    order = greedy_loop_order(forward, sf, forward_bindings)
+    assert order == tuple(dict.fromkeys(forward.fields())) == (i, j, k, m)
     # Repeated calls must agree.
-    assert greedy_loop_order(expr, sf, bindings) == order
+    assert greedy_loop_order(forward, sf, forward_bindings) == order
+
+    # Same chain written back-to-front: the tie must now break the other way.
+    reverse = MapJoin(
+        Literal(ffuncs.mul),
+        (Table(c, (m, k)), Table(b, (k, j)), Table(a, (j, i))),
+    )
+    reverse_bindings = {c: sf(ones, (m, k)), b: sf(ones, (k, j)), a: sf(ones, (j, i))}
+    assert greedy_loop_order(reverse, sf, reverse_bindings) == (m, k, j, i)
 
 
 def _dedup_stats(expr, sf, bindings):
@@ -177,37 +207,52 @@ def _dedup_stats(expr, sf, bindings):
     return conjuncts, disjuncts, input_stats
 
 
-def test_greedy_avoids_transposing_an_input():
-    """``B`` is stored ``(i, j)``, so looping ``j`` before ``i`` forces a
-    reformat. Lookups alone tie, and the expression's field order puts ``j``
-    first, so only the transpose cost can steer greedy to ``(i, j)``.
+def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
+    """``B`` is a sparse diagonal stored ``(i, j)``, so reformatting it costs far
+    more than reformatting the dense ``A`` stored ``(j, i)``. Read and write
+    costs tie, and the expression's field order puts ``j`` first, so only the
+    transpose cost can steer greedy to the cheaper ``(i, j)``.
     """
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
     a, b = Alias("A"), Alias("B")
-    expr = MapJoin(Literal(ffuncs.mul), (Table(a, (j,)), Table(b, (i, j))))
-    bindings = {
-        a: sf(fl.asarray(np.ones(8)), (j,)),
-        b: sf(fl.asarray(np.ones((8, 8))), (i, j)),
-    }
+    n = 16
+    diagonal = np.zeros((n, n))
+    diagonal[np.arange(n), np.arange(n)] = 1.0
 
-    # Without the transpose cost the tie-break would follow the field order.
+    expr = MapJoin(Literal(ffuncs.mul), (Table(a, (j, i)), Table(b, (i, j))))
+    bindings = {
+        a: sf(fl.asarray(np.ones((n, n))), (j, i)),
+        b: sf(fl.asarray(diagonal), (i, j)),
+    }
     assert tuple(dict.fromkeys(expr.fields())) == (j, i)
+
     conjuncts, disjuncts, input_stats = _dedup_stats(expr, sf, bindings)
-    assert get_loop_lookups((j,), conjuncts, disjuncts, sf) == get_loop_lookups(
+    # Reads and writes alone cannot separate the two, so the field-order
+    # tie-break would pick j; transposing the sparse B is what makes that order
+    # the expensive one.
+    assert get_prefix_cost((j,), conjuncts, disjuncts, sf) == get_prefix_cost(
         (i,), conjuncts, disjuncts, sf
     )
-
-    # Only (j, i) forces a reformat, so it must be the more expensive one.
-    assert transpose_penalty(input_stats, (j,), frozenset()) > 0.0
-    assert transpose_penalty(input_stats, (i,), frozenset()) == 0.0
+    assert transpose_penalty(input_stats, (j,), frozenset()) > transpose_penalty(
+        input_stats, (i,), frozenset()
+    )
+    assert loop_order_cost(expr, (i, j), sf, dict(bindings)) < loop_order_cost(
+        expr, (j, i), sf, dict(bindings)
+    )
 
     assert greedy_loop_order(expr, sf, bindings) == (i, j)
 
+    # Drop the transpose term and greedy settles for the more expensive order.
+    monkeypatch.setattr(loop_order_greedy, "transpose_penalty", lambda *args: 0.0)
+    assert greedy_loop_order(expr, sf, bindings) == (j, i)
+
 
 def test_transpose_penalty_totals_match_loop_order_cost():
-    """The penalty is charged incrementally as each loop is appended; summing it
-    over a full order must equal the reformat cost ``loop_order_cost`` charges.
+    """Greedy scores one prefix at a time, charging each reformat at the step
+    where it becomes unavoidable. Summed over a full order, that must reproduce
+    the order's ``loop_order_cost`` exactly -- otherwise greedy is minimising
+    something other than the cost model it claims to use.
     """
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
@@ -215,21 +260,34 @@ def test_transpose_penalty_totals_match_loop_order_cost():
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     ones = fl.asarray(np.ones((3, 3)))
     bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
-    _, _, input_stats = _dedup_stats(expr, sf, bindings)
+    conjuncts, disjuncts, input_stats = _dedup_stats(expr, sf, bindings)
 
-    saw_nonzero = False
-    for order in itertools.permutations((i, j, k)):
-        charged: frozenset[int] = frozenset()
-        incremental = 0.0
-        for n in range(1, len(order) + 1):
-            incremental += transpose_penalty(input_stats, order[:n], charged)
-            charged = get_reformat_set(input_stats, order[:n])
+    saw_reformat = False
+    for output_vars in (None, (i, k), (k, i)):
+        for order in itertools.permutations((i, j, k)):
+            charged: frozenset[int] = frozenset()
+            greedy_score = 0.0
+            reformats = 0.0
+            for n in range(1, len(order) + 1):
+                prefix = order[:n]
+                greedy_score += get_prefix_cost(
+                    prefix, conjuncts, disjuncts, sf, output_vars
+                )
+                penalty = transpose_penalty(input_stats, prefix, charged)
+                greedy_score += penalty
+                reformats += penalty
+                charged = get_reformat_set(input_stats, prefix)
 
-        expected = sum(
-            cost_of_reformat(input_stats[x])
-            for x in get_reformat_set(input_stats, order)
-        )
-        assert incremental == pytest.approx(expected)
-        saw_nonzero |= expected > 0.0
+            assert greedy_score == pytest.approx(
+                loop_order_cost(expr, order, sf, dict(bindings), output_vars)
+            )
+            # The incremental reformat charges add up to the one-shot total.
+            assert reformats == pytest.approx(
+                sum(
+                    cost_of_reformat(input_stats[x])
+                    for x in get_reformat_set(input_stats, order)
+                )
+            )
+            saw_reformat |= reformats > 0.0
 
-    assert saw_nonzero, "expected at least one order to force a reformat"
+    assert saw_reformat, "expected at least one order to force a reformat"
