@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy.sparse as sps
@@ -14,19 +16,11 @@ from finch.algebra import (
 from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
-from .level import (
-    DenseLevel,
-    ElementLevel,
-    Level,
-    LevelFType,
-    SparseCOOLevel,
-    SparseListLevel,
-    dense,
-    element,
-    sparse_list,
-)
 from .override_tensor import OverrideTensor
 from .traits import FormatProperty
+
+if TYPE_CHECKING:
+    from .level.abstract_level import Level, LevelFType
 
 
 @dataclass
@@ -109,6 +103,13 @@ class FiberTensor(OverrideTensor):
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
     def to_scipy(self):
+        from .level import (
+            DenseLevel,
+            ElementLevel,
+            SparseCOOLevel,
+            SparseListLevel,
+        )
+
         if self.ndim != 2:
             raise ValueError("SciPy sparse arrays must be two-dimensional.")
 
@@ -159,6 +160,15 @@ class FiberTensor(OverrideTensor):
         device=None,
         copy=None,
     ):
+        from .level import (
+            DenseLevel,
+            ElementLevel,
+            SparseListLevel,
+            dense,
+            element,
+            sparse_list,
+        )
+
         if dtype is not None:
             if copy is False:
                 obj = obj.astype(dtype, copy=False)
@@ -213,6 +223,12 @@ class FiberTensor(OverrideTensor):
         device=None,
         copy=None,
     ):
+        from .level import (
+            ElementLevel,
+            SparseCOOLevel,
+            element,
+        )
+
         if dtype is not None:
             if copy is False:
                 obj = obj.astype(dtype, copy=False)
