@@ -20,7 +20,7 @@ from .override_tensor import OverrideTensor
 from .traits import FormatProperty
 
 if TYPE_CHECKING:
-    from .level.abstract_level import Level, LevelFType
+    from .level.level import Level, LevelFType
 
 
 @dataclass
@@ -115,6 +115,8 @@ class FiberTensor(OverrideTensor):
 
         if self.fill_value != 0:
             raise ValueError("SciPy CSR conversion requires a zero fill value.")
+
+        assert self.pos == 0
 
         match self.lvl:
             case SparseCOOLevel(
@@ -262,7 +264,7 @@ class FiberTensor(OverrideTensor):
                     _format=element_lvl,
                     _val=NumpyBuffer(data),
                 ),
-                shape=obj.shape,
+                shape=tuple(index_type(d) for d in obj.shape),
                 tbl=(NumpyBuffer(row), NumpyBuffer(col)),
             ),
             _device=device,

@@ -12,7 +12,7 @@ from finch.compile.lower import SymbolicExtent
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
-from .abstract_level import Level, LevelFType
+from .level import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)

@@ -5,7 +5,7 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
 
-from .abstract_level import Level, LevelFType
+from .level import Level, LevelFType
 
 _LOWERING_ERROR = "SparseHashLevelFType lowering is not implemented."
 

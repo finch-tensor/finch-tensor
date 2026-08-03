@@ -9,7 +9,7 @@ from finch.algebra import FType, ImmutableStructFType, ftype
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
 
-from .abstract_level import Level, LevelFType
+from .level import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)

@@ -5,7 +5,7 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, ftype, ftypes
 
-from .abstract_level import Level, LevelFType
+from .level import Level, LevelFType
 
 _LOWERING_ERROR = "SparseByteMapLevelFType lowering is not implemented."
 

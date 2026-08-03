@@ -399,6 +399,11 @@ def asarray(
             return BufferizedNDArray.from_numpy(obj, device=device)
         if sps.issparse(obj):
             if obj.format == "csc":  # CSC has no native Finch layout yet
+                if dtype is not None or copy is True:
+                    raise NotImplementedError(
+                        "asarray cannot honor dtype or copy for CSC input; "
+                        "convert to CSR or COO first."
+                    )
                 return obj
             if copy is False and not (
                 obj.format in ("coo", "csr") and obj.has_canonical_format

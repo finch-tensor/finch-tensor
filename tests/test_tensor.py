@@ -607,6 +607,7 @@ def test_asarray_scipy_coo(coo_type):
     np.testing.assert_array_equal(tensor.lvl.lvl.val.arr, coo.data)
     np.testing.assert_array_equal(tensor.lvl.tbl[0].arr, coo.row)
     np.testing.assert_array_equal(tensor.lvl.tbl[1].arr, coo.col)
+    assert all(type(d) is np.int32 for d in tensor.lvl.coo_shape)
 
     scipy_tensor = tensor.to_scipy()
     np.testing.assert_array_equal(scipy_tensor.data, coo.data)
