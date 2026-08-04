@@ -9,6 +9,8 @@ nav:
 plugins:
   - mkdocs-autoapi:
       autoapi_dir: ./src
+      autoapi_ignore:
+        - "finch/tests/**/*"
   - mkdocstrings:
       default_handler: python
       handlers:
