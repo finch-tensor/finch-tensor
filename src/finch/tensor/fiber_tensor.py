@@ -1,214 +1,26 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import scipy.sparse as sps
 
 from finch.algebra import (
-    FType,
-    FTyped,
     ImmutableStructFType,
     TupleFType,
     bool_,
+    ftype,
     normalize_device,
 )
+from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
 from .override_tensor import OverrideTensor
 from .traits import FormatProperty
 
-
-class LevelFType(FType, ABC):
-    """
-    An abstract base class representing the ftype of levels.
-    """
-
-    @property
-    @abstractmethod
-    def ndim(self):
-        """
-        Number of dimensions of the fibers in the structure.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def fill_value(self):
-        """
-        Fill value of the fibers, or `None` if dynamic.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def element_type(self):
-        """
-        Type of elements stored in the fibers.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def shape_type(self):
-        """
-        Tuple of types of the dimensions in the shape.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def position_type(self):
-        """
-        Type of positions within the levels.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def buffer_factory(self):
-        """
-        Function to create default buffers for the fibers.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def buffer_type(self): ...
-
-    @property
-    @abstractmethod
-    def lvl_t(self):
-        """
-        Get the nested level.
-        """
-        ...
-
-    @abstractmethod
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
-        """
-        Emit code to unfurl the fiber at position `pos` in the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_freeze(self, ctx, tns, op, pos):
-        """
-        Emit code to freeze `pos` previously assembled positions in the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_thaw(self, ctx, tns, op, pos):
-        """
-        Emit code to thaw `pos` previously assembled positions in the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_unwrap(self, ctx, obj, pos):
-        """
-        Emit code to return the unwrapped scalar at position `pos` in the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_increment(self, ctx, obj, op, val, pos):
-        """
-        Emit code to increment position `pos` in the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
-        """
-        Emit code to lower a declare of `pos` previously assembled positions in
-        the level.
-        """
-        ...
-
-    @abstractmethod
-    def level_lower_dim(self, ctx, obj, r):
-        """
-        Emit code to return the size of dimension `r` of the subtensors in the level.
-        """
-        ...
-
-    @abstractmethod
-    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
-        """
-        Construct a level instance with the given shape.
-        """
-        ...
-
-    @abstractmethod
-    def from_numpy(self, shape, val):
-        """
-        Construct level from numpy array
-        (TODO not strictly safe, only works for dense, replace later)
-        """
-        ...
-
-    @abstractmethod
-    def level_format_properties(self, n):
-        """
-        Return the format properties contributed by this level type and children.
-
-        ``n`` is the outer dimension index represented by this level. Nested
-        levels use increasing indices, so the returned properties can describe how
-        this dimension constrains dimensions further inside the fiber tree.
-        """
-        ...
-
-
-class Level(FTyped, ABC):
-    """
-    An abstract base class representing a fiber allocator that manages fibers in
-    a tensor.
-    """
-
-    @property
-    @abstractmethod
-    def shape(self) -> tuple:
-        """
-        Shape of the fibers in the structure.
-        """
-        ...
-
-    @property
-    @abstractmethod
-    def stride(self) -> np.integer: ...
-
-    @property
-    @abstractmethod
-    def val(self) -> Any: ...
-
-    @property
-    def ndim(self):
-        return self.ftype.ndim
-
-    @property
-    def fill_value(self):
-        return self.ftype.fill_value
-
-    @property
-    def element_type(self):
-        return self.ftype.element_type
-
-    @property
-    def shape_type(self):
-        return self.ftype.shape_type
-
-    @property
-    def position_type(self):
-        return self.ftype.position_type
-
-    @property
-    def buffer_factory(self):
-        return self.ftype.buffer_factory
-
-    @property
-    def buffer_type(self):
-        return self.ftype.buffer_type
+if TYPE_CHECKING:
+    from .level.level import Level, LevelFType
 
 
 @dataclass
@@ -291,15 +103,172 @@ class FiberTensor(OverrideTensor):
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
 
     def to_scipy(self):
-        # TODO: temporary for dense only. TBD in sparse_level PR
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy for this layout."
+        from .level import (
+            DenseLevel,
+            ElementLevel,
+            SparseCOOLevel,
+            SparseListLevel,
         )
+
+        if self.ndim != 2:
+            raise ValueError("SciPy sparse arrays must be two-dimensional.")
+
+        if self.fill_value != 0:
+            raise ValueError("SciPy CSR conversion requires a zero fill value.")
+
+        assert self.pos == 0
+
+        match self.lvl:
+            case SparseCOOLevel(
+                lvl=ElementLevel() as element,
+                tbl=(row, col),
+            ):
+                return sps.coo_array(
+                    (element.val.arr, (row.arr, col.arr)),
+                    shape=self.shape,
+                    copy=False,
+                )
+
+            case DenseLevel(
+                lvl=SparseListLevel(
+                    lvl=ElementLevel() as element,
+                    ptr=ptr,
+                    idx=idx,
+                )
+            ):
+                return sps.csr_array(
+                    (element.val.arr, idx.arr, ptr.arr),
+                    shape=self.shape,
+                    copy=False,
+                )
+
+            case _:
+                raise NotImplementedError(
+                    f"Finch format {self.ftype} is not supported by SciPy conversion."
+                )
 
     def item(self):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
         return self.to_numpy().item()
+
+    @classmethod
+    def from_scipy_csr(
+        cls,
+        obj: Any,
+        /,
+        *,
+        dtype=None,
+        device=None,
+        copy=None,
+    ):
+        from .level import (
+            DenseLevel,
+            ElementLevel,
+            SparseListLevel,
+            dense,
+            element,
+            sparse_list,
+        )
+
+        if dtype is not None:
+            if copy is False:
+                obj = obj.astype(dtype, copy=False)
+            else:
+                obj = obj.astype(dtype, copy=True)
+        elif copy is True:
+            obj = obj.copy()
+
+        if not obj.has_canonical_format:
+            if copy is False:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            obj = obj.copy()
+            obj.sum_duplicates()
+
+        data = obj.data
+        indices = obj.indices
+        indptr = obj.indptr
+
+        element_lvl = element(
+            fill_value=np.zeros((), dtype=data.dtype)[()],
+            element_type=ftype(data.dtype),
+            position_type=ftype(indices.dtype),
+        )
+        sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indices.dtype))
+        dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
+
+        return cls(
+            DenseLevel(
+                SparseListLevel(
+                    ElementLevel(
+                        _format=element_lvl,
+                        _val=NumpyBuffer(data),
+                    ),
+                    dimension=sparse_lvl.dimension_type(obj.shape[1]),
+                    ptr=NumpyBuffer(indptr),
+                    idx=NumpyBuffer(indices),
+                ),
+                dimension=dense_lvl.dimension_type(obj.shape[0]),
+            ),
+            _device=device,
+        )
+
+    @classmethod
+    def from_scipy_coo(
+        cls,
+        obj: Any,
+        /,
+        *,
+        dtype=None,
+        device=None,
+        copy=None,
+    ):
+        from .level import (
+            ElementLevel,
+            SparseCOOLevel,
+            element,
+        )
+
+        if dtype is not None:
+            if copy is False:
+                obj = obj.astype(dtype, copy=False)
+            else:
+                obj = obj.astype(dtype, copy=True)
+        elif copy is True:
+            obj = obj.copy()
+
+        if not obj.has_canonical_format:
+            if copy is False:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            obj = obj.copy()
+            obj.sum_duplicates()
+
+        data = obj.data
+        row = obj.row
+        col = obj.col
+        index_type = ftype(row.dtype)
+
+        element_lvl = element(
+            fill_value=np.zeros((), dtype=data.dtype)[()],
+            element_type=ftype(data.dtype),
+            position_type=index_type,
+        )
+
+        return cls(
+            SparseCOOLevel(
+                ElementLevel(
+                    _format=element_lvl,
+                    _val=NumpyBuffer(data),
+                ),
+                shape=tuple(index_type(d) for d in obj.shape),
+                tbl=(NumpyBuffer(row), NumpyBuffer(col)),
+            ),
+            _device=device,
+        )
 
 
 @dataclass(unsafe_hash=True)
