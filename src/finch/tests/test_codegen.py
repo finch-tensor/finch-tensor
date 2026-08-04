@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import numpy as np
-import scipy.sparse
+import scipy.sparse as sps
 
 import finch
 import finch.finch_assembly as asm
@@ -1244,7 +1244,7 @@ def test_sparse_matmul_mlir_regression(file_regression, caplog):
 
     sparse_mat = []
     for arr in (a, b):
-        csr = scipy.sparse.csr_array(arr)
+        csr = sps.csr_array(arr)
         sparse_mat.append(
             fmt.from_fields(
                 fmt.lvl_t.from_fields(
@@ -1312,7 +1312,7 @@ def test_sddmm_mlir_regression(file_regression, caplog):
         )
     )
 
-    csr = scipy.sparse.csr_array(s)
+    csr = sps.csr_array(s)
     sparse_s = sparse_fmt.from_fields(
         sparse_fmt.lvl_t.from_fields(
             sparse_fmt.lvl_t.lvl_t.from_fields(
