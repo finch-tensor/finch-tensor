@@ -48,4 +48,3 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
     assert bfs_cost <= greedy_cost
     assert dfs_cost <= greedy_cost
     assert bfs_cost == pytest.approx(dfs_cost)
-
