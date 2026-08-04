@@ -184,11 +184,6 @@ class LoTriMask(Level):
     def body(self):
         return self.lvl
 
-    def iter_entries(self, pos: int):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support iter_entries."
-        )
-
 
 def tril(x, /, *, k: int = 0):
     x = deepcopy(x)

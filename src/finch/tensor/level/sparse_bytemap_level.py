@@ -170,10 +170,5 @@ class SparseByteMapLevel(Level):
     def val(self) -> Any:
         return self.lvl.val
 
-    def iter_entries(self, pos: int):
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support iter_entries."
-        )
-
     def __str__(self) -> str:
         return f"SparseByteMapLevel(lvl={self.lvl}, dim={self.dimension})"
