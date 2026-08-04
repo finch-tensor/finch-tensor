@@ -326,6 +326,6 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     with with_default_scheduler(scheduler):
         result = ft.compute(expr)
 
-    np.testing.assert_array_equal(result.to_numpy(), expected)
+    np.testing.assert_array_equal(result.to_scipy().toarray(), expected)
     assert formatter.output_ftypes
     _assert_output_pattern(formatter.output_ftypes[-1], output_pattern)
