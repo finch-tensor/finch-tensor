@@ -118,7 +118,7 @@ depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
-cmd = "python -m pytest tests/test_julia_backend.py"
+cmd = "python -m pytest src/finch/tests/test_julia_backend.py"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -190,7 +190,7 @@ pre-commit = "pre-commit run -a"
 
 [tool.ruff]
 extend-exclude = [
-    "tests/reference",
+    "src/finch/tests/reference",
 ]
 line-length = 88
 
