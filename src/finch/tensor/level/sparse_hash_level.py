@@ -3,7 +3,14 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
+from finch.algebra import (
+    FType,
+    ImmutableStructFType,
+    TupleFType,
+    ffuncs,
+    ftype,
+    ftypes,
+)
 from finch.tensor.fiber_tensor import Level, LevelFType
 
 _LOWERING_ERROR = "SparseHashLevelFType lowering is not implemented."
@@ -97,6 +104,42 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     @property
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
+
+    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl):
+
+        reduce_fields = fields[lvl + 1 :]
+        if reduce_fields:
+            reduced_stats = stats_factory.aggregate(
+                ffuncs.or_, False, reduce_fields, stats
+            )
+        else:
+            reduced_stats = stats
+        nnz_prefix = reduced_stats.estimate_non_fill_values()
+
+        cost_sparse_hash = num_pos + nnz_prefix
+        return cost_sparse_hash + self.lvl_t.level_iter_cost(
+            fields, stats, stats_factory, nnz_prefix, lvl + 1
+        )
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        pos_type = getattr(self.position_type, "dtype", np.intp)
+        pos_size = np.dtype(pos_type).itemsize
+        size_ptr = (num_pos + 1) * pos_size
+        reduce_fields = fields[lvl + 1 :]
+        if reduce_fields:
+            reduced_stats = stats_factory.aggregate(
+                ffuncs.or_, False, reduce_fields, stats
+            )
+        else:
+            reduced_stats = stats
+        nnz_prefix = reduced_stats.estimate_non_fill_values()
+        size_idx = nnz_prefix * pos_size
+
+        return (
+            size_ptr
+            + size_idx
+            + self.lvl_t.level_cost(fields, stats, stats_factory, nnz_prefix, lvl + 1)
+        )
 
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
