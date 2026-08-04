@@ -13,7 +13,6 @@ from finch import (
     NumpyBufferFType,
     SparseByteMapLevel,
     SparseCOOLevel,
-    SparseHashLevel,
     SparseListLevel,
     element,
     ftype,
@@ -36,8 +35,6 @@ ROW_PTR = NumpyBuffer(np.array([0, 2, 3, 5], dtype=np.intp))
 COL_IDX = NumpyBuffer(np.array([0, 2, 1, 0, 2], dtype=np.intp))
 STORED_VALUES = np.array([1, 2, 3, 4, 5], dtype=DTYPE)
 EXPECTED_ROW_SUMS = np.array([3, 3, 9], dtype=DTYPE)
-SPARSE_A = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
-SPARSE_B = np.array([[0, 6, 0, 7], [8, 0, 0, 0], [0, 9, 10, 0]], dtype=DTYPE)
 
 
 def _requires_julia_backend():
@@ -155,21 +152,6 @@ class RecordingFDFormatter(FDFormatter):
         return tensor_ftype
 
 
-def _assert_output_pattern(ftype, expected):
-    assert isinstance(ftype, ft.FiberTensorFType)
-    lvl = ftype.lvl_t
-    for level in expected:
-        match level:
-            case "dense":
-                assert isinstance(lvl, ft.DenseLevelFType)
-            case "sparse":
-                assert isinstance(lvl, ft.SparseHashLevelFType)
-            case _:
-                raise ValueError(f"Unknown expected output level: {level}")
-        lvl = lvl.lvl_t
-    assert isinstance(lvl, ft.ElementLevelFType)
-
-
 def _compute_sparse_axis_sum(level):
     from finch.compile_jl import COMPILE_JULIA
 
@@ -236,35 +218,6 @@ def test_compile_julia_sums_sparse_bytemap_level():
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
 
 
-def test_compile_julia_sums_sparse_hash_level():
-    _requires_julia_backend()
-    entry_dtype = np.dtype(
-        [
-            ("element_0", np.intp),
-            ("element_1", np.intp),
-            ("element_2", np.intp),
-        ]
-    )
-    entries = np.array(
-        [(0, 0, 0), (0, 2, 1), (1, 1, 2), (2, 0, 3), (2, 2, 4)],
-        dtype=entry_dtype,
-    )
-    level = SparseHashLevel(
-        _element_level(STORED_VALUES),
-        COLS,
-        ROW_PTR,
-        NumpyBuffer(np.full(len(entries), 0x80, dtype=np.uint8)),
-        NumpyBuffer(entries),
-        NumpyBuffer(np.array([], dtype=np.intp)),
-        NumpyBuffer(np.arange(len(entries), dtype=np.intp)),
-        single_writer=False,
-    )
-
-    result = _compute_sparse_axis_sum(level)
-
-    np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
-
-
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
@@ -285,47 +238,3 @@ def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     assert isinstance(output_ftype.lvl_t, ft.DenseLevelFType)
     assert isinstance(output_ftype.lvl_t.lvl_t, ft.DenseLevelFType)
     assert isinstance(output_ftype.lvl_t.lvl_t.lvl_t, ft.ElementLevelFType)
-
-
-@pytest.mark.parametrize(
-    ("left_format", "right_format", "op_name", "expected", "output_pattern"),
-    [
-        ("csr", "csr", "add", SPARSE_A + SPARSE_A, ("dense", "sparse")),
-        ("csr", "dcsr", "multiply", SPARSE_A * SPARSE_A, ("sparse", "sparse")),
-        ("dcsr", "dcsr", "matmul", SPARSE_A @ SPARSE_B, ("sparse", "sparse")),
-        ("csr", "csr", "matmul", SPARSE_A @ SPARSE_B, ("sparse", "sparse")),
-    ],
-)
-def test_compile_julia_fd_formatter_sparse_end_to_end(
-    left_format,
-    right_format,
-    op_name,
-    expected,
-    output_pattern,
-):
-    _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLCompiler
-
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
-    scheduler = _compile_julia_fd(formatter)
-    left_data = SPARSE_A
-    right_data = SPARSE_B if op_name == "matmul" else SPARSE_A
-    left = _formatted_tensor(left_data, left_format)
-    right = _formatted_tensor(right_data, right_format)
-
-    match op_name:
-        case "add":
-            expr = ft.lazy(left) + ft.lazy(right)
-        case "multiply":
-            expr = ft.lazy(left) * ft.lazy(right)
-        case "matmul":
-            expr = ft.matmul(ft.lazy(left), ft.lazy(right))
-        case _:
-            raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
-
-    with with_default_scheduler(scheduler):
-        result = ft.compute(expr)
-
-    np.testing.assert_array_equal(result.to_scipy().toarray(), expected)
-    assert formatter.output_ftypes
-    _assert_output_pattern(formatter.output_ftypes[-1], output_pattern)

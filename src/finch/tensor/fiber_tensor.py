@@ -23,15 +23,6 @@ if TYPE_CHECKING:
     from .level.level import Level, LevelFType
 
 
-def _sparse_hash_entries(ptr, perm, tbl, pos: int):
-    ptr_arr = ptr.arr
-    perm_arr = perm.arr
-    tbl_arr = tbl.arr
-    for k in range(int(ptr_arr[pos]), int(ptr_arr[pos + 1])):
-        entry = tbl_arr[int(perm_arr[k])]
-        yield int(entry["element_1"]), int(entry["element_2"])
-
-
 @dataclass
 class FiberTensor(OverrideTensor):
     """
@@ -116,7 +107,6 @@ class FiberTensor(OverrideTensor):
             DenseLevel,
             ElementLevel,
             SparseCOOLevel,
-            SparseHashLevel,
             SparseListLevel,
         )
 
@@ -151,47 +141,6 @@ class FiberTensor(OverrideTensor):
                     shape=self.shape,
                     copy=False,
                 )
-
-            case DenseLevel(
-                lvl=SparseHashLevel(
-                    lvl=ElementLevel() as element,
-                    ptr=ptr,
-                    perm=perm,
-                    tbl=tbl,
-                )
-            ):
-                rows = []
-                cols = []
-                vals = []
-                for row in range(self.shape[0]):
-                    for col, elem_pos in _sparse_hash_entries(ptr, perm, tbl, row):
-                        rows.append(row)
-                        cols.append(col)
-                        vals.append(element.val.arr[elem_pos])
-                return sps.coo_array((vals, (rows, cols)), shape=self.shape).tocsr()
-
-            case SparseHashLevel(
-                lvl=SparseHashLevel(
-                    lvl=ElementLevel() as element,
-                    ptr=inner_ptr,
-                    perm=inner_perm,
-                    tbl=inner_tbl,
-                ),
-                ptr=outer_ptr,
-                perm=outer_perm,
-                tbl=outer_tbl,
-            ):
-                rows = []
-                cols = []
-                vals = []
-                for row, q in _sparse_hash_entries(outer_ptr, outer_perm, outer_tbl, 0):
-                    for col, elem_pos in _sparse_hash_entries(
-                        inner_ptr, inner_perm, inner_tbl, q
-                    ):
-                        rows.append(row)
-                        cols.append(col)
-                        vals.append(element.val.arr[elem_pos])
-                return sps.coo_array((vals, (rows, cols)), shape=self.shape).tocsr()
 
             case _:
                 raise NotImplementedError(
