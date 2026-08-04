@@ -4,12 +4,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parents[3]
+
 
 def test_array_api():
+
     array_api_tests_dir = Path(
         os.environ.get(
             "ARRAY_API_TESTS_DIR",
-            Path(__file__).parent.parent / "array-api-tests",
+            PROJECT_ROOT / "array-api-tests",
         ),
     ).resolve()
     array_api_tests_rev = os.environ.get(
@@ -18,7 +21,7 @@ def test_array_api():
     array_api_tests_skips = Path(
         os.environ.get(
             "ARRAY_API_TESTS_SKIPS",
-            Path(__file__).parent.parent / "array-api-skips.txt",
+            PROJECT_ROOT / "array-api-skips.txt",
         ),
     ).resolve()
     array_api_tests_args = shlex.split(os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s"))

@@ -17,7 +17,11 @@ from .conftest import finch_assert_allclose, finch_assert_equal
 
 
 # Utility function to generate random complex numpy tensors
-def random_array(shape, dtype=np.complex128, rng: np.random.Generator | None = None):
+def random_array(
+    shape: tuple[int, ...],
+    dtype: np.typing.DTypeLike = np.complex128,
+    rng: np.random.Generator | None = None,
+) -> np.ndarray:
     """Generates a random complex array. Uses integers for both real
     and imaginary parts to avoid floating-point issues in tests.
 
