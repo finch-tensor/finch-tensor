@@ -1,5 +1,6 @@
 from .dense_level import DenseLevel, DenseLevelFType, dense
 from .element_level import ElementLevel, ElementLevelFType, element
+from .level import Level, LevelFType
 from .sparse_bytemap_level import (
     SparseByteMapLevel,
     SparseByteMapLevelFType,
@@ -14,6 +15,8 @@ __all__ = [
     "DenseLevelFType",
     "ElementLevel",
     "ElementLevelFType",
+    "Level",
+    "LevelFType",
     "SparseByteMapLevel",
     "SparseByteMapLevelFType",
     "SparseCOOLevel",

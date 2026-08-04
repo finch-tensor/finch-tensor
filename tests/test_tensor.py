@@ -11,11 +11,15 @@ from finch import (
     dense,
     element,
     fiber_tensor,
+    int32,
     sparse_list,
 )
 from finch.tensor import (
     BufferizedNDArray,
+    DenseLevel,
+    ElementLevel,
     EyeTensor,
+    FiberTensor,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -30,6 +34,8 @@ from finch.tensor import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SparseCOOLevel,
+    SparseListLevel,
     UpperTriangleTensor,
 )
 from finch.tensor.traits import (
@@ -551,3 +557,123 @@ def test_lazy_array_api_matrix_functions():
         finch.compute(finch.diag(x, k=1)).to_numpy(), np.diag(arr, k=1)
     )
     assert finch.compute(finch.trace(x, offset=1)).item() == np.trace(arr, offset=1)
+
+
+@pytest.mark.parametrize("csr_type", [scipy.sparse.csr_matrix, scipy.sparse.csr_array])
+def test_asarray_scipy_sparse(csr_type):
+    csr = csr_type(
+        (
+            np.array([1.0, 2.0, 3.0]),
+            np.array([0, 2, 1], dtype=np.int32),
+            np.array([0, 2, 3], dtype=np.int32),
+        ),
+        shape=(2, 3),
+    )
+
+    tensor = asarray(csr)
+
+    assert isinstance(tensor, FiberTensor)
+    assert isinstance(tensor.lvl, DenseLevel)
+    assert isinstance(tensor.lvl.lvl, SparseListLevel)
+    assert isinstance(tensor.lvl.lvl.lvl, ElementLevel)
+    np.testing.assert_array_equal(tensor.lvl.lvl.lvl.val.arr, csr.data)
+    np.testing.assert_array_equal(tensor.lvl.lvl.idx.arr, csr.indices)
+    np.testing.assert_array_equal(tensor.lvl.lvl.ptr.arr, csr.indptr)
+
+    scipy_tensor = tensor.to_scipy()
+    np.testing.assert_array_equal(scipy_tensor.data, csr.data)
+    np.testing.assert_array_equal(scipy_tensor.indices, csr.indices)
+    np.testing.assert_array_equal(scipy_tensor.indptr, csr.indptr)
+
+
+@pytest.mark.parametrize("coo_type", [scipy.sparse.coo_matrix, scipy.sparse.coo_array])
+def test_asarray_scipy_coo(coo_type):
+    coo = coo_type(
+        (
+            np.array([1.0, 2.0, 3.0]),
+            (
+                np.array([0, 0, 1], dtype=np.int32),
+                np.array([0, 2, 1], dtype=np.int32),
+            ),
+        ),
+        shape=(2, 3),
+    )
+
+    tensor = asarray(coo)
+
+    assert isinstance(tensor, FiberTensor)
+    assert isinstance(tensor.lvl, SparseCOOLevel)
+    assert isinstance(tensor.lvl.lvl, ElementLevel)
+    np.testing.assert_array_equal(tensor.lvl.lvl.val.arr, coo.data)
+    np.testing.assert_array_equal(tensor.lvl.tbl[0].arr, coo.row)
+    np.testing.assert_array_equal(tensor.lvl.tbl[1].arr, coo.col)
+    assert all(type(d) is np.int32 for d in tensor.lvl.coo_shape)
+
+    scipy_tensor = tensor.to_scipy()
+    np.testing.assert_array_equal(scipy_tensor.data, coo.data)
+    np.testing.assert_array_equal(scipy_tensor.row, coo.row)
+    np.testing.assert_array_equal(scipy_tensor.col, coo.col)
+
+
+def test_fiber_tensor_to_csr():
+    data = np.array([1.0, 2.0, 3.0])
+    indices = np.array([0, 2, 1], dtype=np.int32)
+    indptr = np.array([0, 2, 3], dtype=np.int32)
+
+    tensor = FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(
+                    element(
+                        fill_value=np.float64(0),
+                        position_type=int32,
+                    ),
+                    NumpyBuffer(data),
+                ),
+                np.int32(3),
+                NumpyBuffer(indptr),
+                NumpyBuffer(indices),
+            ),
+            np.int32(2),
+        )
+    )
+
+    scipy_tensor = tensor.to_scipy()
+
+    assert isinstance(scipy_tensor, scipy.sparse.csr_array)
+    np.testing.assert_array_equal(scipy_tensor.data, data)
+    np.testing.assert_array_equal(scipy_tensor.indices, indices)
+    np.testing.assert_array_equal(scipy_tensor.indptr, indptr)
+    assert np.shares_memory(scipy_tensor.data, data)
+    assert np.shares_memory(scipy_tensor.indices, indices)
+    assert np.shares_memory(scipy_tensor.indptr, indptr)
+
+
+def test_fiber_tensor_to_coo():
+    data = np.array([1.0, 2.0, 3.0])
+    row = np.array([0, 1, 1], dtype=np.int32)
+    col = np.array([0, 1, 2], dtype=np.int32)
+
+    tensor = FiberTensor(
+        SparseCOOLevel(
+            ElementLevel(
+                element(
+                    fill_value=np.float64(0),
+                    position_type=int32,
+                ),
+                NumpyBuffer(data),
+            ),
+            (np.int32(2), np.int32(3)),
+            tbl=(NumpyBuffer(row), NumpyBuffer(col)),
+        )
+    )
+
+    scipy_tensor = tensor.to_scipy()
+
+    assert isinstance(scipy_tensor, scipy.sparse.coo_array)
+    np.testing.assert_array_equal(scipy_tensor.data, data)
+    np.testing.assert_array_equal(scipy_tensor.row, row)
+    np.testing.assert_array_equal(scipy_tensor.col, col)
+    assert np.shares_memory(scipy_tensor.data, data)
+    assert np.shares_memory(scipy_tensor.row, row)
+    assert np.shares_memory(scipy_tensor.col, col)

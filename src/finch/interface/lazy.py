@@ -10,6 +10,7 @@ from itertools import accumulate, zip_longest
 from typing import Any, cast, overload
 
 import numpy as np
+import scipy.sparse as sps
 from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finch import finch_einsum as ein
@@ -52,6 +53,7 @@ from finch.symbolic import gensym
 from finch.tensor import (
     BufferizedNDArray,
     EyeTensor,
+    FiberTensor,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -395,6 +397,41 @@ def asarray(
             if copy is True:
                 obj = obj.copy()
             return BufferizedNDArray.from_numpy(obj, device=device)
+        if sps.issparse(obj):
+            if obj.format == "csc":  # CSC has no native Finch layout yet
+                if dtype is not None or copy is True:
+                    raise NotImplementedError(
+                        "asarray cannot honor dtype or copy for CSC input; "
+                        "convert to CSR or COO first."
+                    )
+                return obj
+            if copy is False and not (
+                obj.format in ("coo", "csr") and obj.has_canonical_format
+            ):
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            if obj.format not in ("coo", "csr"):
+                obj = obj.asformat("coo")
+
+            if dtype is not None:
+                if copy is False:
+                    obj = obj.astype(dtype, copy=False)
+                else:
+                    obj = obj.astype(dtype, copy=True)
+            elif copy is True:
+                obj = obj.copy()
+
+            if not obj.has_canonical_format:
+                obj = obj.copy()
+                obj.sum_duplicates()
+
+            match obj.format:
+                case "csr":
+                    return FiberTensor.from_scipy_csr(obj, device=device)
+                case "coo":
+                    return FiberTensor.from_scipy_coo(obj, device=device)
+
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
                 obj = ftype(dtype)(obj)
