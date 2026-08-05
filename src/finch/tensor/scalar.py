@@ -4,7 +4,6 @@ from typing import Any
 
 import numpy as np
 
-from finch import finch_assembly as asm
 from finch.algebra import FType, TensorFType, ffuncs, ftype, normalize_device
 
 from .override_tensor import OverrideTensor
@@ -68,11 +67,7 @@ class ScalarFType(TensorFType):
         return ()
 
     def lower_unwrap(self, ctx, obj):
-        res = ctx(obj)
-        match res:
-            case asm.Literal(Scalar() as scalar):
-                return asm.Literal(scalar.val)
-        return res
+        return ctx(obj)
 
 
 class Scalar(OverrideTensor):
