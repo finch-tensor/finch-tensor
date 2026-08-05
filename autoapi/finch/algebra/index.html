@@ -5496,7 +5496,7 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Perform type conversion or construction with the given value.</span>
 
@@ -5568,6 +5568,7 @@ For composite types, this may construct an instance of this type.</p>
                 <code>val</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5593,6 +5594,7 @@ For composite types, this may construct an instance of this type.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5621,7 +5623,7 @@ For composite types, this may construct an instance of this type.</p>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Perform type conversion or construction with the given value.</span>
 
@@ -5706,8 +5708,7 @@ For composite types, this may construct an instance of this type.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">690</span>
-<span class="normal">691</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">691</span>
 <span class="normal">692</span>
 <span class="normal">693</span>
 <span class="normal">694</span>
@@ -5717,7 +5718,8 @@ For composite types, this may construct an instance of this type.</p>
 <span class="normal">698</span>
 <span class="normal">699</span>
 <span class="normal">700</span>
-<span class="normal">701</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FTyped</span><span class="p">:</span>
+<span class="normal">701</span>
+<span class="normal">702</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FTyped</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Abstract base class for objects that can be formatted.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -5951,15 +5953,15 @@ It is currently not used anywhere, but maybe it will be useful in the future?</p
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">779</span>
-<span class="normal">780</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">780</span>
 <span class="normal">781</span>
 <span class="normal">782</span>
 <span class="normal">783</span>
 <span class="normal">784</span>
 <span class="normal">785</span>
 <span class="normal">786</span>
-<span class="normal">787</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MutableStructFType</span><span class="p">(</span><span class="n">StructFType</span><span class="p">):</span>
+<span class="normal">787</span>
+<span class="normal">788</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MutableStructFType</span><span class="p">(</span><span class="n">StructFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Class for a mutable struct type.</span>
 <span class="sd">    It is currently not used anywhere, but maybe it will be useful in the future?</span>
@@ -6018,8 +6020,7 @@ It is currently not used anywhere, but maybe it will be useful in the future?</p
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">704</span>
-<span class="normal">705</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">705</span>
 <span class="normal">706</span>
 <span class="normal">707</span>
 <span class="normal">708</span>
@@ -6084,7 +6085,8 @@ It is currently not used anywhere, but maybe it will be useful in the future?</p
 <span class="normal">767</span>
 <span class="normal">768</span>
 <span class="normal">769</span>
-<span class="normal">770</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StructFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">770</span>
+<span class="normal">771</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StructFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
@@ -6185,8 +6187,7 @@ or keyword arguments matching field names.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">719</span>
-<span class="normal">720</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">720</span>
 <span class="normal">721</span>
 <span class="normal">722</span>
 <span class="normal">723</span>
@@ -6200,7 +6201,8 @@ or keyword arguments matching field names.</p>
 <span class="normal">731</span>
 <span class="normal">732</span>
 <span class="normal">733</span>
-<span class="normal">734</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="normal">734</span>
+<span class="normal">735</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Construct a struct instance from the given fields.</span>
 
@@ -7113,8 +7115,7 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">790</span>
-<span class="normal">791</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">791</span>
 <span class="normal">792</span>
 <span class="normal">793</span>
 <span class="normal">794</span>
@@ -7198,7 +7199,8 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 <span class="normal">872</span>
 <span class="normal">873</span>
 <span class="normal">874</span>
-<span class="normal">875</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TupleFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FDType</span><span class="p">):</span>
+<span class="normal">875</span>
+<span class="normal">876</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TupleFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FDType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;FType for Python tuples, with a struct-compatible interface.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">struct_types</span><span class="p">):</span>
@@ -7394,11 +7396,11 @@ a pointwise operator <code>y</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">926</span>
-<span class="normal">927</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">927</span>
 <span class="normal">928</span>
 <span class="normal">929</span>
-<span class="normal">930</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
+<span class="normal">930</span>
+<span class="normal">931</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Check if `x` is an instance of `f`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -7572,8 +7574,7 @@ Override .ftype to customize the ftype of an object.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 963</span>
-<span class="normal"> 964</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 964</span>
 <span class="normal"> 965</span>
 <span class="normal"> 966</span>
 <span class="normal"> 967</span>
@@ -7648,7 +7649,8 @@ Override .ftype to customize the ftype of an object.</p>
 <span class="normal">1036</span>
 <span class="normal">1037</span>
 <span class="normal">1038</span>
-<span class="normal">1039</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="normal">1039</span>
+<span class="normal">1040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the corresponding FType for a given object.  Recognizes numpy,</span>
 <span class="sd">    Python builtins, and Python tuples.  Sometimes recognizes types.</span>
 <span class="sd">    Override .ftype to customize the ftype of an object.</span>
@@ -7747,8 +7749,7 @@ Override .ftype to customize the ftype of an object.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">933</span>
-<span class="normal">934</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">934</span>
 <span class="normal">935</span>
 <span class="normal">936</span>
 <span class="normal">937</span>
@@ -7774,7 +7775,8 @@ Override .ftype to customize the ftype of an object.</p>
 <span class="normal">957</span>
 <span class="normal">958</span>
 <span class="normal">959</span>
-<span class="normal">960</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">isdtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">kind</span><span class="p">):</span>
+<span class="normal">960</span>
+<span class="normal">961</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">isdtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">kind</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Check if a dtype belongs to an Array API dtype kind.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -7836,13 +7838,30 @@ which both type1 and type2 may be safely cast.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>*args</code>
+                <code>T1</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-internal" title="FDType (finch.algebra.ftypes.FDType)" href="ftypes/#finch.algebra.ftypes.FDType">FDType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The types to promote.</p>
+                <p>The first type to promote.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>T2</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="FDType (finch.algebra.ftypes.FDType)" href="ftypes/#finch.algebra.ftypes.FDType">FDType</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The second type to promote.</p>
               </div>
             </td>
             <td>
@@ -7864,6 +7883,7 @@ which both type1 and type2 may be safely cast.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><a class="autorefs autorefs-internal" title="FDType (finch.algebra.ftypes.FDType)" href="ftypes/#finch.algebra.ftypes.FDType">FDType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7897,13 +7917,15 @@ which both type1 and type2 may be safely cast.</p>
 <span class="normal">76</span>
 <span class="normal">77</span>
 <span class="normal">78</span>
-<span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">promote_type</span><span class="p">(</span><span class="n">T1</span><span class="p">:</span> <span class="n">FDType</span><span class="p">,</span> <span class="n">T2</span><span class="p">:</span> <span class="n">FDType</span><span class="p">):</span>
+<span class="normal">79</span>
+<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">promote_type</span><span class="p">(</span><span class="n">T1</span><span class="p">:</span> <span class="n">FDType</span><span class="p">,</span> <span class="n">T2</span><span class="p">:</span> <span class="n">FDType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FDType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Returns the data type with the smallest size and smallest scalar kind to</span>
 <span class="sd">    which both type1 and type2 may be safely cast.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        *args: The types to promote.</span>
+<span class="sd">        T1: The first type to promote.</span>
+<span class="sd">        T2: The second type to promote.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The common type of the given arguments.</span>

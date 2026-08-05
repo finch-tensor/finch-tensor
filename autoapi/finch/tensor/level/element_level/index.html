@@ -5828,6 +5828,7 @@
                 <code>fill_value</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5843,6 +5844,7 @@
                 <code>element_type</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-internal" title="FType (finch.algebra.FType)" href="../../../algebra/#finch.algebra.FType">FType</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5858,6 +5860,7 @@
                 <code>position_type</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-internal" title="FType (finch.algebra.FType)" href="../../../algebra/#finch.algebra.FType">FType</a> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5873,6 +5876,7 @@
                 <code>buffer_factory</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5888,6 +5892,7 @@
                 <code>buffer_type</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5913,6 +5918,12 @@
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><a class="autorefs autorefs-internal" title="ElementLevelFType
+
+
+  
+      dataclass
+   (finch.tensor.level.element_level.ElementLevelFType)" href="#finch.tensor.level.element_level.ElementLevelFType">ElementLevelFType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5953,12 +5964,12 @@
 <span class="normal">174</span>
 <span class="normal">175</span>
 <span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span>
-    <span class="n">fill_value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">element_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">position_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-    <span class="n">buffer_factory</span><span class="o">=</span><span class="n">NumpyBufferFType</span><span class="p">,</span>
-    <span class="n">buffer_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-<span class="p">):</span>
+    <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">element_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">position_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">buffer_factory</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">NumpyBufferFType</span><span class="p">,</span>
+    <span class="n">buffer_type</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ElementLevelFType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Creates an ElementLevelFType with the given parameters.</span>
 

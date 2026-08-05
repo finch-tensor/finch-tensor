@@ -5320,10 +5320,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/fuse.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
 <span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
@@ -5376,7 +5373,10 @@ entire operation in an optimized manner using the provided scheduler.</p>
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
-<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Executes a fused operation represented by LazyTensors. This function evaluates the</span>
 <span class="sd">    entire operation in an optimized manner using the provided scheduler.</span>
@@ -5467,13 +5467,15 @@ composing operations and executing them efficiently.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>- f</code>
+                <code>f</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="collections.abc.Callable" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable">Callable</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The function representing the operation to be fused, returning a tensor or</p>
+                <p>The function representing the operation to be fused, returning a tensor or
+tuple of tensor results.</p>
               </div>
             </td>
             <td>
@@ -5482,9 +5484,10 @@ composing operations and executing them efficiently.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>- *args</code>
+                <code>*args</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5492,22 +5495,24 @@ composing operations and executing them efficiently.</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>()</code>
             </td>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>- ctx</code>
+                <code>ctx</code>
             </td>
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The scheduler to use for computation. Defaults to the result of</p>
+                <p>The scheduler to use for computation. Defaults to the result of
+<code>get_default_scheduler()</code>.</p>
               </div>
             </td>
             <td>
-                <em>required</em>
+                  <code>None</code>
             </td>
           </tr>
       </tbody>
@@ -5525,12 +5530,11 @@ composing operations and executing them efficiently.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
+                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <ul>
-<li>The result of the fused operation, a tensor or tuple of tensors.</li>
-</ul>
+                <p>The result of the fused operation, a tensor or tuple of tensors.</p>
               </div>
             </td>
           </tr>
@@ -5540,10 +5544,7 @@ composing operations and executing them efficiently.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/fuse.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
@@ -5561,25 +5562,28 @@ composing operations and executing them efficiently.</p>
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fuse</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fuse</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Fuses multiple array operations into a single kernel. This function allows for</span>
 <span class="sd">    composing operations and executing them efficiently.</span>
 
-<span class="sd">    Parameters:</span>
-<span class="sd">        - f: The function representing the operation to be fused, returning a tensor or</span>
-<span class="sd">        tuple of tensor results.</span>
-<span class="sd">        - *args: The input arrays or LazyTensors to be fused.</span>
-<span class="sd">        - ctx: The scheduler to use for computation. Defaults to the result of</span>
-<span class="sd">        `get_default_scheduler()`.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        f: The function representing the operation to be fused, returning a tensor or</span>
+<span class="sd">            tuple of tensor results.</span>
+<span class="sd">        *args: The input arrays or LazyTensors to be fused.</span>
+<span class="sd">        ctx: The scheduler to use for computation. Defaults to the result of</span>
+<span class="sd">            `get_default_scheduler()`.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        - The result of the fused operation, a tensor or tuple of tensors.</span>
+<span class="sd">        The result of the fused operation, a tensor or tuple of tensors.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
 
-    <span class="n">args</span> <span class="o">=</span> <span class="p">[</span><span class="n">lazy</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">lazy</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">),</span> <span class="n">ctx</span><span class="o">=</span><span class="n">ctx</span><span class="p">)</span>
@@ -5613,10 +5617,7 @@ the <code>fuse</code> function for automatic fusion of operations.</li>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/fuse.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
@@ -5631,7 +5632,10 @@ the <code>fuse</code> function for automatic fusion of operations.</li>
 <span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
-<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fused</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fused</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    - fused(f):</span>
 <span class="sd">    A decorator that marks a function as fused. This allows the function to be used with</span>
