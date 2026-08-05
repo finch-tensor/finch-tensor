@@ -1,5 +1,4 @@
 import dataclasses
-import importlib
 import math
 import warnings
 
@@ -1825,13 +1824,14 @@ def test_new_eager_only_methods_warn_compute_lazy_operands():
 
 
 def test_new_lazy_methods_error_directly():
-    lazy_mod = importlib.import_module("finch.interface.lazy")
+    import finch.interface.defer as defer
+
     x = finch.lazy(np.eye(2))
 
     with pytest.raises(NotImplementedError, match="det is eager-only"):
-        lazy_mod.det(x)
+        defer.det(x)
     with pytest.raises(NotImplementedError, match="fft is eager-only"):
-        lazy_mod.fft(x)
+        defer.fft(x)
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -2167,15 +2167,16 @@ def test_lazy_reshape_preserves_fill_value():
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 def test_lazy_reshape_uses_single_mask(monkeypatch):
-    lazy_module = importlib.import_module("finch.interface.lazy")
-    original = lazy_module.ReshapeMaskTensor
+    import finch.interface.defer as defer
+
+    original = defer.ReshapeMaskTensor
     mask_shapes = []
 
     def recording_mask(old_shape, new_shape, *args, **kwargs):
         mask_shapes.append((tuple(old_shape), tuple(new_shape)))
         return original(old_shape, new_shape, *args, **kwargs)
 
-    monkeypatch.setattr(lazy_module, "ReshapeMaskTensor", recording_mask)
+    monkeypatch.setattr(defer, "ReshapeMaskTensor", recording_mask)
     array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
 
     result = finch.reshape(finch.lazy(array), (6, 4))

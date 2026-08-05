@@ -13,7 +13,7 @@ import scipy.sparse.linalg as scipy_sparse_linalg
 
 from finch.algebra import FinchOperator, to_numpy, to_scipy
 
-from . import lazy
+from . import _lazy as lazy
 from .fuse import compute
 
 EighResult = namedtuple("EighResult", ["eigenvalues", "eigenvectors"])

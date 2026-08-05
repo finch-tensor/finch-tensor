@@ -9,8 +9,8 @@ from finch.autoschedule.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_ordering import DefaultLoopOrderer
 from finch.autoschedule.optimize import DefaultLogicOptimizer
 from finch.finch_einsum import MockEinsumLoader
+from finch.interface.defer import lazy
 from finch.interface.fuse import compute
-from finch.interface.lazy import lazy
 
 from .conftest import finch_assert_allclose
 

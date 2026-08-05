@@ -3,6 +3,11 @@ from finch.tensor.np_wrapper import NumPyFType, NumPyWrapper
 from finch.tensor.scalar import Scalar, ScalarFType
 
 from . import fft, linalg
+from .defer import (
+    LazyTensor,
+    asarray,
+    lazy,
+)
 from .eager import (
     abs,
     acos,
@@ -143,11 +148,6 @@ from .fuse import (
     compute,
     fuse,
     fused,
-)
-from .lazy import (
-    LazyTensor,
-    asarray,
-    lazy,
 )
 
 __all__ = [
