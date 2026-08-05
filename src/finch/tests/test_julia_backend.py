@@ -153,7 +153,7 @@ class RecordingFDFormatter(FDFormatter):
 
 
 def _compute_sparse_axis_sum(level):
-    from finch.compile_jl import COMPILE_JULIA
+    from finch.autoschedule import COMPILE_JULIA
 
     arg = FiberTensor(DenseLevel(level, ROWS))
     expr = ft.sum(ft.lazy(arg), axis=1)
