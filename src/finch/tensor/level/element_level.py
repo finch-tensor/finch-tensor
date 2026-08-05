@@ -8,7 +8,8 @@ from finch import finch_notation as ntn
 from finch.algebra import FType, ImmutableStructFType, ftype
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
-from finch.tensor.fiber_tensor import Level, LevelFType
+
+from .level import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
@@ -147,12 +148,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
 
 
 def element(
-    fill_value=None,
-    element_type=None,
-    position_type=None,
-    buffer_factory=NumpyBufferFType,
-    buffer_type=None,
-):
+    fill_value: Any = None,
+    element_type: FType | None = None,
+    position_type: FType | None = None,
+    buffer_factory: Any = NumpyBufferFType,
+    buffer_type: Any = None,
+) -> ElementLevelFType:
     """
     Creates an ElementLevelFType with the given parameters.
 

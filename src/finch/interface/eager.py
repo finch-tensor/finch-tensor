@@ -1570,7 +1570,7 @@ def std(
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
 
 
-def einop(prgm: str, /, **kwargs):
+def einop(prgm: str, /, **kwargs: Any) -> Any:
     """Execute an einsum expression using the specified array framework.
 
     This function parses and executes einsum-like expressions with extended syntax
