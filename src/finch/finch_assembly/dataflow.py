@@ -1,7 +1,7 @@
 import copy
 from abc import abstractmethod
-from collections.abc import Callable
-from typing import TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 from finch.symbolic import (
     DataFlowAnalysis,
@@ -187,7 +187,7 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                     continue
         return annotated
 
-    def transfer(self, stmts, state: dict) -> dict:
+    def transfer(self, stmts: Iterable[Any], state: dict) -> dict:
         """Transfer function over a sequence of statements.
 
         Applies copy-propagation effects of each statement in order, returning
