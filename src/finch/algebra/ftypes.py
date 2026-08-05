@@ -23,7 +23,7 @@ class FType(ABC):
     def __hash__(self): ...
 
     @abstractmethod
-    def __call__(self, val):
+    def __call__(self, val: Any) -> Any:
         """
         Perform type conversion or construction with the given value.
 
@@ -56,13 +56,14 @@ class FDType(FType):
         return
 
 
-def promote_type(T1: FDType, T2: FDType):
+def promote_type(T1: FDType, T2: FDType) -> FDType:
     """
     Returns the data type with the smallest size and smallest scalar kind to
     which both type1 and type2 may be safely cast.
 
     Args:
-        *args: The types to promote.
+        T1: The first type to promote.
+        T2: The second type to promote.
 
     Returns:
         The common type of the given arguments.

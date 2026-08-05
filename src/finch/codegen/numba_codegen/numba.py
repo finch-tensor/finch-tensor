@@ -196,9 +196,9 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             raise TypeError(f"{op} has no Numba representation.")
 
 
-class NumbaArgumentFType(ABC):
+class NumbaArgumentFType(FType, ABC):
     @abstractmethod
-    def numba_type(self):
+    def numba_type(self) -> Any:
         """
         Return a Numba-compatible type for this ftype.
         """
@@ -240,7 +240,7 @@ def to_numpy_type(t: FType) -> np.dtype:
     raise NotImplementedError(f"No NumPy dtype mapping for {t}")
 
 
-def numba_type(t: FType):
+def numba_type(t: FType) -> Any:
     """
     Returns the Numba type/ftype after serialization.
 
@@ -265,7 +265,7 @@ def numba_type(t: FType):
             return t
 
 
-def numba_jitclass_type(t: FType):
+def numba_jitclass_type(t: FType) -> Any:
     """
     Returns the Numba jitclass spec type/ftype after serialization.
 
@@ -342,7 +342,7 @@ def assembly_struct_numba_jitclass_type(ftype_: StructFType) -> numba.types.Type
     return numba_type(ftype_).class_type.instance_type
 
 
-def serialize_to_numba(fmt: FType, obj):
+def serialize_to_numba(fmt: FType, obj: Any) -> Any:
     """
     Serialize an object to a Numba-compatible ftype.
 
@@ -388,7 +388,7 @@ def immutable_construct_from_numba(fmt: ImmutableStructFType, numba_tuple):
     )
 
 
-def deserialize_from_numba(fmt: FType, obj, numba_obj):
+def deserialize_from_numba(fmt: FType, obj: Any, numba_obj: Any) -> None:
     """
     Deserialize a Numba-compatible object back to the original ftype.
 
@@ -411,7 +411,7 @@ def deserialize_from_numba(fmt: FType, obj, numba_obj):
             return
 
 
-def construct_from_numba(fmt: FType, numba_obj):
+def construct_from_numba(fmt: FType, numba_obj: Any) -> Any:
     """
     Construct an object from a Numba-compatible ftype.
 

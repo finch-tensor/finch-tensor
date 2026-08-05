@@ -148,12 +148,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
 
 
 def element(
-    fill_value=None,
-    element_type=None,
-    position_type=None,
-    buffer_factory=NumpyBufferFType,
-    buffer_type=None,
-):
+    fill_value: Any = None,
+    element_type: FType | None = None,
+    position_type: FType | None = None,
+    buffer_factory: Any = NumpyBufferFType,
+    buffer_type: Any = None,
+) -> ElementLevelFType:
     """
     Creates an ElementLevelFType with the given parameters.
 

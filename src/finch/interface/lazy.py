@@ -2541,7 +2541,7 @@ def unstack(x, /, *, axis: int = 0) -> tuple[LazyTensor, ...]:
     )
 
 
-def broadcast_to(tensor, /, shape: tuple) -> LazyTensor:
+def broadcast_to(tensor: Any, /, shape: tuple) -> LazyTensor:
     """
     Broadcasts a lazy tensor to a specified shape.
 
