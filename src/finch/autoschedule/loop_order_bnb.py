@@ -28,15 +28,16 @@ def loop_order_bfs(
     stats_factory: StatsFactory,
     stats_bindings: dict[Alias, TensorStats],
     *,
-    k: float = float("inf"),
+    k: int | None = None,
 ) -> tuple[Field, ...]:
     all_vars = tuple(expr.fields())
-    cache: dict[object, TensorStats] = {}
-    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
-        expr, stats_factory, stats_bindings.copy(), cache
-    )
     if not all_vars:
         return ()
+
+    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
+        expr, stats_factory, stats_bindings.copy(), {}
+    )
+    unique_stats = list({id(s): s for s in conjunct_stats + disjunct_stats}.values())
 
     best_order = greedy_loop_order(expr, stats_factory, stats_bindings)
     best_cost = loop_order_cost(expr, best_order, stats_factory, stats_bindings)
@@ -45,11 +46,13 @@ def loop_order_bfs(
     for _ in all_vars:
         new_optimal_orders: list[tuple[tuple[Field, ...], float]] = []
         for prefix, prefix_cost in prev_new_optimal_orders:
-            remaining = set(all_vars) - set(prefix)
+            prefix_set = set(prefix)
+            remaining = [field for field in all_vars if field not in prefix_set]
+            # Preserves remaining / all_vars order (see connected_loop_candidates).
             candidates = connected_loop_candidates(
                 prefix, remaining, conjunct_stats, disjunct_stats
             )
-            for field in (field for field in all_vars if field in candidates):
+            for field in candidates:
                 new_prefix = prefix + (field,)
                 new_cost = prefix_cost + get_prefix_cost(
                     new_prefix,
@@ -60,23 +63,19 @@ def loop_order_bfs(
                 if new_cost >= best_cost:
                     continue
                 if len(new_prefix) == len(all_vars):
-                    # transpose cost
-                    reformat_cost = 0.0
-                    seen: list[TensorStats] = []
-                    for stat in conjunct_stats + disjunct_stats:
-                        if any(stat is other for other in seen):
-                            continue
-                        seen.append(stat)
-                        if needs_reformat(stat, new_prefix):
-                            reformat_cost += cost_of_reformat(stat)
+                    reformat_cost = sum(
+                        cost_of_reformat(stat)
+                        for stat in unique_stats
+                        if needs_reformat(stat, new_prefix)
+                    )
                     total_cost = new_cost + reformat_cost
                     if total_cost < best_cost:
                         best_order, best_cost = new_prefix, total_cost
                 else:
                     new_optimal_orders.append((new_prefix, new_cost))
-        new_optimal_orders.sort(key=lambda state: state[1])
-        if k != float("inf"):
-            new_optimal_orders = new_optimal_orders[: int(k)]
+        if k is not None:
+            new_optimal_orders.sort(key=lambda state: state[1])
+            new_optimal_orders = new_optimal_orders[:k]
         prev_new_optimal_orders = new_optimal_orders
 
     return best_order
@@ -88,12 +87,13 @@ def loop_order_dfs(
     stats_bindings: dict[Alias, TensorStats],
 ) -> tuple[Field, ...]:
     all_vars = tuple(expr.fields())
-    cache: dict[object, TensorStats] = {}
-    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
-        expr, stats_factory, stats_bindings.copy(), cache
-    )
     if not all_vars:
         return ()
+
+    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
+        expr, stats_factory, stats_bindings.copy(), {}
+    )
+    unique_stats = list({id(s): s for s in conjunct_stats + disjunct_stats}.values())
 
     best_order = greedy_loop_order(expr, stats_factory, stats_bindings)
     best_cost = loop_order_cost(expr, best_order, stats_factory, stats_bindings)
@@ -101,13 +101,15 @@ def loop_order_dfs(
 
     while stack:
         prefix, prefix_cost = stack.pop()
-        remaining = set(all_vars) - set(prefix)
+        prefix_set = set(prefix)
+        remaining = [field for field in all_vars if field not in prefix_set]
         children: list[tuple[tuple[Field, ...], float]] = []
 
+        # Preserves remaining / all_vars order (see connected_loop_candidates).
         candidates = connected_loop_candidates(
             prefix, remaining, conjunct_stats, disjunct_stats
         )
-        for field in (field for field in all_vars if field in candidates):
+        for field in candidates:
             new_prefix = prefix + (field,)
             new_cost = prefix_cost + get_prefix_cost(
                 new_prefix,
@@ -118,15 +120,11 @@ def loop_order_dfs(
             if new_cost >= best_cost:
                 continue
             if len(new_prefix) == len(all_vars):
-                # transpose cost
-                reformat_cost = 0.0
-                seen: list[TensorStats] = []
-                for stat in conjunct_stats + disjunct_stats:
-                    if any(stat is other for other in seen):
-                        continue
-                    seen.append(stat)
-                    if needs_reformat(stat, new_prefix):
-                        reformat_cost += cost_of_reformat(stat)
+                reformat_cost = sum(
+                    cost_of_reformat(stat)
+                    for stat in unique_stats
+                    if needs_reformat(stat, new_prefix)
+                )
                 total_cost = new_cost + reformat_cost
                 if total_cost < best_cost:
                     best_order, best_cost = new_prefix, total_cost
@@ -144,7 +142,7 @@ class BFSLoopOrderer(DefaultLoopOrderer):
         self,
         ctx: LogicLoader | None = None,
         *,
-        k: float = float("inf"),
+        k: int | None = None,
     ):
         super().__init__(ctx)
         self.k = k
