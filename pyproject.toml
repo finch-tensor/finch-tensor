@@ -34,6 +34,7 @@ test = [
     "mypy>=1.15,<2",
     "pytest-mypy>=1,<2",
     "pytest-regressions>=2.8.1,<3",
+    "pytest-xdist>=3.6.0,<4",
 ]
 benchmark = [
     "pytest-codspeed>=5",
@@ -103,22 +104,39 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
-depends-on = [{task = "compile", environment = "test"}]
+args = [
+  { "arg" = "njobs", "default" = "auto" },
+]
+cmd = "python -m pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+depends-on = [
+    { task = "compile", environment = "test" },
+    "type-check",
+    { task = "test-array-api", environment = "test", args = [ "{{ njobs }}"] },
+]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "python -m pytest -m c_backend"
+# Use disable parallelism for C compilation tests to avoid resource contention, C test suite isn't thread-safe.
+args = [
+  { "arg" = "njobs", "default" = "0" },
+]
+cmd = "python -m pytest -m c_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-c"}]
 default-environment = "test-c"
 
 [tool.pixi.feature.test.tasks.test-mlir]
-cmd = "python -m pytest -m mlir_backend"
+args = [
+  { "arg" = "njobs", "default" = "auto" },
+]
+cmd = "python -m pytest -m mlir_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
-cmd = "python -m pytest src/finch/tests/test_julia_backend.py"
+args = [
+  { "arg" = "njobs", "default" = "auto" },
+]
+cmd = "python -m pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -129,6 +147,13 @@ default-environment = "benchmark"
 
 [tool.pixi.feature.test.tasks.type-check]
 cmd = "python -m mypy"
+default-environment = "test"
+
+[tool.pixi.feature.test.tasks.test-array-api]
+args = [
+  { "arg" = "njobs", "default" = "auto" },
+]
+cmd = "./scripts/run_array_api_tests.py -n {{ njobs }}"
 default-environment = "test"
 
 [tool.pixi.feature.docs.tasks.serve-docs]
