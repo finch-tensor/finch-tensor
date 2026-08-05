@@ -171,6 +171,17 @@ def _compile_julia_fd(formatter):
     )
 
 
+def _to_csr(fbr: FiberTensor) -> FiberTensor:
+    """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
+    own reformat, regardless of its current level structure (e.g. SparseHash)."""
+    from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
+    from finch.compile_jl.julia import jl
+
+    jl_obj = tensor_to_jl(fbr)
+    csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
+    return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
+
+
 def test_compile_julia_sums_sparse_list_level():
     _requires_julia_backend()
     level = SparseListLevel(
@@ -238,3 +249,57 @@ def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     assert isinstance(output_ftype.lvl_t, ft.DenseLevelFType)
     assert isinstance(output_ftype.lvl_t.lvl_t, ft.DenseLevelFType)
     assert isinstance(output_ftype.lvl_t.lvl_t.lvl_t, ft.ElementLevelFType)
+
+
+@pytest.mark.parametrize(
+    ("left_format", "right_format", "op_name"),
+    [
+        ("csr", "csr", "add"),
+        ("csr", "dcsr", "multiply"),
+        ("dcsr", "dcsr", "matmul"),
+        ("csr", "csr", "matmul"),
+    ],
+)
+def test_compile_julia_fd_formatter_sparse_end_to_end(
+    left_format,
+    right_format,
+    op_name,
+):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLCompiler
+
+    sparse_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
+    sparse_b = np.array([[0, 6, 0, 7], [8, 0, 0, 0], [0, 9, 10, 0]], dtype=DTYPE)
+
+    match op_name:
+        case "add":
+            expected = sparse_a + sparse_a
+        case "multiply":
+            expected = sparse_a * sparse_a
+        case "matmul":
+            expected = sparse_a @ sparse_b
+        case _:
+            raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
+
+    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    scheduler = _compile_julia_fd(formatter)
+    left_data = sparse_a
+    right_data = sparse_b if op_name == "matmul" else sparse_a
+    left = _formatted_tensor(left_data, left_format)
+    right = _formatted_tensor(right_data, right_format)
+
+    match op_name:
+        case "add":
+            expr = ft.lazy(left) + ft.lazy(right)
+        case "multiply":
+            expr = ft.lazy(left) * ft.lazy(right)
+        case "matmul":
+            expr = ft.matmul(ft.lazy(left), ft.lazy(right))
+        case _:
+            raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
+
+    with with_default_scheduler(scheduler):
+        result = ft.compute(expr)
+
+    csr_result = _to_csr(result)
+    np.testing.assert_allclose(csr_result.to_scipy().toarray(), expected)
