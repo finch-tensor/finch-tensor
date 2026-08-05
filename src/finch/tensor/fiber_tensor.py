@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+import scipy.sparse as sp
 
 from finch.algebra import (
     FType,
@@ -210,6 +211,9 @@ class Level(FTyped, ABC):
     def buffer_type(self):
         return self.ftype.buffer_type
 
+    @abstractmethod
+    def iter_entries(self, pos: int): ...
+
 
 @dataclass
 class FiberTensor(OverrideTensor):
@@ -287,14 +291,24 @@ class FiberTensor(OverrideTensor):
         return self.lvl.buffer_factory
 
     def to_numpy(self) -> np.ndarray:
-        # TODO: temporary for dense only. TBD in sparse_level PR
-        return np.reshape(self.lvl.val.arr, self.shape, copy=False)
+        out = np.full(self.shape, self.fill_value, dtype=self.lvl.val.arr.dtype)
+        for idx, val in self.lvl.iter_entries(int(self.pos)):
+            out[idx] = val
+        return out
 
     def to_scipy(self):
-        # TODO: temporary for dense only. TBD in sparse_level PR
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support to_scipy for this layout."
-        )
+        if self.ndim != 2:
+            raise NotImplementedError(
+                f"{type(self).__name__} only supports to_scipy for 2D tensors."
+            )
+        rows = []
+        cols = []
+        vals = []
+        for (r, c), val in self.lvl.iter_entries(int(self.pos)):
+            rows.append(r)
+            cols.append(c)
+            vals.append(val)
+        return sp.coo_matrix((vals, (rows, cols)), shape=self.shape).tocsr()
 
     def item(self):
         if self.ndim != 0:

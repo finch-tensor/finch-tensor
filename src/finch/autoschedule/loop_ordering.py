@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from functools import reduce
 from itertools import chain as join_chains
 
@@ -198,7 +199,8 @@ class CycleInFields(Exception): ...
 
 
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
-    chains = [c for c in chains if len(c) > 0]
+    # chains = [c for c in chains if len(c) > 0]
+    chains = deepcopy(chains)
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
         for f in chain[1:]:
@@ -235,7 +237,6 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
         logger.warning("Cycle in fields detected, need to permute.")
         need_fix = True
         result = root.fields()
-
     if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
         set(join_chains(*chains))
     ):
@@ -243,7 +244,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
         for chain in chains:
             for f in chain:
                 counts[f] = counts.get(f, 0) + 1
-        result = tuple(sorted(result, key=lambda x: counts[x] == 1))
+        result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
     return result
 
 
@@ -256,6 +257,7 @@ def set_loop_order(plan: Plan) -> Plan:
                 case Query(lhs, Aggregate(op, init, arg, idxs)):
                     assert isinstance(arg, LogicExpression)
                     idxs_2 = _heuristic_loop_order(arg)
+
                     rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):

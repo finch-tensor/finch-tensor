@@ -246,5 +246,16 @@ class SparseHashLevel(Level):
     def val(self) -> Any:
         return self.lvl.val
 
+    def iter_entries(self, pos: int):
+        ptr = self.ptr.arr
+        perm = self.perm.arr
+        tbl = self.tbl.arr
+        for k in range(int(ptr[pos]), int(ptr[pos + 1])):
+            entry = tbl[int(perm[k])]
+            index = int(entry["element_1"])
+            q = int(entry["element_2"])
+            for idx, val in self.lvl.iter_entries(q):
+                yield (index, *idx), val
+
     def __str__(self) -> str:
         return f"SparseHashLevel(lvl={self.lvl}, dim={self.dimension})"

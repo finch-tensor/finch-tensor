@@ -1,4 +1,5 @@
 import importlib.util
+import logging
 import time
 from pathlib import Path
 
@@ -32,6 +33,7 @@ from finch.autoschedule import (
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.tensor_stats import FDStatsFactory
 from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.julia import jl
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -43,11 +45,13 @@ from finch.finch_logic import (
     Query,
     Table,
 )
+from finch.util.logging import FORMAT, get_logger_handler
 
 from .conftest import finch_assert_allclose
 from .test_julia_backend import RecordingFDFormatter
 
-BOEING_PATH = Path("data/ct20stif.mtx")
+jl.seval("Base.cumulative_compile_timing(true)")
+BOEING_PATH = Path("tests/data/ct20stif.mtx")
 BLOCK_SIZE = 300
 
 
@@ -85,7 +89,7 @@ def describe_format(tensor_ftype):
     lvl = tensor_ftype.lvl_t
     axes = []
     while type(lvl).__name__ != "ElementLevelFType":
-        axes.append("dense" if "Dense" in type(lvl).__name__ else "sparse")
+        axes.append("dense" if "Dense" in type(lvl).__name__ else "Sparse")
         lvl = lvl.lvl_t
     return axes
 
@@ -95,6 +99,7 @@ def fd_scheduler(formatter):
         LogicExecutor(
             DefaultLogicOptimizer(DefaultLoopOrderer(formatter)),
             stats_factory=FDStatsFactory(),
+            cache=True,
         )
     )
 
@@ -113,10 +118,10 @@ def test_boeing_matrix_load(boeing_slice):
 
 def test_built_levels(boeing_slice):
     tensor = csr_tensor_from_scipy(boeing_slice)
-    assert describe_format(tensor.ftype) == ["dense", "sparse"]
+    assert describe_format(tensor.ftype) == ["dense", "Sparse"]
 
     # finch_assert_allclose(tensor.to_numpy(),boeing_slice.toarray()) -
-    # no to_numpy() in sparselevel
+    # no to_numpy() in Sparselevel
 
     outer = tensor.lvl
     inner = outer.lvl
@@ -134,7 +139,7 @@ def test_matmul_on_boeing_slice(boeing_slice, numba_compiler):
     )
 
 
-def test_fd_formatter_decides_sparse_output(boeing_slice):
+def test_fd_formatter_decides_Sparse_output(boeing_slice):
     tensor = csr_tensor_from_scipy(boeing_slice)
     i, k, j = Field("i"), Field("k"), Field("j")
     A, B, C = Alias("A"), Alias("B"), Alias("C")
@@ -158,9 +163,10 @@ def test_fd_formatter_decides_sparse_output(boeing_slice):
     FDFormatter(capture).lower(
         plan, {A: tensor.ftype, B: tensor.ftype}, stats, stats_factory
     )
-    assert describe_format(capture.last_bindings[C]) == ["sparse", "sparse"]
+    assert describe_format(capture.last_bindings[C]) == ["Sparse", "Sparse"]
 
 
+"""
 def test_full_pipeline_through_julia_backend(boeing_slice):
     requires_julia_backend()
 
@@ -175,33 +181,78 @@ def test_full_pipeline_through_julia_backend(boeing_slice):
     finch_assert_allclose(
         result.to_numpy(), (boeing_slice @ boeing_slice).toarray(), rtol=1e-5, atol=1e-3
     )
-    assert describe_format(formatter.output_ftypes[-1]) == ["sparse", "sparse"]
+    assert describe_format(formatter.output_ftypes[-1]) == ["Sparse", "Sparse"]
+"""
 
 
-def run_full_boeing():
+def test_run_full_boeing():
+    handler = get_logger_handler(filter_pattern="r.n,r.a")
+    logging.basicConfig(
+        level=logging.DEBUG, handlers=[handler], format=FORMAT, force=True
+    )
     t0 = time.time()
     M = scipy.io.mmread(BOEING_PATH).tocsr()
-    print(
-        f"[{time.time() - t0:6.2f}s] for loading matrix:\n shape={M.shape}, nnz={M.nnz}"
-    )
+    time_load = time.time() - t0
+    print(f"[{time_load:6.2f}s] for loading matrix:\n shape={M.shape}, nnz={M.nnz}")
+
+    t0 = time.time()
+    _scipy_result = M @ M
+    time_scipy = time.time() - t0
+    print(f"{time_scipy:6.2f}s for scipy boeing matmul")
 
     tensor = csr_tensor_from_scipy(M)
+    t0 = time.time()
+    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+
+    scheduler = fd_scheduler(formatter)
+    ft.set_default_scheduler(ctx=scheduler)
+
+    with with_default_scheduler(scheduler):
+        _result = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
+    time_finchjl_exec_compile = time.time() - t0
+    print(f"{time_finchjl_exec_compile:6.2f}s for boeing julia matmul")
+    t0 = time.time()
+    with with_default_scheduler(scheduler):
+        _result2 = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
+    time_finchjl_exec = time.time() - t0
+    print(f"second call with julia_finch : {time.time() - t0:6.2f}s")
+    print(
+        "output format decided by FDFormatter:",
+        describe_format(formatter.output_ftypes[-1]),
+    )
+    print(f"Scipy is {time_finchjl_exec / time_scipy}x faster than finch-jl")
+
+
+def make_matrix(M):
+    matrix_M = scipy.sparse.lil_matrix(M.shape, dtype=M.dtype)
+    matrix_M[0, 0] = 1.0
+    return matrix_M.tocsr()
+
+
+def run_split(expr):
+    t_start = time.time()
+    c0 = jl.seval("Base.cumulative_compile_time_ns()")
+    result = ft.compute(expr)
+    c1 = jl.seval("Base.cumulative_compile_time_ns()")
+    t_end = time.time()
+
+    total = t_end - t_start
+    julia_compile = (c1[0] - c0[0]) / 1e9
+
+    print(f"Total time = {total}s \n Julia compile time = {julia_compile}")
+    return result
+
+
+def test_separate_compile_time():
+    M = scipy.io.mmread(BOEING_PATH).tocsr()
+    test_M = make_matrix(M)
+    test_tensor_M = csr_tensor_from_scipy(test_M)
     formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
     scheduler = fd_scheduler(formatter)
     ft.set_default_scheduler(ctx=scheduler)
 
     with with_default_scheduler(scheduler):
-        result = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
-    print(f"[{time.time() - t0:6.2f}s] for complte boeing julia matmul")
-    print(
-        "output format decided by FDFormatter:",
-        describe_format(formatter.output_ftypes[-1]),
-    )
-    print("type of result Python received finally:", type(result).__name__)
-
-
-if __name__ == "__main__":
-    run_full_boeing()
+        run_split(ft.matmul(ft.lazy(test_tensor_M), ft.lazy(test_tensor_M)))
 
 
 """

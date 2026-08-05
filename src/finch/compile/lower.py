@@ -667,7 +667,7 @@ def instantiate(ctx, prgm):
 
     def instantiate_node(node):
         match node:
-            case ntn.Access(tns, mode, idxs):
+            case ntn.Access(ntn.Slot() as tns, mode, idxs):
                 if tns not in undeclared:
                     return ntn.Access(
                         instantiate_tns(ctx, tns, mode),

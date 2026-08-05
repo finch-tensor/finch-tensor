@@ -252,5 +252,11 @@ class DenseLevel(Level):
     def val(self) -> Any:
         return self.lvl.val
 
+    def iter_entries(self, pos: int):
+        dimension = int(self.dimension)
+        for i in range(dimension):
+            for idx, val in self.lvl.iter_entries(pos * dimension + i):
+                yield (i, *idx), val
+
     def __str__(self):
         return f"DenseLevel(lvl={self.lvl}, dim={self.dimension})"
