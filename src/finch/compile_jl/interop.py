@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import numpy as np
 
-from finch.codegen import NumpyBuffer
+from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.finch_assembly import Buffer
 from finch.tensor import (
     BufferizedNDArray,
@@ -17,6 +17,7 @@ from finch.tensor import (
     SparseCOOLevel,
     SparseHashLevel,
     SparseListLevel,
+    element,
 )
 from finch.tensor.np_wrapper import NumPyWrapper
 
@@ -125,6 +126,87 @@ def level_to_jl(level: Level):
             raise ValueError(f"Unsupported Finch level type: {type(level)}")
 
 
+def _jl_index_buffer_to_python(v) -> NumpyBuffer:
+
+    raw = np.asarray(v.data) if jl.isa(v, jl.Finch.PlusOneVector) else np.asarray(v) - 1
+    return NumpyBuffer(np.ascontiguousarray(raw).astype(np.intp))
+
+
+def _jl_buffer_to_python(v) -> NumpyBuffer:
+    return NumpyBuffer(np.ascontiguousarray(np.asarray(v)).copy())
+
+
+def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> NumpyBuffer:
+    raw = np.asarray(v)
+    dtype = np.dtype([(f"element_{i}", raw.dtype[i]) for i in range(n_fields)])
+    out = np.empty(raw.shape, dtype=dtype)
+    for i in range(n_fields):
+        out[f"element_{i}"] = raw[f"f{i}"] - offset
+    return NumpyBuffer(out)
+
+
+def jl_level_to_python(jl_lvl) -> Level:
+    if jl.isa(jl_lvl, jl.Finch.ElementLevel):
+        fill_value = jl.Finch.level_fill_value(jl.typeof(jl_lvl))
+        val = np.ascontiguousarray(np.asarray(jl_lvl.val)).copy()
+        elem_ftype = element(
+            jl_dtypes.to_fl_dtype(val.dtype)(fill_value),
+            jl_dtypes.to_fl_dtype(val.dtype),
+            jl_dtypes.int_,
+            NumpyBufferFType,
+        )
+        return ElementLevel(elem_ftype, NumpyBuffer(val))
+
+    if jl.isa(jl_lvl, jl.Finch.DenseLevel):
+        return DenseLevel(
+            jl_level_to_python(jl_lvl.lvl),
+            np.intp(int(jl_lvl.shape)),
+        )
+
+    if jl.isa(jl_lvl, jl.Finch.SparseListLevel):
+        return SparseListLevel(
+            jl_level_to_python(jl_lvl.lvl),
+            np.intp(int(jl_lvl.shape)),
+            _jl_index_buffer_to_python(jl_lvl.ptr),
+            _jl_index_buffer_to_python(jl_lvl.idx),
+        )
+
+    if jl.isa(jl_lvl, jl.Finch.SparseByteMapLevel):
+        return SparseByteMapLevel(
+            jl_level_to_python(jl_lvl.lvl),
+            np.intp(int(jl_lvl.shape)),
+            _jl_index_buffer_to_python(jl_lvl.ptr),
+            _jl_buffer_to_python(jl_lvl.tbl),
+            _jl_index_buffer_to_python(jl_lvl.srt),
+        )
+
+    if jl.isa(jl_lvl, jl.Finch.SparseCOOLevel):
+        coo_shape = tuple(np.intp(int(s)) for s in jl_lvl.shape)
+        tbl = tuple(_jl_index_buffer_to_python(idx) for idx in jl_lvl.tbl)
+        return SparseCOOLevel(
+            jl_level_to_python(jl_lvl.lvl),
+            coo_shape,
+            _jl_index_buffer_to_python(jl_lvl.ptr),
+            tbl,
+        )
+
+    if jl.isa(jl_lvl, jl.Finch.SparseHashLevel):
+        single_writer = bool(jl.typeof(jl_lvl).parameters[1])
+        return SparseHashLevel(
+            jl_level_to_python(jl_lvl.lvl),
+            np.intp(int(jl_lvl.shape)),
+            _jl_index_buffer_to_python(jl_lvl.ptr),
+            _jl_buffer_to_python(jl_lvl.tbl_ctrl),
+            _jl_tuple_buffer_to_python(jl_lvl.tbl, 3, offset=1),
+            _jl_buffer_to_python(jl_lvl.pool),
+            _jl_index_buffer_to_python(jl_lvl.perm),
+            subtables=int(jl_lvl.subtables),
+            single_writer=single_writer,
+        )
+
+    raise ValueError(f"Unsupported Julia level type for recovery: {jl.typeof(jl_lvl)}")
+
+
 def _ndarray_to_jl_tensor(
     arr: np.ndarray,
     fill_value: Any,
@@ -176,44 +258,7 @@ def scalar_to_jl(val):
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(buf.item()), jl.Vector(buf)))
 
 
-def _dense_jl_tensor_to_numpy(obj) -> np.ndarray:
-    if len(tuple(jl.size(obj))) == 0:
-        return np.asarray(jl.getindex(obj))
-
-    if _is_dense_jl_tensor(obj):
-        shape = tuple(jl.size(obj))
-        dense_level = obj.lvl
-    else:
-        shape = tuple(jl.size(obj))
-        fill_value = jl.fill_value(obj)
-        fill_type = jl_dtypes.to_jl_type(jl_dtypes.to_fl_dtype(fill_value))
-        dense_level = jl.Element(jc.convert(fill_type, fill_value))
-        for _ in shape:
-            dense_level = jl.Dense(dense_level)
-        dense_level = jl.Tensor(dense_level, obj).lvl
-
-    for _ in shape:
-        dense_level = dense_level.lvl
-
-    arr = np.asarray(jl.reshape(dense_level.val, shape))
-    if len(shape) > 0:
-        arr = arr.transpose()
-    return arr.copy()
-
-
-def _is_dense_jl_tensor(obj) -> bool:
-    lvl = obj.lvl
-    for _ in tuple(jl.size(obj)):
-        if not jl.isa(lvl, jl.Finch.Dense):
-            return False
-        lvl = lvl.lvl
-    return True
-
-
 def jl_tensor_to_python(obj):
     if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
         return obj
-    return BufferizedNDArray.from_numpy(
-        _dense_jl_tensor_to_numpy(obj),
-        fill_value=jl.fill_value(obj),
-    )
+    return FiberTensor(jl_level_to_python(obj.lvl))
