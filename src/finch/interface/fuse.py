@@ -50,6 +50,9 @@ Performance:
   or `with_scheduler`.
 """
 
+from collections.abc import Callable
+from typing import Any
+
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
     Alias,
@@ -123,25 +126,25 @@ def compute(arg, ctx=None):
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
 
-def fuse(f, *args, ctx=None):
+def fuse(f: Callable, *args: Any, ctx: Any = None) -> Any:
     """
     Fuses multiple array operations into a single kernel. This function allows for
     composing operations and executing them efficiently.
 
-    Parameters:
-        - f: The function representing the operation to be fused, returning a tensor or
-        tuple of tensor results.
-        - *args: The input arrays or LazyTensors to be fused.
-        - ctx: The scheduler to use for computation. Defaults to the result of
-        `get_default_scheduler()`.
+    Args:
+        f: The function representing the operation to be fused, returning a tensor or
+            tuple of tensor results.
+        *args: The input arrays or LazyTensors to be fused.
+        ctx: The scheduler to use for computation. Defaults to the result of
+            `get_default_scheduler()`.
 
     Returns:
-        - The result of the fused operation, a tensor or tuple of tensors.
+        The result of the fused operation, a tensor or tuple of tensors.
     """
     if ctx is None:
         ctx = get_default_scheduler()
 
-    args = [lazy(arg) for arg in args]
+    args = tuple(lazy(arg) for arg in args)
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)

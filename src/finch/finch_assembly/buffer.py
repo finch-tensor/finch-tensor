@@ -51,7 +51,7 @@ class Buffer(FTyped, ABC):
         ...
 
 
-def length_type(arg: Any):
+def length_type(arg: Any) -> FType:
     """The length type of the given argument. The length type is the type of
     the value returned by len(arg).
 
