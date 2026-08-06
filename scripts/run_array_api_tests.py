@@ -4,12 +4,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).parents[1]
 
-def test_array_api():
+
+def main() -> None:
     array_api_tests_dir = Path(
         os.environ.get(
             "ARRAY_API_TESTS_DIR",
-            Path(__file__).parent.parent / "array-api-tests",
+            PROJECT_ROOT / "array-api-tests",
         ),
     ).resolve()
     array_api_tests_rev = os.environ.get(
@@ -18,7 +20,7 @@ def test_array_api():
     array_api_tests_skips = Path(
         os.environ.get(
             "ARRAY_API_TESTS_SKIPS",
-            Path(__file__).parent.parent / "array-api-skips.txt",
+            PROJECT_ROOT / "array-api-skips.txt",
         ),
     ).resolve()
     array_api_tests_args = shlex.split(os.environ.get("ARRAY_API_TESTS_ARGS", "-vv -s"))
@@ -42,6 +44,9 @@ def test_array_api():
                 str(array_api_tests_dir),
             ],
             check=True,
+            stdin=sys.stdin,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
         )
 
     array_api_tests_git = [
@@ -58,6 +63,9 @@ def test_array_api():
             "-xddf",
         ],
         check=True,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
 
     print("[array-api] fetching latest refs...", flush=True)
@@ -67,6 +75,9 @@ def test_array_api():
             "fetch",
         ],
         check=False,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
 
     print("[array-api] checking out target revision...", flush=True)
@@ -78,6 +89,9 @@ def test_array_api():
             array_api_tests_rev,
         ],
         check=True,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
 
     print("[array-api] initializing submodules...", flush=True)
@@ -90,11 +104,14 @@ def test_array_api():
             "--recursive",
         ],
         check=True,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
 
     # Run the tests using pytest
     print("[array-api] running external array-api-tests...", flush=True)
-    result = subprocess.run(
+    subprocess.run(
         [
             sys.executable,
             "-m",
@@ -109,6 +126,7 @@ def test_array_api():
             "--disable-warnings",
             "--skips-file",
             str(array_api_tests_skips),
+            *sys.argv[1:],
         ],
         env={
             **os.environ,
@@ -116,8 +134,13 @@ def test_array_api():
             "PYTEST_ADDOPTS": "",
             "PYTHONUNBUFFERED": "1",
         },
-        check=False,
-        text=True,
+        check=True,
+        stdin=sys.stdin,
+        stdout=sys.stdout,
+        stderr=sys.stderr,
     )
     print("[array-api] array-api-tests completed!", flush=True)
-    assert result.returncode == 0, "Array API tests failed"
+
+
+if __name__ == "__main__":
+    main()

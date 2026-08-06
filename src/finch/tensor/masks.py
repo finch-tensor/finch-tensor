@@ -7,7 +7,8 @@ from finch import finch_notation as ntn
 from finch.algebra import ImmutableStructFType, ffuncs
 from finch.compile import looplets as lplt
 
-from .fiber_tensor import FiberTensor, FiberTensorFType, Level, LevelFType
+from .fiber_tensor import FiberTensor, FiberTensorFType
+from .level import Level, LevelFType
 from .scalar import Scalar
 
 

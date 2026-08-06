@@ -255,7 +255,6 @@ def set_loop_order(plan: Plan) -> Plan:
         def rule_1(query):
             match query:
                 case Query(lhs, Aggregate(op, init, arg, idxs)):
-                    assert isinstance(arg, LogicExpression)
                     idxs_2 = _heuristic_loop_order(arg)
 
                     rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
@@ -281,6 +280,14 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
+    def _set_loop_order(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> Plan:
+        return set_loop_order(prgm)
+
     def lower(
         self,
         prgm: LogicStatement,
@@ -291,7 +298,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = set_loop_order(prgm)
+            prgm = self._set_loop_order(prgm, stats, stats_factory)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)

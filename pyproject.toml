@@ -5,6 +5,8 @@ version = "0.6.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<4'
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "numpy>=2.0,<3",
     "numba>=0.61,<2",
@@ -27,10 +29,9 @@ test = [
     "ndindex>=1.8,<2",
     "pre-commit>=3.6.0,<5",
     "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.8.0,<4",
     "sparse>=0.17.0",
-    "scipy>=1.7,<2",
     "mypy>=1.15,<2",
-    "pytest-mypy>=1,<2",
     "pytest-regressions>=2.8.1,<3",
 ]
 benchmark = [
@@ -41,6 +42,7 @@ docs = [
     "mkdocs-material>=9.7.7,<10",
     "mkdocstrings[python]>=1.0.6",
     "mkdocs-autoapi>=0.4.1",
+    "ruff>=0.6.0",
 ]
 
 
@@ -101,22 +103,38 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
-depends-on = [{task = "compile", environment = "test"}]
+cmd = "python -m pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "logical" },
+]
+depends-on = [
+    { task = "compile", environment = "test" },
+    "type-check",
+    { task = "test-array-api", args = ["{{ njobs }}"] },
+]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "python -m pytest -m c_backend"
+cmd = "python -m pytest -m c_backend -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "0" },
+]
 depends-on = [{task = "compile", environment = "test-c"}]
 default-environment = "test-c"
 
 [tool.pixi.feature.test.tasks.test-mlir]
-cmd = "python -m pytest -m mlir_backend"
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "python -m pytest -m mlir_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
-cmd = "python -m pytest tests/test_julia_backend.py"
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "python -m pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -129,12 +147,19 @@ default-environment = "benchmark"
 cmd = "python -m mypy"
 default-environment = "test"
 
+[tool.pixi.feature.test.tasks.test-array-api]
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "python scripts/run_array_api_tests.py -n {{ njobs }}"
+default-environment = "test"
+
 [tool.pixi.feature.docs.tasks.serve-docs]
-cmd = "mkdocs serve"
+cmd = "mkdocs serve --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.docs.tasks.build-docs]
-cmd = "mkdocs build"
+cmd = "mkdocs build --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.mindeps.dependencies]
@@ -188,7 +213,7 @@ pre-commit = "pre-commit run -a"
 
 [tool.ruff]
 extend-exclude = [
-    "tests/reference",
+    "src/finch/tests/reference",
 ]
 line-length = 88
 
@@ -218,9 +243,6 @@ section-order = [
 [tool.mypy]
 ignore_missing_imports = true
 exclude = [
-    "tests/reference",
+    "src/finch/tests/reference",
 ]
-files = [
-    "src",
-    "tests",
-]
+files = ["src"]
