@@ -677,9 +677,15 @@ def test_scheduler_e2e_sddmm(file_regression):
         (
             Query(
                 Alias("AB"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (k, j))),
+                Reorder(
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Reorder(Table(Alias("A"), (i, j)), (i, j)),
+                            Reorder(Table(Alias("B"), (k, j)), (j, k)),
+                        ),
+                    ),
+                    (i, j, k),
                 ),
             ),
             # matmul
@@ -692,9 +698,15 @@ def test_scheduler_e2e_sddmm(file_regression):
             # elemwise
             Query(
                 Alias("RES"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (Table(Alias("C"), (i, j)), Table(Alias("S"), (j, i))),
+                Reorder(
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Reorder(Table(Alias("C"), (i, j)), (i, j)),
+                            Reorder(Table(Alias("S"), (j, i)), (i, j)),
+                        ),
+                    ),
+                    (i, j),
                 ),
             ),
             Produces((Alias("RES"),)),
@@ -717,7 +729,9 @@ def test_scheduler_e2e_sddmm(file_regression):
     plan_opt = capture.last_prgm
 
     file_regression.check(
-        str(plan_opt), extension=".txt", basename="test_scheduler_e2e_sddmm_plan"
+        reset_name_counts(str(plan_opt)),
+        extension=".txt",
+        basename="test_scheduler_e2e_sddmm_plan",
     )
 
 
