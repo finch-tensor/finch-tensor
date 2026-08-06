@@ -144,11 +144,9 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                 join_args.append(self._mapjoin_union(op, *union_args))
 
             return self._mapjoin_join(op, *join_args)
-        else:
-            if len(union_args) > 1:
-                return self._mapjoin_union(op, *args)
-            else:
-                return self._mapjoin_join(op, *args)
+        if len(union_args) > 1:
+            return self._mapjoin_union(op, *args)
+        return self._mapjoin_join(op, *args)
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: TS) -> TS:
         raise NotImplementedError

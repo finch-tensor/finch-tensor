@@ -1,4 +1,3 @@
-import importlib
 import threading
 from contextlib import contextmanager
 
@@ -21,11 +20,11 @@ from finch.finch_notation.interpreter import NotationInterpreter
 from .compiler import LogicCompiler
 from .executor import LogicExecutor
 from .formatter import DefaultLogicFormatter
-from .smart_formatter import FDFormatter
 from .galley_optimize import GalleyLogicalOptimizer
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer
 from .optimize import DefaultLogicOptimizer
+from .smart_formatter import FDFormatter
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -130,7 +129,7 @@ COMPILE_JULIA = LogicNormalizer(
         DefaultLogicOptimizer(
             DefaultLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler())))
         ),
-        stats_factory = FDStatsFactory()
+        stats_factory=FDStatsFactory(),
     )
 )
 
