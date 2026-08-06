@@ -9,10 +9,11 @@ from pathlib import Path
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch
 import finch.finch_assembly as asm
-from finch import dense, element, ffuncs, fiber_tensor, ftype
+from finch import dense, element, ffuncs, fiber_tensor, ftype, sparse_list
 from finch.algebra import ftypes
 from finch.codegen import (
     CCompiler,
@@ -30,6 +31,11 @@ from finch.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
     serialize_to_c,
+)
+from finch.codegen.mlir_codegen import (
+    construct_from_mlir,
+    deserialize_from_mlir,
+    serialize_to_mlir,
 )
 from finch.codegen.numba_codegen import (
     construct_from_numba,
@@ -1171,7 +1177,7 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
         dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
     )
 
-    with caplog.at_level(logging.DEBUG, logger="finch.codegen.mlir_codegen.mlir"):
+    with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.matmul(
                 finch.lazy(finch.asarray(a, format=fmt)),
@@ -1212,3 +1218,289 @@ def test_mlir_resize_not_supported():
     )
     with pytest.raises(NotImplementedError, match="Resize"):
         MLIRCompiler()(prgm)
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sparse_matmul_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+
+    fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    sparse_mat = []
+    for arr in (a, b):
+        csr = sps.csr_array(arr)
+        sparse_mat.append(
+            fmt.from_fields(
+                fmt.lvl_t.from_fields(
+                    fmt.lvl_t.lvl_t.from_fields(
+                        fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                        np.intp(arr.shape[1]),
+                        NumpyBuffer(csr.indptr.astype(np.intp)),
+                        NumpyBuffer(csr.indices.astype(np.intp)),
+                    ),
+                    np.intp(arr.shape[0]),
+                    np.intp(arr.shape[1]),
+                ),
+                arr.shape,
+                np.intp(0),
+                False,
+            )
+        )
+
+    with caplog.at_level(logging.DEBUG):
+        result = finch.compute(
+            finch.matmul(
+                finch.lazy(sparse_mat[0]),
+                finch.lazy(sparse_mat[1]),
+            )
+        )
+
+    finch_assert_equal(result, a @ b)
+
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    mlir_code = re.sub(r"%_A_(\d+)_\d+", r"%_A_\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+def test_sddmm_mlir_regression(file_regression, caplog):
+    dtype = np.float64
+    a = np.array(
+        [[2, 0, 3], [1, 3, -1], [1, 1, 8]],
+        dtype=dtype,
+    )
+    b = np.array(
+        [[4, 1, 9], [2, 2, 4], [4, 4, -5]],
+        dtype=dtype,
+    )
+    s = np.array(
+        [[1, 0, 1], [0, 1, 0], [1, 0, 1]],
+        dtype=dtype,
+    )
+
+    dense_fmt = fiber_tensor(
+        dense(dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)))
+    )
+    sparse_fmt = fiber_tensor(
+        dense(
+            sparse_list(
+                element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType),
+                ftype(np.intp),
+            )
+        )
+    )
+
+    csr = sps.csr_array(s)
+    sparse_s = sparse_fmt.from_fields(
+        sparse_fmt.lvl_t.from_fields(
+            sparse_fmt.lvl_t.lvl_t.from_fields(
+                sparse_fmt.lvl_t.lvl_t.lvl_t.from_fields(csr.data),
+                np.intp(s.shape[1]),
+                NumpyBuffer(csr.indptr.astype(np.intp)),
+                NumpyBuffer(csr.indices.astype(np.intp)),
+            ),
+            np.intp(s.shape[0]),
+            np.intp(s.shape[1]),
+        ),
+        s.shape,
+        np.intp(0),
+        False,
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        result = finch.compute(
+            finch.multiply(
+                finch.lazy(sparse_s),
+                finch.matmul(
+                    finch.lazy(finch.asarray(a, format=dense_fmt)),
+                    finch.lazy(finch.asarray(b, format=dense_fmt)),
+                ),
+            )
+        )
+
+    finch_assert_equal(result, s * (a @ b))
+
+    mlir_code = next(
+        record.message
+        for record in caplog.records
+        if record.name == "finch.codegen.mlir_codegen.mlir"
+        and record.message.startswith("Compiling MLIR code:\n")
+    )
+    mlir_code = re.sub(r"%(_A_\d+|__A)(?:_\d+)+", r"%\1", mlir_code)
+    file_regression.check(mlir_code, extension=".mlir")
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,np_type,c_type",
+    [
+        (3, np.int64, ctypes.c_int64),
+        (1, np.float32, ctypes.c_float),
+        (1.2, np.float64, ctypes.c_double),
+    ],
+)
+def test_np_mlir_serialization(value, np_type, c_type):
+    fmt = ftype(np_type)
+    serialized = serialize_to_mlir(fmt, np_type(value))
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == np_type(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "value,fmt,c_type",
+    [
+        (3, ftype(np.int64), ctypes.c_int64),
+        (1, ftype(np.float32), ctypes.c_float),
+        (1.2, ftype(np.float64), ctypes.c_double),
+    ],
+)
+def test_ctypes_mlir_serialization(value, fmt, c_type):
+    cvalue = c_type(value)
+    serialized = serialize_to_mlir(fmt, cvalue.value)
+    assert serialized.value == c_type(value).value
+    assert isinstance(serialized, c_type)
+    constructed = construct_from_mlir(fmt, serialized)
+    assert constructed == fmt(value)
+    assert deserialize_from_mlir(fmt, constructed, serialized) is None
+
+
+@mlir_backend
+@pytest.mark.usefixtures("mlir_compiler")
+@pytest.mark.parametrize("dtype", [np.float64, np.int64])
+@pytest.mark.parametrize(
+    "a",
+    [
+        np.array([[1, 2, 3], [4, 5, 6]]),
+        np.array([[2, 0, 3], [1, 3, -1], [1, 1, 8]]),
+    ],
+)
+def test_e2e_transpose_mlir(a, dtype):
+    a = a.astype(dtype)
+    wa = finch.lazy(finch.asarray(a))
+    result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
+    finch_assert_equal(result, a.T)
+
+
+@mlir_backend
+def test_mlir_ifelse_branch_local_var():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    c_v = asm.Variable("c", ftypes.bool_)
+    x_v = asm.Variable("x", ftype(np.float64))
+    t_v = asm.Variable("t", ftype(np.float64))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("kern", ftypes.none_),
+                (b_v, c_v, x_v),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.IfElse(
+                            c_v,
+                            asm.Block(
+                                (
+                                    # `t` exists only in this branch and must
+                                    # not be merged out of the scf.if
+                                    asm.Assign(
+                                        t_v,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (x_v, asm.Literal(np.float64(1.0))),
+                                        ),
+                                    ),
+                                    asm.Store(b_slt, asm.Literal(np.intp(0)), t_v),
+                                )
+                            ),
+                            asm.Block(
+                                (asm.Store(b_slt, asm.Literal(np.intp(0)), x_v),)
+                            ),
+                        ),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    mod.kern(buf, True, np.float64(41.0))
+    assert buf.arr[0] == 42.0
+    mod.kern(buf, False, np.float64(7.0))
+    assert buf.arr[0] == 7.0
+
+
+@mlir_backend
+def test_mlir_setattr_in_while():
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+
+    p_var = asm.Variable("p", ftype(p))
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("advance", ftype(np.float64)),
+                (p_var,),
+                asm.Block(
+                    (
+                        asm.WhileLoop(
+                            asm.Call(
+                                asm.Literal(ffuncs.lt),
+                                (
+                                    asm.GetAttr(p_var, asm.Literal("x")),
+                                    asm.Literal(np.float64(10.0)),
+                                ),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.SetAttr(
+                                        p_var,
+                                        asm.Literal("x"),
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("x")),
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(asm.GetAttr(p_var, asm.Literal("x"))),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    assert mod.advance(p) == np.float64(11.0)

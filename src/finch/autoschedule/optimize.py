@@ -263,6 +263,12 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
     root = Rewrite(PreWalk(rule_1))(root)
     root = push_fields(root)
 
+    def unwrap_reorder(ex):
+        match ex:
+            case Reorder(Aggregate() as agg, idxs) if set(idxs) == set(agg.fields()):
+                return agg
+        return ex
+
     def rule_2(ex):
         match ex:
             case MapJoin(
@@ -272,7 +278,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                 for idx, item in reversed(list(enumerate(args))):
                     before_item = args[:idx]
                     after_item = args[idx + 1 :]
-                    match item:
+                    match unwrap_reorder(item):
                         case Aggregate(Literal(g), Literal(init), arg, idxs) as agg if (
                             is_distributive(f, g)
                             and is_annihilator(f, init)

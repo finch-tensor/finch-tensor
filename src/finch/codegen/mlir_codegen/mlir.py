@@ -21,6 +21,7 @@ from finch.finch_assembly import BufferFType
 from finch.symbolic import Context, Form, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
+from .scansearch import SCANSEARCH
 from .stages import MLIRCode, MLIRLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
@@ -28,6 +29,9 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_ML
 
 mlir_memrefs: dict[Any, Any] = {}
 mlir_structs: dict[Any, Any] = {}
+mlir_globals: dict[str, str] = {
+    "scansearch": SCANSEARCH,
+}
 MLIR_PIPELINE = (
     "builtin.module("
     "expand-strided-metadata,"
@@ -67,6 +71,12 @@ class MLIRBinaryOperator(MLIROperator):
 
 
 class MLIRKernel(asm.AssemblyKernel):
+    """
+    A class to represent MLIR kernel. It validates and serializes arguments,
+    invokes the compiled function, and reconstructs the result.
+
+    """
+
     def __init__(self, engine, func_name, ret_type, argtypes):
         self.engine = engine
         self.func_name = func_name
@@ -113,6 +123,11 @@ class MLIRKernel(asm.AssemblyKernel):
 
 
 class MLIRLibrary(asm.AssemblyLibrary):
+    """
+    A class to represent MLIR module.
+
+    """
+
     def __init__(self, mlir_module, kernels):
         self.mlir_module = mlir_module
         self.kernels = kernels
@@ -213,8 +228,24 @@ class MLIRForm(Form):
                 inner = dict(defined)
                 inner[name] = depth + 1
                 cls.validate_stmt(func_name, body, inner, depth + 1)
-            # TODO:
-            case asm.Unpack(_, _) | asm.Repack(_) | asm.Store(_, _, _) | asm.Return(_):
+            case asm.BufferLoop(_, asm.Variable(name, _), body):
+                inner = dict(defined)
+                inner[name] = depth + 1
+                cls.validate_stmt(func_name, body, inner, depth + 1)
+            case asm.If(_, body):
+                cls.validate_stmt(func_name, body, defined, depth)
+            case asm.IfElse(_, body, else_body):
+                cls.validate_stmt(func_name, body, defined, depth)
+                cls.validate_stmt(func_name, else_body, defined, depth)
+            case asm.WhileLoop(_, body):
+                cls.validate_stmt(func_name, body, defined, depth)
+            case (
+                asm.Unpack(_, _)
+                | asm.Repack(_)
+                | asm.SetAttr(_, _, _)
+                | asm.Store(_, _, _)
+                | asm.Return(_)
+            ):
                 pass
 
             case _:
@@ -225,6 +256,11 @@ class MLIRForm(Form):
 
 
 class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
+    """
+    A class to compile and run FinchAssembly.
+
+    """
+
     def __init__(self, ctx: MLIRLowerer | None = None):
         self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
 
@@ -299,6 +335,8 @@ def mlir_function_name(op, arg: FType) -> str:
             if MLIROperator.is_unsigned(arg):
                 return "arith.maxui"
             return "arith.maxsi"
+        case ffuncs.scansearch:
+            return "scansearch"
         case ffuncs.and_:
             return "arith.andi"
         case ffuncs.or_:
@@ -383,6 +421,26 @@ def mlir_new_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
     return res
 
 
+def mlir_call_function_call(
+    mlir_name: str, ret_type: FType, ctx: MLIRContext, *args: Any
+) -> str:
+    arg_values = []
+    for arg in args:
+        match arg:
+            case asm.Slot():
+                arg_values.append(ctx.resolve(arg).buffer)
+            case _:
+                arg_values.append(ctx(arg))
+
+    arg_types = ", ".join(mlir_type(arg.result_type) for arg in args)
+    res = ctx.new_ssa()
+    ctx.exec(
+        f"{ctx.feed}{res} = func.call @{mlir_name}("
+        f"{', '.join(arg_values)}) : ({arg_types}) -> {mlir_type(ret_type)}"
+    )
+    return res
+
+
 def mlir_function_call(op, ctx, *args: Any) -> str:
     match op:
         case MLIROperator():
@@ -428,6 +486,13 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
         case ffuncs.not_ | ffuncs.invert:
             return mlir_new_function_call(
                 mlir_function_name(op, args[0].result_type), ctx, *args
+            )
+        case ffuncs.scansearch:
+            return mlir_call_function_call(
+                mlir_function_name(op, args[0].result_type),
+                op.return_type(*(arg.result_type for arg in args)),
+                ctx,
+                *args,
             )
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
@@ -728,6 +793,14 @@ class MLIRStackFType(ABC):
 
 
 class MLIRContext(Context):
+    """
+    A context for generating MLIR code.
+
+    The context tracks SSA values, variable and slot bindings, indentation,
+    nested blocks, constants, and operations emitted into the MLIR module.
+
+    """
+
     def __init__(
         self,
         tab="  ",
@@ -775,7 +848,18 @@ class MLIRContext(Context):
         return "\n".join([*self.preamble, *self.epilogue])
 
     def emit_global(self):
-        return f"module {{\n{self.emit()}\n}}\n"
+        body = self.emit()
+        new_funcs = []
+
+        for name, value in mlir_globals.items():
+            if f"func.call @{name}(" in body:
+                new_funcs.append(value)
+
+        funcs = "\n".join(new_funcs)
+        if funcs:
+            funcs += "\n"
+
+        return f"module {{\n{funcs}{body}\n}}\n"
 
     def block(self) -> MLIRContext:
         blk = super().block()
@@ -856,6 +940,22 @@ class MLIRContext(Context):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
                 return mlir_getattr(obj_t, self, self(base), attrs)
 
+            case asm.SetAttr(asm.Variable(name, obj_t), asm.Literal(attr), value):
+                if not isinstance(obj_t, StructFType):
+                    raise TypeError(f"Expected struct type, got: {obj_t}")
+                obj = self.bindings[name][0]
+                val = self(value)
+                field_index = obj_t.struct_fieldnames.index(attr)
+                result = self.new_ssa()
+
+                self.exec(
+                    f"{feed}{result} = llvm.insertvalue {val}, {obj}[{field_index}] "
+                    f": {mlir_type(obj_t)}"
+                )
+
+                self.bindings[name] = (result, mlir_type(obj_t))
+                return None
+
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 if val.result_type != var_t:
                     raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
@@ -871,7 +971,10 @@ class MLIRContext(Context):
                 ctx_2 = self.block()
                 for body in bodies:
                     ctx_2(body)
-                self.exec(ctx_2.emit())
+
+                block = ctx_2.emit()
+                if block:
+                    self.exec(block)
                 return None
 
             case asm.ForLoop(asm.Variable(var_n, var_t), start, end, body):
@@ -909,6 +1012,294 @@ class MLIRContext(Context):
                     f"{ctx_2.emit()}\n"
                     f"{feed}}}"
                 )
+                return None
+
+            case asm.BufferLoop(buffer, asm.Variable(var_n, var_t), body):
+                buf_t = buffer.result_type
+                if not isinstance(buf_t, MLIRBufferFType):
+                    raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                buf = self.resolve(buffer)
+                length = buf_t.mlir_length(self, buf)
+
+                zero = self.constant(0, "index")
+                step = self.constant(1, "index")
+
+                iv = self.new_ssa()
+                ctx_2 = self.subblock()
+
+                idx_name = ctx_2.freshen(".buffer_index")
+                ctx_2.bindings[idx_name] = (iv, "index")
+
+                elem = buf_t.mlir_load(ctx_2, buf, asm.Variable(idx_name, algebra.intp))
+                ctx_2.bindings[var_n] = (elem, mlir_type(var_t))
+                ctx_2(body)
+
+                self.exec(
+                    f"{feed}scf.for {iv} = {zero} to {length} step {step} {{\n"
+                    f"{ctx_2.emit()}\n"
+                    f"{feed}}}"
+                )
+                return None
+
+            case asm.If(condition, body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
+
+                changed = {
+                    name: body_bindings[name]
+                    for name, old_binding in before.items()
+                    if not name.startswith(".")
+                    and body_bindings.get(name) != old_binding
+                }
+
+                if not changed:
+                    self.exec(f"{feed}scf.if {cond} {{\n{new_ctx.emit()}\n{feed}}}")
+                else:
+                    names = list(changed)
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [changed[i][0] for i in names]
+                    new_type = [changed[i][1] for i in names]
+                    old_vals = [before[i][0] for i in names]
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield "
+                        f"{', '.join(new_vals)} : {', '.join(new_type)}"
+                    )
+
+                    self.exec(
+                        f"{feed}{', '.join(new_result)} = scf.if {cond} "
+                        f"-> ({', '.join(new_type)}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{new_ctx.feed}scf.yield {', '.join(old_vals)} : "
+                        f"{', '.join(new_type)}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.IfElse(condition, body, else_body):
+                cond = self(condition)
+
+                before = {}
+                vars = self.bindings
+
+                while vars is not None:
+                    for i, j in vars.bindings.items():
+                        if i not in before:
+                            before[i] = j
+                    vars = vars.parent
+
+                new_ctx = self.subblock()
+                new_ctx.bindings = ScopedDict(before.copy())
+                new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
+
+                else_ctx = self.subblock()
+                else_ctx.bindings = ScopedDict(before.copy())
+                else_ctx(else_body)
+                else_bindings = else_ctx.bindings.bindings
+
+                names = sorted(
+                    i
+                    for i in set(body_bindings) & set(else_bindings)
+                    if not i.startswith(".")
+                    and (
+                        body_bindings[i] != before.get(i)
+                        or else_bindings[i] != before.get(i)
+                    )
+                )
+
+                if not names:
+                    self.exec(
+                        f"{feed}scf.if {cond} {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                else:
+                    new_result = [self.new_ssa() for _ in names]
+
+                    new_vals = [body_bindings[i][0] for i in names]
+                    else_vals = [else_bindings[i][0] for i in names]
+                    new_type = [body_bindings[i][1] for i in names]
+
+                    new_ctx.exec(
+                        f"{new_ctx.feed}scf.yield {', '.join(new_vals)} "
+                        f": {', '.join(new_type)}"
+                    )
+                    else_ctx.exec(
+                        f"{else_ctx.feed}scf.yield {', '.join(else_vals)} "
+                        f": {', '.join(new_type)}"
+                    )
+
+                    self.exec(
+                        f"{feed}{', '.join(new_result)} = "
+                        f"scf.if {cond} -> ({', '.join(new_type)}) {{\n"
+                        f"{new_ctx.emit()}\n"
+                        f"{feed}}} else {{\n"
+                        f"{else_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+
+                    for i, j, k in zip(
+                        names,
+                        new_result,
+                        new_type,
+                        strict=True,
+                    ):
+                        self.bindings[i] = (j, k)
+
+                return None
+
+            case asm.WhileLoop(condition, loop_body):
+                loop_names = []
+                nodes: list[Any] = [loop_body]
+
+                while nodes:
+                    node = nodes.pop()
+
+                    match node:
+                        case asm.Assign(asm.Variable(i, _), _) | asm.SetAttr(
+                            asm.Variable(i, _), _, _
+                        ):
+                            if i in self.bindings and i not in loop_names:
+                                loop_names.append(i)
+                        case asm.Block(bodies):
+                            nodes.extend(reversed(bodies))
+                        case asm.IfElse(_, body, else_body):
+                            nodes.extend((else_body, body))
+                        case (
+                            asm.If(_, body)
+                            | asm.ForLoop(_, _, _, body)
+                            | asm.BufferLoop(_, _, body)
+                            | asm.WhileLoop(_, body)
+                        ):
+                            nodes.append(body)
+
+                if not loop_names:
+                    condition_ctx = self.subblock()
+                    cond = condition_ctx(condition)
+                    condition_ctx.exec(f"{condition_ctx.feed}scf.condition({cond})")
+
+                    body_ctx = self.subblock()
+                    body_ctx(loop_body)
+                    body_ctx.exec(f"{body_ctx.feed}scf.yield")
+
+                    self.exec(
+                        f"{feed}scf.while : () -> () {{\n"
+                        f"{condition_ctx.emit()}\n"
+                        f"{feed}}} do {{\n"
+                        f"{body_ctx.emit()}\n"
+                        f"{feed}}}"
+                    )
+                    return None
+
+                before = {i: self.bindings[i] for i in loop_names}
+                before_vals = [before[i][0] for i in loop_names]
+                before_type = [before[i][1] for i in loop_names]
+                loop_args = [self.new_ssa() for _ in loop_names]
+
+                condition_ctx = self.subblock()
+                for i, j, k in zip(
+                    loop_names,
+                    loop_args,
+                    before_type,
+                    strict=True,
+                ):
+                    condition_ctx.bindings.bindings[i] = (j, k)
+                cond = condition_ctx(condition)
+                condition_ctx.exec(
+                    f"{condition_ctx.feed}scf.condition({cond}) "
+                    f"{', '.join(loop_args)} : {', '.join(before_type)}"
+                )
+
+                body_ctx = self.subblock()
+                for i, j, k in zip(
+                    loop_names,
+                    loop_args,
+                    before_type,
+                    strict=True,
+                ):
+                    body_ctx.bindings.bindings[i] = (j, k)
+
+                body_ctx(loop_body)
+
+                new_vals = [body_ctx.bindings[i][0] for i in loop_names]
+                new_type = [body_ctx.bindings[i][1] for i in loop_names]
+                body_ctx.exec(
+                    f"{body_ctx.feed}scf.yield "
+                    f"{', '.join(new_vals)} : {', '.join(before_type)}"
+                )
+
+                arg_bindings = {
+                    arg: (initial, type_)
+                    for arg, initial, type_ in zip(
+                        loop_args,
+                        before_vals,
+                        before_type,
+                        strict=True,
+                    )
+                }
+
+                new_ssa = ", ".join(
+                    f"{arg} = {initial}" for arg, (initial, _) in arg_bindings.items()
+                )
+                body_args = ", ".join(
+                    f"{arg}: {type_}" for arg, (_, type_) in arg_bindings.items()
+                )
+                result_types = ", ".join(type_ for _, type_ in arg_bindings.values())
+
+                result = self.new_ssa()
+                if len(arg_bindings) == 1:
+                    result_name = result
+                    result_vals = [result]
+                else:
+                    result_name = f"{result}:{len(arg_bindings)}"
+                    result_vals = [f"{result}#{i}" for i in range(len(arg_bindings))]
+
+                block = self.freshen("bb")
+                self.exec(
+                    f"{feed}{result_name} = scf.while ({new_ssa}) "
+                    f": ({result_types}) -> ({result_types}) {{\n"
+                    f"{condition_ctx.emit()}\n"
+                    f"{feed}}} do {{\n"
+                    f"{body_ctx.feed}^{block}({body_args}):\n"
+                    f"{body_ctx.emit()}\n"
+                    f"{feed}}}"
+                )
+
+                for i, j, (_, k) in zip(
+                    loop_names,
+                    result_vals,
+                    arg_bindings.values(),
+                    strict=True,
+                ):
+                    self.bindings[i] = (j, k)
+
                 return None
 
             case asm.Function(asm.Variable(func_name, return_t), args, body):
