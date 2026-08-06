@@ -533,19 +533,20 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 self.function_state.return_value = self(value)
                 return None
             case ntn.Module(funcs):
+                ctx_2 = self.scope()
                 for func in funcs:
-                    self(func)
+                    ctx_2(func)
                 kernels = {}
                 for func in funcs:
                     match func:
                         case ntn.Function(ntn.Variable(func_n, ret_t), args, _):
-                            kernel = NotationInterpreterKernel(self, func_n, ret_t)
+                            kernel = NotationInterpreterKernel(ctx_2, func_n, ret_t)
                             kernels[func_n] = kernel
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return NotationInterpreterLibrary(self, kernels)
+                return NotationInterpreterLibrary(ctx_2, kernels)
             case _:
                 raise NotImplementedError(
                     f"Unrecognized notation node type: {type(prgm)}"
