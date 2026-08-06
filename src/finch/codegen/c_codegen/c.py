@@ -243,7 +243,7 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         return CLibrary(lib, kernels)
 
 
-def c_function_name(op: FinchOperator, ctx, *args: Any) -> str:
+def c_function_name(op: FinchOperator, ctx: Any, *args: Any) -> str:
     """Returns the C function name corresponding to the given Python function
     and argument types.
 
@@ -322,7 +322,7 @@ def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     return f"{c_symbol}{ctx(args[0])}"
 
 
-def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
+def c_function_call(op: FinchOperator, ctx: Any, *args: Any) -> str:
     """Returns a call to the C function corresponding to the given Python
     function and argument types.
 
@@ -364,7 +364,7 @@ def c_function_call(op: FinchOperator, ctx, *args: Any) -> str:
             raise TypeError(f"{op} has no C representation.")
 
 
-def c_literal(ctx, val):
+def c_literal(ctx: Any, val: Any) -> str:
     """
     Returns the C literal corresponding to the given Python value.
 
@@ -396,12 +396,11 @@ def numpy_c_literal(fmt: FType, x, ctx):
     return f"({ctx.ctype_name(c_type(fmt))}){value}"
 
 
-def c_type(t: FType):
+def c_type(t: FType) -> Any:
     """
     Returns the C type corresponding to the given Finch type.
 
     Args:
-        ctx: The context in which the value is used.
         t: The Finch type.
 
     Returns:
@@ -936,7 +935,7 @@ class CArgumentFType(ABC):
         """
 
 
-def serialize_to_c(fmt: FType, obj):
+def serialize_to_c(fmt: FType, obj: Any) -> Any:
     """
     Serialize an object to a C-compatible ftype.
 
@@ -974,7 +973,7 @@ def serialize_tuple_to_c(fmt: TupleFType, obj):
     return serialize_to_c(ftype(x), x)
 
 
-def deserialize_from_c(fmt: FType, obj, c_obj):
+def deserialize_from_c(fmt: FType, obj: Any, c_obj: Any) -> None:
     """
     Deserialize a C-compatible object back to the original ftype.
 
@@ -1004,7 +1003,7 @@ def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
         return
 
 
-def construct_from_c(fmt: FType, c_obj):
+def construct_from_c(fmt: FType, c_obj: Any) -> Any:
     """
     Construct an object from a C-compatible ftype.
 

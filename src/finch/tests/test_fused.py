@@ -21,7 +21,8 @@ from finch.finch_fused.parser import (
     parse_fused_function,
 )
 from finch.interface import add, asarray, matmul, sum
-from tests.conftest import finch_assert_allclose
+
+from .conftest import finch_assert_allclose
 
 
 def test_parse_simple_function_with_control_flow_and_calls():
