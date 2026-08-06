@@ -77,7 +77,7 @@ ignore-pypi-mapping = false
 # workspace environments
 
 [tool.pixi.environments]
-default = { features = ["julia"], solve-group = "default" } 
+default = { features = ["julia"], solve-group = "default" }
 test = { features = ["test", "julia"], solve-group = "default" }
 test-c = { features = ["test", "c", "julia"], solve-group = "default" }
 test-mlir = { features = ["test", "mlir", "julia"], solve-group = "mlir" }
