@@ -126,7 +126,7 @@ class FinchJLGenerator:
         self.pack_dict = {}
         self.names: dict[str, str] = {}
 
-    def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
+    def __call__(self, prgm: ntn.Module) -> str:
         self.pack_dict.clear()
         self.names.clear()
         return self.generate_julia(prgm)
