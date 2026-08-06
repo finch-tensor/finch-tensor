@@ -61,6 +61,7 @@ from .algebra import (
 )
 from .array_namespace_info import __array_namespace_info__
 from .autoschedule import (
+    COMPILE_MLIR,
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
     INTERPRET_LOGIC,
@@ -292,6 +293,7 @@ newaxis = None
 __array_api_version__ = "2024.12"
 
 __all__ = [
+    "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "CPU",
     "DC",
