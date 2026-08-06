@@ -77,19 +77,18 @@ ignore-pypi-mapping = false
 # workspace environments
 
 [tool.pixi.environments]
-default = { features = ["julia"], solve-group = "default" }
-test = { features = ["test", "julia"], solve-group = "default" }
-test-c = { features = ["test", "c", "julia"], solve-group = "default" }
-test-mlir = { features = ["test", "mlir", "julia"], solve-group = "mlir" }
-mindeps = { features = ["test", "mindeps", "julia"], solve-group = "mindeps" }
-benchmark = { features = ["test", "benchmark", "julia"], solve-group = "default" }
-c = { features = ["c", "julia"], solve-group = "default" }
-mlir = { features = ["mlir", "julia"], solve-group = "mlir" }
-c-gcc = { features = ["c-gcc", "julia"], solve-group = "default" }
-c-clang = { features = ["c-clang", "julia"], solve-group = "default" }
+test = { features = ["test"], solve-group = "default" }
+test-c = { features = ["test", "c"], solve-group = "default" }
+test-mlir = { features = ["test", "mlir"], solve-group = "mlir" }
+mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
+benchmark = { features = ["test", "benchmark"], solve-group = "default" }
+c = { features = ["c"], solve-group = "default" }
+mlir = { features = ["mlir"], solve-group = "mlir" }
+c-gcc = { features = ["c-gcc"], solve-group = "default" }
+c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
-docs = { features = ["docs", "julia"], solve-group = "default" }
+docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 # default feature definition
