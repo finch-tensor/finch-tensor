@@ -136,7 +136,15 @@ COMPILE_JULIA = LogicNormalizer(
 # This scheduler is used for computing tensor statistics.
 # Crucially, in order to avoid a circular dependency, this scheduler does not
 # cannot rely on a stats factory that itself calls the interface.
-NON_RECURSIVE_SCHEDULER = COMPILE_JULIA
+NON_RECURSIVE_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicOptimizer(
+            DefaultLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler())))
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
 
 _DEFAULT_SCHEDULER = threading.local()
 
