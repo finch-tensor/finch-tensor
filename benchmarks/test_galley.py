@@ -70,23 +70,20 @@ def _build_expr(empty_last):
 
 
 def _make_pipeline():
-    optimizer = GalleyLogicalOptimizer(
-        DefaultLoopOrderer(
-            DefaultLogicFormatter(
-                LogicCompiler(
-                    NotationCompiler(
-                        NumbaCompiler(),
-                        ctx_transforms=(
-                            LowerPackedStructSlots(),
-                            AssemblySimplify(),
-                        ),
-                    )
-                )
+    formatter = DefaultLogicFormatter(
+        LogicCompiler(
+            NotationCompiler(
+                NumbaCompiler(),
+                ctx_transforms=(
+                    LowerPackedStructSlots(),
+                    AssemblySimplify(),
+                ),
             )
         )
     )
+    optimizer = GalleyLogicalOptimizer(DefaultLoopOrderer(formatter))
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
-    return LogicNormalizer(executor)
+    return LogicNormalizer(executor), formatter
 
 
 @pytest.mark.parametrize("metric", ["optimize", "downstream"])
@@ -103,7 +100,7 @@ def test_galley_matmul_chain(
     import finch.autoschedule.galley_optimize as galley
 
     # Warmup
-    pipeline = _make_pipeline()
+    pipeline, formatter = _make_pipeline()
     plan = _plan_from_lazy(_build_expr(empty_last))
     pipeline(plan)
 
@@ -111,6 +108,6 @@ def test_galley_matmul_chain(
     if metric == "optimize":
         patch_benchmark(benchmark, monkeypatch, galley, "optimize_plan")
     else:
-        patch_benchmark(benchmark, monkeypatch, DefaultLogicFormatter, "lower")
+        patch_benchmark(benchmark, monkeypatch, formatter, "lower")
 
     pipeline(plan)
