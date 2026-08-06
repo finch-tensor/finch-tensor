@@ -1,3 +1,7 @@
+# TODO: The helper is typed for memref<?xindex>, so it only supports sparse
+# index buffers that lower to `index` (np.intp). Buffers with other index
+# dtypes (e.g. int32 indices from scipy CSR) produce an MLIR verification
+# error; generate a variant of this function per element type instead.
 SCANSEARCH = """  func.func @scansearch(
     %arr: memref<?xindex>, %x: index, %lo: index, %hi: index
   ) -> index attributes {llvm.emit_c_interface} {

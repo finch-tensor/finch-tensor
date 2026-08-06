@@ -1056,12 +1056,13 @@ class MLIRContext(Context):
                 new_ctx = self.subblock()
                 new_ctx.bindings = ScopedDict(before.copy())
                 new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
 
                 changed = {
-                    name: new_ctx.bindings.bindings[name]
+                    name: body_bindings[name]
                     for name, old_binding in before.items()
                     if not name.startswith(".")
-                    and new_ctx.bindings.bindings.get(name) != old_binding
+                    and body_bindings.get(name) != old_binding
                 }
 
                 if not changed:
@@ -1114,19 +1115,20 @@ class MLIRContext(Context):
                 new_ctx = self.subblock()
                 new_ctx.bindings = ScopedDict(before.copy())
                 new_ctx(body)
+                body_bindings = new_ctx.bindings.bindings
 
                 else_ctx = self.subblock()
                 else_ctx.bindings = ScopedDict(before.copy())
                 else_ctx(else_body)
+                else_bindings = else_ctx.bindings.bindings
 
                 names = sorted(
                     i
-                    for i in set(new_ctx.bindings.bindings)
-                    | set(else_ctx.bindings.bindings)
+                    for i in set(body_bindings) & set(else_bindings)
                     if not i.startswith(".")
                     and (
-                        new_ctx.bindings.bindings.get(i) != before.get(i)
-                        or else_ctx.bindings.bindings.get(i) != before.get(i)
+                        body_bindings[i] != before.get(i)
+                        or else_bindings[i] != before.get(i)
                     )
                 )
 
@@ -1141,9 +1143,9 @@ class MLIRContext(Context):
                 else:
                     new_result = [self.new_ssa() for _ in names]
 
-                    new_vals = [new_ctx.bindings.bindings[i][0] for i in names]
-                    else_vals = [else_ctx.bindings.bindings[i][0] for i in names]
-                    new_type = [new_ctx.bindings.bindings[i][1] for i in names]
+                    new_vals = [body_bindings[i][0] for i in names]
+                    else_vals = [else_bindings[i][0] for i in names]
+                    new_type = [body_bindings[i][1] for i in names]
 
                     new_ctx.exec(
                         f"{new_ctx.feed}scf.yield {', '.join(new_vals)} "
@@ -1181,7 +1183,9 @@ class MLIRContext(Context):
                     node = nodes.pop()
 
                     match node:
-                        case asm.Assign(asm.Variable(i, _), _):
+                        case asm.Assign(asm.Variable(i, _), _) | asm.SetAttr(
+                            asm.Variable(i, _), _, _
+                        ):
                             if i in self.bindings and i not in loop_names:
                                 loop_names.append(i)
                         case asm.Block(bodies):

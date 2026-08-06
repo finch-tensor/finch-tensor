@@ -1405,3 +1405,102 @@ def test_e2e_transpose_mlir(a, dtype):
     wa = finch.lazy(finch.asarray(a))
     result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
     finch_assert_equal(result, a.T)
+
+
+@mlir_backend
+def test_mlir_ifelse_branch_local_var():
+    buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
+    b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
+    c_v = asm.Variable("c", ftypes.bool_)
+    x_v = asm.Variable("x", ftype(np.float64))
+    t_v = asm.Variable("t", ftype(np.float64))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("kern", ftypes.none_),
+                (b_v, c_v, x_v),
+                asm.Block(
+                    (
+                        asm.Unpack(b_slt, b_v),
+                        asm.IfElse(
+                            c_v,
+                            asm.Block(
+                                (
+                                    # `t` exists only in this branch and must
+                                    # not be merged out of the scf.if
+                                    asm.Assign(
+                                        t_v,
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (x_v, asm.Literal(np.float64(1.0))),
+                                        ),
+                                    ),
+                                    asm.Store(b_slt, asm.Literal(np.intp(0)), t_v),
+                                )
+                            ),
+                            asm.Block(
+                                (asm.Store(b_slt, asm.Literal(np.intp(0)), x_v),)
+                            ),
+                        ),
+                        asm.Repack(b_slt),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    mod.kern(buf, True, np.float64(41.0))
+    assert buf.arr[0] == 42.0
+    mod.kern(buf, False, np.float64(7.0))
+    assert buf.arr[0] == 7.0
+
+
+@mlir_backend
+def test_mlir_setattr_in_while():
+    Point = namedtuple("Point", ["x", "y"])
+    p = Point(np.float64(1.0), np.float64(2.0))
+
+    p_var = asm.Variable("p", ftype(p))
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable("advance", ftype(np.float64)),
+                (p_var,),
+                asm.Block(
+                    (
+                        asm.WhileLoop(
+                            asm.Call(
+                                asm.Literal(ffuncs.lt),
+                                (
+                                    asm.GetAttr(p_var, asm.Literal("x")),
+                                    asm.Literal(np.float64(10.0)),
+                                ),
+                            ),
+                            asm.Block(
+                                (
+                                    asm.SetAttr(
+                                        p_var,
+                                        asm.Literal("x"),
+                                        asm.Call(
+                                            asm.Literal(ffuncs.add),
+                                            (
+                                                asm.GetAttr(p_var, asm.Literal("x")),
+                                                asm.GetAttr(p_var, asm.Literal("y")),
+                                            ),
+                                        ),
+                                    ),
+                                )
+                            ),
+                        ),
+                        asm.Return(asm.GetAttr(p_var, asm.Literal("x"))),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = MLIRCompiler()(prgm)
+    assert mod.advance(p) == np.float64(11.0)
