@@ -139,12 +139,16 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                 join_args.append(s)
             else:
                 union_args.append(s)
+        if op.is_associative and op.is_commutative:
+            if union_args:
+                join_args.append(self._mapjoin_union(op, *union_args))
 
-        if union_args:
-            join_args.append(self._mapjoin_union(op, *union_args))
-            # Add test cases - To test both join and union
-
-        return self._mapjoin_join(op, *join_args)
+            return self._mapjoin_join(op, *join_args)
+        else:
+            if len(union_args) > 1:
+                return self._mapjoin_union(op, *args)
+            else:
+                return self._mapjoin_join(op, *args)
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: TS) -> TS:
         raise NotImplementedError
