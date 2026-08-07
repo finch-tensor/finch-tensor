@@ -226,6 +226,43 @@ def test_compile_julia_sums_sparse_bytemap_level():
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
 
 
+def test_compile_julia_kernel_is_typed_and_cache_is_dtype_aware():
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLCompiler
+
+    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    scheduler = _compile_julia_fd(formatter)
+
+    data_f32 = np.array([[1, 0, 2], [0, 3, 4]], dtype=np.float32)
+    data_f64 = data_f32.astype(np.float64)
+
+    before = set(FinchJLCompiler._kernels)
+    with with_default_scheduler(scheduler):
+        result_f32 = ft.compute(
+            ft.lazy(ft.asarray(data_f32)) + ft.lazy(ft.asarray(data_f32))
+        )
+        result_f64 = ft.compute(
+            ft.lazy(ft.asarray(data_f64)) + ft.lazy(ft.asarray(data_f64))
+        )
+
+    np.testing.assert_allclose(result_f32.to_numpy(), data_f32 + data_f32)
+    np.testing.assert_allclose(result_f64.to_numpy(), data_f64 + data_f64)
+
+    # Same program shape, different argument dtypes: two distinct cache
+    # entries (a monomorphic `@finch_kernel` function can't be shared).
+    new_keys = set(FinchJLCompiler._kernels) - before
+    assert len(new_keys) == 2
+
+    from finch.compile_jl.julia import jl
+
+    new_kernels = [FinchJLCompiler._kernels[key] for key in new_keys]
+    signatures = [str(jl.methods(getattr(jl, k.func_name))) for k in new_kernels]
+    assert any("Float32" in sig for sig in signatures)
+    assert any("Float64" in sig for sig in signatures)
+    for sig in signatures:
+        assert "Tensor{" in sig
+
+
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
