@@ -6,7 +6,15 @@ from typing import Any
 
 from finch.algebra import FType, ftype, return_type
 from finch.finch_assembly import AssemblyNode
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.symbolic import (
+    CallTerm,
+    Context,
+    LiteralTerm,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_repr,
+)
 from finch.util import qual_str
 
 
@@ -72,7 +80,7 @@ class NotationStatement(NotationNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(NotationExpression):
+class Literal(NotationExpression, LiteralTerm):
     """
     Notation AST expression for the literal value `val`.
     """
@@ -140,7 +148,7 @@ class Variable(NotationExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(NotationTree, NotationExpression):
+class Call(NotationTree, NotationExpression, CallTerm):
     """
     Notation AST expression for the result of calling the function `op` on
     `args...`.

@@ -71,6 +71,32 @@ class TermTree(Term, ABC):
         ...
 
 
+class LiteralTerm(Term, ABC):
+    """
+    A leaf term which wraps the constant `val`.
+
+    Note that `val` is declared as a plain annotation rather than an abstract
+    property, because implementors satisfy it with a dataclass field, and a
+    dataclass field never counts as an implementation of an abstract property.
+    """
+
+    val: Any
+
+
+class CallTerm(TermTree, ABC):
+    """
+    A tree term which applies the operator held by the literal `op` to `args`.
+
+    `op` is the operator's *literal term*, not the operator itself, so that
+    IR-agnostic passes can both query the operator (`node.op.val`) and rebuild
+    the node (`node.make_term(node.head(), node.op, *args)`). See `LiteralTerm`
+    for why these are annotations rather than abstract properties.
+    """
+
+    op: LiteralTerm
+    args: tuple[Term, ...]
+
+
 def _get_repr(val: Any) -> str:
     if isbuiltin(val) or isclass(val) or isfunction(val):
         return f"{val.__module__}.{val.__qualname__}"
