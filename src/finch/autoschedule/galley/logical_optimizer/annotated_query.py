@@ -32,12 +32,9 @@ from finch.symbolic import gensym
 
 from .logic_to_stats import insert_statistics
 
-# A location in an expression tree: the sequence of child indices leading from
-# the root to a node. Unlike a node value, a path names one occurrence, so
-# rewrites addressed by path cannot confuse structurally equal subexpressions
-# (two `Literal(2.0)` constants, a repeated table, ...). Paths also remain
-# meaningful if node allocations are ever shared (hash consing), where object
-# identity degenerates to value equality.
+# A location in an expression tree. Unlike a node value, a path identifies one occurrence.
+# So, rewrites addressed by path cannot confuse structurally equal subexpressions
+# (e.g. two `Literal(2.0)` constants, repeated tables, ...).
 Path = tuple[int, ...]
 
 
