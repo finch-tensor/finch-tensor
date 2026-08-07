@@ -289,10 +289,6 @@ class Literal(LogicExpression):
     def __eq__(self, value):
         if not isinstance(value, Literal):
             return False
-        # A literal carries the element type of its value, so `2` and `2.0` are
-        # different constants even though `2 == 2.0`. Comparing without the type
-        # would let equality-based rewrites and caches silently substitute one
-        # for the other and change the type of a constant.
         if type(self.val) is not type(value.val):
             return False
         # For consistency with __hash__, we fall back to pointer equality
@@ -326,9 +322,6 @@ class Literal(LogicExpression):
     ) -> T:
         return self.val
 
-    # `valmap` returns the raw value, which callers combining literals with
-    # other nodes normalize themselves (`return_type` applies `ftype` to its
-    # arguments). A bare literal is its own base case, so it must normalize.
     def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
         return ftype(self.val)
