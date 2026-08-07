@@ -1,5 +1,4 @@
 import importlib.util
-import logging
 import time
 from pathlib import Path
 
@@ -32,7 +31,7 @@ from finch.autoschedule import (
 )
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.tensor_stats import FDStatsFactory
-from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.compiler import FinchJLCompiler, FinchJLKernel
 from finch.compile_jl.julia import jl
 from finch.finch_logic import (
     Aggregate,
@@ -45,13 +44,12 @@ from finch.finch_logic import (
     Query,
     Table,
 )
-from finch.util.logging import FORMAT, get_logger_handler
 
 from .conftest import finch_assert_allclose
 from .test_julia_backend import RecordingFDFormatter
 
 jl.seval("Base.cumulative_compile_timing(true)")
-BOEING_PATH = Path("tests/data/ct20stif.mtx")
+BOEING_PATH = Path("data/ct20stif.mtx")
 BLOCK_SIZE = 300
 
 
@@ -185,6 +183,74 @@ def test_full_pipeline_through_julia_backend(boeing_slice):
 """
 
 
+def test_timed_boeing():
+    M = scipy.io.mmread(BOEING_PATH).tocsr()
+    tensor = csr_tensor_from_scipy(M)
+
+    timings = {"seval": [], "call": []}
+    orig_call = FinchJLKernel.__call__
+
+    def timed_init(self, func_name, jl_code):
+        self.jl_code = jl_code
+        self.func_name = func_name
+        t0 = time.time()
+        jl.seval(self.jl_code)
+        timings["seval"].append(time.time() - t0)
+
+    def timed_call(self, *args):
+        t0 = time.time()
+        result = orig_call(self, *args)
+        timings["call"].append(time.time() - t0)  # 0 -> cold, 1 -> warm
+        return result
+
+    FinchJLKernel.__init__ = timed_init
+    FinchJLKernel.__call__ = timed_call
+
+    try:
+        t0 = time.time()
+        _scipy_result = M @ M
+        time_scipy = time.time() - t0
+        formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+        scheduler = fd_scheduler(formatter)
+        ft.set_default_scheduler(ctx=scheduler)
+        expr = ft.matmul(ft.lazy(tensor), ft.lazy(tensor))
+        t0 = time.time()
+        with with_default_scheduler(scheduler):
+            ft.compute(expr)
+        total_cold = time.time() - t0
+
+        t0 = time.time()
+        with with_default_scheduler(scheduler):
+            ft.compute(expr)
+        total_warm = time.time() - t0
+        logic_exec = scheduler.ctx
+        ((mod, *_),) = logic_exec.cached_kernels.values()
+        kernel = next(iter(mod.kernel_dict.values()))
+
+        print(f"\n{kernel.jl_code}")
+        print("DONE")
+
+    finally:
+        del FinchJLKernel.__init__
+        del FinchJLKernel.__call__
+
+    julia_seval_time = timings["seval"][0]
+    julia_cold_call = timings["call"][0]
+    julia_warm_call = timings["call"][1]
+
+    python_time = total_cold - julia_seval_time - julia_cold_call
+    julia_compile_time = julia_cold_call - julia_warm_call
+    julia_run_time = julia_warm_call
+
+    print(f"scipy time for boeing matmul : {time_scipy:.3f}")
+    print(f"python pipeline time : {python_time:.3f}s")
+    print(f"julia compile time : {julia_compile_time:.3f}s")
+    print(f"julia run time : {julia_run_time:.3f}s")
+    print(f"total pipeline time (compile and run) : {total_cold:.3f}")
+    print(f"total pipeline runtime : {total_warm:.3f}")
+
+
+"""
 def test_run_full_boeing():
     handler = get_logger_handler(filter_pattern="r.n,r.a")
     logging.basicConfig(
@@ -241,8 +307,8 @@ def run_split(expr):
 
     print(f"Total time = {total}s \n Julia compile time = {julia_compile}")
     return result
-
-
+"""
+"""
 def test_separate_compile_time():
     M = scipy.io.mmread(BOEING_PATH).tocsr()
     test_M = make_matrix(M)
@@ -253,7 +319,7 @@ def test_separate_compile_time():
 
     with with_default_scheduler(scheduler):
         run_split(ft.matmul(ft.lazy(test_tensor_M), ft.lazy(test_tensor_M)))
-
+"""
 
 """
 def test_toy_pipeline():
