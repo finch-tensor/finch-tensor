@@ -4,12 +4,19 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from .ftypes import FDTypeOrdered, FType, ftype
+from .tensor import Tensor
 
 
 class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    # How many arguments the operator accepts, or `math.inf` when it accepts any
+    # number. Associativity says an operator may be regrouped, not that it is
+    # variadic: `logical_and` is associative but has arity 2, so a nest of them
+    # cannot be flattened into one wide call. Every operator in `ffuncs` declares
+    # its own; the default is only for operators that do not.
+    arity: int | float = 2
 
     @abstractmethod
     def __call__(self, *args: Any) -> Any:
@@ -54,11 +61,27 @@ def is_idempotent(op: FinchOperator) -> bool:
     return op.is_idempotent
 
 
+def arity(op: FinchOperator) -> int | float:
+    return op.arity
+
+
+"""
+Operators answer `is_identity` and `is_annihilator` about constants.
+These properties cannot hold for mutable objects (e.g. Scalars), so we
+always fail for them.
+TODO: In the future, we may want to raise on Scalar.
+"""
+
+
 def is_identity(op: FinchOperator, val: Any) -> bool:
+    if isinstance(val, Tensor):
+        return False
     return op.is_identity(val)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
+    if isinstance(val, Tensor):
+        return False
     return op.is_annihilator(val)
 
 

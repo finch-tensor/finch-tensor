@@ -9,8 +9,11 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
+from .simplification import simplify, simplify_rules
 from .stage import Form, Stage, UnvalidatedForm
 from .term import (
+    CallTerm,
+    LiteralTerm,
     Term,
     TermTree,
     literal_repr,
@@ -19,12 +22,14 @@ from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
 __all__ = [
     "BasicBlock",
+    "CallTerm",
     "Chain",
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",
     "Fixpoint",
     "Form",
+    "LiteralTerm",
     "Memo",
     "NamedTerm",
     "Namespace",
@@ -43,4 +48,6 @@ __all__ = [
     "intree",
     "isdescendant",
     "literal_repr",
+    "simplify",
+    "simplify_rules",
 ]

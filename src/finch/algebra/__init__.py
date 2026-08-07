@@ -1,6 +1,7 @@
 from . import ffuncs
 from .algebra import (
     FinchOperator,
+    arity,
     cansplitpush,
     fixpoint_type,
     init_value,
@@ -110,6 +111,7 @@ __all__ = [
     "TensorFType",
     "TupleFType",
     "TupleFType",
+    "arity",
     "bool",
     "bool_",
     "can_cast",

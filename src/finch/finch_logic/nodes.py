@@ -14,7 +14,15 @@ from finch.algebra import (
     promote_type,
     return_type,
 )
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.symbolic import (
+    CallTerm,
+    Context,
+    LiteralTerm,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_repr,
+)
 from finch.util import qual_str
 
 
@@ -267,7 +275,7 @@ class LogicStatement(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicExpression):
+class Literal(LogicExpression, LiteralTerm):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -460,7 +468,7 @@ class Table(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class MapJoin(LogicTree, LogicExpression):
+class MapJoin(LogicTree, LogicExpression, CallTerm):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
     Dimensions which are not present are broadcasted. Dimensions which are
