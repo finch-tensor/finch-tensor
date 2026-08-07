@@ -44,8 +44,6 @@ class AnnotatedQuery:
     output_name: Alias
     reduce_idxs: list[Field]
     point_expr: LogicExpression
-    # Locations are stored as paths into `point_expr`, never as node values:
-    # equal nodes at different positions are distinct locations.
     idx_lowest_path: OrderedDict[Field, Path]
     idx_op: OrderedDict[Field, Any]
     idx_init: OrderedDict[Field, Any]
@@ -168,12 +166,6 @@ class AnnotatedQuery:
             (idx, idx) for idx in cache[q.rhs].index_order
         )
         idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
-        # Repeat rewrites are keyed by the path of the node being wrapped, so
-        # each occurrence is its own rewrite even when several occurrences are
-        # structurally equal, and by reduction index within a path so each
-        # index contributes its domain size exactly once. They are applied in
-        # one pass after the loop; rewriting incrementally would let a later
-        # rewrite match inside a subtree an earlier one inserted.
         repeats: dict[Path, OrderedDict[Field, tuple[FinchOperator, Any]]] = {}
         stats_point = cache_point[point_expr]
         for idx in starting_reduce_idxs:
@@ -643,8 +635,6 @@ class AnnotatedQuery:
                     return roots_without + roots_with
 
                 return [base]
-            # A Literal is a zero-dimensional constant, so it is a leaf that a
-            # reduction can be pushed down to just like a table.
             case Alias(_) | Table(_, _) | Reorder(_, _) | Literal(_):
                 return [base]
             case _:
@@ -708,8 +698,6 @@ class AnnotatedQuery:
                 kernel_idxs = set().union(
                     *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
                 )
-                # Positions, not values: equal arguments at different positions
-                # are distinct.
                 relevant_pos = [
                     i
                     for i, arg in enumerate(args)
