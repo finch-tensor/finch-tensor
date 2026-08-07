@@ -54,6 +54,8 @@ class PointwiseContext:
                         tuple(loops[idx] for idx in idxs),
                     )
                 )
+            case lgc.Literal(val):
+                return ntn.Literal(val)
             case lgc.Relabel(arg, idxs):
                 return self(
                     arg,

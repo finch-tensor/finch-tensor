@@ -37,6 +37,7 @@ from finch.symbolic import (
     intree,
     isdescendant,
 )
+from finch.tensor import Scalar
 
 from .logic_to_stats import insert_statistics
 
@@ -171,11 +172,10 @@ class AnnotatedQuery:
                         f = repeat_operator(agg_op)
                         if f is None:
                             continue
-                        dim_val = Table(
-                            Literal(idx_dim_size),
-                            (),
+                        dim_val = Literal(idx_dim_size)
+                        cache_point[dim_val] = self.stats_factory(
+                            Scalar(idx_dim_size), ()
                         )
-                        cache_point[dim_val] = self.stats_factory(idx_dim_size, ())
                         new_node = MapJoin(Literal(f), (node, dim_val))
                         cache_point[new_node] = self.stats_factory.mapjoin(
                             f, cache_point[node], cache_point[dim_val]
@@ -188,6 +188,17 @@ class AnnotatedQuery:
                                 new_node=new_node,
                                 nodes_to_remove=set(),
                             ),
+                        )
+                        # Replacing a node rebuilds every ancestor up to the
+                        # root, so the new spine has no entries in cache_point.
+                        # insert_statistics is keyed on nodes and returns early
+                        # for ones already present, so this only fills the gaps.
+                        insert_statistics(
+                            self.stats_factory,
+                            point_expr,
+                            bindings=bindings,
+                            replace=False,
+                            cache=cache_point,
                         )
                         continue
                     new_idx = new_idxs[i]
