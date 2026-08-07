@@ -488,7 +488,7 @@ def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = Scalar(arr) if isinstance(arr, bool | int | float | complex) else asarray(arr)
+    arr = Scalar(arr) if _is_numeric_constant(arr) else asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
@@ -868,6 +868,14 @@ def _broadcast_shape(*args: tuple) -> tuple:
     return shape
 
 
+def _is_numeric_constant(x) -> bool:
+    """
+    True for values that enter a logic program as numeric constants: Python
+    and NumPy numeric scalars.
+    """
+    return isinstance(x, bool | int | float | complex | np.number | np.bool_)
+
+
 def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
         elementwise(f, *args) -> LazyTensor:
@@ -881,6 +889,10 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
     x, y)` is equivalent to `x + y`.
 
+
+    Raw numeric inputs become `Literal` constants. When every argument is a literal
+    there is no tensor to draw a device or context from.
+
     Parameters:
     - f: The function to apply elementwise.
     - *args: The tensors to apply the function to. These tensors should be
@@ -891,14 +903,9 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    # Raw Python scalars become `Literal` constants in the logic program rather
-    # than zero-dimensional tables, which would bind each one to its own alias
-    # and materialize it as a rank-0 tensor. When every argument is a scalar
-    # there is no tensor to draw a device or context from, so fall back to
-    # deferring all of them.
-    is_scalar = tuple(isinstance(a, bool | int | float | complex) for a in args)
+    is_scalar = tuple(_is_numeric_constant(a) for a in args)
     if builtins.all(is_scalar):
-        is_scalar = (False,) * len(args)
+        return lazy(f(*args))
     args = tuple(a if s else lazy(a) for a, s in zip(args, is_scalar, strict=True))
     shapes = tuple(() if s else a.shape for a, s in zip(args, is_scalar, strict=True))
     shape = _broadcast_shape(*shapes)
