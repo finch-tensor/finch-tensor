@@ -1,5 +1,3 @@
-import importlib.util
-
 import pytest
 
 import numpy as np
@@ -27,6 +25,7 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
+from finch.compile_jl.julia import julia_available
 
 DTYPE = np.int64
 ROWS = np.intp(3)
@@ -38,10 +37,8 @@ EXPECTED_ROW_SUMS = np.array([3, 3, 9], dtype=DTYPE)
 
 
 def _requires_julia_backend():
-    if importlib.util.find_spec("juliapkg") is None:
-        pytest.skip("juliapkg is not installed")
-    if importlib.util.find_spec("juliacall") is None:
-        pytest.skip("juliacall is not installed")
+    if not julia_available():
+        pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
 
 
 def test_julia_element_ftype_can_customize_vector_lowering():
@@ -153,7 +150,7 @@ class RecordingFDFormatter(FDFormatter):
 
 
 def _compute_sparse_axis_sum(level):
-    from finch.compile_jl import COMPILE_JULIA
+    from finch.autoschedule import COMPILE_JULIA
 
     arg = FiberTensor(DenseLevel(level, ROWS))
     expr = ft.sum(ft.lazy(arg), axis=1)

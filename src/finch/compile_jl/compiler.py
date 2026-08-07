@@ -1,3 +1,6 @@
+import hashlib
+from typing import ClassVar
+
 import numpy as np
 
 import finch.algebra.ffuncs as ffuncs
@@ -121,10 +124,19 @@ class FinchJLLibrary(AssemblyLibrary):
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
+        self.names: dict[str, str] = {}
 
-    def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
+    def __call__(self, prgm: ntn.Module) -> str:
         self.pack_dict.clear()
+        self.names.clear()
         return self.generate_julia(prgm)
+
+    def emit_name(self, sym: str) -> str:
+        """
+        Canonical Julia identifier for each notation symbol. Avoids
+        issues with gensym making duplicate programs appear distinct.
+        """
+        return self.names.setdefault(sym, f"_v{len(self.names)}")
 
     def generate_julia(self, prgm, nestingLvl=0):
         match prgm:
@@ -134,9 +146,8 @@ class FinchJLGenerator:
                 for arg in args:
                     match arg:
                         case ntn.Variable(sym, type):
-                            arg_strs.append(
-                                f"{sym.replace('#', '_')}"
-                            )  # TODO later use finch_kernel and type the args
+                            # TODO later use finch_kernel and type the args
+                            arg_strs.append(self.emit_name(sym))
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
@@ -260,7 +271,7 @@ class FinchJLGenerator:
 
             case ntn.Variable(name, _):
                 # finch uses '#' in generated names; not valid Julia syntax.
-                return name.replace("#", "_")
+                return self.emit_name(name)
 
             case _:
                 # Dimension, Stack, Value are deliberately unimplemented.
@@ -268,12 +279,24 @@ class FinchJLGenerator:
 
 
 class FinchJLCompiler(NotationCompiler):
+    _kernels: ClassVar[dict[str, FinchJLKernel]] = {}
+
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
 
         kernel_dict = {}
         for func in prgm.children:
             generated_prgm = generator(func)
-            kernel_dict[func.name.name] = FinchJLKernel(func.name.name, generated_prgm)
+            kernel = self._kernels.get(generated_prgm)
+            if kernel is None:
+                # Give every distinct program its own Julia symbol to avoid
+                # conflicts in the julia runtime.
+                digest = hashlib.sha256(generated_prgm.encode()).hexdigest()
+                jl_name = f"{func.name.name}_{digest}"
+                kernel = FinchJLKernel(
+                    jl_name, generated_prgm.replace(func.name.name, jl_name, 1)
+                )
+                self._kernels[generated_prgm] = kernel
+            kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)
