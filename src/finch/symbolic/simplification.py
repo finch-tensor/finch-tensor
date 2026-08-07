@@ -29,6 +29,7 @@ from finch.algebra import (
     is_commutative,
     is_idempotent,
     is_identity,
+    is_variadic,
 )
 
 from .rewriters import Chain, Fixpoint, PostWalk, Rewrite, RwCallable
@@ -47,43 +48,56 @@ def _call_like(node: CallTerm, args: Sequence[Term]) -> Term:
     return node.make_term(node.head(), node.op, *args)
 
 
-def _value_holds(pred: Any, op: Any, val: Any) -> bool:
-    """
-    Ask an operator whether `val` is an identity/annihilator for it.
-
-    These predicates are written against numbers, but a literal may hold
-    anything an IR cares to store in one, such as a tensor, a buffer, or a
-    type. A value the operator cannot compare against is simply not an
-    identity or an annihilator, so an unanswerable question is a `False`.
-    """
-    try:
-        return bool(pred(op, val))
-    except (TypeError, ValueError, AttributeError):
-        return False
+def _same_op_leaves(node: CallTerm) -> list[Term]:
+    """Flatten the maximal subtree of same-operator calls into its leaves."""
+    leaves: list[Term] = []
+    for arg in node.args:
+        match arg:
+            case CallTerm(op=inner_op) if inner_op == node.op:
+                leaves.extend(_same_op_leaves(arg))
+            case _:
+                leaves.append(arg)
+    return leaves
 
 
-def fold_constants(node: Term) -> Term | None:
-    """`f(a...)` => `literal(f(a...))` when every argument is a literal."""
-    match node:
-        case CallTerm(op=op, args=args) if args:
-            vals = [arg.val for arg in args if isinstance(arg, LiteralTerm)]
-            if len(vals) != len(args):
-                return None
-            try:
-                return _literal_like(op, op.val(*vals))
-            except Exception:  # noqa: BLE001
-                # `op.val` is arbitrary user code being run at compile time on
-                # whatever the literals happen to hold. If it cannot handle
-                # these values, that is a term we decline to fold, not an error
-                # in the program being compiled.
-                return None
-    return None
+def _nest(node: CallTerm, args: Sequence[Term]) -> Term:
+    """Rebuild `args` as a left-nested chain of two-argument calls."""
+    result = args[0]
+    for arg in args[1:]:
+        result = _call_like(node, [result, arg])
+    return result
+
+
+def _run_of_literals(args: Sequence[Term]) -> tuple[int, int]:
+    """Return the bounds of the longest run of adjacent literal arguments."""
+    best_start, best_stop = 0, 0
+    start = 0
+    for i, arg in enumerate(args):
+        if not isinstance(arg, LiteralTerm):
+            start = i + 1
+        elif i + 1 - start > best_stop - best_start:
+            best_start, best_stop = start, i + 1
+    return best_start, best_stop
+
+
+def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
+    """Run `op` on literal `args` now."""
+    vals = [arg.val for arg in args if isinstance(arg, LiteralTerm)]
+    return _literal_like(op, op.val(*vals))
 
 
 def flatten_associative(node: Term) -> Term | None:
-    """`f(a..., f(b...), c...)` => `f(a..., b..., c...)` for associative `f`."""
+    """
+    `f(a..., f(b...), c...)` => `f(a..., b..., c...)` for associative `f`.
+
+    Also requires `f` to be variadic. Associativity permits the regrouping, but
+    a binary-only operator like `logical_and` cannot be handed the wider
+    argument list that regrouping produces.
+    """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val):
+        case CallTerm(op=op, args=args) if is_associative(op.val) and is_variadic(
+            op.val
+        ):
             for i, arg in enumerate(args):
                 match arg:
                     case CallTerm(op=inner_op, args=inner_args) if inner_op == op:
@@ -91,6 +105,32 @@ def flatten_associative(node: Term) -> Term | None:
                             node, [*args[:i], *inner_args, *args[i + 1 :]]
                         )
     return None
+
+
+def _lift_nested_literals(node: CallTerm) -> Term | None:
+    """
+    `f(f(x, k), y)` => `f(f(x, y), k)` for literal `k` and abelian `f`.
+
+    A non-variadic operator cannot be flattened into one wide call, so a nest
+    of two-argument calls is the only shape it has and its literals can sit at
+    any depth, out of reach of every other rule. Re-associating the nest brings
+    them to the top. Literals that meet there are combined on the way, because
+    two of them can never share a two-argument call otherwise, and the nodes
+    this builds below the top are not revisited by the surrounding `PostWalk`.
+    """
+    leaves = _same_op_leaves(node)
+    if len(leaves) == len(node.args):
+        return None  # nothing is nested, so the flat branch covers it
+    literals = [leaf for leaf in leaves if isinstance(leaf, LiteralTerm)]
+    if not literals:
+        return None
+    folded = literals[0]
+    for other in literals[1:]:
+        # Two at a time, which is an arity the operator certainly accepts.
+        folded = _evaluate(node.op, [folded, other])
+    rest = [leaf for leaf in leaves if not isinstance(leaf, LiteralTerm)]
+    rebuilt = _nest(node, [*rest, folded])
+    return rebuilt if rebuilt != node else None
 
 
 def hoist_literals(node: Term) -> Term | None:
@@ -102,11 +142,18 @@ def hoist_literals(node: Term) -> Term | None:
     `fold_literals` needs in order to reach non-adjacent literals, and which
     leaves the order of the remaining arguments -- and so the order of the
     loads and calls in the generated code -- alone.
+
+    Where the operator is not variadic the literals may be nested rather than
+    merely out of order, which `_lift_nested_literals` handles.
     """
     match node:
         case CallTerm(op=op, args=args) if is_associative(op.val) and is_commutative(
             op.val
         ):
+            if not is_variadic(op.val):
+                lifted = _lift_nested_literals(node)
+                if lifted is not None:
+                    return lifted
             hoisted = [
                 *(arg for arg in args if not isinstance(arg, LiteralTerm)),
                 *(arg for arg in args if isinstance(arg, LiteralTerm)),
@@ -134,17 +181,36 @@ def dedup_idempotent(node: Term) -> Term | None:
 
 
 def fold_literals(node: Term) -> Term | None:
-    """`f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` for associative `f`."""
+    """
+    Evaluate literal arguments at compile time.
+
+    Three branches, each asking more of the operator than the last:
+
+    - `f(x, y)` => `literal(f(x, y))` when every argument is a literal. The
+      call disappears, so this is sound for any operator.
+    - `f(a..., x, b..., y, c...)` => `f(a..., b..., c..., f(x, y))` when `f` is
+      commutative as well as associative, which lets the literals be gathered
+      from wherever they sit. The folded value goes last, the same place
+      `hoist_literals` would have put it.
+    - `f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` when `f` is only
+      associative, so nothing may be reordered and only a run of adjacent
+      literals can fold.
+    """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val):
-            for i, (x, y) in enumerate(zip(args, args[1:], strict=False)):
-                if not (isinstance(x, LiteralTerm) and isinstance(y, LiteralTerm)):
-                    continue
-                try:
-                    folded = _literal_like(op, op.val(x.val, y.val))
-                except Exception:  # noqa: BLE001
-                    continue  # See `fold_constants`.
-                return _call_like(node, [*args[:i], folded, *args[i + 2 :]])
+        case CallTerm(op=op, args=args) if args:
+            literals = [arg for arg in args if isinstance(arg, LiteralTerm)]
+            if len(literals) == len(args):
+                return _evaluate(op, args)
+            if not is_associative(op.val):
+                return None
+            if is_commutative(op.val) and len(literals) > 1:
+                rest = [arg for arg in args if not isinstance(arg, LiteralTerm)]
+                return _call_like(node, [*rest, _evaluate(op, literals)])
+            start, stop = _run_of_literals(args)
+            if stop - start < 2:
+                return None
+            folded = _evaluate(op, args[start:stop])
+            return _call_like(node, [*args[:start], folded, *args[stop:]])
     return None
 
 
@@ -154,9 +220,7 @@ def annihilate(node: Term) -> Term | None:
         case CallTerm(op=op, args=args):
             for arg in args:
                 match arg:
-                    case LiteralTerm(val=val) if _value_holds(
-                        is_annihilator, op.val, val
-                    ):
+                    case LiteralTerm(val=val) if is_annihilator(op.val, val):
                         return arg
     return None
 
@@ -174,10 +238,7 @@ def drop_identities(node: Term) -> Term | None:
             kept = [
                 arg
                 for arg in args
-                if not (
-                    isinstance(arg, LiteralTerm)
-                    and _value_holds(is_identity, op.val, arg.val)
-                )
+                if not (isinstance(arg, LiteralTerm) and is_identity(op.val, arg.val))
             ]
             if len(kept) == len(args):
                 return None
@@ -204,12 +265,11 @@ def simplify_rules() -> list[RwCallable]:
     for the others.
     """
     return [
-        fold_constants,
+        fold_literals,
         annihilate,
         flatten_associative,
         hoist_literals,
         dedup_idempotent,
-        fold_literals,
         drop_identities,
         unwrap_singleton,
     ]

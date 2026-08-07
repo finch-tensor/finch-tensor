@@ -4,12 +4,14 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from .ftypes import FDTypeOrdered, FType, ftype
+from .tensor import Tensor
 
 
 class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    is_variadic: bool = False
 
     @abstractmethod
     def __call__(self, *args: Any) -> Any:
@@ -54,11 +56,27 @@ def is_idempotent(op: FinchOperator) -> bool:
     return op.is_idempotent
 
 
+def is_variadic(op: FinchOperator) -> bool:
+    return op.is_variadic
+
+
+"""
+Operators answer `is_identity` and `is_annihilator` about constants.
+These properties cannot hold for mutable objects (e.g. Scalars), so we
+always fail for them. 
+TODO: In the future, we may want to raise on Scalar.
+"""
+
+
 def is_identity(op: FinchOperator, val: Any) -> bool:
+    if isinstance(val, Tensor):
+        return False
     return op.is_identity(val)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
+    if isinstance(val, Tensor):
+        return False
     return op.is_annihilator(val)
 
 

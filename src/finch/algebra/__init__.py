@@ -10,6 +10,7 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
+    is_variadic,
     repeat_operator,
     return_type,
 )
@@ -147,6 +148,7 @@ __all__ = [
     "is_identity",
     "is_on_device",
     "is_parent_device",
+    "is_variadic",
     "isdtype",
     "none_",
     "normalize_device",

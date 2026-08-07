@@ -3,11 +3,14 @@ import pytest
 from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
-from finch.algebra import ffuncs, int64
+from finch.algebra import bool_, ffuncs, float64, int64
 from finch.symbolic import simplify
 
 x = ntn.Variable("x", int64)
 y = ntn.Variable("y", int64)
+a = ntn.Variable("a", bool_)
+b = ntn.Variable("b", bool_)
+c = ntn.Variable("c", bool_)
 
 
 def call(op, *args):
@@ -26,6 +29,27 @@ def call(op, *args):
                 ntn.Literal(3),
             ),
             ntn.Literal(9),
+        ),
+        # a whole-call fold is sound even where the operator is not associative
+        (call(ffuncs.sub, ntn.Literal(1), ntn.Literal(2)), ntn.Literal(-1)),
+        (call(ffuncs.add, ntn.Literal(7)), ntn.Literal(7)),
+        # a run of adjacent literals folds in one step
+        (
+            call(ffuncs.add, x, ntn.Literal(1), ntn.Literal(2), ntn.Literal(3)),
+            call(ffuncs.add, x, ntn.Literal(6)),
+        ),
+        (
+            call(ffuncs.min, x, ntn.Literal(5), ntn.Literal(3)),
+            call(ffuncs.min, x, ntn.Literal(3)),
+        ),
+        # commutativity gathers literals from wherever they sit
+        (
+            call(ffuncs.add, ntn.Literal(1), x, ntn.Literal(2), y, ntn.Literal(3)),
+            call(ffuncs.add, x, y, ntn.Literal(6)),
+        ),
+        (
+            call(ffuncs.min, ntn.Literal(5), x, ntn.Literal(3)),
+            call(ffuncs.min, x, ntn.Literal(3)),
         ),
         # identities, from either side
         (call(ffuncs.add, x, ntn.Literal(0)), x),
@@ -100,6 +124,99 @@ def test_simplify_recurses_into_statements():
     )
 
 
+def test_simplify_does_not_flatten_a_fixed_arity_operator():
+    """
+    Associativity permits regrouping, not a wider call. `logical_and` is
+    associative but takes exactly two arguments, so flattening a nest of them
+    would build a term that cannot be typed or evaluated.
+    """
+    term = call(ffuncs.logical_and, call(ffuncs.logical_and, a, b), c)
+    result = simplify(term)
+    assert result == term
+    assert result.result_type == term.result_type
+
+
+def test_simplify_flattens_a_variadic_operator():
+    """The same shape does flatten when the operator accepts any arity."""
+    term = call(ffuncs.and_, call(ffuncs.and_, a, b), c)
+    assert simplify(term) == call(ffuncs.and_, a, b, c)
+
+
+@pytest.mark.parametrize(
+    ("term", "expected"),
+    [
+        # an identity buried one level down is lifted out, then dropped
+        (
+            call(ffuncs.logical_and, call(ffuncs.logical_and, a, ntn.Literal(True)), b),
+            call(ffuncs.logical_and, a, b),
+        ),
+        # ... from either side of the nest
+        (
+            call(ffuncs.logical_and, a, call(ffuncs.logical_and, b, ntn.Literal(True))),
+            call(ffuncs.logical_and, a, b),
+        ),
+        # a buried annihilator collapses the whole nest
+        (
+            call(
+                ffuncs.logical_and, call(ffuncs.logical_and, a, ntn.Literal(False)), b
+            ),
+            ntn.Literal(False),
+        ),
+        # two literals on different levels are combined
+        (
+            call(
+                ffuncs.logical_and,
+                call(ffuncs.logical_and, a, ntn.Literal(True)),
+                ntn.Literal(False),
+            ),
+            ntn.Literal(False),
+        ),
+        # lifting reaches past more than one level
+        (
+            call(
+                ffuncs.logical_and,
+                call(
+                    ffuncs.logical_and,
+                    call(ffuncs.logical_and, a, ntn.Literal(True)),
+                    b,
+                ),
+                c,
+            ),
+            call(ffuncs.logical_and, call(ffuncs.logical_and, a, b), c),
+        ),
+        # a nest of nothing but literals folds away entirely
+        (
+            call(
+                ffuncs.logical_and,
+                call(ffuncs.logical_and, ntn.Literal(True), ntn.Literal(True)),
+                ntn.Literal(True),
+            ),
+            ntn.Literal(True),
+        ),
+    ],
+)
+def test_simplify_lifts_literals_out_of_a_fixed_arity_nest(term, expected):
+    assert simplify(term) == expected
+
+
+def test_simplify_lifts_and_folds_numeric_literals_across_levels():
+    x_f = ntn.Variable("x", float64)
+    term = call(
+        ffuncs.logaddexp,
+        call(ffuncs.logaddexp, x_f, ntn.Literal(2.0)),
+        ntn.Literal(3.0),
+    )
+    assert simplify(term) == call(
+        ffuncs.logaddexp, x_f, ntn.Literal(ffuncs.logaddexp(2.0, 3.0))
+    )
+
+
+def test_simplify_does_not_reassociate_a_nest_without_literals():
+    """Lifting must not churn the argument order when it buys nothing."""
+    term = call(ffuncs.logical_and, call(ffuncs.logical_and, a, b), c)
+    assert simplify(term) == term
+
+
 def test_simplify_assembly():
     v = asm.Variable("x", int64)
     term = asm.Call(
@@ -121,9 +238,11 @@ def test_simplify_logic_mapjoin():
     assert simplify(term) == lgc.MapJoin(lgc.Literal(ffuncs.mul), (a, lgc.Literal(6)))
 
 
-def test_simplify_tolerates_non_scalar_literals():
-    """A literal the operator cannot be run on is left untouched, not an error."""
-    import numpy as np
-
-    term = call(ffuncs.mul, x, ntn.Literal(np.zeros(3)))
-    assert simplify(term) == term
+def test_simplify_surfaces_a_malformed_call():
+    """
+    A literal the operator cannot be run on is a malformed term, so the error
+    reaches the caller rather than being quietly skipped over.
+    """
+    term = call(ffuncs.add, ntn.Literal(1), ntn.Literal("s"))
+    with pytest.raises(TypeError):
+        simplify(term)

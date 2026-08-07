@@ -29,6 +29,8 @@ from .ftypes import (
 
 
 class NAryFinchOperator(FinchOperator):
+    is_variadic = True
+
     def return_type(self, *args) -> FType:  # type: ignore[override]
         new_args: list[Any] = []
         for arg in args:
@@ -1393,6 +1395,8 @@ class _FirstArg(FinchOperator):
     Returns the first argument passed to it.
     """
 
+    is_variadic = True
+
     def __call__(self, *args):
         return args[0] if args else None
 
@@ -1408,6 +1412,7 @@ first_arg = _FirstArg()
 
 class _Choose(FinchOperator):
     is_associative = True
+    is_variadic = True
 
     def __init__(self, fill_value):
         self.fill_value = fill_value
@@ -1493,6 +1498,7 @@ conjugate = _Conjugate()
 class _MakeTuple(FinchOperator):
     is_commutative = False
     is_associative = False
+    is_variadic = True
 
     def __call__(self, *args: Any) -> tuple:
         return tuple(args)
