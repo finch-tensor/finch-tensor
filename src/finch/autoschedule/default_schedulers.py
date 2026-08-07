@@ -1,9 +1,11 @@
 import threading
 from contextlib import contextmanager
 
-from finch.autoschedule.optimize import DefaultLogicOptimizer
+from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
+from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.julia import julia_available
 from finch.finch_assembly import (
     AssemblyInterpreter,
     AssemblySimplify,
@@ -22,6 +24,8 @@ from .formatter import DefaultLogicFormatter
 from .galley_optimize import GalleyLogicalOptimizer
 from .loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer
+from .optimize import DefaultLogicOptimizer
+from .smart_formatter import FDFormatter
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -118,6 +122,32 @@ COMPILE_MLIR = LogicNormalizer(
                 )
             )
         )
+    )
+)
+
+COMPILE_JULIA = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicOptimizer(
+            DefaultLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler())))
+        ),
+        stats_factory=FDStatsFactory(),
+    )
+)
+
+# This scheduler is used for computing tensor statistics.
+# Crucially, in order to avoid a circular dependency, this scheduler does not
+# cannot rely on a stats factory that itself calls the interface.
+_NON_RECURSIVE_BACKEND = (
+    FDFormatter(LogicCompiler(FinchJLCompiler()))
+    if julia_available()
+    else DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+)
+
+NON_RECURSIVE_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        DefaultLogicOptimizer(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND)),
+        stats_factory=FDStatsFactory(),
+        cache=True,
     )
 )
 

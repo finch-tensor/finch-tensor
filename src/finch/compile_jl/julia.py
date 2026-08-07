@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 from pathlib import Path
 from typing import Any
@@ -7,6 +8,17 @@ from typing import Any
 _jc: Any | None = None
 _jl: Any | None = None
 _packages_loaded = False
+
+
+def julia_available() -> bool:
+    """
+    Whether the Julia backend can be used, i.e. whether both Python packages
+    `init_julia` needs are installed. They are optional dependencies; see the
+    `julia` extra in `pyproject.toml`.
+    """
+    return all(
+        importlib.util.find_spec(name) is not None for name in ("juliapkg", "juliacall")
+    )
 
 
 def _julia_exe_from_libjulia(libjulia: str) -> Path | None:

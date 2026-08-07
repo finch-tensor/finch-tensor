@@ -3499,14 +3499,13 @@ def test_lp_norm_endpoints():
     # p=1 -> nnz along the conditioned column; p=inf -> max degree.
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 1.0, 1.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]])
-    stats = _lp_stats(A, (i, j), ps=(1.0, math.inf))
-    by_p = {}
+    stats = _lp_stats(A, (i, j), ps=(0.0, 1.0, math.inf))
+    by_to = {}
     for dc in stats.dcs:
-        if dc.from_indices == frozenset({i}):
-            by_p[dc.p] = dc.value
-    # row 0 has degree 3, row 1 has degree 1: l1 = 4 (== nnz), linf = 3
-    assert by_p[1.0] == pytest.approx(4.0)
-    assert by_p[math.inf] == pytest.approx(3.0)
+        if dc.from_indices == frozenset():
+            by_to[dc.to_indices] = dc.value
+    assert by_to[frozenset({i})] == pytest.approx(2.0)
+    assert by_to[frozenset({i, j})] == pytest.approx(4.0)
 
 
 def test_lpdc_is_hashable_frozen():
