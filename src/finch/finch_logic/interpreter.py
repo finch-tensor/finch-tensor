@@ -243,6 +243,7 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        lgc.LogicStatement,
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
-        return MockLogicLibrary(prgm, bindings), bindings, shape_vars
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars, prgm

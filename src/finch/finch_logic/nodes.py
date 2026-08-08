@@ -8,9 +8,11 @@ from typing import Any, Self, TypeVar
 from finch.algebra import (
     FType,
     FTyped,
+    apply_fill,
     ffuncs,
     fixpoint_type,
     ftype,
+    is_dynamic,
     promote_type,
     return_type,
 )
@@ -43,10 +45,14 @@ def reduce_element_type(op, z: Any, t: FType) -> FType:
 
 
 def merge_fill_value(op, *args):
-    return op(*args)
+    return apply_fill(op, *args)
 
 
 def reduce_fill_value(op, z, t):
+    # An overwrite reduction's background is the argument's background when
+    # the init is not compile-time data.
+    if is_dynamic(z) and op is ffuncs.overwrite:
+        return t
     return z
 
 
@@ -699,7 +705,10 @@ class Query(LogicTree, LogicStatement):
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         if self.lhs in bindings:
-            if self.rhs.valmap(f, g, bindings) != bindings[self.lhs]:
+            val = self.rhs.valmap(f, g, bindings)
+            prev = bindings[self.lhs]
+            # A dynamic value is compatible with any value of its dtype.
+            if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(
                     f"Cannot rebind alias {self.lhs} to a different values"
                 )

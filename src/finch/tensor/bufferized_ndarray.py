@@ -6,12 +6,14 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    DynamicFillError,
     FType,
     ImmutableStructFType,
     Tensor,
     TupleFType,
     ffuncs,
     ftype,
+    is_dynamic,
     normalize_device,
 )
 from finch.codegen import NumpyBuffer, NumpyBufferFType
@@ -40,6 +42,10 @@ class BufferizedNDArray(OverrideTensor):
         self.val = val
         self._shape = shape
         self.strides = strides
+        if is_dynamic(fill_value):
+            raise DynamicFillError(
+                "BufferizedNDArray instances require a concrete fill value"
+            )
         self._fill_value = val.ftype.element_type(fill_value)
         self._device = normalize_device(device)
 
@@ -96,6 +102,12 @@ class BufferizedNDArray(OverrideTensor):
         return self._fill_value
 
     @property
+    def fill(self) -> Any:
+        """The fill value as a struct field, for marshaling to kernels
+        compiled against a dynamic fill."""
+        return self._fill_value
+
+    @property
     def device(self):
         return self._device
 
@@ -128,6 +140,9 @@ class BufferizedNDArray(OverrideTensor):
         Declare a bufferized NDArray with the given initialization value,
         operation, and shape.
         """
+        if is_dynamic(init):
+            # The value arrives at bind time: use this instance's fill.
+            init = self._fill_value
         for i in range(self.val.length()):
             self.val.store(i, init)
         return self
@@ -221,22 +236,26 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     @property
     def struct_fields(self):
-        return [
+        fields = [
             ("val", self.buf_t),
             ("shape", self.shape_t),
             ("strides", self.strides_t),
         ]
+        if is_dynamic(self._fill_value):
+            # The fill value is bound at call time through a struct field.
+            fields.append(("fill", self.element_type))
+        return fields
 
-    def from_fields(self, buf, shape, strides):
+    def from_fields(self, buf, shape, strides, fill=None):
         return BufferizedNDArray(
             buf,
             shape,
             strides,
-            self.fill_value,
+            self.fill_value if fill is None else fill,
             device=self.device,
         )
 
-    def from_numpy(self, arr):
+    def from_numpy(self, arr, fill_value=None):
         val = NumpyBuffer(arr.reshape(-1, copy=False))
         strides = _get_default_strides(arr.shape)
         return BufferizedNDArray(
@@ -251,7 +270,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
                     strides, self.strides_t.struct_fieldtypes, strict=True
                 )
             ),
-            fill_value=self.fill_value,
+            fill_value=self.fill_value if fill_value is None else fill_value,
             device=self.device,
         )
 
@@ -276,16 +295,26 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self._ndim = ndim
         self.shape_t = dimension_type
         self.strides_t = dimension_type  # assuming strides is the same type as shape
-        self._fill_value = self.buf_t.element_type(fill_value)
+        if is_dynamic(fill_value):
+            self._fill_value = fill_value
+        else:
+            self._fill_value = self.buf_t.element_type(fill_value)
         self._device = normalize_device(device)
 
     def construct(
         self,
         shape: tuple[int, ...],
+        fill_value: Any = None,
     ) -> BufferizedNDArray:
+        if fill_value is None:
+            fill_value = self.fill_value
+            if is_dynamic(fill_value):
+                raise DynamicFillError(
+                    f"cannot construct {self!r} without a resolved fill value"
+                )
         arr = np.empty(shape, dtype=to_numpy_type(self.element_type))
-        arr[...] = self.fill_value
-        return self.from_numpy(arr)
+        arr[...] = fill_value
+        return self.from_numpy(arr, fill_value=fill_value)
 
     def __call__(
         self,
@@ -312,6 +341,19 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             and bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
             and self.device == other.device
         )
+
+    def fisinstance(self, other):
+        other_t = ftype(other)
+        if is_dynamic(self._fill_value) and isinstance(other_t, BufferizedNDArrayFType):
+            # A dynamic-fill ftype accepts any fill value of matching dtype.
+            other_t = BufferizedNDArrayFType(
+                buffer_type=other_t.buf_t,
+                ndim=other_t.ndim,
+                dimension_type=other_t.shape_t,
+                fill_value=self._fill_value,
+                device=other_t.device,
+            )
+        return other_t == self
 
     def __hash__(self):
         return hash(
@@ -365,10 +407,16 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
         buf = asm.GetAttr(tns.root, asm.Literal("val"))
+        init_e: asm.AssemblyExpression = (
+            # The init value arrives at bind time through the fill field.
+            asm.GetAttr(tns.root, asm.Literal("fill"))
+            if is_dynamic(getattr(init, "val", None))
+            else asm.Literal(init.val)
+        )
         body = asm.Store(
             buf,
             i_var,
-            asm.Literal(init.val),
+            init_e,
         )
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
         if isinstance(tns.root, asm.Slot):
@@ -621,7 +669,12 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             op_e,
             (asm.Load(buf, pos_e), val_e),
         )
-        if tns.dirty and op.val is ffuncs.overwrite:
+        if (
+            tns.dirty
+            and op.val is ffuncs.overwrite
+            # init_write only helps the simplifier elide stores of a Known fill
+            and not is_dynamic(tns.type.fill_value)
+        ):
             increment_call = asm.Call(
                 asm.Literal(ffuncs.init_write(tns.type.fill_value)),
                 (asm.Load(buf, pos_e), increment_call),

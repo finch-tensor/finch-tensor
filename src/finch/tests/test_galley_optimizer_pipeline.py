@@ -443,3 +443,23 @@ def test_repeat_operator_scalar_outside_reduction():
         fl_interface.prod(x * 6.0) * 6.0, ctx=INTERPRET_NOTATION_GALLEY
     )
     assert np.allclose(np.array(out), (arr * 6.0).prod() * 6.0)
+
+
+def test_mapjoin_strict_binary_partitioned_fills():
+    """
+    Regression: a strict-binary assoc/comm op (logical_and) whose argument
+    fills split into annihilator (False) and non-annihilator (True) partitions
+    must not union the single non-annihilator side alone — op(single_fill) is
+    an arity error for binary operators.
+    """
+    arr = np.array([[1.0, 2.0], [3.0, 4.0]])
+    mask_arr = np.array([[True, False], [False, True]])
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+    mask = fl_interface.lazy(fl_interface.asarray(mask_arr))
+
+    out = fl_interface.compute(
+        fl_interface.logical_and(x <= 2, mask),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    expected = np.logical_and(arr <= 2, mask_arr)
+    assert np.array_equal(np.array(out), expected)

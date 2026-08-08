@@ -7,6 +7,7 @@ import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
 from finch.algebra.algebra import FinchOperator
 from finch.algebra.ffuncs import make_tuple, overwrite
+from finch.algebra.fill import DynamicFillError, is_dynamic
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 
@@ -262,6 +263,11 @@ class FinchJLGenerator:
                 return self.pack_dict[name]
 
             case ntn.Literal(val):
+                if is_dynamic(val):
+                    # str() would silently emit broken source.
+                    raise DynamicFillError(
+                        "cannot emit a dynamic fill as a Julia literal"
+                    )
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"

@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .fill import is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
 
 
@@ -55,11 +56,13 @@ def is_idempotent(op: FinchOperator) -> bool:
 
 
 def is_identity(op: FinchOperator, val: Any) -> bool:
-    return op.is_identity(val)
+    # Dynamic fills have no known value, so no property of the value holds.
+    return not is_dynamic(val) and op.is_identity(val)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    return op.is_annihilator(val)
+    # Dynamic fills have no known value, so no property of the value holds.
+    return not is_dynamic(val) and op.is_annihilator(val)
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:
