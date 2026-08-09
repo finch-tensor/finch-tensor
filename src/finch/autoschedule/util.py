@@ -5,6 +5,7 @@ from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequ
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Literal,
     LogicExpression,
     LogicNode,
     LogicStatement,
@@ -51,6 +52,9 @@ def push_fields(root):
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
             case Relabel(Table(arg, _), idxs):
                 return Table(arg, idxs)
+            # A literal is zero-dimensional, so there are no fields to relabel.
+            case Relabel(Literal() as lit, _):
+                return lit
 
     root = Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
 
