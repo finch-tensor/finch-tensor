@@ -63,7 +63,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.output_name = None
     aq.reduce_idxs = reduce_fields
     aq.point_expr = None
-    aq.idx_lowest_root = OrderedDict()
+    aq.idx_lowest_path = OrderedDict()
     aq.idx_op = OrderedDict()
     aq.idx_init = OrderedDict()
     aq.parent_idxs = parent_fields
@@ -114,7 +114,7 @@ def test_get_reducible_idxs_for_component(
     aq.output_name = None
     aq.reduce_idxs = reduce_fields
     aq.point_expr = None
-    aq.idx_lowest_root = OrderedDict()
+    aq.idx_lowest_path = OrderedDict()
     aq.idx_op = OrderedDict()
     aq.idx_init = OrderedDict()
     aq.parent_idxs = parent_fields
@@ -196,97 +196,96 @@ def test_get_idx_connected_components(parent_idxs, connected_idxs, expected):
     assert result == expected
 
 
-@pytest.mark.parametrize(
-    "expr,node_to_replace,new_node,nodes_to_remove,expected_names",
-    [
+def _abc_mapjoin():
+    return MapJoin(
+        Literal("op"),
         (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
             Table(Literal("a"), (Field("a"),)),
-            set(),
-            ["a", "a", "c"],
+            Table(Literal("b"), (Field("b"),)),
+            Table(Literal("c"), (Field("c"),)),
         ),
+    )
+
+
+def test_node_at():
+    expr = _abc_mapjoin()
+    assert AnnotatedQuery.node_at(expr, ()) is expr
+    assert AnnotatedQuery.node_at(expr, (0,)) == Literal("op")
+    assert AnnotatedQuery.node_at(expr, (2,)) == Table(Literal("b"), (Field("b"),))
+    assert AnnotatedQuery.node_at(expr, (2, 0)) == Literal("b")
+
+
+@pytest.mark.parametrize(
+    "transforms,expected_names",
+    [
+        # Replace the second argument.
+        ({(2,): lambda _: Table(Literal("a"), (Field("a"),))}, ["a", "a", "c"]),
+        # Replace the second argument and remove the third.
         (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("c"), (Field("c"),))},
+            {
+                (2,): lambda _: Table(Literal("a"), (Field("a"),)),
+                (3,): lambda _: None,
+            },
             ["a", "a"],
         ),
+        # Remove the first argument only; later siblings shift.
+        ({(1,): lambda _: None}, ["b", "c"]),
+        # Structurally equal replacements at different paths stay distinct:
+        # replacing the third argument does not touch an equal first argument.
         (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("c"), (Field("c"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("c"), (Field("c"),))},
-            ["a", "b"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("b"), (Field("b"),)),
-            Table(Literal("a"), (Field("a"),)),
-            {Table(Literal("b"), (Field("b"),))},
-            ["a", "c"],
-        ),
-        (
-            MapJoin(
-                Literal("op"),
-                (
-                    Table(Literal("a"), (Field("a"),)),
-                    Table(Literal("b"), (Field("b"),)),
-                    Table(Literal("c"), (Field("c"),)),
-                ),
-            ),
-            Table(Literal("c"), (Field("c"),)),
-            Table(Literal("a"), (Field("a"),)),
-            set(),
+            {(3,): lambda _: Table(Literal("a"), (Field("a"),))},
             ["a", "b", "a"],
         ),
     ],
 )
-def test_replace_and_remove_nodes(
-    expr,
-    node_to_replace,
-    new_node,
-    nodes_to_remove,
-    expected_names,
-):
-    out = AnnotatedQuery.replace_and_remove_nodes(
-        expr=expr,
-        node_to_replace=node_to_replace,
-        new_node=new_node,
-        nodes_to_remove=nodes_to_remove,
-    )
-
+def test_replace_at(transforms, expected_names):
+    out = AnnotatedQuery.replace_at(_abc_mapjoin(), transforms)
     result = [tbl.idxs[0].name for tbl in out.args]
     assert result == expected_names
+
+
+def test_replace_at_root():
+    replacement = Table(Literal("z"), (Field("z"),))
+    out = AnnotatedQuery.replace_at(_abc_mapjoin(), {(): lambda _: replacement})
+    assert out == replacement
+
+
+def test_replace_at_nested_transforms_compose():
+    # An outer wrap receives the node with the inner transform already
+    # applied, and the walk never descends into inserted subtrees even though
+    # the inserted expression contains its own transform target.
+    expr = _abc_mapjoin()
+    wrap = lambda node: MapJoin(Literal("wrap"), (node, Literal(2.0)))  # noqa: E731
+    out = AnnotatedQuery.replace_at(
+        expr,
+        {
+            (2,): wrap,
+            (2, 0): lambda _: Literal("b2"),
+        },
+    )
+    wrapped = out.args[1]
+    assert wrapped.op == Literal("wrap")
+    assert wrapped.args[0] == Table(Literal("b2"), (Field("b"),))
+    assert wrapped.args[1] == Literal(2.0)
+
+
+@pytest.mark.parametrize(
+    "path,replace_path,removal_paths,expected",
+    [
+        # Inside the replaced kernel -> the replacement position.
+        ((2, 0), (2,), [], (2,)),
+        # Inside a removed sibling -> the replacement position.
+        ((3, 0), (2,), [(3,)], (2,)),
+        # A later sibling of a removal shifts down.
+        ((3,), (1,), [(2,)], (2,)),
+        # An earlier sibling of a removal is unchanged.
+        ((1,), (2,), [(3,)], (1,)),
+        # A path above the splice is unchanged.
+        ((), (2,), [(3,)], ()),
+    ],
+)
+def test_splice_paths(path, replace_path, removal_paths, expected):
+    assert AnnotatedQuery.splice_paths(path, replace_path, removal_paths) == expected
 
 
 @pytest.mark.parametrize(
@@ -388,7 +387,8 @@ def test_replace_and_remove_nodes(
     ],
 )
 def test_find_lowest_roots(root, idx_name, expected):
-    roots = AnnotatedQuery.find_lowest_roots(ffuncs.add, Field(idx_name), root)
+    paths = AnnotatedQuery.find_lowest_roots(ffuncs.add, Field(idx_name), root)
+    roots = [AnnotatedQuery.node_at(root, path) for path in paths]
 
     # Special-case: the max(C(i), D(j)) example – we expect the MapJoin itself.
     if expected and not isinstance(expected[0], str):
@@ -532,7 +532,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
-    aq.idx_lowest_root = OrderedDict({reduce_field: expr.arg})
+    aq.idx_lowest_path = OrderedDict({reduce_field: (2,)})
     aq.idx_op = OrderedDict({reduce_field: ffuncs.add})
     aq.idx_init = OrderedDict({reduce_field: 0})
     aq.parent_idxs = OrderedDict()
@@ -558,9 +558,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
             if isinstance(i, str):
                 dims[Field(i)] = dims[i]
 
-    query, node_to_replace, nodes_to_remove, reduced_idxs = aq.get_reduce_query(
-        reduce_field
-    )
+    query, replace_path, removal_paths, reduced_idxs = aq.get_reduce_query(reduce_field)
 
     assert query.rhs == expected
 
@@ -699,7 +697,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
-    aq.idx_lowest_root = OrderedDict({reduce_field: expr})
+    aq.idx_lowest_path = OrderedDict({reduce_field: ()})
     aq.idx_op = OrderedDict({reduce_field: ffuncs.add})
     aq.idx_init = OrderedDict({reduce_field: 0})
     aq.parent_idxs = OrderedDict()
@@ -770,7 +768,7 @@ def rename_aliases(expr):
                 Alias("out"),
                 Aggregate(
                     Literal(ffuncs.overwrite),
-                    Literal(0.0),
+                    Literal(np.float64(0.0)),
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -803,7 +801,7 @@ def rename_aliases(expr):
                 Alias("out"),
                 Aggregate(
                     Literal(ffuncs.overwrite),
-                    Literal(0.0),
+                    Literal(np.float64(0.0)),
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -838,7 +836,7 @@ def rename_aliases(expr):
                 Alias("out"),
                 Aggregate(
                     Literal(ffuncs.overwrite),
-                    Literal(0.0),
+                    Literal(np.float64(0.0)),
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -1040,12 +1038,7 @@ def test_greedy_query_multi_component():
     aq.output_name = Alias("out")
     aq.reduce_idxs = [fi, fj]
     aq.point_expr = point_expr
-    aq.idx_lowest_root = OrderedDict(
-        {
-            fi: Table(Literal(A), (fi,)),
-            fj: Table(Literal(B), (fj,)),
-        }
-    )
+    aq.idx_lowest_path = OrderedDict({fi: (1,), fj: (2,)})
     aq.idx_op = OrderedDict(
         {
             fi: ffuncs.add,
