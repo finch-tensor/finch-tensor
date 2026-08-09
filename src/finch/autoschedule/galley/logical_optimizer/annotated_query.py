@@ -29,6 +29,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import gensym
+from finch.tensor import Scalar
 
 from .logic_to_stats import insert_statistics
 
@@ -111,8 +112,7 @@ class AnnotatedQuery:
         ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal, LogicNode]]]:
             """Remove Aggregate nodes bottom-up, recording each reduction index
             together with the path of the aggregate's argument in the stripped
-            tree. An aggregate collapses to its argument, so that path is the
-            aggregate's own position."""
+            tree."""
             match node:
                 case Aggregate(Literal() as op, Literal() as init, arg, idxs):
                     new_arg, records = strip_aggregates(arg)
@@ -166,11 +166,10 @@ class AnnotatedQuery:
             (idx, idx) for idx in cache[q.rhs].index_order
         )
         idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
-        repeats: dict[Path, OrderedDict[Field, tuple[FinchOperator, Any]]] = {}
         stats_point = cache_point[point_expr]
+        self.idx_dim_size: dict[Field, Any] = dict(stats_point.dim_sizes)
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
-            idx_dim_size = stats_point.dim_sizes[idx]
             starting_path = idx_starting_path[idx]
             lowest_paths = AnnotatedQuery.find_lowest_roots(
                 agg_op,
@@ -191,19 +190,6 @@ class AnnotatedQuery:
                     for i, _ in enumerate(lowest_paths, start=1)
                 ]
                 for i, path in enumerate(lowest_paths):
-                    node = AnnotatedQuery.node_at(point_expr, path)
-                    if idx not in cache_point[node].index_order:
-                        # If the lowest root doesn't contain the reduction index, we
-                        # attempt to remove the reduction via a repeat_operator, i.e.
-                        # ∑_i B_j = B_j*|Dom(i)|
-                        f = repeat_operator(agg_op)
-                        if f is None:
-                            continue
-                        repeats.setdefault(path, OrderedDict())[idx] = (
-                            f,
-                            idx_dim_size,
-                        )
-                        continue
                     new_idx = new_idxs[i]
                     idx_op[new_idx] = agg_op
                     idx_init[new_idx] = idx_init[idx]
@@ -211,65 +197,6 @@ class AnnotatedQuery:
                     idx_starting_path[new_idx] = starting_path
                     original_idx[new_idx] = idx
                     reduce_idxs.append(new_idx)
-
-        if repeats:
-            # Repeats over several indices with the same operator compose by
-            # multiplying their domain sizes, since the repeat operators are
-            # power-like: (x*d1)*d2 == x*(d1*d2) and (x**d1)**d2 == x**(d1*d2).
-            wrap_groups: dict[Path, list[tuple[FinchOperator, Any]]] = {}
-            for path, per_idx in repeats.items():
-                groups: list[tuple[FinchOperator, Any]] = []
-                for f, size in per_idx.values():
-                    if groups and groups[-1][0] == f:
-                        groups[-1] = (f, groups[-1][1] * size)
-                    else:
-                        groups.append((f, size))
-                wrap_groups[path] = groups
-
-            def make_wrap(
-                groups: list[tuple[FinchOperator, Any]],
-            ) -> Callable[[LogicNode], LogicNode]:
-                def wrap(node: LogicNode) -> LogicNode:
-                    for f, factor in groups:
-                        node = MapJoin(
-                            Literal(f),
-                            (cast(LogicExpression, node), Literal(factor)),
-                        )
-                    return node
-
-                return wrap
-
-            point_expr = cast(
-                LogicExpression,
-                AnnotatedQuery.replace_at(
-                    point_expr,
-                    {path: make_wrap(g) for path, g in wrap_groups.items()},
-                ),
-            )
-            # Wrapping inserts MapJoin levels above the wrapped nodes, so every
-            # stored path running through a wrapped position must be remapped.
-            # The wrapped node sits at child 1 of each inserted MapJoin
-            # (children are [op, node, factor]).
-            wrap_paths = sorted(wrap_groups, key=len, reverse=True)
-
-            def remap_through_wraps(path: Path) -> Path:
-                for p in wrap_paths:
-                    if path[: len(p)] == p:
-                        levels = (1,) * len(wrap_groups[p])
-                        path = (*p, *levels, *path[len(p) :])
-                return path
-
-            for idx, path in idx_lowest_path.items():
-                idx_lowest_path[idx] = remap_through_wraps(path)
-            for idx, path in idx_starting_path.items():
-                idx_starting_path[idx] = remap_through_wraps(path)
-            insert_statistics(
-                self.stats_factory,
-                point_expr,
-                bindings=bindings,
-                replace=False,
-                cache=cache_point,
-            )
 
         parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
             (i, []) for i in reduce_idxs
@@ -345,6 +272,7 @@ class AnnotatedQuery:
         new.bindings = OrderedDict(self.bindings.items())
         new.cache = OrderedDict(self.cache.items())
         new.cache_point = OrderedDict(self.cache_point.items())
+        new.idx_dim_size = dict(self.idx_dim_size)
 
         return new
 
@@ -608,8 +536,6 @@ class AnnotatedQuery:
         """
         match root:
             case MapJoin(Literal(FinchOperator() as mj_op), args):
-                # A MapJoin's children are [op, *args]: argument i is child
-                # i + 1.
                 with_idx = [
                     (i, arg) for i, arg in enumerate(args) if idx in arg.fields()
                 ]
@@ -707,8 +633,6 @@ class AnnotatedQuery:
                 if len(relevant_pos) == len(args):
                     replace_path = root_path
                 else:
-                    # A MapJoin's children are [op, *args]: argument i is child
-                    # i + 1.
                     replace_path = (*root_path, relevant_pos[0] + 1)
                     removal_paths = [(*root_path, i + 1) for i in relevant_pos[1:]]
                 query_expr = MapJoin(Literal(op), tuple(relevant_args))
@@ -756,17 +680,40 @@ class AnnotatedQuery:
         agg_op = self.idx_op[self.original_idx[reduce_idx]]
         agg_init = self.idx_init[self.original_idx[reduce_idx]]
 
+        # An index absent from the extracted kernel is not reduced by iterating:
+        # applying the operator over |Dom(idx)| identical values is the repeat
+        # operator, i.e. sum_i B = B * |Dom(i)|.
+        kernel_order = stats_cache[query_expr].index_order
+        repeat_op = repeat_operator(agg_op)
+        repeated = (
+            []
+            if repeat_op is None
+            else [i for i in final_idxs_to_be_reduced if i not in kernel_order]
+        )
+        aggregated = [i for i in final_idxs_to_be_reduced if i not in repeated]
+
+        # The repeat factor goes under the aggregate, which is equivalent for
+        # these power-like operators (sum_j(K*n) == (sum_j K)*n) and keeps an
+        # Aggregate at the root, as the rest of the optimizer expects.
+        for idx in repeated:
+            factor = Literal(self.idx_dim_size[idx])
+            stats_cache[factor] = self.stats_factory(Scalar(factor.val), ())
+            repeated_expr = MapJoin(Literal(repeat_op), (query_expr, factor))
+            stats_cache[repeated_expr] = self.stats_factory.mapjoin(
+                repeat_op, stats_cache[query_expr], stats_cache[factor]
+            )
+            query_expr = repeated_expr
+
         query_expr = Aggregate(
             Literal(agg_op),
             Literal(agg_init),
             query_expr,
-            tuple(final_idxs_to_be_reduced),
+            tuple(aggregated),
         )
-
         stats_cache[query_expr] = self.stats_factory.aggregate(
             agg_op,
             agg_init,
-            tuple(final_idxs_to_be_reduced),
+            tuple(aggregated),
             stats_cache[query_expr.arg],
         )
 
