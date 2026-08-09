@@ -8,8 +8,10 @@ import finch.finch_notation.nodes as ntn
 from finch.algebra.algebra import FinchOperator
 from finch.algebra.ffuncs import make_tuple, overwrite
 from finch.algebra.fill import DynamicFillError, is_dynamic
+from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finch.symbolic import PostWalk, Rewrite
 
 from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
@@ -96,15 +98,22 @@ ops_to_ignore = [make_tuple]
 
 
 class FinchJLKernel(AssemblyKernel):
-    def __init__(self, func_name, jl_code):
+    def __init__(self, func_name, jl_code, dynamic_args: tuple[int, ...] = ()):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
+        # Argument positions with dynamic fill values that are
+        # arbitrarily set to zero. Other arguments keep their
+        # Known fills.
+        self.dynamic_args = dynamic_args
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args = [tensor_to_jl(arg) for arg in args]
+        raw_args = [
+            tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            for i, arg in enumerate(args)
+        ]
         result = finch_fn(*raw_args)
 
         # The finch function returns tuples when multiple values are returned
@@ -127,7 +136,7 @@ class FinchJLGenerator:
         self.pack_dict = {}
         self.names: dict[str, str] = {}
 
-    def __call__(self, prgm: ntn.Module) -> str:
+    def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
         self.names.clear()
         return self.generate_julia(prgm)
@@ -284,25 +293,48 @@ class FinchJLGenerator:
                 raise Exception(f"Unhandled node type: {type(prgm)}")
 
 
+def zero_dynamic_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
+    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
+    which argument positions carried a Dynamic fill. This is a necessary but
+    potentially unsound rewrite which should be removed eventually.
+    """
+    dynamic_args = tuple(
+        i
+        for i, arg in enumerate(func.args)
+        if is_dynamic(getattr(arg.type_, "fill_value", None))
+    )
+
+    def rule(node):
+        match node:
+            case ntn.Literal(val) if is_dynamic(val):
+                return ntn.Literal(ftype(val)(0))
+        return None
+
+    return Rewrite(PostWalk(rule))(func), dynamic_args
+
+
 class FinchJLCompiler(NotationCompiler):
-    _kernels: ClassVar[dict[str, FinchJLKernel]] = {}
+    _kernels: ClassVar[dict[tuple[str, tuple[int, ...]], FinchJLKernel]] = {}
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
 
         kernel_dict = {}
-        for func in prgm.children:
+        for orig_func in prgm.children:
+            func, dynamic_args = zero_dynamic_fills(orig_func)
             generated_prgm = generator(func)
-            kernel = self._kernels.get(generated_prgm)
+            kernel = self._kernels.get((generated_prgm, dynamic_args))
             if kernel is None:
                 # Give every distinct program its own Julia symbol to avoid
                 # conflicts in the julia runtime.
                 digest = hashlib.sha256(generated_prgm.encode()).hexdigest()
                 jl_name = f"{func.name.name}_{digest}"
                 kernel = FinchJLKernel(
-                    jl_name, generated_prgm.replace(func.name.name, jl_name, 1)
+                    jl_name,
+                    generated_prgm.replace(func.name.name, jl_name, 1),
+                    dynamic_args=dynamic_args,
                 )
-                self._kernels[generated_prgm] = kernel
+                self._kernels[(generated_prgm, dynamic_args)] = kernel
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)
