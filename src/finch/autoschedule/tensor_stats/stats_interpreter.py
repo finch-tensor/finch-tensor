@@ -124,8 +124,6 @@ class StatsMachine:
                 return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
 
             case Literal(val):
-                # A literal is a zero-dimensional constant, so its statistics
-                # are those of a rank-0 dense tensor holding that value.
                 return self.stats_factory(Scalar(val), ())
 
             case Reorder():
