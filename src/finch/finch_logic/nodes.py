@@ -8,9 +8,11 @@ from typing import Any, Self, TypeVar
 from finch.algebra import (
     FType,
     FTyped,
+    apply_fill,
     ffuncs,
     fixpoint_type,
     ftype,
+    is_dynamic,
     promote_type,
     return_type,
 )
@@ -51,10 +53,14 @@ def reduce_element_type(op, z: Any, t: FType) -> FType:
 
 
 def merge_fill_value(op, *args):
-    return op(*args)
+    return apply_fill(op, *args)
 
 
 def reduce_fill_value(op, z, t):
+    # An overwrite reduction's background is the argument's background when
+    # the init is not compile-time data.
+    if is_dynamic(z) and op is ffuncs.overwrite:
+        return t
     return z
 
 
@@ -209,7 +215,7 @@ class LogicExpression(LogicNode):
 
     def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
-        return self.valmap(merge_element_type, reduce_element_type, bindings)
+        return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
     def fill_value(self, bindings: dict[Alias, Any]) -> Any:
         """Returns fill value of the node."""
@@ -328,14 +334,6 @@ class Literal(LogicExpression, LiteralTerm):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.val
-
-    def element_type(self, bindings: dict[Alias, FType]) -> FType:
-        """Returns element type of the node."""
-        return ftype(self.val)
-
-    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
-        """Returns fill value of the node."""
         return self.val
 
 
@@ -707,7 +705,10 @@ class Query(LogicTree, LogicStatement):
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         if self.lhs in bindings:
-            if self.rhs.valmap(f, g, bindings) != bindings[self.lhs]:
+            val = self.rhs.valmap(f, g, bindings)
+            prev = bindings[self.lhs]
+            # A dynamic value is compatible with any value of its dtype.
+            if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(
                     f"Cannot rebind alias {self.lhs} to a different values"
                 )

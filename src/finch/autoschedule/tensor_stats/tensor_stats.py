@@ -11,6 +11,10 @@ import numpy as np
 
 from finch.algebra import (
     FinchOperator,
+    NAryFinchOperator,
+    apply_fill,
+    is_annihilator,
+    is_dynamic,
     is_idempotent,
     is_identity,
     repeat_operator,
@@ -135,11 +139,15 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
-            if op.is_annihilator(s.fill_value):
+            if is_annihilator(op, s.fill_value):
                 join_args.append(s)
             else:
                 union_args.append(s)
-        if op.is_associative and op.is_commutative:
+        if (
+            op.is_associative
+            and op.is_commutative
+            and isinstance(op, NAryFinchOperator)
+        ):
             if union_args:
                 join_args.append(self._mapjoin_union(op, *union_args))
 
@@ -171,7 +179,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
 
     @staticmethod
     def _mapjoin_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
-        new_fill_value = op(*(s.fill_value for s in args))
+        new_fill_value = apply_fill(op, *(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),
             tuple(
@@ -200,7 +208,10 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
 
         if init is None:
-            if is_identity(op, d.fill_value) or is_idempotent(op):
+            if is_dynamic(d.fill_value):
+                # The reduced background of an unknown fill is value-dependent.
+                init = apply_fill(op, d.fill_value, d.fill_value)
+            elif is_identity(op, d.fill_value) or is_idempotent(op):
                 init = op(d.fill_value, d.fill_value)
             else:
                 try:

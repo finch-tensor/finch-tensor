@@ -11,6 +11,7 @@ from .algebra import (
     type_max,
     type_min,
 )
+from .fill import is_dynamic
 from .ftypes import (
     FDType,
     FDTypeBoolean,
@@ -1377,7 +1378,10 @@ class _InitWrite(FinchOperator):
         return hash((self.value,))
 
     def __call__(self, x: Any, y: Any):
-        assert x == self.value, f"Expected {self.value}, got {x}"
+        # A dynamic init has no compile-time value to check against.
+        assert is_dynamic(self.value) or x == self.value, (
+            f"Expected {self.value}, got {x}"
+        )
         return y
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]

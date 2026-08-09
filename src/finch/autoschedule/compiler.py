@@ -434,9 +434,10 @@ class LogicCompiler(FormattedForm, LogicLoader):
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        lgc.LogicStatement,
     ]:
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
         shape_vars = compute_shape_vars(prgm, bindings)
-        return lib, bindings, shape_vars
+        return lib, bindings, shape_vars, prgm

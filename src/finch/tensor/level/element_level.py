@@ -5,7 +5,12 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import FType, ImmutableStructFType, ftype
+from finch.algebra import (
+    FType,
+    ImmutableStructFType,
+    ftype,
+    is_dynamic,
+)
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
 
@@ -26,9 +31,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
 
     @property
     def struct_fields(self):
-        return [
+        fields = [
             ("val", self.buffer_type),
         ]
+        if is_dynamic(self.fill_value):
+            # The fill value is bound at call time through a struct field.
+            fields.append(("fill", self.element_type))
+        return fields
 
     def __post_init__(self):
         # Ensure element_type is an FType
@@ -46,7 +55,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             self.position_type = np.intp
         self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
-        self.fill_value = self.element_type(self.fill_value)
+        if not is_dynamic(self.fill_value):
+            self.fill_value = self.element_type(self.fill_value)
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "ElementLevel":
         """
@@ -93,18 +103,37 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return []
 
-    def from_fields(self, val=None) -> "ElementLevel":
+    def with_fill(self, fill_value: Any) -> "ElementLevelFType":
+        return ElementLevelFType(
+            fill_value=fill_value,
+            element_type=self.element_type,
+            position_type=self.position_type,
+            buffer_factory=self.buffer_factory,
+            buffer_type=self.buffer_type,
+        )
+
+    def lower_fill(self, lvl_expr):
+        return asm.GetAttr(lvl_expr, asm.Literal("fill"))
+
+    def from_fields(self, val=None, fill=None) -> "ElementLevel":
         # Wrap numpy arrays in NumpyBuffer and flatten, similar to BufferizedNDArray
         if val is not None and isinstance(val, np.ndarray):
             from finch.codegen import NumpyBuffer
 
             val = NumpyBuffer(np.asarray(val).reshape(-1, copy=False))
-        return ElementLevel(_format=self, _val=val)
+        fmt = self if fill is None else self.with_fill(fill)
+        return ElementLevel(_format=fmt, _val=val)
 
     def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
         buf = asm.GetAttr(lvl, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
-        body = asm.Store(buf, i_var, asm.Literal(init.val))
+        init_e: asm.AssemblyExpression = (
+            # The init value arrives at bind time through the fill field.
+            asm.GetAttr(lvl, asm.Literal("fill"))
+            if is_dynamic(getattr(init, "val", None))
+            else asm.Literal(init.val)
+        )
+        body = asm.Store(buf, i_var, init_e)
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):
@@ -204,6 +233,12 @@ class ElementLevel(Level):
     @property
     def val(self) -> Any:
         return self._val
+
+    @property
+    def fill(self) -> Any:
+        """The fill value as a struct field, for marshaling to kernels
+        compiled against a dynamic fill."""
+        return self._format.fill_value
 
     def __str__(self):
         return f"ElementLevel(val={self._val})"

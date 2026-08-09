@@ -19,6 +19,7 @@ from finch.algebra import (
     FType,
     Tensor,
     TensorFType,
+    apply_fill,
     common_device,
     ffuncs,
     fixpoint_type,
@@ -70,7 +71,7 @@ from finch.tensor import (
     UpperTriangleTensor,
 )
 from finch.tensor.override_tensor import OverrideTensor
-from finch.tensor.scalar import Scalar
+from finch.tensor.scalar import ConstantScalar, Scalar
 
 
 def _shape_size(shape: tuple) -> int:
@@ -887,11 +888,8 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
 
     The function will automatically handle broadcasting of the input tensors to
     ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
-    x, y)` is equivalent to `x + y`.
-
-
-    Raw numeric inputs become `Literal` constants. When every argument is a literal
-    there is no tensor to draw a device or context from.
+    x, y)` is equivalent to `x + y`. If an input is a ConstantScalar, it will
+    be unwrapped into a Literal(val) node.
 
     Parameters:
     - f: The function to apply elementwise.
@@ -903,18 +901,18 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    is_scalar = tuple(_is_numeric_constant(a) for a in args)
-    if builtins.all(is_scalar):
-        return lazy(f(*args))
-    args = tuple(a if s else lazy(a) for a, s in zip(args, is_scalar, strict=True))
-    shapes = tuple(() if s else a.shape for a, s in zip(args, is_scalar, strict=True))
+    is_constant = tuple(isinstance(a, ConstantScalar) for a in args)
+    if builtins.all(is_constant):
+        return lazy(f(*[a.val for a in args]))
+    args = tuple(a if c else lazy(a) for a, c in zip(args, is_constant, strict=True))
+    shapes = tuple(() if c else a.shape for a, c in zip(args, is_constant, strict=True))
     shape = _broadcast_shape(*shapes)
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs: list[LogicExpression] = []
-    for arg, scalar, arg_shape in zip(args, is_scalar, shapes, strict=True):
-        if scalar:
-            bargs.append(Literal(arg))
+    for arg, constant, arg_shape in zip(args, is_constant, shapes, strict=True):
+        if constant:
+            bargs.append(Literal(arg.val))
             continue
         arg_ndim = len(arg_shape)
         idims = []
@@ -929,17 +927,9 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
     expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
-    new_fill_value = f(
-        *[a if s else a.fill_value for a, s in zip(args, is_scalar, strict=True)]
-    )
-    new_element_type = return_type(
-        f,
-        *[
-            ftype(a) if s else a.element_type
-            for a, s in zip(args, is_scalar, strict=True)
-        ],
-    )
-    tensors = [a for a, s in zip(args, is_scalar, strict=True) if not s]
+    new_fill_value = apply_fill(f, *[a.fill_value for a in args])
+    new_element_type = return_type(f, *[a.element_type for a in args])
+    tensors = [a for a, s in zip(args, is_constant, strict=True) if not s]
     ctx = tensors[0].ctx.join(*[x.ctx for x in tensors[1:]])
     data, ctx = ctx.eval(expr)
     return LazyTensor(
@@ -2925,7 +2915,7 @@ def outer(x1, x2) -> LazyTensor:
         data,
         ctx,
         (x1.shape[0], x2.shape[0]),
-        ffuncs.mul(x1.fill_value, x2.fill_value),
+        apply_fill(ffuncs.mul, x1.fill_value, x2.fill_value),
         return_type(ffuncs.mul, x1.element_type, x2.element_type),
         common_device(x1.device, x2.device),
     )

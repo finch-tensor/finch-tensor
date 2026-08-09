@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .fill import is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
 from .tensor import Tensor
 
@@ -67,20 +68,21 @@ def arity(op: FinchOperator) -> int | float:
 
 """
 Operators answer `is_identity` and `is_annihilator` about constants.
-These properties cannot hold for mutable objects (e.g. Scalars), so we
-always fail for them.
+These properties cannot hold for mutable objects (e.g. Scalars), nor for a
+dynamic fill, whose value is not known until the kernel is called, so we
+always fail for both.
 TODO: In the future, we may want to raise on Scalar.
 """
 
 
 def is_identity(op: FinchOperator, val: Any) -> bool:
-    if isinstance(val, Tensor):
+    if is_dynamic(val) or isinstance(val, Tensor):
         return False
     return op.is_identity(val)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    if isinstance(val, Tensor):
+    if is_dynamic(val) or isinstance(val, Tensor):
         return False
     return op.is_annihilator(val)
 

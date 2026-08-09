@@ -34,6 +34,13 @@ from .devices import (
     normalize_device,
     serial,
 )
+from .ffuncs import NAryFinchOperator
+from .fill import (
+    DynamicFill,
+    DynamicFillError,
+    apply_fill,
+    is_dynamic,
+)
 from .ftypes import (
     FDTypeSignedInteger,
     FDTypeUnsignedInteger,
@@ -91,6 +98,8 @@ __all__ = [
     "CPUThread",
     "CPUThreadFType",
     "DeviceFType",
+    "DynamicFill",
+    "DynamicFillError",
     "FDTypeSignedInteger",
     "FDTypeUnsignedInteger",
     "FInfo",
@@ -100,6 +109,7 @@ __all__ = [
     "IInfo",
     "ImmutableStructFType",
     "MutableStructFType",
+    "NAryFinchOperator",
     "NamedTupleFType",
     "Serial",
     "SerialFType",
@@ -111,6 +121,7 @@ __all__ = [
     "TensorFType",
     "TupleFType",
     "TupleFType",
+    "apply_fill",
     "arity",
     "bool",
     "bool_",
@@ -145,6 +156,7 @@ __all__ = [
     "is_associative",
     "is_commutative",
     "is_distributive",
+    "is_dynamic",
     "is_idempotent",
     "is_identity",
     "is_on_device",
