@@ -9,11 +9,10 @@ from finch.algebra.tensor import TensorFType
 from finch.codegen.numba_codegen import to_numpy_type
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
+from finch.tensor.scalar import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from . import nodes as lgc
-from finch.tensor.scalar import Scalar
-
 from .nodes import (
     Aggregate,
     Alias,
