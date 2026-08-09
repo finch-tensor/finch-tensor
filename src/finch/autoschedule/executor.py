@@ -98,8 +98,12 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
             val_ftypes: dict[lgc.Alias, TensorFType] = {
                 var: val.ftype for var, val in bindings.items()
             }
+            if val_ftypes == arg_ftypes:
+                # Nothing was generalized, so retrying would hit the same cache
+                # key. Recompile without the fallback so the pipeline's own
+                # error surfaces instead of a memoized sentinel.
+                self.cached_kernels.pop((stmt, tuple(arg_ftypes.items())), None)
             entry = self._load_cached(stmt, val_ftypes, bindings, fallback=False)
-            assert entry is not FALLBACK
         mod, binding_ftypes, binding_idxs, final_prgm = entry
 
         input_bindings = dict(

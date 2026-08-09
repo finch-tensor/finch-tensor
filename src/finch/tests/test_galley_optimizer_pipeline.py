@@ -463,6 +463,8 @@ def test_mapjoin_strict_binary_partitioned_fills():
     )
     expected = np.logical_and(arr <= 2, mask_arr)
     assert np.array_equal(np.array(out), expected)
+
+
 @pytest.mark.parametrize("scalar", [2.0, 3.0, 6.0])
 def test_repeat_operator_under_nested_reduction(scalar):
     """
