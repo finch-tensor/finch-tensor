@@ -24,6 +24,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
 )
+from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
@@ -121,6 +122,11 @@ class StatsMachine:
                 arg2 = self(node.arg)
                 reduce_indices = node.idxs
                 return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
+
+            case Literal(val):
+                # A literal is a zero-dimensional constant, so its statistics
+                # are those of a rank-0 dense tensor holding that value.
+                return self.stats_factory(Scalar(val), ())
 
             case Reorder():
                 return self(node.arg)

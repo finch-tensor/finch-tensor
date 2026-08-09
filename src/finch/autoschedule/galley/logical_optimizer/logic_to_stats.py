@@ -12,6 +12,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
+from finch.tensor import Scalar
 
 
 def insert_statistics(
@@ -80,6 +81,13 @@ def insert_statistics(
             if (node not in cache) or replace:
                 cache[node] = tensor
             return cache[node]
+
+        case Literal(val):
+            # A literal is a zero-dimensional constant, so its statistics are
+            # those of a rank-0 dense tensor holding that value.
+            st = stats_factory(Scalar(val), ())
+            cache[node] = st
+            return st
 
         case _:
             raise TypeError(f"Unhandled node type: {type(node)}")
