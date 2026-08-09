@@ -207,7 +207,7 @@ class LogicExpression(LogicNode):
 
     def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
-        return self.valmap(merge_element_type, reduce_element_type, bindings)
+        return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
     def fill_value(self, bindings: dict[Alias, Any]) -> Any:
         """Returns fill value of the node."""
@@ -326,14 +326,6 @@ class Literal(LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.val
-
-    def element_type(self, bindings: dict[Alias, FType]) -> FType:
-        """Returns element type of the node."""
-        return ftype(self.val)
-
-    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
-        """Returns fill value of the node."""
         return self.val
 
 

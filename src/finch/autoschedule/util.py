@@ -52,7 +52,6 @@ def push_fields(root):
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
             case Relabel(Table(arg, _), idxs):
                 return Table(arg, idxs)
-            # A literal is zero-dimensional, so there are no fields to relabel.
             case Relabel(Literal() as lit, _):
                 return lit
 

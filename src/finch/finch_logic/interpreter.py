@@ -9,6 +9,7 @@ from finch.algebra.tensor import TensorFType
 from finch.codegen.numba_codegen import to_numpy_type
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
+from finch.tensor.scalar import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from . import nodes as lgc
@@ -62,7 +63,10 @@ class LogicMachine:
         logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
-                return val
+                # A literal is a zero-dimensional tensor, so it evaluates to a
+                # rank-0 TableValue and every consumer below can treat it
+                # uniformly rather than special-casing raw scalars.
+                return TableValue(Scalar(val), ())
             case Value(_):
                 raise ValueError(
                     "The interpreter cannot evaluate a lazy node. Instead, you can "
@@ -84,14 +88,9 @@ class LogicMachine:
                 return val
             case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
-                # Literal arguments evaluate to plain scalars. They are
-                # zero-dimensional, so they broadcast across every index rather
-                # than contributing dimensions of their own.
                 dims = {}
                 idxs = []
                 for arg in args:
-                    if not isinstance(arg, TableValue):
-                        continue
                     for idx, dim in zip(arg.idxs, arg.tns.shape, strict=True):
                         if idx in dims:
                             if dims[idx] != dim:
@@ -99,21 +98,8 @@ class LogicMachine:
                         else:
                             idxs.append(idx)
                             dims[idx] = dim
-                fill_val = op(
-                    *[
-                        arg.tns.fill_value if isinstance(arg, TableValue) else arg
-                        for arg in args
-                    ]
-                )
-                dtype = return_type(
-                    op,
-                    *[
-                        arg.tns.element_type
-                        if isinstance(arg, TableValue)
-                        else ftype(arg)
-                        for arg in args
-                    ],
-                )
+                fill_val = op(*[arg.tns.fill_value for arg in args])
+                dtype = return_type(op, *[arg.tns.element_type for arg in args])
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
                 )
@@ -121,8 +107,6 @@ class LogicMachine:
                     idx_crds = dict(zip(idxs, crds, strict=True))
                     vals = [
                         arg.tns[*[idx_crds[idx] for idx in arg.idxs]].item()
-                        if isinstance(arg, TableValue)
-                        else arg
                         for arg in args
                     ]
                     result[*crds] = op(*vals)
