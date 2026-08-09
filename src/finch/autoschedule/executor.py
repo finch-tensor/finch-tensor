@@ -2,7 +2,7 @@ from collections import OrderedDict
 from typing import Any
 
 from finch import finch_logic as lgc
-from finch.algebra import DynamicFillError, is_dynamic
+from finch.algebra import is_dynamic
 from finch.algebra.tensor import Tensor, TensorFType
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
@@ -10,10 +10,6 @@ from finch.finch_logic.nodes import TableValue
 from finch.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 
 from .formatter import BufferizedNDArrayFormatter
-
-# Cache marker: this key's dynamic-fill kernel cannot be compiled; use
-# value-specialized compilation instead.
-FALLBACK = object()
 
 
 def extract_tensors(
@@ -86,25 +82,16 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
 
         stmt, bindings = extract_tensors(stmt, bindings)
 
-        # Compile against the argument ftypes first: these may generalize the
-        # value ftypes (e.g. dynamic scalar fills) so one kernel serves many
-        # values. If the pipeline needs a concrete value, fall back to the
-        # value ftypes and memoize the failure so it is not retried.
+        # Compile against the argument ftypes, which may generalize the value
+        # ftypes (e.g. dynamic scalar fills) so one kernel serves many values.
+        # A backend that cannot express a runtime fill must raise
+        # DynamicFillError, and is responsible for its own recovery.
         arg_ftypes: dict[lgc.Alias, TensorFType] = {
             var: val.argument_ftype for var, val in bindings.items()
         }
-        entry = self._load_cached(stmt, arg_ftypes, bindings)
-        if entry is FALLBACK:
-            val_ftypes: dict[lgc.Alias, TensorFType] = {
-                var: val.ftype for var, val in bindings.items()
-            }
-            if val_ftypes == arg_ftypes:
-                # Nothing was generalized, so retrying would hit the same cache
-                # key. Recompile without the fallback so the pipeline's own
-                # error surfaces instead of a memoized sentinel.
-                self.cached_kernels.pop((stmt, tuple(arg_ftypes.items())), None)
-            entry = self._load_cached(stmt, val_ftypes, bindings, fallback=False)
-        mod, binding_ftypes, binding_idxs, final_prgm = entry
+        mod, binding_ftypes, binding_idxs, final_prgm = self._load_cached(
+            stmt, arg_ftypes, bindings
+        )
 
         input_bindings = dict(
             zip(binding_ftypes.keys(), bindings.values(), strict=False)
@@ -151,7 +138,6 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         stmt: lgc.LogicStatement,
         binding_ftypes: dict[lgc.Alias, TensorFType],
         bindings: dict[lgc.Alias, Tensor],
-        fallback: bool = True,
     ):
         key = (stmt, tuple(binding_ftypes.items()))
         if self.cache and key in self.cached_kernels:
@@ -168,17 +154,12 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
                 stat.fill_value = binding_ftypes[var].fill_value
             stats_bindings[var] = stat
 
-        try:
-            entry = self.ctx(
-                stmt,
-                binding_ftypes,
-                stats_bindings,
-                self.stats_factory,
-            )
-        except DynamicFillError:
-            if not fallback:
-                raise
-            entry = FALLBACK
+        entry = self.ctx(
+            stmt,
+            binding_ftypes,
+            stats_bindings,
+            self.stats_factory,
+        )
 
         if self.cache:
             self.cached_kernels[key] = entry

@@ -377,19 +377,17 @@ class _DynamicRejectingLoader(UnvalidatedForm, LogicLoader):
 
     def __init__(self, ctx):
         self.ctx = ctx
-        self.calls = 0
 
     def lower(self, prgm, bindings, stats, stats_factory):
-        self.calls += 1
         if builtins.any(is_dynamic(t.fill_value) for t in bindings.values()):
             raise DynamicFillError("dynamic fills unsupported here")
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
-def test_executor_fallback_memoized():
-    # A pipeline that cannot compile dynamic fills degrades to per-value
-    # kernels, and the failed dynamic key is memoized so the dynamic compile
-    # is only attempted once.
+def test_backend_refusal_propagates():
+    # The executor does not recover from a backend that cannot express a
+    # runtime fill; the error reaches the caller so the backend (or the user)
+    # can decide what to do, rather than silently recompiling per value.
     loader = _DynamicRejectingLoader(
         DefaultLogicOptimizer(
             DefaultLoopOrderer(
@@ -397,15 +395,7 @@ def test_executor_fallback_memoized():
             )
         )
     )
-    executor = LogicExecutor(loader, cache=True)
-    ctx = LogicNormalizer(executor)
-    arr = np.arange(3.0)
-    x = finch.asarray(arr)
-    values = [1.0, 2.0, 3.0]
-    for v in values:
-        out = finch.compute(finch.lazy(x) + v, ctx=ctx)
-        finch_assert_allclose(out, arr + v)
-    # one FALLBACK entry plus one kernel per distinct value
-    assert len(executor.cached_kernels) == 1 + len(values)
-    # dynamic compile attempted once, then one per-value compile each
-    assert loader.calls == 1 + len(values)
+    ctx = LogicNormalizer(LogicExecutor(loader, cache=True))
+    x = finch.asarray(np.arange(3.0))
+    with pytest.raises(DynamicFillError):
+        finch.compute(finch.lazy(x) + 2.0, ctx=ctx)
