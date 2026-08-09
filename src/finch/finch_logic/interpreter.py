@@ -84,9 +84,6 @@ class LogicMachine:
                 return val
             case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
-                # Literal arguments evaluate to plain scalars. They are
-                # zero-dimensional, so they broadcast across every index rather
-                # than contributing dimensions of their own.
                 dims = {}
                 idxs = []
                 for arg in args:
