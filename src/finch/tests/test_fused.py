@@ -8,6 +8,15 @@ import pytest
 import numpy as np
 
 import finch
+from finch.autoschedule import (
+    DefaultLogicFormatter,
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+)
 from finch.finch_fused import jit
 from finch.finch_fused import nodes as fzd
 from finch.finch_fused.cfg_builder import (
@@ -15,12 +24,20 @@ from finch.finch_fused.cfg_builder import (
     fused_desugar,
     number_statements,
 )
-from finch.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
+from finch.finch_fused.dataflow import (
+    LivenessAnalysis,
+    insert_lazy_and_compute,
+    maybelazy,
+)
 from finch.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
+from finch.finch_logic import Literal, Query
+from finch.finch_notation.interpreter import NotationInterpreter
 from finch.interface import add, asarray, matmul, sum
+from finch.interface.lazy import LazyTensor
+from finch.tensor.scalar import ConstantScalar, ScalarFType
 
 from .conftest import finch_assert_allclose
 
@@ -409,6 +426,62 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
         return F  # noqa: RET504
 
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
+def test_maybelazy_preserves_constant_scalars():
+    """A ConstantScalar must stay one, so `elementwise` can still inline it."""
+    A = asarray(np.arange(3.0))
+    (lazy_A, constant, plain) = maybelazy((A, ConstantScalar(2.0), 2.0))
+    assert isinstance(lazy_A, LazyTensor)
+    assert constant == ConstantScalar(2.0)
+    assert plain == 2.0
+
+    # Lazifying the constant would bind it as a table, adding a third query and
+    # dropping the bare Literal that lets the kernel specialize on the value.
+    y = finch.lazy(A) * constant
+    queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
+    assert len(queries) == 2
+    assert Literal(2.0) in queries[-1].rhs.arg.args
+
+
+class _CollectBindings(LogicCapture):
+    """A LogicCapture that keeps the bindings of every lowering, not just the last."""
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self.all_bindings: list[dict] = []
+
+    def lower(self, prgm, bindings, stats, stats_factory):
+        self.all_bindings.append(bindings.copy())
+        return super().lower(prgm, bindings, stats, stats_factory)
+
+
+def test_jit_constant_scalar_argument():
+    """A ConstantScalar argument is inlined, never bound as a runtime tensor."""
+
+    @jit
+    def opt_fn(A, s, n):
+        B = A
+        for _i in range(n):
+            B = add(B, s)
+        return B
+
+    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    executor = LogicExecutor(
+        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+    )
+
+    arr = np.arange(3.0)
+    with finch.with_default_scheduler(LogicNormalizer(executor)):
+        result = opt_fn(asarray(arr), ConstantScalar(2.0), 2)
+    finch_assert_allclose(result, arr + 4.0)
+    scalars = [
+        t
+        for bindings in capture.all_bindings
+        for t in bindings.values()
+        if isinstance(t, ScalarFType)
+    ]
+    assert not scalars
 
 
 def test_jit_scalar_loop():
