@@ -8,8 +8,27 @@ from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
-from finch.autoschedule import COMPILE_NUMBA
-from finch.symbolic import simplify
+from finch.autoschedule import (
+    COMPILE_NUMBA,
+    DefaultLogicFormatter,
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+)
+from finch.compile import NotationCompiler
+from finch.finch_assembly import (
+    AssemblyInterpreter,
+    AssemblyLoader,
+    AssemblySimplify,
+    LowerPackedStructSlots,
+)
+from finch.finch_logic import LogicSimplify
+from finch.finch_logic.simplification import simplify_logic, unwrap_literal
+from finch.finch_notation.interpreter import NotationInterpreter
+from finch.symbolic import UnvalidatedForm, simplify
 from finch.symbolic.term import CallTerm
 
 x = ntn.Variable("x", int64)
@@ -325,3 +344,134 @@ def test_float_annihilator_preserves_nan_end_to_end():
     x = finch.asarray(arr)
     out = finch.compute(finch.lazy(x) * ConstantScalar(0.0), ctx=COMPILE_NUMBA)
     np.testing.assert_array_equal(out.to_numpy(), arr * 0.0)
+
+
+def _capturing_scheduler():
+    """A scheduler that records the program `LogicSimplify` hands downstream."""
+    capture = LogicCapture(
+        DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
+    )
+    executor = LogicExecutor(DefaultLogicOptimizer(LogicSimplify(capture)))
+    return capture, LogicNormalizer(executor)
+
+
+def _mapjoins(node):
+    if isinstance(node, lgc.MapJoin):
+        return [node, *(m for c in node.children for m in _mapjoins(c))]
+    if isinstance(node, lgc.LogicTree):
+        return [m for c in node.children for m in _mapjoins(c)]
+    return []
+
+
+def test_logic_simplify_unwraps_literals():
+    """
+    `optimize` leaves a literal operand inside a `Reorder`, which hides it from
+    every rule keyed on `LiteralTerm`.
+    """
+    lit = lgc.Literal(2)
+    assert unwrap_literal(lgc.Reorder(lit, ())) == lit
+    assert unwrap_literal(lgc.Relabel(lit, ())) == lit
+    # A reorder that does something is left alone.
+    idxs = (lgc.Field("i"), lgc.Field("j"))
+    table = lgc.Reorder(lgc.Table(lgc.Alias("A"), idxs), idxs[::-1])
+    assert unwrap_literal(table) is None
+
+
+def test_logic_simplify_folds_wrapped_literals():
+    """Once unwrapped, an all-literal MapJoin evaluates at compile time."""
+    two = lgc.Reorder(lgc.Literal(2), ())
+    three = lgc.Reorder(lgc.Literal(3), ())
+    expr = lgc.MapJoin(lgc.Literal(ffuncs.add), (two, three))
+    assert simplify_logic(expr) == lgc.Literal(5)
+
+
+@pytest.mark.parametrize(
+    "build,ids",
+    [
+        (lambda x: x * ConstantScalar(1), "drops_identity"),
+        (lambda x: x + ConstantScalar(0), "drops_zero_addend"),
+    ],
+    ids=["drops_identity", "drops_zero_addend"],
+)
+def test_logic_simplify_drops_identity_operands(build, ids):
+    """An identity operand disappears together with the MapJoin holding it."""
+    arr = np.arange(6, dtype=np.int64).reshape(2, 3)
+    x = finch.asarray(arr)
+    capture, ctx = _capturing_scheduler()
+    out = finch.compute(build(finch.lazy(x)), ctx=ctx)
+
+    np.testing.assert_array_equal(out.to_numpy(), arr)
+    assert not _mapjoins(capture.last_prgm)
+
+
+def test_logic_simplify_leaves_annihilators_to_notation():
+    """
+    Dropping an annihilated operand would drop the fields that give the result
+    its extent, so the MapJoin has to survive: `A * 0` must still be 2x3, not
+    the 1x1 that annihilating here produces.
+    """
+    arr = np.arange(6, dtype=np.int64).reshape(2, 3)
+    x = finch.asarray(arr)
+    capture, ctx = _capturing_scheduler()
+    out = finch.compute(finch.lazy(x) * ConstantScalar(0), ctx=ctx)
+
+    assert out.to_numpy().shape == arr.shape
+    np.testing.assert_array_equal(out.to_numpy(), arr * 0)
+    assert _mapjoins(capture.last_prgm)
+
+
+class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
+    """Records the assembly a kernel is built from, after all transforms."""
+
+    def __init__(self, ctx):
+        self.ctx = ctx
+        self.last: asm.Module
+
+    def lower(self, prgm: asm.Module):
+        self.last = prgm
+        return self.ctx(prgm)
+
+
+def _assembly_for(build):
+    capture = _CaptureAssembly(AssemblyInterpreter())
+    ctx = LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicOptimizer(
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        DefaultLogicFormatter(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    capture,
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+    arr = np.arange(6, dtype=np.int64).reshape(2, 3)
+    out = finch.compute(build(finch.lazy(finch.asarray(arr)), arr), ctx=ctx)
+    return str(capture.last), out.to_numpy(), arr
+
+
+def test_annihilator_empties_the_loop_body():
+    """
+    The payoff of a compile-time constant: `A * 0` keeps its loop nest, but the
+    body loses the multiply and the load of `A`, so the pass over `A` is gone.
+    A runtime scalar of the same value cannot be simplified away.
+    """
+    # The remaining `mul`s are stride arithmetic; `mul(load(` is the one that
+    # multiplies an element of `A`.
+    code, out, arr = _assembly_for(lambda x, arr: x * ConstantScalar(0))
+    np.testing.assert_array_equal(out, arr * 0)
+    assert "mul(load(" not in code
+
+    runtime_code, runtime_out, _ = _assembly_for(lambda x, arr: x * 0)
+    np.testing.assert_array_equal(runtime_out, arr * 0)
+    assert "mul(load(" in runtime_code
