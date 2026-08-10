@@ -9,7 +9,17 @@ import types
 from collections.abc import Callable
 from typing import Any
 
+from finch.tensor.scalar import ConstantScalar
+
 from . import nodes as fzd
+
+# Numeric literals written inside a jit function are compile-time constants, so
+# they are parsed as ConstantScalars: `elementwise` inlines one into the logic
+# program as a bare literal instead of binding it as a runtime tensor, which
+# lets the simplifier fold it and lets a backend specialize on the value.
+# `bool` is excluded, being a control-flow value more often than an operand,
+# and `type` is exact so that a NumPy scalar is not caught as a `float`.
+_CONSTANT_TYPES = (int, float, complex)
 
 _BIN_OPS = {
     ast.Add: operator.add,
@@ -143,6 +153,8 @@ class _FusedFunctionParser:
     def _parse_expr(self, expr: ast.expr) -> fzd.FusedExpression:
         match expr:
             case ast.Constant(value=value):
+                if type(value) in _CONSTANT_TYPES:
+                    return fzd.Literal(ConstantScalar(value))
                 return fzd.Literal(value)
             case ast.Name(id=name):
                 return self._parse_name(name)
@@ -427,6 +439,14 @@ class _FusedToPythonAST:
             value, str | bytes | int | float | complex | bool
         ):
             return ast.Constant(value=value)
+
+        if isinstance(value, ConstantScalar):
+            self._extra_globals["ConstantScalar"] = ConstantScalar
+            return ast.Call(
+                func=ast.Name(id="ConstantScalar", ctx=ast.Load()),
+                args=[ast.Constant(value=value.val)],
+                keywords=[],
+            )
 
         if callable(value):
             if getattr(builtins, getattr(value, "__name__", ""), None) is value:
