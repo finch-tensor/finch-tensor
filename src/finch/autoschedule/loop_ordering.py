@@ -37,29 +37,9 @@ def concordize(
 ) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
-    field_orders: dict[Alias, tuple[Field, ...]] = {}
-
-    match root:
-        case Plan(bodies):
-            for body in bodies:
-                match body:
-                    case Query(lhs, rhs):
-                        field_orders[lhs] = rhs.fields()
 
     def rule_0(ex):
         match ex:
-            case Table(Alias(_) as var, idxs) if (
-                var in field_orders
-                and idxs != field_orders[var]
-                and set(idxs) == set(field_orders[var])
-            ):
-                perm = tuple(field_orders[var].index(idx) for idx in idxs)
-                return Table(
-                    needed_swizzles.setdefault(var, {}).setdefault(
-                        perm, Alias(namespace.freshen(var.name))
-                    ),
-                    idxs,
-                )
             case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
                 if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
                     idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
@@ -253,9 +233,15 @@ def set_loop_order(plan: Plan) -> Plan:
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs)):
+                case Query(lhs, Aggregate(op, init, arg, idxs) as agg):
                     idxs_2 = _heuristic_loop_order(arg)
-                    rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+                    # The loop order only ever goes inside an outer Reorder that
+                    # pins the output order, so that choosing a loop order never
+                    # changes the fields this query presents to its consumers.
+                    rhs_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                        agg.fields(),
+                    )
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
                     idxs_2 = _heuristic_loop_order(arg)
