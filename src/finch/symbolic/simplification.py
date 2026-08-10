@@ -101,11 +101,11 @@ def canonicalize_associative(node: Term) -> Term | None:
      `_lift_nested_literals`.
     """
     match node:
-        case CallTerm(op=op, args=args):
+        case CallTerm(op=op):
             if not (is_associative(op.val) and is_commutative(op.val)):
                 return None
             if not math.isinf(arity(op.val)):
-                return _lift_nested_literals(node) if is_commutative(op.val) else None
+                return _lift_nested_literals(node)
             leaves = _same_op_leaves(node)
             leaves = [
                 *(arg for arg in leaves if isinstance(arg, LiteralTerm)),

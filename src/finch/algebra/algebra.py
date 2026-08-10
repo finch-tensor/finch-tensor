@@ -12,14 +12,6 @@ class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
-    # Exactly how many arguments the operator accepts, or `math.inf` when it is
-    # variadic and accepts any number from one upwards. A fixed arity is exact,
-    # not an upper bound: `where` has arity 3 and accepts only 3.
-    #
-    # Associativity says an operator may be regrouped, not that it is variadic:
-    # `logical_and` is associative but has arity 2, so a nest of them cannot be
-    # collapsed into one wide call. Every operator in `ffuncs` declares its own;
-    # the default is only for operators that do not.
     arity: int | float = 2
 
     @abstractmethod
@@ -71,9 +63,8 @@ def arity(op: FinchOperator) -> int | float:
 
 """
 Operators answer `is_identity` and `is_annihilator` about constants.
-These properties cannot hold for mutable objects (e.g. Scalars), nor for a
-dynamic fill, whose value is not known until the kernel is called, so we
-always fail for both.
+These properties cannot always hold for mutable objects (e.g. Scalars) or
+dynamic fill so we fail for both.
 TODO: In the future, we may want to raise on Scalar.
 """
 

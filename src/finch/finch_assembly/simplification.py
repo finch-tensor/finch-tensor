@@ -8,8 +8,6 @@ from .stages import AssemblyTransform
 
 class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
     def lower(self, term: asm.Module) -> asm.Module:
-        # The generic algebraic rules handle calls; `simplify` below adds the
-        # rules which are specific to assembly's statements and operators.
         return simplify_terms(term, [*simplify_rules(), self.simplify])
 
     @classmethod

@@ -9,8 +9,6 @@ from .stages import NotationTransform
 
 class LoopletSimplify(UnvalidatedForm, NotationTransform):
     def lower(self, term: ntn.Module) -> ntn.Module:
-        # The generic algebraic rules handle calls; `simplify` below adds the
-        # rule for annihilators reached through a looplet access.
         return simplify_terms(term, [*simplify_rules(), self.simplify])
 
     @staticmethod
