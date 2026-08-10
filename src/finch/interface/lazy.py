@@ -903,7 +903,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     """
     is_constant = tuple(isinstance(a, ConstantScalar) for a in args)
     if builtins.all(is_constant):
-        return lazy(f(*[a.val for a in args]))
+        return lazy(ConstantScalar(f(*[a.val for a in args])))
     args = tuple(a if c else lazy(a) for a, c in zip(args, is_constant, strict=True))
     shapes = tuple(() if c else a.shape for a, c in zip(args, is_constant, strict=True))
     shape = _broadcast_shape(*shapes)
