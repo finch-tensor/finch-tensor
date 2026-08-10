@@ -12,7 +12,7 @@
         <link rel="prev" href="../interop/">
       
       
-        <link rel="next" href="../scheduler/">
+        <link rel="next" href="../../finch_assembly/">
       
       
         
@@ -2706,38 +2706,21 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.julia.julia_available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        julia_available
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../scheduler/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scheduler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -5059,6 +5042,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.julia.julia_available" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        julia_available
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5107,6 +5101,47 @@
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.compile_jl.julia.julia_available" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">julia_available</span><span class="p">()</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Whether the Julia backend can be used, i.e. whether both Python packages
+<code>init_julia</code> needs are installed. They are optional dependencies; see the
+<code>julia</code> extra in <code>pyproject.toml</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/julia.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">julia_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Whether the Julia backend can be used, i.e. whether both Python packages</span>
+<span class="sd">    `init_julia` needs are installed. They are optional dependencies; see the</span>
+<span class="sd">    `julia` extra in `pyproject.toml`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;juliapkg&quot;</span><span class="p">,</span> <span class="s2">&quot;juliacall&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

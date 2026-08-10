@@ -2659,34 +2659,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compile_jl/scheduler/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scheduler
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -8523,7 +8495,8 @@ FinchNotation.</p>
 <span class="normal">549</span>
 <span class="normal">550</span>
 <span class="normal">551</span>
-<span class="normal">552</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
+<span class="normal">552</span>
+<span class="normal">553</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    An interpreter for FinchNotation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -8770,19 +8743,20 @@ FinchNotation.</p>
                 <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span><span class="o">.</span><span class="n">return_value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span><span class="n">funcs</span><span class="p">):</span>
+                <span class="n">ctx_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
                 <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+                    <span class="n">ctx_2</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
                 <span class="n">kernels</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
                     <span class="k">match</span> <span class="n">func</span><span class="p">:</span>
                         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                            <span class="n">kernel</span> <span class="o">=</span> <span class="n">NotationInterpreterKernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">)</span>
+                            <span class="n">kernel</span> <span class="o">=</span> <span class="n">NotationInterpreterKernel</span><span class="p">(</span><span class="n">ctx_2</span><span class="p">,</span> <span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">)</span>
                             <span class="n">kernels</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span>
                         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                                 <span class="sa">f</span><span class="s2">&quot;Unrecognized function definition: </span><span class="si">{</span><span class="n">func</span><span class="si">}</span><span class="s2">&quot;</span>
                             <span class="p">)</span>
-                <span class="k">return</span> <span class="n">NotationInterpreterLibrary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernels</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">ctx_2</span><span class="p">,</span> <span class="n">kernels</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;Unrecognized notation node type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>

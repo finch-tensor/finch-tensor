@@ -1728,10 +1728,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.autoschedule.tensor_stats.util.degree_count_scan" class="md-nav__link">
+  <a href="#finch.autoschedule.tensor_stats.util.get_lp_norms" class="md-nav__link">
     <span class="md-ellipsis">
       
-        degree_count_scan
+        get_lp_norms
       
     </span>
   </a>
@@ -2715,34 +2715,6 @@
     
   
     julia
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../compile_jl/scheduler/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scheduler
   
 
     
@@ -5073,10 +5045,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.autoschedule.tensor_stats.util.degree_count_scan" class="md-nav__link">
+  <a href="#finch.autoschedule.tensor_stats.util.get_lp_norms" class="md-nav__link">
     <span class="md-ellipsis">
       
-        degree_count_scan
+        get_lp_norms
       
     </span>
   </a>
@@ -5137,15 +5109,24 @@
 <div class="doc doc-object doc-function">
 
 
-<h2 id="finch.autoschedule.tensor_stats.util.degree_count_scan" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">degree_count_scan</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span></code>
+<h2 id="finch.autoschedule.tensor_stats.util.get_lp_norms" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_lp_norms</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">norms</span><span class="p">)</span></code>
 
 </h2>
 
 
     <div class="doc doc-contents ">
 
-        <p>Scan <code>arr</code> and return per-dimension degree sequences and <code>nnz</code>.</p>
+        <p>Scan <code>arr</code> and return the Lp norms of each axis' degree sequence.</p>
+<p>The degree sequence of axis <code>i</code> counts, for each index of that axis, how
+many non-fill entries carry it. Its norms are what :class:<code>DC</code> degree
+constraints are built from:</p>
+<ul>
+<li><code>p == 0</code> -- the number of indices with at least one non-fill entry,
+  i.e. the size of the projection onto that axis.</li>
+<li><code>p == inf</code> -- the largest degree.</li>
+<li>otherwise -- <code>(sum(degree ** p)) ** (1 / p)</code>.</li>
+</ul>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -5164,7 +5145,7 @@
                 <code>arr</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Tensor (finch.algebra.Tensor)" href="../../../algebra/#finch.algebra.Tensor">Tensor</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5198,15 +5179,14 @@
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>fill_value</code>
+                <code>norms</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+                  <code><a class="autorefs autorefs-external" title="collections.abc.Iterable" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable">Iterable</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The value treated as "empty"; entries not equal to it are
-counted.</p>
+                <p>The Lp norms to compute.</p>
               </div>
             </td>
             <td>
@@ -5228,41 +5208,16 @@ counted.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" title="numpy.ndarray" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a>]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a>[<a class="autorefs autorefs-internal" title="Field
+
+
+  
+      dataclass
+   (finch.finch_logic.Field)" href="../../../finch_logic/#finch.finch_logic.Field">Field</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>]]</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>A pair <code>(counts, nnz)</code> where <code>counts[i]</code> is a 1-D <code>int64</code> numpy</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>array of length <code>arr.shape[i]</code> giving, for each index of dimension</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" title="numpy.ndarray" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a>], <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p><code>i</code>, the number of non-fill entries with that index, and <code>nnz</code> is</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" title="numpy.ndarray" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a>], <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>the total number of non-fill entries.</p>
+                <p>A dictionary mapping each field to its norms, ordered as <code>norms</code>.</p>
               </div>
             </td>
           </tr>
@@ -5272,13 +5227,7 @@ counted.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 25</span>
-<span class="normal"> 26</span>
-<span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
-<span class="normal"> 30</span>
-<span class="normal"> 31</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 31</span>
 <span class="normal"> 32</span>
 <span class="normal"> 33</span>
 <span class="normal"> 34</span>
@@ -5373,170 +5322,102 @@ counted.</p>
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">degree_count_scan</span><span class="p">(</span>
-    <span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan ``arr`` and return per-dimension degree sequences and ``nnz``.</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_lp_norms</span><span class="p">(</span>
+    <span class="n">arr</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span> <span class="n">norms</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Scan ``arr`` and return the Lp norms of each axis&#39; degree sequence.</span>
+
+<span class="sd">    The degree sequence of axis ``i`` counts, for each index of that axis, how</span>
+<span class="sd">    many non-fill entries carry it. Its norms are what :class:`DC` degree</span>
+<span class="sd">    constraints are built from:</span>
+
+<span class="sd">    * ``p == 0`` -- the number of indices with at least one non-fill entry,</span>
+<span class="sd">      i.e. the size of the projection onto that axis.</span>
+<span class="sd">    * ``p == inf`` -- the largest degree.</span>
+<span class="sd">    * otherwise -- ``(sum(degree ** p)) ** (1 / p)``.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        arr: The tensor to scan.</span>
 <span class="sd">        fields: The axis names of ``arr`` (one per dimension), in order.</span>
-<span class="sd">        fill_value: The value treated as &quot;empty&quot;; entries not equal to it are</span>
-<span class="sd">            counted.</span>
+<span class="sd">        norms: The Lp norms to compute.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        A pair ``(counts, nnz)`` where ``counts[i]`` is a 1-D ``int64`` numpy</span>
-<span class="sd">        array of length ``arr.shape[i]`` giving, for each index of dimension</span>
-<span class="sd">        ``i``, the number of non-fill entries with that index, and ``nnz`` is</span>
-<span class="sd">        the total number of non-fill entries.</span>
+<span class="sd">        A dictionary mapping each field to its norms, ordered as ``norms``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">fields</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
-    <span class="n">ndims</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">finch.autoschedule.default_schedulers</span><span class="w"> </span><span class="kn">import</span> <span class="n">NON_RECURSIVE_SCHEDULER</span>
 
-    <span class="n">dim_loop_variables</span> <span class="o">=</span> <span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fields</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">int64</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)]</span>
-    <span class="n">dim_array_variables</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;x_</span><span class="si">{</span><span class="n">fields</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">_INT64_VECTOR_FTYPE</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)</span>
-    <span class="p">]</span>
-    <span class="n">dim_size_variables</span> <span class="o">=</span> <span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_</span><span class="si">{</span><span class="n">fields</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">int64</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)]</span>
-    <span class="n">dim_array_slots</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;x_</span><span class="si">{</span><span class="n">fields</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">_&quot;</span><span class="p">,</span> <span class="n">_INT64_VECTOR_FTYPE</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)</span>
-    <span class="p">]</span>
+    <span class="n">fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    <span class="n">norms</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">norms</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">fields</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">norms</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">field</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">}</span>
 
-    <span class="n">A</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
-    <span class="n">A_</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="s2">&quot;A_&quot;</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
-    <span class="n">A_access</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unwrap</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span><span class="n">A_</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Read</span><span class="p">(),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">dim_loop_variables</span><span class="p">)))</span>
-    <span class="n">A_nnz_variable</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;nnz&quot;</span><span class="p">,</span> <span class="n">int64</span><span class="p">)</span>
+    <span class="n">int_zero</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">float_zero</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
+    <span class="c1"># Indicator of the non-fill structure. Left inlined in each reduction below</span>
+    <span class="c1"># rather than bound to its own alias, so no full-size temporary is built.</span>
+    <span class="n">non_fill</span> <span class="o">=</span> <span class="n">MapJoin</span><span class="p">(</span>
+        <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span>
+        <span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">fields</span><span class="p">),</span> <span class="n">_scalar</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)),</span>
+    <span class="p">)</span>
 
-    <span class="n">dim_size_assignments</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">dim_array_unpacks</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">dim_array_declares</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">dim_array_increments</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">):</span>
-        <span class="n">dim_size_assignments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">dim_size_variables</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Dimension</span><span class="p">(</span><span class="n">A_</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">i</span><span class="p">)))</span>
-        <span class="p">)</span>
-        <span class="n">dim_array_unpacks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">dim_array_slots</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">dim_array_variables</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
-        <span class="n">dim_array_declares</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span>
-                <span class="n">dim_array_slots</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                <span class="p">(</span><span class="n">dim_size_variables</span><span class="p">[</span><span class="n">i</span><span class="p">],),</span>
-            <span class="p">)</span>
-        <span class="p">)</span>
-        <span class="n">dim_array_increments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Increment</span><span class="p">(</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span>
-                    <span class="n">dim_array_slots</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-                    <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">)),</span>
-                    <span class="p">(</span><span class="n">dim_loop_variables</span><span class="p">[</span><span class="n">i</span><span class="p">],),</span>
+    <span class="n">bodies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Query</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">):</span>
+        <span class="n">degrees</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;degrees_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">Query</span><span class="p">(</span>
+                <span class="n">degrees</span><span class="p">,</span>
+                <span class="n">Aggregate</span><span class="p">(</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
+                    <span class="n">int_zero</span><span class="p">,</span>
+                    <span class="n">non_fill</span><span class="p">,</span>
+                    <span class="nb">tuple</span><span class="p">(</span><span class="n">f</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fields</span> <span class="k">if</span> <span class="n">f</span> <span class="o">!=</span> <span class="n">field</span><span class="p">),</span>
                 <span class="p">),</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span> <span class="p">(</span><span class="n">A_access</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))),</span>
             <span class="p">)</span>
         <span class="p">)</span>
+        <span class="n">degree_table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="n">degrees</span><span class="p">,</span> <span class="p">(</span><span class="n">field</span><span class="p">,))</span>
 
-    <span class="n">array_build_loop</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span>
-        <span class="p">(</span>
-            <span class="o">*</span><span class="n">dim_array_increments</span><span class="p">,</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span>
-                <span class="n">A_nnz_variable</span><span class="p">,</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
-                    <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                    <span class="p">(</span>
-                        <span class="n">A_nnz_variable</span><span class="p">,</span>
-                        <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
-                            <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span>
-                            <span class="p">(</span><span class="n">A_access</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)),</span>
-                        <span class="p">),</span>
+        <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">norm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">norms</span><span class="p">):</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;norm_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">rhs</span><span class="p">:</span> <span class="n">Aggregate</span>
+            <span class="k">if</span> <span class="n">norm</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
+                    <span class="n">int_zero</span><span class="p">,</span>
+                    <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span> <span class="p">(</span><span class="n">degree_table</span><span class="p">,</span> <span class="n">_scalar</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">)))),</span>
+                    <span class="p">(</span><span class="n">field</span><span class="p">,),</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">norm</span><span class="p">):</span>
+                <span class="c1"># Degrees are non-negative, so 0 is a safe identity for max.</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span> <span class="n">int_zero</span><span class="p">,</span> <span class="n">degree_table</span><span class="p">,</span> <span class="p">(</span><span class="n">field</span><span class="p">,))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># The outer ** (1 / norm) is applied to the scalar result below.</span>
+                <span class="n">rhs</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
+                    <span class="n">float_zero</span><span class="p">,</span>
+                    <span class="n">MapJoin</span><span class="p">(</span>
+                        <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">pow</span><span class="p">),</span> <span class="p">(</span><span class="n">degree_table</span><span class="p">,</span> <span class="n">_scalar</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="n">norm</span><span class="p">)))</span>
                     <span class="p">),</span>
-                <span class="p">),</span>
-            <span class="p">),</span>
-        <span class="p">)</span>
-    <span class="p">)</span>
-    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">):</span>
-        <span class="n">array_build_loop</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Loop</span><span class="p">(</span>
-            <span class="n">dim_loop_variables</span><span class="p">[</span><span class="n">i</span><span class="p">],</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">make_extent</span><span class="p">),</span>
-                <span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="n">dim_size_variables</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span>
-            <span class="p">),</span>
-            <span class="n">array_build_loop</span><span class="p">,</span>
-        <span class="p">)</span>
+                    <span class="p">(</span><span class="n">field</span><span class="p">,),</span>
+                <span class="p">)</span>
+            <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">rhs</span><span class="p">))</span>
+            <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
 
-    <span class="n">dim_array_freezes</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">ntn</span><span class="o">.</span><span class="n">Freeze</span><span class="p">(</span><span class="n">dim_array_slots</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)</span>
-    <span class="p">]</span>
-    <span class="n">dim_array_repacks</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">ntn</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">dim_array_slots</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">dim_array_variables</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)</span>
-    <span class="p">]</span>
+    <span class="n">prgm</span> <span class="o">=</span> <span class="n">Plan</span><span class="p">((</span><span class="o">*</span><span class="n">bodies</span><span class="p">,</span> <span class="n">Produces</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">))))</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">NON_RECURSIVE_SCHEDULER</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">to_tuple</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,)</span>
+    <span class="n">flat</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">all_norms</span> <span class="o">=</span> <span class="p">[</span><span class="n">norm</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fields</span> <span class="k">for</span> <span class="n">norm</span> <span class="ow">in</span> <span class="n">norms</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">result</span><span class="p">,</span> <span class="n">norm</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="n">all_norms</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">result</span><span class="p">)[()])</span>
+        <span class="k">if</span> <span class="n">norm</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">norm</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">value</span> <span class="o">**</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">norm</span><span class="p">)</span>
+        <span class="n">flat</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
-    <span class="n">return_expr</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">to_tuple</span><span class="p">),</span> <span class="p">(</span><span class="n">A_nnz_variable</span><span class="p">,)))</span>
-
-    <span class="n">prgm</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span>
-        <span class="p">(</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;degree_count_scan&quot;</span><span class="p">,</span> <span class="n">_int_tuple_ftype</span><span class="p">(</span><span class="mi">1</span><span class="p">)),</span>
-                <span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="o">*</span><span class="n">dim_array_variables</span><span class="p">),</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span>
-                    <span class="p">(</span>
-                        <span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">A_</span><span class="p">,</span> <span class="n">A</span><span class="p">),</span>
-                        <span class="o">*</span><span class="n">dim_size_assignments</span><span class="p">,</span>
-                        <span class="n">ntn</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">A_nnz_variable</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">))),</span>
-                        <span class="o">*</span><span class="n">dim_array_unpacks</span><span class="p">,</span>
-                        <span class="o">*</span><span class="n">dim_array_declares</span><span class="p">,</span>
-                        <span class="n">array_build_loop</span><span class="p">,</span>
-                        <span class="o">*</span><span class="n">dim_array_freezes</span><span class="p">,</span>
-                        <span class="o">*</span><span class="n">dim_array_repacks</span><span class="p">,</span>
-                        <span class="n">ntn</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">A_</span><span class="p">,</span> <span class="n">A</span><span class="p">),</span>
-                        <span class="n">return_expr</span><span class="p">,</span>
-                    <span class="p">)</span>
-                <span class="p">),</span>
-            <span class="p">),</span>
-        <span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">mod</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationInterpreter</span><span class="p">()(</span><span class="n">prgm</span><span class="p">)</span>
-
-    <span class="n">dim_array_instances</span> <span class="o">=</span> <span class="p">[</span>
-        <span class="n">BufferizedNDArray</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">))</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndims</span><span class="p">)</span>
-    <span class="p">]</span>
-    <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">degree_count_scan</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="o">*</span><span class="n">dim_array_instances</span><span class="p">)</span>
-    <span class="n">counts</span> <span class="o">=</span> <span class="p">[</span><span class="n">inst</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">for</span> <span class="n">inst</span> <span class="ow">in</span> <span class="n">dim_array_instances</span><span class="p">]</span>
-    <span class="k">return</span> <span class="n">counts</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">out</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">field</span><span class="p">:</span> <span class="n">flat</span><span class="p">[</span><span class="n">i</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">norms</span><span class="p">)</span> <span class="p">:</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">norms</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span>
+    <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
