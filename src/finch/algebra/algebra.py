@@ -12,11 +12,14 @@ class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
-    # How many arguments the operator accepts, or `math.inf` when it accepts any
-    # number. Associativity says an operator may be regrouped, not that it is
-    # variadic: `logical_and` is associative but has arity 2, so a nest of them
-    # cannot be flattened into one wide call. Every operator in `ffuncs` declares
-    # its own; the default is only for operators that do not.
+    # Exactly how many arguments the operator accepts, or `math.inf` when it is
+    # variadic and accepts any number from one upwards. A fixed arity is exact,
+    # not an upper bound: `where` has arity 3 and accepts only 3.
+    #
+    # Associativity says an operator may be regrouped, not that it is variadic:
+    # `logical_and` is associative but has arity 2, so a nest of them cannot be
+    # collapsed into one wide call. Every operator in `ffuncs` declares its own;
+    # the default is only for operators that do not.
     arity: int | float = 2
 
     @abstractmethod

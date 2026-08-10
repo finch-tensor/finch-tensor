@@ -46,9 +46,10 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
                     ),
                 ) as bodies
             ) if s1 == s2 and idx1 == idx2:
-                if op == ffuncs.init_write(arg.val):
+                arg_val = arg.val if isinstance(arg, Scalar) else arg
+                if op == ffuncs.init_write(arg_val):
                     return asm.Block(bodies[:-1])
-                if is_identity(op, arg.val):
+                if is_identity(op, arg_val):
                     return asm.Block(bodies[:-1])
             # loop(...) {} is removed
             case asm.ForLoop(_, _, _, asm.Block(())):

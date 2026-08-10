@@ -1,23 +1,16 @@
 """
 Basic algebraic simplification.
 
-This module provides an IR-agnostic constant folding and algebraic
-simplification pass, in the spirit of `simplify.jl` in Finch.jl. It applies to
-any Finch IR whose call and literal nodes implement the `CallTerm` and
-`LiteralTerm` interfaces, which today means FinchLogic (`MapJoin`),
-FinchNotation (`Call`), and FinchAssembly (`Call`).
+This module provides an IR-agnostic algebraic simplification pass.
+It applies to any Finch IR whose call and literal nodes implement the
+`CallTerm` and `LiteralTerm` interfaces, which today means
+FinchLogic (`MapJoin`), FinchNotation (`Call`), and FinchAssembly (`Call`).
 
-No rule mentions a particular operator. Every rule is driven by what the
-operator declares about itself (`is_associative`, `is_commutative`,
-`is_idempotent`, `is_identity`, `is_annihilator`, and `arity`), so an
-operator earns these simplifications by describing its own algebra. Rules which
-need to know about specific operators, or about IR nodes other than calls,
-belong in that IR's own simplification pass.
-
-Following `simplify.jl`, the pass is a flat list of small rewrite rules which
-are `Chain`ed together, driven to a `Fixpoint` at each node, and applied
-bottom-up over the whole term by a `PostWalk`. Each rule takes a term and
-returns either a rewritten term or `None` if it does not apply.
+No rule mentions a particular operator. Rules are triggered by algebraic properties
+`is_associative`, `is_commutative`, `is_idempotent`, `is_identity`,
+`is_annihilator`, and `arity`. Rules which need to know about specific operators,
+or about IR nodes other than calls, belong in that IR's own simplification pass.
+Rules are applied until fixpoint.
 """
 
 import math
@@ -32,6 +25,7 @@ from finch.algebra import (
     is_idempotent,
     is_identity,
 )
+from finch.algebra.ftypes import FDTypeBoolean, FDTypeInteger
 
 from .rewriters import Chain, Fixpoint, PostWalk, Rewrite, RwCallable
 from .term import CallTerm, LiteralTerm, Term
@@ -82,35 +76,9 @@ def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
     return op.make_term(op.head(), op.val(*vals))
 
 
-def flatten_associative(node: Term) -> Term | None:
-    """
-    `f(a..., f(b...), c...)` => `f(a..., b..., c...)` for associative `f`.
-
-    Only as far as `f`'s arity allows. Associativity permits the regrouping, but
-    a binary operator like `logical_and` cannot be handed the wider argument
-    list that regrouping produces.
-    """
-    match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val):
-            for i, arg in enumerate(args):
-                match arg:
-                    case CallTerm(op=inner_op, args=inner_args) if inner_op == op:
-                        flat = [*args[:i], *inner_args, *args[i + 1 :]]
-                        if len(flat) <= arity(op.val):
-                            return _call_like(node, flat)
-    return None
-
-
 def _lift_nested_literals(node: CallTerm) -> Term | None:
     """
-    `f(f(x, k), y)` => `f(f(x, y), k)` for literal `k` and abelian `f`.
-
-    An operator of finite arity cannot absorb a whole nest into one call, so it
-    keeps a nested shape whose literals can sit at any depth, out of reach of
-    every other rule. Re-associating the nest brings them to the top. Literals
-    that meet there are combined on the way, because a two-argument call has no
-    room for two of them, and the nodes this builds below the top are not
-    revisited by the surrounding `PostWalk`.
+    `f(x, f(k, y))` => `f(f(k, x), y)` for literal `k` and abelian `f`.
     """
     leaves = _same_op_leaves(node)
     if len(leaves) == len(node.args):
@@ -118,42 +86,32 @@ def _lift_nested_literals(node: CallTerm) -> Term | None:
     literals = [leaf for leaf in leaves if isinstance(leaf, LiteralTerm)]
     if not literals:
         return None
-    folded = literals[0]
-    for other in literals[1:]:
-        # Two at a time, which is an arity the operator certainly accepts.
-        folded = _evaluate(node.op, [folded, other])
     rest = [leaf for leaf in leaves if not isinstance(leaf, LiteralTerm)]
-    rebuilt = _nest(node, [*rest, folded])
+    rebuilt = _nest(node, [*literals, *rest])
     return rebuilt if rebuilt != node else None
 
 
-def hoist_literals(node: Term) -> Term | None:
+def canonicalize_associative(node: Term) -> Term | None:
     """
-    `f(a..., x, b...)` => `f(a..., b..., x)` for literal `x` and abelian `f`.
+    Bring a nest of same-operator calls into canonical form.
 
-    Finch.jl canonicalizes the arguments of a commutative call by sorting them
-    on a static hash. We only float the literals to the end, which is what
-    `fold_literals` needs in order to reach non-adjacent literals, and which
-    leaves the order of the remaining arguments -- and so the order of the
-    loads and calls in the generated code -- alone.
-
-    Where the operator's arity is finite the literals may be nested rather than
-    merely out of order, which `_lift_nested_literals` handles.
+    - An n-ary `f` absorbs the whole nest into one wide call:
+      `f(a..., f(b...), c...)` => `f(a..., b..., c...)`.
+    - A fixed-arity `f` is re-associated instead, using
+     `_lift_nested_literals`.
     """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val) and is_commutative(
-            op.val
-        ):
+        case CallTerm(op=op, args=args):
+            if not (is_associative(op.val) and is_commutative(op.val)):
+                return None
             if not math.isinf(arity(op.val)):
-                lifted = _lift_nested_literals(node)
-                if lifted is not None:
-                    return lifted
-            hoisted = [
-                *(arg for arg in args if not isinstance(arg, LiteralTerm)),
-                *(arg for arg in args if isinstance(arg, LiteralTerm)),
+                return _lift_nested_literals(node) if is_commutative(op.val) else None
+            leaves = _same_op_leaves(node)
+            leaves = [
+                *(arg for arg in leaves if isinstance(arg, LiteralTerm)),
+                *(arg for arg in leaves if not isinstance(arg, LiteralTerm)),
             ]
-            if hoisted != list(args):
-                return _call_like(node, hoisted)
+            return _call_like(node, leaves)
     return None
 
 
@@ -163,8 +121,7 @@ def dedup_idempotent(node: Term) -> Term | None:
         case CallTerm(op=op, args=args) if (
             is_idempotent(op.val) and is_associative(op.val) and is_commutative(op.val)
         ):
-            # Compared by equality rather than hashed into a set, since a
-            # literal is free to hold an unhashable value.
+            # Does not use set because arg may be unhashable.
             unique: list[Term] = []
             for arg in args:
                 if arg not in unique:
@@ -182,24 +139,25 @@ def fold_literals(node: Term) -> Term | None:
 
     - `f(x, y)` => `literal(f(x, y))` when every argument is a literal. The
       call disappears, so this is sound for any operator.
-    - `f(a..., x, b..., y, c...)` => `f(a..., b..., c..., f(x, y))` when `f` is
-      commutative as well as associative, which lets the literals be gathered
-      from wherever they sit. The folded value goes last, the same place
-      `hoist_literals` would have put it.
+    - `f(a..., x, b..., y, c...)` => `f(f(x, y), a..., b..., c...)` when `f` is
+      commutative as well as associative.
     - `f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` when `f` is only
-      associative, so nothing may be reordered and only a run of adjacent
-      literals can fold.
+      associative, so nothing is reordered and only adjacent literals fold.
     """
     match node:
         case CallTerm(op=op, args=args) if args:
             literals = [arg for arg in args if isinstance(arg, LiteralTerm)]
             if len(literals) == len(args):
                 return _evaluate(op, args)
-            if not is_associative(op.val):
+            if (
+                not math.isinf(arity(op.val))
+                or len(literals) < 2
+                or not is_associative(op.val)
+            ):
                 return None
-            if is_commutative(op.val) and len(literals) > 1:
+            if is_commutative(op.val):
                 rest = [arg for arg in args if not isinstance(arg, LiteralTerm)]
-                return _call_like(node, [*rest, _evaluate(op, literals)])
+                return _call_like(node, [_evaluate(op, literals), *rest])
             start, stop = _run_of_literals(args)
             if stop - start < 2:
                 return None
@@ -208,10 +166,29 @@ def fold_literals(node: Term) -> Term | None:
     return None
 
 
+def _can_annihilate(node: CallTerm) -> bool:
+    """
+    Whether an annihilator of `node`'s operator absorbs *every* operand.
+
+    Over the integers it does: `n * 0` is `0` for every `n`. Over the floats it
+    does not, because `nan * 0` and `inf * 0` are `nan`.
+    """
+    try:
+        result_type = node.result_type  # type: ignore[attr-defined]
+    except (AttributeError, AssertionError, NotImplementedError):
+        return False
+    return isinstance(result_type, FDTypeInteger | FDTypeBoolean)
+
+
 def annihilate(node: Term) -> Term | None:
-    """`f(a..., z, b...)` => `z` when `z` is an annihilator for `f`."""
+    """
+    `f(a..., z, b...)` => `z` when `z` is an annihilator for `f`.
+
+    Only where the annihilator absorbs unconditionally; see
+    `_absorbs_unconditionally`.
+    """
     match node:
-        case CallTerm(op=op, args=args):
+        case CallTerm(op=op, args=args) if _can_annihilate(node):
             for arg in args:
                 match arg:
                     case LiteralTerm(val=val) if is_annihilator(op.val, val):
@@ -222,10 +199,6 @@ def annihilate(node: Term) -> Term | None:
 def drop_identities(node: Term) -> Term | None:
     """
     `f(a..., e, b...)` => `f(a..., b...)` when `e` is an identity for `f`.
-
-    Restricted to associative `f`, because a one-sided identity is not safe to
-    drop from either side: `truediv` reports `1` as an identity, but only as a
-    divisor, and `truediv(1, x)` is not `x`.
     """
     match node:
         case CallTerm(op=op, args=args) if len(args) > 1 and is_associative(op.val):
@@ -251,18 +224,10 @@ def unwrap_singleton(node: Term) -> Term | None:
 
 
 def simplify_rules() -> list[RwCallable]:
-    """
-    The default rules, in the order they are tried at each node.
-
-    Ordered cheapest and most reductive first: rules which collapse a call
-    outright run before rules which only rearrange its arguments to expose work
-    for the others.
-    """
     return [
         fold_literals,
         annihilate,
-        flatten_associative,
-        hoist_literals,
+        canonicalize_associative,
         dedup_idempotent,
         drop_identities,
         unwrap_singleton,
@@ -284,4 +249,4 @@ def simplify(root: T, rules: Sequence[RwCallable] | None = None) -> T:
     """
     if rules is None:
         rules = simplify_rules()
-    return Rewrite(PostWalk(Fixpoint(Chain(rules))))(root)
+    return Rewrite(Fixpoint(PostWalk(Chain(rules))))(root)
