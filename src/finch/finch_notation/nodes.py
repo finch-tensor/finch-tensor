@@ -198,6 +198,12 @@ class AccessFType(FType):
         """
         return self.obj.element_type
 
+    def __call__(self, val: Any) -> Any:
+        """
+        Convert `val` the way the accessed tensor's type would.
+        """
+        return self.obj(val)
+
 
 @dataclass(eq=True, frozen=True)
 class Dimension(NotationTree, NotationExpression):
@@ -306,6 +312,7 @@ class Unwrap(NotationTree, NotationExpression):
     def children(self):
         return [self.arg]
 
+    @property
     def result_type(self):
         """
         Returns the type of the unwrapped value.
