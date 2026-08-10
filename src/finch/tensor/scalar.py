@@ -109,7 +109,6 @@ class ScalarFType(TensorFType, ImmutableStructFType):
 
 class Scalar(OverrideTensor):
     def __init__(self, val: Any, fill_value: Any = None, device=None):
-        self._fill_defaulted = fill_value is None
         if fill_value is None:
             fill_value = val
         self.val = val
@@ -122,12 +121,14 @@ class Scalar(OverrideTensor):
 
     @property
     def argument_ftype(self):
-        # A scalar whose fill merely defaulted to its value binds with a
-        # dynamic fill, so one kernel serves all values of this dtype.
-        if self._fill_defaulted:
-            elem_t = ftype(self.val)
-            return ScalarFType(elem_t, DynamicFill(elem_t), self._device)
-        return self.ftype
+        # A scalar's fill is not part of its kernel identity, so it never enters
+        # the cache key: `struct_fields` carries only `val`, and `lower_unwrap`
+        # reads only `val`, so no kernel body can observe the fill. It is used
+        # solely at bind time -- `infer_fill_value` reads it off the actual
+        # instance -- which is why one kernel serves every fill of a dtype.
+        # `ConstantScalar` overrides this to opt into value specialization.
+        elem_t = ftype(self.val)
+        return ScalarFType(elem_t, DynamicFill(elem_t), self._device)
 
     @property
     def shape(self):
@@ -148,8 +149,7 @@ class Scalar(OverrideTensor):
         device = normalize_device(device)
         if device == self.device:
             return self
-        fill_value = None if self._fill_defaulted else self._fill_value
-        return Scalar(self.val, fill_value=fill_value, device=device)
+        return Scalar(self.val, fill_value=self._fill_value, device=device)
 
     @property
     def element_type(self) -> FType:
