@@ -96,6 +96,9 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 [tool.pixi.dependencies]
 finch-tensor.path = "."
 
+[tool.pixi.target.macos-arm64.dependencies]
+libblas = { version = "*", build = "*newaccelerate" }
+
 [tool.pixi.dev]
 finch-tensor.path = "."
 
