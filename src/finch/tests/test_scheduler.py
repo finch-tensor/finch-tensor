@@ -558,29 +558,38 @@ def test_set_loop_order():
         (
             Query(
                 Alias("C"),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Reorder(
+                Reorder(
+                    Aggregate(
+                        Literal(ffuncs.add),
+                        Literal(0),
                         Reorder(
-                            MapJoin(
-                                Literal(ffuncs.mul),
-                                (
-                                    Reorder(
-                                        Table(Alias("A"), (Field("i0"), Field("i1"))),
-                                        (Field("i0"), Field("i1")),
-                                    ),
-                                    Reorder(
-                                        Table(Alias("B"), (Field("i1"), Field("i2"))),
-                                        (Field("i1"), Field("i2")),
+                            Reorder(
+                                MapJoin(
+                                    Literal(ffuncs.mul),
+                                    (
+                                        Reorder(
+                                            Table(
+                                                Alias("A"),
+                                                (Field("i0"), Field("i1")),
+                                            ),
+                                            (Field("i0"), Field("i1")),
+                                        ),
+                                        Reorder(
+                                            Table(
+                                                Alias("B"),
+                                                (Field("i1"), Field("i2")),
+                                            ),
+                                            (Field("i1"), Field("i2")),
+                                        ),
                                     ),
                                 ),
+                                (Field("i0"), Field("i2"), Field("i1")),
                             ),
-                            (Field("i0"), Field("i2"), Field("i1")),
+                            (Field("i0"), Field("i1"), Field("i2")),
                         ),
-                        (Field("i0"), Field("i1"), Field("i2")),
+                        (Field("i1"),),
                     ),
-                    (Field("i1"),),
+                    (Field("i0"), Field("i2")),
                 ),
             ),
             Produces((Alias("C"),)),
