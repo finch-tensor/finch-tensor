@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 from abc import abstractmethod
 from functools import reduce
 from itertools import chain as join_chains
@@ -179,7 +180,8 @@ class CycleInFields(Exception): ...
 
 
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
-    chains = [c for c in chains if len(c) > 0]
+    # chains = [c for c in chains if len(c) > 0]
+    chains = deepcopy(chains)
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
         for f in chain[1:]:
@@ -224,6 +226,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
             for f in chain:
                 counts[f] = counts.get(f, 0) + 1
         result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
+        result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
     return result
 
 
@@ -237,12 +240,20 @@ def heuristic_loop_order(
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs) as agg):
+                case Query(lhs, Aggregate(op, init, arg, idxs)):
+                    assert isinstance(arg, LogicExpression)
                     idxs_2 = _heuristic_loop_order(arg)
-                    output_idxs = output_fields.get(lhs, agg.fields())
+
+                    rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+                    return Query(lhs, rhs_2)
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
+                    idxs_2 = _heuristic_loop_order(arg)
+                    output_idxs = output_fields.get(lhs, rhs.fields())
                     rhs_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                        output_idxs,                         output_idxs,
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                        output_idxs,
                     )
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
@@ -260,17 +271,6 @@ class AbstractLoopOrderer(LogicLoopOrderOptimizer):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    @abstractmethod
-    def set_loop_orders(
-        self,
-        prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-        *,
-        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
-    ) -> Plan:
-        pass
-
     def lower(
         self,
         prgm: LogicStatement,
@@ -286,9 +286,7 @@ class AbstractLoopOrderer(LogicLoopOrderOptimizer):
                 if isinstance(body, Query)
             }
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = self.set_loop_orders(
-                prgm, stats, stats_factory, output_fields=output_fields
-            )
+            prgm = set_loop_order(prgm)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
