@@ -265,7 +265,9 @@ def set_loop_order(
                         output_idxs,
                     )
                     return Query(lhs, rhs_2)
-                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
                     idxs_2 = _heuristic_loop_order(arg)
                     output_idxs = output_fields.get(lhs, rhs.fields())
                     rhs_2 = Reorder(
