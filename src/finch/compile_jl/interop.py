@@ -152,7 +152,18 @@ def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> NumpyBuf
     if offset:
         for i in range(n_fields):
             raw[f"f{i}"] -= offset
-    dtype = np.dtype([(f"element_{i}", raw.dtype[i]) for i in range(n_fields)])
+
+    src_fields = raw.dtype.fields
+    assert src_fields is not None
+    src_names = [f"f{i}" for i in range(n_fields)]
+    dtype = np.dtype(
+        {
+            "names": [f"element_{i}" for i in range(n_fields)],
+            "formats": [src_fields[name][0] for name in src_names],
+            "offsets": [src_fields[name][1] for name in src_names],
+            "itemsize": raw.dtype.itemsize,
+        }
+    )
     return NumpyBuffer(raw.view(dtype))
 
 
