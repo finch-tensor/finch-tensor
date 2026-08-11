@@ -32,7 +32,8 @@ from finch.autoschedule import (
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.tensor_stats import FDStatsFactory
 from finch.compile_jl.compiler import FinchJLCompiler, FinchJLKernel
-from finch.compile_jl.julia import jl
+from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
+from finch.compile_jl.julia import get_jl, jl
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -184,13 +185,21 @@ def test_full_pipeline_through_julia_backend(boeing_slice):
 
 
 def test_timed_boeing():
+
     M = scipy.io.mmread(BOEING_PATH).tocsr()
     tensor = csr_tensor_from_scipy(M)
 
-    timings = {"seval": [], "call": []}
-    orig_call = FinchJLKernel.__call__
+    timings = {
+        "seval": [],
+        "julia_call": [],
+        "arg_conversion": [],
+        "result_conversion": [],
+        "gc_ns": [],
+    }
+    captured = {}
 
     def timed_init(self, func_name, jl_code):
+        print(self)
         self.jl_code = jl_code
         self.func_name = func_name
         t0 = time.time()
@@ -199,9 +208,28 @@ def test_timed_boeing():
 
     def timed_call(self, *args):
         t0 = time.time()
-        result = orig_call(self, *args)
-        timings["call"].append(time.time() - t0)  # 0 -> cold, 1 -> warm
-        return result
+        raw_args = [tensor_to_jl(arg) for arg in args]
+        timings["arg_conversion"].append(time.time() - t0)
+
+        # Only julia call
+        finch_fn = getattr(jl, self.func_name)
+        gc0 = jl.seval("Base.gc_time_ns()")
+        t0 = time.time()
+        result = finch_fn(*raw_args)
+        timings["julia_call"].append(time.time() - t0)  # 0 -> cold, 1 -> warm
+        gc1 = jl.seval("Base.gc_time_ns()")
+        timings["gc_ns"].append(gc1 - gc0)
+
+        t0 = time.time()
+        if jl.isa(result, jl.Finch.Tensor):
+            out = (jl_tensor_to_python(result),)
+        else:
+            out = tuple(jl_tensor_to_python(res) for res in result)
+        timings["result_conversion"].append(time.time() - t0)
+
+        captured["raw_args"] = raw_args
+        captured["func_name"] = self.func_name
+        return out
 
     FinchJLKernel.__init__ = timed_init
     FinchJLKernel.__call__ = timed_call
@@ -219,136 +247,119 @@ def test_timed_boeing():
             ft.compute(expr)
         total_cold = time.time() - t0
 
+        # jl.seval("GC.gc()")
+
         t0 = time.time()
         with with_default_scheduler(scheduler):
             ft.compute(expr)
         total_warm = time.time() - t0
         logic_exec = scheduler.ctx
         ((mod, *_),) = logic_exec.cached_kernels.values()
-        kernel = next(iter(mod.kernel_dict.values()))
+        # kernel_key = next(iter(mod.kernel_dict.keys()))
 
+        kernel = next(iter(mod.kernel_dict.values()))
         print(f"\n{kernel.jl_code}")
-        print("DONE")
 
     finally:
         del FinchJLKernel.__init__
         del FinchJLKernel.__call__
 
     julia_seval_time = timings["seval"][0]
-    julia_cold_call = timings["call"][0]
-    julia_warm_call = timings["call"][1]
+    cold_arg_conv, warm_arg_conv = timings["arg_conversion"]
 
-    python_time = total_cold - julia_seval_time - julia_cold_call
-    julia_compile_time = julia_cold_call - julia_warm_call
-    julia_run_time = julia_warm_call
+    cold_julia_call, warm_julia_call = timings["julia_call"]
 
+    cold_result_conv, warm_result_conv = timings["result_conversion"]
+
+    python_time = (
+        total_cold
+        - julia_seval_time
+        - cold_arg_conv
+        - cold_julia_call
+        - cold_result_conv
+    )
+    julia_compile_time = cold_julia_call - warm_julia_call
+    julia_run_time = warm_julia_call
+
+    print("GC time during warm call:", timings["gc_ns"][1] / 1e9)
     print(f"scipy time for boeing matmul : {time_scipy:.3f}")
     print(f"python pipeline time : {python_time:.3f}s")
+    print(f"julia seval time : {julia_seval_time}")
     print(f"julia compile time : {julia_compile_time:.3f}s")
+    print(f"cold argument conversion time : {cold_arg_conv}")
+    print(f"warm argument conversion time : {warm_arg_conv}")
+    print(f"result conversion time :{warm_result_conv}")
     print(f"julia run time : {julia_run_time:.3f}s")
     print(f"total pipeline time (compile and run) : {total_cold:.3f}")
     print(f"total pipeline runtime : {total_warm:.3f}")
 
+    Main = get_jl()
+    for i, a in enumerate(captured["raw_args"]):
+        setattr(Main, f"bencharg{i}", a)
 
-"""
-def test_run_full_boeing():
-    handler = get_logger_handler(filter_pattern="r.n,r.a")
-    logging.basicConfig(
-        level=logging.DEBUG, handlers=[handler], format=FORMAT, force=True
-    )
+    arglist = ", ".join(f"$bencharg{i}" for i in range(len(captured["raw_args"])))
+    bench_kernel = jl.seval(f"@benchmark {captured['func_name']}({arglist})")
+    print(jl.seval("string")(bench_kernel))
+
+    """
+    #To check if calling the same function through python adds an overhead
+    finch_fn_fresh = getattr(jl, captured["func_name"])
     t0 = time.time()
-    M = scipy.io.mmread(BOEING_PATH).tocsr()
-    time_load = time.time() - t0
-    print(f"[{time_load:6.2f}s] for loading matrix:\n shape={M.shape}, nnz={M.nnz}")
+    _ = finch_fn_fresh(*captured["raw_args"])
+    print("fresh python-side recall next to benchmark:", time.time() - t0)
+    """
 
+    """
+    #To check the difference between the types of argument we provide in the
+    # pipeline and manually
+    #Made single_write = True -> improvement
+
+    jl.seval('''
+    using Finch
+    m, n = size(bencharg0)
+    v1_fresh = Tensor(Dense(SparseHash(Element(0.0))), m, n)
+    v2_fresh = Tensor(SparseHash(SparseHash(Element(0.0))), m, n)
+    ''')
+
+    bench2 = jl.seval(f"@benchmark {
+    captured['func_name']}($bencharg0, $v1_fresh, $v2_fresh)")
+    print(jl.seval("string")(bench2))
+
+    typeof = jl.seval("typeof")
+    print("our pipeline's _v1 type:", typeof(Main.bencharg1))
+    print("manual v1_fresh type:", typeof(Main.v1_fresh))
+    """
+
+    """
+    #Test to check whether writing to a fresh or filled arguments accounts
+    # for the time difference
+    #Baically checking if sparsehash fresh or being written to when
+    #filled creates a big difference
+    v1_python = jl_tensor_to_python(Main.bencharg1)
+    v2_python = jl_tensor_to_python(Main.bencharg2)
+
+    v1_fresh_py = v1_python.ftype.construct(v1_python.shape)
+    v2_fresh_py = v2_python.ftype.construct(v2_python.shape)
+
+    v1_fresh_jl = tensor_to_jl(v1_fresh_py)
+    v2_fresh_jl = tensor_to_jl(v2_fresh_py)
+
+    setattr(Main,"v1_fresh_correct",v1_fresh_jl)
+    setattr(Main,"v2_fresh_correct",v2_fresh_jl)
+
+    bench_fresh_correct = jl.seval(f"@benchmark {
+    captured["func_name"]}($bencharg0, $v1_fresh_correct, $v2_fresh_correct)")
+    print(jl.seval("string")(bench_fresh_correct))
+    """
+
+    """
+    #Checking if the call overhead is accounting for the time difference
+    jl.seval("_noop(x,y,z)=(x,y,z)")
+    noop_fn = jl.seval("_noop")
     t0 = time.time()
-    _scipy_result = M @ M
-    time_scipy = time.time() - t0
-    print(f"{time_scipy:6.2f}s for scipy boeing matmul")
+    _ = noop_fn(*captured["raw_args"])
+    print(f"call overhead from python-side call : {time.time()-t0}")
 
-    tensor = csr_tensor_from_scipy(M)
-    t0 = time.time()
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
-
-    scheduler = fd_scheduler(formatter)
-    ft.set_default_scheduler(ctx=scheduler)
-
-    with with_default_scheduler(scheduler):
-        _result = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
-    time_finchjl_exec_compile = time.time() - t0
-    print(f"{time_finchjl_exec_compile:6.2f}s for boeing julia matmul")
-    t0 = time.time()
-    with with_default_scheduler(scheduler):
-        _result2 = ft.compute(ft.matmul(ft.lazy(tensor), ft.lazy(tensor)))
-    time_finchjl_exec = time.time() - t0
-    print(f"second call with julia_finch : {time.time() - t0:6.2f}s")
-    print(
-        "output format decided by FDFormatter:",
-        describe_format(formatter.output_ftypes[-1]),
-    )
-    print(f"Scipy is {time_finchjl_exec / time_scipy}x faster than finch-jl")
-
-
-def make_matrix(M):
-    matrix_M = scipy.sparse.lil_matrix(M.shape, dtype=M.dtype)
-    matrix_M[0, 0] = 1.0
-    return matrix_M.tocsr()
-
-
-def run_split(expr):
-    t_start = time.time()
-    c0 = jl.seval("Base.cumulative_compile_time_ns()")
-    result = ft.compute(expr)
-    c1 = jl.seval("Base.cumulative_compile_time_ns()")
-    t_end = time.time()
-
-    total = t_end - t_start
-    julia_compile = (c1[0] - c0[0]) / 1e9
-
-    print(f"Total time = {total}s \n Julia compile time = {julia_compile}")
-    return result
-"""
-"""
-def test_separate_compile_time():
-    M = scipy.io.mmread(BOEING_PATH).tocsr()
-    test_M = make_matrix(M)
-    test_tensor_M = csr_tensor_from_scipy(test_M)
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
-    scheduler = fd_scheduler(formatter)
-    ft.set_default_scheduler(ctx=scheduler)
-
-    with with_default_scheduler(scheduler):
-        run_split(ft.matmul(ft.lazy(test_tensor_M), ft.lazy(test_tensor_M)))
-"""
-
-"""
-def test_toy_pipeline():
-
-    A = np.array([[1,0,2],[0,3,0],[4,0,5]],dtype=np.int64)
-    B = np.array([[0,6,0],[8,0,0],[0,9,0]],dtype=np.int64)
-
-    expr = ft.matmul(ft.lazy(A),ft.lazy(B))
-    result = ft.compute(expr)
-
-    expected = A@B
-    calculated = result.to_numpy()
-
-    #print(f"expected : {expected}")
-    #print(f"finchtensor output :{calculated}")
-    #assert np.array_equal(calculated,expected), "Doesn't match"
-    #print(f"default scheduler used : {type(ft.get_default_scheduler()).__name__}")
-
-
-def test_parse_boeing():
-    M = scipy.io.mmread('data/ct20stif.mtx')
-    print(f"type after mmread : {type(M)}")
-    print(f"shape : {M.shape}")
-    print(f"nnz stored: {M.nnz}")
-
-    #Converting to CSR
-    M_csr = M.tocsr()
-    print(f"type as csr : {type(M)}")
-    print(f"ptr length: {len(M_csr.indptr)}")
-    print(f"indices(idx) length: {len(M_csr.indices)}")
-    print(f"few values : {M_csr.data[:5]}")
-"""
+    bench_noop = jl.seval("@benchmark _noop($bencharg0, $bencharg1, $bencharg2)")
+    print(jl.seval("string")(bench_noop))
+    """

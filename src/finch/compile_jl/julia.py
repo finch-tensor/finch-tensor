@@ -59,7 +59,14 @@ def init_julia() -> tuple[Any, Any]:
     if not _packages_loaded:
         # To change the version of Finch used, see pyjuliapkg and
         # `juliapkg.json` in this package.
-        for pkg in ("Finch", "HDF5", "NPZ", "TensorMarket", "Random", "Statistics"):
+        for pkg in (
+            "Finch",
+            "HDF5",
+            "NPZ",
+            "TensorMarket",
+            "Random",
+            "Statistics, BenchmarkTools",
+        ):
             _jl.seval(f"using {pkg}")
         _packages_loaded = True
 

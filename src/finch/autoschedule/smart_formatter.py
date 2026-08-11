@@ -115,6 +115,6 @@ class FDFormatter(SmartFormatter):
             if is_dense:
                 lvl = dense(lvl, shape_type[dim])
             else:
-                lvl = sparse_hash(lvl, shape_type[dim], single_writer=False)
+                lvl = sparse_hash(lvl, shape_type[dim], single_writer=True)
 
         return fiber_tensor(lvl)
