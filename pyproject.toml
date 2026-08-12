@@ -108,7 +108,7 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+cmd = "pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
 args = [
     { arg = "njobs", default = "logical" },
 ]
@@ -120,7 +120,7 @@ depends-on = [
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "python -m pytest -m c_backend -n {{ njobs }}"
+cmd = "pytest -m c_backend -n {{ njobs }}"
 args = [
     { arg = "njobs", default = "0" },
 ]
@@ -131,7 +131,7 @@ default-environment = "test-c"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "python -m pytest -m mlir_backend -n {{ njobs }}"
+cmd = "pytest -m mlir_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
@@ -139,7 +139,7 @@ default-environment = "test-mlir"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "python -m pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
+cmd = "pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -256,3 +256,23 @@ exclude = [
     "src/finch/tests/reference",
 ]
 files = ["src"]
+
+[tool.pytest]
+addopts = [
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-report=term",
+    "--cov=finch",
+    "--cov-config=.coveragerc",
+    "--junitxml=junit/test-results.xml",
+    "--ignore-glob=src/finch/tests/reference/*",
+]
+markers = [
+    "c_backend: tests that exercise the C backend (require a native C compiler)",
+    "mlir_backend: tests that exercise the MLIR backend (require MLIR Python bindings)",
+    "slow: tests that are slow (not recommended for CI)",
+]
+testpaths = ["src"]
+junit_family = "xunit2"
+strict = true

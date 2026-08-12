@@ -3,12 +3,23 @@ from pathlib import Path
 
 import pytest
 
+import numpy as np
 from numpy.random import default_rng
 from numpy.testing import assert_allclose, assert_equal
 
-from finch import get_default_scheduler, set_default_scheduler
+from finch import (
+    dense,
+    element,
+    fiber_tensor,
+    ftype,
+    get_default_scheduler,
+    set_default_scheduler,
+)
+from finch.algebra import ftypes
 from finch.autoschedule import COMPILE_MLIR, COMPILE_NUMBA, INTERPRET_LOGIC
+from finch.codegen import NumpyBufferFType
 from finch.finch_logic import Field
+from finch.tensor import BufferizedNDArrayFType
 
 
 @pytest.fixture(scope="session")
@@ -79,6 +90,28 @@ def tp_2():
 @pytest.fixture
 def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
+
+
+@pytest.fixture(scope="session", params=[
+    pytest.param(
+        lambda dtype: BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(ftype(dtype)),
+            ndim=2,
+            dimension_type=(ftypes.intp, ftypes.intp),
+        ),
+        id="BufferizedNDArrayFType",
+    ),
+    pytest.param(
+        lambda dtype: fiber_tensor(
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
+        ),
+        id="fiber_tensor",
+    ),
+])
+def fmt_fn(request):
+    yield request.param
 
 
 # TODO Remove once we solve #280

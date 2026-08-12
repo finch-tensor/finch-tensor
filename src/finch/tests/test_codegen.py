@@ -950,21 +950,6 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(fmt, constructed, serialized) is None
 
 
-@pytest.mark.parametrize(
-    "fmt_fn",
-    [
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
-        ),
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
-        ),
-    ],
-)
 @pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
@@ -1011,21 +996,6 @@ def test_e2e_transpose_numba(a, dtype):
     finch_assert_equal(result, a.T)
 
 
-@pytest.mark.parametrize(
-    "fmt_fn",
-    [
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
-        ),
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
-        ),
-    ],
-)
 @mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
