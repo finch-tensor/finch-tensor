@@ -393,8 +393,8 @@ def test_repeat_operator_scalar_literal(scalar, axis):
         (fl_interface.prod, np.prod),
     ):
         for expr, np_expr in (
-            (fl_interface.lazy(x) * scalar, arr * scalar),
-            (fl_interface.lazy(x) + scalar, arr + scalar),
+            (fl_interface.defer(x) * scalar, arr * scalar),
+            (fl_interface.defer(x) + scalar, arr + scalar),
         ):
             out = fl_interface.compute(
                 reduce_fn(expr, axis=axis), ctx=INTERPRET_NOTATION_GALLEY
@@ -406,7 +406,7 @@ def test_repeat_operator_repeated_scalar_literal():
     """The same constant twice under one reduction: each occurrence is reduced
     over, so each takes the combined factor."""
     arr = np.arange(6.0).reshape(2, 3) + 1
-    x = fl_interface.lazy(fl_interface.asarray(arr))
+    x = fl_interface.defer(fl_interface.asarray(arr))
 
     out = fl_interface.compute(
         fl_interface.prod(x * 2.0 * 2.0), ctx=INTERPRET_NOTATION_GALLEY
@@ -427,7 +427,7 @@ def test_repeat_operator_scalar_outside_reduction():
     applies to the inner occurrence only.
     """
     arr = np.arange(6.0).reshape(2, 3) + 1
-    x = fl_interface.lazy(fl_interface.asarray(arr))
+    x = fl_interface.defer(fl_interface.asarray(arr))
 
     out = fl_interface.compute(
         fl_interface.prod(x * 2.0) * 2.0, ctx=INTERPRET_NOTATION_GALLEY
@@ -454,7 +454,7 @@ def test_repeat_operator_under_nested_reduction(scalar):
     giving sum(prod(x + 2*scalar)) instead of sum(prod(x + scalar)).
     """
     arr = np.arange(1.0, 7.0).reshape(2, 3)
-    x = fl_interface.lazy(fl_interface.asarray(arr))
+    x = fl_interface.defer(fl_interface.asarray(arr))
 
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.prod(x + scalar, axis=1)),
@@ -467,8 +467,8 @@ def test_repeat_operator_nested_reduction_no_constant():
     """The same nesting without a constant, as a control."""
     arr = np.arange(1.0, 7.0).reshape(2, 3)
     other = np.arange(7.0, 13.0).reshape(2, 3)
-    x = fl_interface.lazy(fl_interface.asarray(arr))
-    y = fl_interface.lazy(fl_interface.asarray(other))
+    x = fl_interface.defer(fl_interface.asarray(arr))
+    y = fl_interface.defer(fl_interface.asarray(other))
 
     out = fl_interface.compute(
         fl_interface.sum(fl_interface.prod(x + y, axis=1)),
@@ -480,7 +480,7 @@ def test_repeat_operator_nested_reduction_no_constant():
 def test_repeat_operator_nested_reduction_swapped_ops():
     """Outer prod over an inner sum, the mirror of the failing case."""
     arr = np.arange(1.0, 7.0).reshape(2, 3)
-    x = fl_interface.lazy(fl_interface.asarray(arr))
+    x = fl_interface.defer(fl_interface.asarray(arr))
 
     out = fl_interface.compute(
         fl_interface.prod(fl_interface.sum(x + 2.0, axis=1)),

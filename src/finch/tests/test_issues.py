@@ -51,8 +51,8 @@ def test_issue_620(rng, shapes, density):
 
     result = finch.compute(
         finch.matmul(
-            finch.matmul(finch.lazy(a_f), finch.lazy(b_f)),
-            finch.lazy(c_f),
+            finch.matmul(finch.defer(a_f), finch.defer(b_f)),
+            finch.defer(c_f),
         )
     )
 

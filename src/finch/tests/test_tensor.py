@@ -148,14 +148,13 @@ def test_dense_tensor_to_scipy_rejects():
 
 
 def test_empty_like_preserves_fill_value():
-    import importlib
+    from finch.interface import lazy
 
-    lazy_interface = importlib.import_module("finch.interface.lazy")
     arr = np.ones((2, 3), dtype=np.int32)
     x = BufferizedNDArray.from_numpy(arr, fill_value=5)
 
     lazy_x = finch.defer(x)
-    lazy_out = lazy_interface.empty_like(lazy_x)
+    lazy_out = lazy.empty_like(lazy_x)
     out = finch.empty_like(x)
 
     assert lazy_out.fill_value == np.int32(5)
@@ -166,11 +165,9 @@ def test_empty_like_preserves_fill_value():
 
 
 def test_index_tensor_returns_linear_indices():
-    import importlib
+    from finch.interface import lazy
 
-    lazy_interface = importlib.import_module("finch.interface.lazy")
-
-    tns = lazy_interface.IndexTensor((2, 3), np.int64)
+    tns = lazy.IndexTensor((2, 3), np.int64)
 
     assert tns.shape == (2, 3)
     assert tns.element_type == finch.int64
