@@ -16,7 +16,7 @@ def test_elementwise_mul():
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.lazy(a) * fl_interface.lazy(b),
+        fl_interface.defer(a) * fl_interface.defer(b),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array([[1.0, 2.0], [3.0, 4.0]]) * np.array([[1.0, 1.0], [1.0, 1.0]])
@@ -31,8 +31,8 @@ def test_add_of_elementwise():
     c = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     d = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.lazy(a) * fl_interface.lazy(b)
-        + fl_interface.lazy(c) * fl_interface.lazy(d),
+        fl_interface.defer(a) * fl_interface.defer(b)
+        + fl_interface.defer(c) * fl_interface.defer(d),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array(a) * np.array(b) + np.array(c) * np.array(d)
@@ -47,7 +47,7 @@ def test_matmul_sum_axis0():
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B), axis=0),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.sum(np.array(A) @ np.array(B), axis=0)
@@ -65,8 +65,8 @@ def test_sum_axis0_plus_sum_axis1():
     D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B), axis=0)
+        + fl_interface.sum(fl_interface.defer(C) @ fl_interface.defer(D), axis=1),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -86,7 +86,7 @@ def test_nested_aggregates_full_sum():
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B)),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -104,7 +104,7 @@ def test_deeper_nesting():
 
     out = fl_interface.compute(
         fl_interface.sum(
-            (fl_interface.lazy(A) @ fl_interface.lazy(B)) @ fl_interface.lazy(C)
+            (fl_interface.defer(A) @ fl_interface.defer(B)) @ fl_interface.defer(C)
         ),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
@@ -120,7 +120,7 @@ def test_expand_dims_sum_singleton():
     """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
 
-    expanded = fl_interface.expand_dims(fl_interface.lazy(A), axis=2)
+    expanded = fl_interface.expand_dims(fl_interface.defer(A), axis=2)
     out = fl_interface.compute(
         fl_interface.sum(expanded, axis=2),
         ctx=INTERPRET_NOTATION_GALLEY,
@@ -136,7 +136,7 @@ def test_alias_matmul():
     Exercises alias-based query merging and reordering.
     """
     A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
-    A = fl_interface.lazy(fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]])))
+    A = fl_interface.defer(fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]])))
     B = A @ A
     C = B @ B @ B
     out = fl_interface.compute(
@@ -165,7 +165,7 @@ def test_galley_performance_optimization_chain_matmul():
     C = fl_interface.asarray(np.arange(3 * 4, dtype=float).reshape(3, 4))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -185,7 +185,7 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
     C = fl_interface.asarray(np.arange(1000 * 2, dtype=float).reshape(1000, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -201,8 +201,8 @@ def test_alias_matmul_two_bases():
     """
     A1_np = np.array([[1.0, 2.0], [3.0, 4.0]])
     A2_np = np.array([[1.0, 0.0], [0.0, 1.0]])
-    A1 = fl_interface.lazy(fl_interface.asarray(A1_np))
-    A2 = fl_interface.lazy(fl_interface.asarray(A2_np))
+    A1 = fl_interface.defer(fl_interface.asarray(A1_np))
+    A2 = fl_interface.defer(fl_interface.asarray(A2_np))
     B = A1 @ A2
     C = B @ B
     out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
@@ -223,7 +223,7 @@ def test_galley_chain_matmul_5_4_4_6_6_3():
     C = fl_interface.asarray(np.arange(6 * 3, dtype=float).reshape(6, 3))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -243,7 +243,7 @@ def test_galley_chain_matmul_3_5_5_2_2_2():
     C = fl_interface.asarray(np.arange(2 * 2, dtype=float).reshape(2, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -263,10 +263,10 @@ def test_galley_chain_matmul_four_matrices():
     D = fl_interface.asarray(np.arange(3 * 2, dtype=float).reshape(3, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A)
-        @ fl_interface.lazy(B)
-        @ fl_interface.lazy(C)
-        @ fl_interface.lazy(D),
+        fl_interface.defer(A)
+        @ fl_interface.defer(B)
+        @ fl_interface.defer(C)
+        @ fl_interface.defer(D),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -281,7 +281,7 @@ def test_alias_matmul_longer_chain():
     Exercises alias merging with more inlined copies (8 uses of A).
     """
     A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
-    A = fl_interface.lazy(fl_interface.asarray(A_np))
+    A = fl_interface.defer(fl_interface.asarray(A_np))
     B = A @ A
     C = B @ B @ B @ B
     out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
@@ -300,7 +300,7 @@ def test_sum_elementwise_mul():
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B)),
+        fl_interface.sum(fl_interface.defer(A) * fl_interface.defer(B)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -317,7 +317,7 @@ def test_sum_elementwise_mul_axis1():
     B = fl_interface.asarray(np.array([[1.0, 2.0], [1.0, 2.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B), axis=1),
+        fl_interface.sum(fl_interface.defer(A) * fl_interface.defer(B), axis=1),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -337,8 +337,8 @@ def test_matmul_plus_matmul():
     D = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
 
     out = fl_interface.compute(
-        (fl_interface.lazy(A) @ fl_interface.lazy(B))
-        + (fl_interface.lazy(C) @ fl_interface.lazy(D)),
+        (fl_interface.defer(A) @ fl_interface.defer(B))
+        + (fl_interface.defer(C) @ fl_interface.defer(D)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -359,8 +359,8 @@ def test_multiple_compute():
 
     out = fl_interface.compute(
         (
-            fl_interface.lazy(A) @ fl_interface.lazy(B),
-            fl_interface.lazy(C) @ fl_interface.lazy(D),
+            fl_interface.defer(A) @ fl_interface.defer(B),
+            fl_interface.defer(C) @ fl_interface.defer(D),
         ),
         ctx=INTERPRET_NOTATION_GALLEY,
     )

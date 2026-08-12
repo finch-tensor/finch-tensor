@@ -463,16 +463,16 @@ def asarray(
 
 
 @overload
-def lazy(arr: tuple[Any, ...]) -> tuple[Any, ...]: ...
+def defer(arr: tuple[Any, ...]) -> tuple[Any, ...]: ...
 
 
 @overload
-def lazy(arr: Any) -> LazyTensor: ...
+def defer(arr: Any) -> LazyTensor: ...
 
 
-def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
+def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
     """
-    - lazy(arr) -> LazyTensor:
+    - defer(arr) -> LazyTensor:
     Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
     returned as-is.
     Otherwise, it creates a LazyTensor representation of the input array.
@@ -484,7 +484,7 @@ def lazy(arr: Any) -> LazyTensor | tuple[Any, ...]:
     - LazyTensor: A lazy representation of the input array.
     """
     if isinstance(arr, tuple):
-        return tuple(lazy(arr_i) for arr_i in arr)
+        return tuple(defer(arr_i) for arr_i in arr)
 
     if isinstance(arr, LazyTensor):
         return arr
@@ -538,7 +538,7 @@ def full(
 
 
 def full_like(x, /, fill_value, *, dtype=None, device=None):
-    x = lazy(x)
+    x = defer(x)
     return full(
         x.shape,
         fill_value,
@@ -576,7 +576,7 @@ def empty(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTenso
 
 
 def empty_like(x, /, *, dtype=None, device=None) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     return full_like(x, x.fill_value, dtype=dtype, device=device)
 
 
@@ -600,7 +600,7 @@ def arange(
     if stop is None:
         start, stop = 0, start
     arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
-    return lazy(asarray(arr, device=device))
+    return defer(asarray(arr, device=device))
 
 
 def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
@@ -621,7 +621,7 @@ def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
         an array containing the axes permutation. The returned array must have the same
         data type as ``x``.
     """
-    arg = lazy(arg)
+    arg = defer(arg)
     axis = normalize_axis_tuple(axes, arg.ndim + len(axes))
     idxs = tuple(Field(gensym("i")) for _ in range(arg.ndim))
     expr = Reorder(Table(arg.data, idxs), tuple(idxs[i] for i in axis))
@@ -668,7 +668,7 @@ def expand_dims(
     IndexError
         If provided an invalid ``axis`` position, an ``IndexError`` should be raised.
     """
-    x = lazy(x)
+    x = defer(x)
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
@@ -726,7 +726,7 @@ def squeeze(
         If a specified axis has a size greater than one (i.e., it is not a
         singleton dimension), a ``ValueError`` should be raised.
     """
-    x = lazy(x)
+    x = defer(x)
     if isinstance(axis, int):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
@@ -794,7 +794,7 @@ def reduce(
         reduction. The returned array must have a data type as described by the
         ``dtype`` parameter above.
     """
-    x = lazy(x)
+    x = defer(x)
     assert isinstance(op, FinchOperator)
     explicit_dtype = dtype is not None
     if dtype is not None:
@@ -891,7 +891,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    args = tuple(lazy(a) for a in args)
+    args = tuple(defer(a) for a in args)
     shape = _broadcast_shape(*(arg.shape for arg in args))
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
@@ -924,26 +924,26 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
 
 
 def round(x) -> LazyTensor:
-    return elementwise(ffuncs.round, lazy(x))
+    return elementwise(ffuncs.round, defer(x))
 
 
 def floor(x) -> LazyTensor:
-    return elementwise(ffuncs.floor, lazy(x))
+    return elementwise(ffuncs.floor, defer(x))
 
 
 def ceil(x) -> LazyTensor:
-    return elementwise(ffuncs.ceil, lazy(x))
+    return elementwise(ffuncs.ceil, defer(x))
 
 
 def astype(x, dtype, /, *, copy=True, device=None) -> LazyTensor:
     explicit_device = device is not None
     device = normalize_device(device)
-    out = elementwise(ffuncs.astype(ftype(dtype)), lazy(x))
+    out = elementwise(ffuncs.astype(ftype(dtype)), defer(x))
     return out.to_device(device) if explicit_device else out
 
 
 def trunc(x) -> LazyTensor:
-    return elementwise(ffuncs.trunc, lazy(x))
+    return elementwise(ffuncs.trunc, defer(x))
 
 
 def sum(
@@ -954,7 +954,7 @@ def sum(
     dtype=None,
     keepdims: bool = False,
 ):
-    x = lazy(x)
+    x = defer(x)
     return reduce(ffuncs.add, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
@@ -966,7 +966,7 @@ def prod(
     dtype=None,
     keepdims: bool = False,
 ):
-    x = lazy(x)
+    x = defer(x)
     return reduce(ffuncs.mul, x, axis=axis, dtype=dtype, keepdims=keepdims)
 
 
@@ -977,7 +977,7 @@ def argmin(
     axis: int | None = None,
     keepdims: bool = False,
 ):
-    x = lazy(x)
+    x = defer(x)
     if axis is not None:
         axis = normalize_axis_index(axis, x.ndim)
         indices = arange(x.shape[axis], dtype=np.intp)
@@ -988,7 +988,7 @@ def argmin(
         sentinel = np.intp(x.shape[axis])
     else:
         sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
-        indices = lazy(IndexTensor(x.shape, np.intp))
+        indices = defer(IndexTensor(x.shape, np.intp))
 
     return elementwise(
         ffuncs.last,
@@ -1009,7 +1009,7 @@ def argmax(
     axis: int | None = None,
     keepdims: bool = False,
 ):
-    x = lazy(x)
+    x = defer(x)
     if axis is not None:
         axis = normalize_axis_index(axis, x.ndim)
         indices = arange(x.shape[axis], dtype=np.intp)
@@ -1020,7 +1020,7 @@ def argmax(
         sentinel = np.intp(x.shape[axis])
     else:
         sentinel = np.intp(np.prod(x.shape, dtype=np.intp))
-        indices = lazy(IndexTensor(x.shape, np.intp))
+        indices = defer(IndexTensor(x.shape, np.intp))
 
     indices = negative(indices)
     return negative(
@@ -1081,7 +1081,7 @@ def sort(
     descending: bool = False,
     stable: bool = True,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if not isinstance(descending, bool):
         raise TypeError("descending must be a boolean")
     if not isinstance(stable, bool):
@@ -1099,7 +1099,7 @@ def argsort(
     descending: bool = False,
     stable: bool = True,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if not isinstance(descending, bool):
         raise TypeError("descending must be a boolean")
     if not isinstance(stable, bool):
@@ -1130,8 +1130,8 @@ def argsort(
 
 
 def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
     if x1.ndim != 1:
         raise ValueError("x1 must be a one-dimensional array")
     if side not in ("left", "right"):
@@ -1152,7 +1152,7 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
     )
     marker = cast(
         LazyTensor,
-        lazy(OneHotMaskTensor(search_size, index=0, dtype=np.bool_)),
+        defer(OneHotMaskTensor(search_size, index=0, dtype=np.bool_)),
     )
     marker = marker.to_device(device)
     if x2.ndim > 0:
@@ -1196,7 +1196,7 @@ def any(
     """
     Test whether any element of input array ``x`` along given axis is True.
     """
-    x = lazy(x)
+    x = defer(x)
     return reduce(
         ffuncs.or_,
         elementwise(ffuncs.truth, x),
@@ -1217,7 +1217,7 @@ def all(
     """
     Test whether all elements of input array ``x`` along given axis are True.
     """
-    x = lazy(x)
+    x = defer(x)
     return reduce(
         ffuncs.and_,
         elementwise(ffuncs.truth, x),
@@ -1228,11 +1228,11 @@ def all(
 
 
 def real(x) -> LazyTensor:
-    return elementwise(ffuncs.real, lazy(x))
+    return elementwise(ffuncs.real, defer(x))
 
 
 def imag(x) -> LazyTensor:
-    return elementwise(ffuncs.imag, lazy(x))
+    return elementwise(ffuncs.imag, defer(x))
 
 
 def min(
@@ -1246,7 +1246,7 @@ def min(
     """
     Return the minimum of input array ``arr`` along given axis.
     """
-    x = lazy(x)
+    x = defer(x)
     return reduce(ffuncs.min, x, axis=axis, keepdims=keepdims, init=init)
 
 
@@ -1261,64 +1261,64 @@ def max(
     """
     Return the maximum of input array ``arr`` along given axis.
     """
-    x = lazy(x)
+    x = defer(x)
     return reduce(ffuncs.max, x, axis=axis, keepdims=keepdims, init=init)
 
 
 def minimum(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.min, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.min, defer(x1), defer(x2))
 
 
 def maximum(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.max, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.max, defer(x1), defer(x2))
 
 
 def clip(x, /, min=None, max=None) -> LazyTensor:
-    return elementwise(ffuncs.clip, lazy(x), lazy(min), lazy(max))
+    return elementwise(ffuncs.clip, defer(x), defer(min), defer(max))
 
 
 def sqrt(x) -> LazyTensor:
-    return elementwise(ffuncs.sqrt, lazy(x))
+    return elementwise(ffuncs.sqrt, defer(x))
 
 
 def square(x) -> LazyTensor:
-    return elementwise(ffuncs.square, lazy(x))
+    return elementwise(ffuncs.square, defer(x))
 
 
 def sign(x) -> LazyTensor:
-    return elementwise(ffuncs.sign, lazy(x))
+    return elementwise(ffuncs.sign, defer(x))
 
 
 def add(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.add, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.add, defer(x1), defer(x2))
 
 
 def reciprocal(x) -> LazyTensor:
-    return elementwise(ffuncs.reciprocal, lazy(x))
+    return elementwise(ffuncs.reciprocal, defer(x))
 
 
 def subtract(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.sub, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.sub, defer(x1), defer(x2))
 
 
 def multiply(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.mul, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.mul, defer(x1), defer(x2))
 
 
 def divide(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.truediv, defer(x1), defer(x2))
 
 
 def abs(x) -> LazyTensor:
-    return elementwise(ffuncs.abs, lazy(x))
+    return elementwise(ffuncs.abs, defer(x))
 
 
 def positive(x) -> LazyTensor:
-    return elementwise(ffuncs.pos, lazy(x))
+    return elementwise(ffuncs.pos, defer(x))
 
 
 def negative(x) -> LazyTensor:
-    return elementwise(ffuncs.neg, lazy(x))
+    return elementwise(ffuncs.neg, defer(x))
 
 
 def is_broadcastable(shape_a, shape_b):
@@ -1367,8 +1367,8 @@ def matmul(x1, x2) -> LazyTensor:
             axis=-2,
         )
 
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
 
     if x1.ndim < 1 or x2.ndim < 1:
         raise ValueError("Both inputs must be at least 1D arrays")
@@ -1403,7 +1403,7 @@ def matrix_transpose(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the axes of `x` transposed.
     """
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         # this is following numpy's behavior.
         # data-apis specification assumes that input is atleast 2D
@@ -1415,12 +1415,12 @@ def matrix_transpose(x) -> LazyTensor:
 
 
 def inv(x, /):
-    x = lazy(x)
+    x = defer(x)
     raise ValueError("inv requires a materialized array; call compute() first")
 
 
 def matrix_power(x, n) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
 
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
@@ -1456,39 +1456,39 @@ def matrix_power(x, n) -> LazyTensor:
 
 
 def bitwise_invert(x) -> LazyTensor:
-    return elementwise(ffuncs.invert, lazy(x))
+    return elementwise(ffuncs.invert, defer(x))
 
 
 def bitwise_and(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.and_, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.and_, defer(x1), defer(x2))
 
 
 def bitwise_left_shift(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.lshift, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.lshift, defer(x1), defer(x2))
 
 
 def bitwise_or(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.or_, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.or_, defer(x1), defer(x2))
 
 
 def bitwise_right_shift(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.rshift, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.rshift, defer(x1), defer(x2))
 
 
 def bitwise_xor(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.xor, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.xor, defer(x1), defer(x2))
 
 
 def truediv(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.truediv, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.truediv, defer(x1), defer(x2))
 
 
 def floor_divide(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.floordiv, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.floordiv, defer(x1), defer(x2))
 
 
 def mod(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.mod, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.mod, defer(x1), defer(x2))
 
 
 def pow(x1, x2) -> LazyTensor:
@@ -1496,11 +1496,11 @@ def pow(x1, x2) -> LazyTensor:
 
 
 def power(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.pow, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.pow, defer(x1), defer(x2))
 
 
 def remainder(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.remainder, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.remainder, defer(x1), defer(x2))
 
 
 def conj(x) -> LazyTensor:
@@ -1517,18 +1517,18 @@ def conj(x) -> LazyTensor:
     LazyTensor
         A new LazyTensor with the complex conjugate of `x`.
     """
-    return elementwise(ffuncs.conjugate, lazy(x))
+    return elementwise(ffuncs.conjugate, defer(x))
 
 
 def count_nonzero(
     x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     element_type = x.element_type
     zero = element_type(False if isinstance(element_type, FDTypeBoolean) else 0)
     return reduce(
         ffuncs.add,
-        elementwise(ffuncs.not_equal, x, lazy(zero)),
+        elementwise(ffuncs.not_equal, x, defer(zero)),
         axis=axis,
         keepdims=keepdims,
         init=0,
@@ -1538,7 +1538,7 @@ def count_nonzero(
 def count_nonfill(
     x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     fill = full(x.shape, x.fill_value, dtype=x.element_type, device=x.device)
     return reduce(
         ffuncs.add,
@@ -1558,8 +1558,8 @@ def tensordot(
     Returns a LazyTensor if either x1 or x2 is a LazyTensor.
     Otherwise, computes the result eagerly.
     """
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
 
     # Parse axes
     if not isinstance(axes, tuple):
@@ -1619,8 +1619,8 @@ def vecdot(x1, x2, /, *, axis=-1) -> LazyTensor:
     """
     Computes the vector dot product along the specified axis.
     """
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
 
     # check broadcastability
     if not is_broadcastable(x1.shape, x2.shape):
@@ -1647,7 +1647,7 @@ def _norm_axes(axis: int | tuple[int, ...] | None, ndim: int) -> tuple[int, ...]
 
 
 def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     axes = _norm_axes(axis, x.ndim)
     abs_x = abs(x)
 
@@ -1712,7 +1712,7 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
 
 
 def matrix_norm(x, /, *, keepdims=False, ord="fro") -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
 
@@ -1772,8 +1772,8 @@ _cross_E = [
 
 
 def cross(x1, x2, /, *, axis=-1):
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
     shape = _broadcast_shape(x1.shape, x2.shape)
     x1 = broadcast_to(x1, shape)
     x2 = broadcast_to(x2, shape)
@@ -1913,7 +1913,7 @@ def eye(
     device = normalize_device(device)
     out = cast(
         LazyTensor,
-        lazy(
+        defer(
             EyeTensor(
                 (n_rows, n_rows if n_cols is None else n_cols),
                 k=k,
@@ -1925,7 +1925,7 @@ def eye(
 
 
 def triu(x, /, *, k: int = 0) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     mask = UpperTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
@@ -1938,7 +1938,7 @@ def triu(x, /, *, k: int = 0) -> LazyTensor:
 
 
 def tril(x, /, *, k: int = 0) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     mask = LowerTriangleTensor(x.shape[-2:], k=k, dtype=np.bool_)
@@ -1951,7 +1951,7 @@ def tril(x, /, *, k: int = 0) -> LazyTensor:
 
 
 def diag(x, /, *, k: int = 0) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim == 1 and k == 0:
         vals = broadcast_to(expand_dims(x, axis=1), (x.shape[0], x.shape[0]))
         return where(
@@ -1964,20 +1964,20 @@ def diag(x, /, *, k: int = 0) -> LazyTensor:
 
         return cast(
             LazyTensor,
-            lazy(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k))),
+            defer(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k))),
         )
     raise ValueError(f"x must be a 1D or 2D array, got {x.ndim}D array")
 
 
 def diagonal(x, /, *, offset: int = 0) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     from .fuse import compute
 
     return cast(
         LazyTensor,
-        lazy(
+        defer(
             np.ascontiguousarray(
                 np.diagonal(
                     compute(x).to_numpy(),
@@ -1991,7 +1991,7 @@ def diagonal(x, /, *, offset: int = 0) -> LazyTensor:
 
 
 def trace(x, /, *, offset: int = 0, dtype=None) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim < 2:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     return sum(diagonal(x, offset=offset), axis=-1, dtype=dtype)
@@ -2006,7 +2006,7 @@ def diff(
     prepend=None,
     append=None,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if not isinstance(n, int) or isinstance(n, bool):
         raise TypeError(f"n must be an integer, got {type(n).__name__}")
     if n < 0:
@@ -2055,7 +2055,7 @@ def cumulative(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if x.ndim == 0:
         raise ValueError("cumulative requires an array with at least one dimension")
     if axis is None:
@@ -2160,7 +2160,7 @@ def cumulative_sum(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_sum requires a numeric input array")
 
@@ -2181,7 +2181,7 @@ def cumulative_prod(
     dtype=None,
     include_initial: bool = False,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if isinstance(x.element_type, FDTypeBoolean):
         raise TypeError("cumulative_prod requires a numeric input array")
 
@@ -2195,7 +2195,7 @@ def cumulative_prod(
 
 
 def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if isinstance(shape, (int, np.integer)) and not isinstance(
         shape,
         (bool, np.bool_),
@@ -2266,7 +2266,7 @@ def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTen
     if fill is None:
         fill = x.fill_value
     fill_value = fill
-    selector = lazy(selector)
+    selector = defer(selector)
     if selector.ndim == 2:
         selector = expand_dims(
             selector,
@@ -2274,13 +2274,13 @@ def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTen
         )
     expanded = expand_dims(x, axis=axis)
     if isinstance(fill, tuple):
-        fill = lazy(FillTensor(_broadcast_shape(selector.shape, expanded.shape), fill))
+        fill = defer(FillTensor(_broadcast_shape(selector.shape, expanded.shape), fill))
     masked = where(selector, expanded, fill)
     return reduce(ffuncs.choose(fill_value), masked, axis=axis + 1, init=fill_value)
 
 
 def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
-    arrays = tuple(lazy(array) for array in arrays)
+    arrays = tuple(defer(array) for array in arrays)
     if len(arrays) == 0:
         raise ValueError("concat requires at least one array")
     if axis is None:
@@ -2331,7 +2331,7 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
 
 
 def flip(x, /, *, axis: int | tuple[int, ...] | None = None) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     axes = tuple(range(x.ndim)) if axis is None else normalize_axis_tuple(axis, x.ndim)
     out = x
     for ax in axes:
@@ -2352,7 +2352,7 @@ def roll(
     *,
     axis: int | tuple[int, ...] | None = None,
 ) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if axis is None:
         original_shape = x.shape
         flat = reshape(x, (_shape_size(x.shape),))
@@ -2384,7 +2384,7 @@ def roll(
 
 
 def _axis_indices(size: int, dtype=np.intp) -> LazyTensor:
-    return cast(LazyTensor, lazy(IndexTensor((size,), dtype)))
+    return cast(LazyTensor, defer(IndexTensor((size,), dtype)))
 
 
 def _normalize_take_indices(indices: LazyTensor, axis_size: int) -> LazyTensor:
@@ -2404,8 +2404,8 @@ def _take_mask(indices: LazyTensor, axis_size: int) -> LazyTensor:
 
 
 def take(x, indices, /, *, axis: int | None = None) -> LazyTensor:
-    x = lazy(x)
-    indices = lazy(indices)
+    x = defer(x)
+    indices = defer(indices)
     if indices.ndim != 1:
         raise ValueError("indices must be a one-dimensional array")
     if axis is None:
@@ -2417,8 +2417,8 @@ def take(x, indices, /, *, axis: int | None = None) -> LazyTensor:
 
 
 def take_along_axis(x, indices, /, *, axis: int = -1) -> LazyTensor:
-    x = lazy(x)
-    indices = lazy(indices)
+    x = defer(x)
+    indices = defer(indices)
     if indices.ndim != x.ndim:
         raise ValueError("indices must have the same rank as x")
     axis = normalize_axis_index(axis, x.ndim)
@@ -2464,7 +2464,7 @@ def _literal_repeat_count(repeats) -> int | None:
 
 
 def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if axis is None:
         x = reshape(x, (_shape_size(x.shape),))
         axis = 0
@@ -2498,7 +2498,7 @@ def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
 
 
 def stack(arrays: Sequence[Any], /, *, axis: int = 0) -> LazyTensor:
-    arrays = tuple(lazy(array) for array in arrays)
+    arrays = tuple(defer(array) for array in arrays)
     if len(arrays) == 0:
         raise ValueError("stack requires at least one array")
     axis = normalize_axis_index(axis, arrays[0].ndim + 1)
@@ -2506,7 +2506,7 @@ def stack(arrays: Sequence[Any], /, *, axis: int = 0) -> LazyTensor:
 
 
 def tile(x, repetitions: tuple[int, ...], /) -> LazyTensor:
-    x = lazy(x)
+    x = defer(x)
     if isinstance(repetitions, (bool, np.bool_)):
         raise TypeError("repetitions must be an integer or a tuple of integers")
     if isinstance(repetitions, (int, np.integer)):
@@ -2533,7 +2533,7 @@ def tile(x, repetitions: tuple[int, ...], /) -> LazyTensor:
 
 
 def unstack(x, /, *, axis: int = 0) -> tuple[LazyTensor, ...]:
-    x = lazy(x)
+    x = defer(x)
     axis = normalize_axis_index(axis, x.ndim)
     return tuple(
         squeeze(take(x, asarray([i], dtype=np.intp, device=x.device), axis=axis), axis)
@@ -2552,7 +2552,7 @@ def broadcast_to(tensor: Any, /, shape: tuple) -> LazyTensor:
     Returns:
         A new lazy tensor with the specified shape.
     """
-    tensor = lazy(tensor)
+    tensor = defer(tensor)
 
     if not is_broadcastable_directional(tensor.shape, shape):
         raise ValueError(
@@ -2573,7 +2573,7 @@ def broadcast_arrays(*arrays: LazyTensor) -> tuple[LazyTensor, ...]:
 def meshgrid(*arrays, indexing: str = "xy") -> tuple[LazyTensor, ...]:
     if indexing not in {"xy", "ij"}:
         raise ValueError("indexing must be either 'xy' or 'ij'")
-    arrays = tuple(lazy(arr) for arr in arrays)
+    arrays = tuple(defer(arr) for arr in arrays)
     for arr in arrays:
         if arr.ndim != 1:
             raise ValueError("meshgrid input arrays must be one-dimensional")
@@ -2597,7 +2597,7 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
     """
     Moves axes of an array to new positions.
     """
-    x = lazy(x)
+    x = defer(x)
 
     # argument validation
     # handles uniqueness, int -> tuple, and bound check
@@ -2615,174 +2615,174 @@ def moveaxis(x, source: int | tuple[int, ...], destination: int | tuple[int, ...
 
 
 def sin(x) -> LazyTensor:
-    return elementwise(ffuncs.sin, lazy(x))
+    return elementwise(ffuncs.sin, defer(x))
 
 
 def sinh(x) -> LazyTensor:
-    return elementwise(ffuncs.sinh, lazy(x))
+    return elementwise(ffuncs.sinh, defer(x))
 
 
 def cos(x) -> LazyTensor:
-    return elementwise(ffuncs.cos, lazy(x))
+    return elementwise(ffuncs.cos, defer(x))
 
 
 def cosh(x) -> LazyTensor:
-    return elementwise(ffuncs.cosh, lazy(x))
+    return elementwise(ffuncs.cosh, defer(x))
 
 
 def tan(x) -> LazyTensor:
-    return elementwise(ffuncs.tan, lazy(x))
+    return elementwise(ffuncs.tan, defer(x))
 
 
 def tanh(x) -> LazyTensor:
-    return elementwise(ffuncs.tanh, lazy(x))
+    return elementwise(ffuncs.tanh, defer(x))
 
 
 def asin(x) -> LazyTensor:
-    return elementwise(ffuncs.asin, lazy(x))
+    return elementwise(ffuncs.asin, defer(x))
 
 
 def asinh(x) -> LazyTensor:
-    return elementwise(ffuncs.asinh, lazy(x))
+    return elementwise(ffuncs.asinh, defer(x))
 
 
 def acos(x) -> LazyTensor:
-    return elementwise(ffuncs.acos, lazy(x))
+    return elementwise(ffuncs.acos, defer(x))
 
 
 def acosh(x) -> LazyTensor:
-    return elementwise(ffuncs.acosh, lazy(x))
+    return elementwise(ffuncs.acosh, defer(x))
 
 
 def atan(x) -> LazyTensor:
-    return elementwise(ffuncs.atan, lazy(x))
+    return elementwise(ffuncs.atan, defer(x))
 
 
 def hypot(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.hypot, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.hypot, defer(x1), defer(x2))
 
 
 def atanh(x) -> LazyTensor:
-    return elementwise(ffuncs.atanh, lazy(x))
+    return elementwise(ffuncs.atanh, defer(x))
 
 
 def atan2(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.atan2, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.atan2, defer(x1), defer(x2))
 
 
 def exp(x) -> LazyTensor:
-    return elementwise(ffuncs.exp, lazy(x))
+    return elementwise(ffuncs.exp, defer(x))
 
 
 def expm1(x) -> LazyTensor:
-    return elementwise(ffuncs.expm1, lazy(x))
+    return elementwise(ffuncs.expm1, defer(x))
 
 
 def log(x) -> LazyTensor:
-    return elementwise(ffuncs.log, lazy(x))
+    return elementwise(ffuncs.log, defer(x))
 
 
 def log1p(x) -> LazyTensor:
-    return elementwise(ffuncs.log1p, lazy(x))
+    return elementwise(ffuncs.log1p, defer(x))
 
 
 def log2(x) -> LazyTensor:
-    return elementwise(ffuncs.log2, lazy(x))
+    return elementwise(ffuncs.log2, defer(x))
 
 
 def log10(x) -> LazyTensor:
-    return elementwise(ffuncs.log10, lazy(x))
+    return elementwise(ffuncs.log10, defer(x))
 
 
 def logaddexp(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.logaddexp, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.logaddexp, defer(x1), defer(x2))
 
 
 def signbit(x) -> LazyTensor:
-    return elementwise(ffuncs.signbit, lazy(x))
+    return elementwise(ffuncs.signbit, defer(x))
 
 
 def copysign(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.copysign, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.copysign, defer(x1), defer(x2))
 
 
 def nextafter(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.nextafter, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.nextafter, defer(x1), defer(x2))
 
 
 def isfinite(x) -> LazyTensor:
-    return elementwise(ffuncs.isfinite, lazy(x))
+    return elementwise(ffuncs.isfinite, defer(x))
 
 
 def isinf(x) -> LazyTensor:
-    return elementwise(ffuncs.isinf, lazy(x))
+    return elementwise(ffuncs.isinf, defer(x))
 
 
 def isnan(x) -> LazyTensor:
-    return elementwise(ffuncs.isnan, lazy(x))
+    return elementwise(ffuncs.isnan, defer(x))
 
 
 def iscomplexobj(x) -> LazyTensor:
-    return elementwise(ffuncs.iscomplexobj, lazy(x))
+    return elementwise(ffuncs.iscomplexobj, defer(x))
 
 
 def logical_and(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.logical_and, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.logical_and, defer(x1), defer(x2))
 
 
 def logical_or(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.logical_or, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.logical_or, defer(x1), defer(x2))
 
 
 def logical_xor(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.logical_xor, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.logical_xor, defer(x1), defer(x2))
 
 
 def logical_not(x) -> LazyTensor:
-    return elementwise(ffuncs.logical_not, lazy(x))
+    return elementwise(ffuncs.logical_not, defer(x))
 
 
 def less(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.less, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.less, defer(x1), defer(x2))
 
 
 def less_equal(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.less_equal, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.less_equal, defer(x1), defer(x2))
 
 
 def greater(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.greater, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.greater, defer(x1), defer(x2))
 
 
 def greater_equal(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.greater_equal, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.greater_equal, defer(x1), defer(x2))
 
 
 def equal(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.equal, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.equal, defer(x1), defer(x2))
 
 
 def same(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.same, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.same, defer(x1), defer(x2))
 
 
 def not_equal(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.not_equal, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.not_equal, defer(x1), defer(x2))
 
 
 def not_same(x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.not_same, lazy(x1), lazy(x2))
+    return elementwise(ffuncs.not_same, defer(x1), defer(x2))
 
 
 def where(condition, x1, x2) -> LazyTensor:
-    return elementwise(ffuncs.where, lazy(condition), lazy(x1), lazy(x2))
+    return elementwise(ffuncs.where, defer(condition), defer(x1), defer(x2))
 
 
 def mean(x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False):
     """
     Calculates the arithmetic mean of the input array ``x``.
     """
-    x = lazy(x)
+    x = defer(x)
     n = (
         np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
         if isinstance(axis, tuple)
@@ -2803,7 +2803,7 @@ def var(
     """
     Calculates the variance of the input array ``x``.
     """
-    x = lazy(x)
+    x = defer(x)
     n = (
         np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
         if isinstance(axis, tuple)
@@ -2825,7 +2825,7 @@ def std(
     """
     Calculates the standard deviation of the input array ``x``.
     """
-    x = lazy(x)
+    x = defer(x)
     n = (
         np.prod(tuple(x.shape[i] for i in range(x.ndim) if i in axis))
         if isinstance(axis, tuple)
@@ -2873,8 +2873,8 @@ def get_lazy_tensor_stats(
 
 
 def outer(x1, x2) -> LazyTensor:
-    x1 = lazy(x1)
-    x2 = lazy(x2)
+    x1 = defer(x1)
+    x2 = defer(x2)
 
     if x1.ndim != 1:
         raise ValueError(f"x1 must be a 1D array, got {x1.ndim}D array")

@@ -186,7 +186,7 @@ class TestOverrideTensor(finch.OverrideTensor):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -194,7 +194,7 @@ class TestOverrideTensor(finch.OverrideTensor):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -313,7 +313,7 @@ def test_ffunc_floor_divide_float_special_cases(x1, x2, expected):
     assert np.signbit(result) == np.signbit(expected)
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, finch.defer])
 def test_same_elementwise_nan(wrap):
     a = np.array([1.0, np.nan, np.nan, 2.0])
     b = np.array([1.0, np.nan, 0.0, np.nan])
@@ -331,7 +331,7 @@ def test_same_elementwise_nan(wrap):
     finch_assert_equal(not_same, np.logical_not(expected))
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, finch.defer])
 def test_count_nonfill(wrap):
     x = np.array([[0.0, 1.0, np.nan], [2.0, 0.0, 0.0]])
 
@@ -379,7 +379,7 @@ def test_asarray_python_scalars_use_default_array_dtypes():
 
 def test_asarray_existing_finch_tensors_pass_through():
     scalar = finch.asarray(1)
-    lazy = finch.lazy(1)
+    lazy = finch.defer(1)
 
     assert finch.asarray(scalar) is scalar
     assert finch.asarray(lazy) is lazy
@@ -552,10 +552,10 @@ def test_result_type_python_scalars_are_weak():
 
 
 def test_lazy_python_scalars_keep_builtin_dtypes():
-    assert finch.lazy(True).dtype == finch.bool_
-    assert finch.lazy(1).dtype == finch.int_
-    assert finch.lazy(1.0).dtype == finch.float_
-    assert finch.lazy(1j).dtype == finch.complex_
+    assert finch.defer(True).dtype == finch.bool_
+    assert finch.defer(1).dtype == finch.int_
+    assert finch.defer(1.0).dtype == finch.float_
+    assert finch.defer(1j).dtype == finch.complex_
 
 
 def test_nan_fill_value_ftype_equality():
@@ -565,8 +565,8 @@ def test_nan_fill_value_ftype_equality():
     assert x.ftype == y.ftype
     assert hash(x.ftype) == hash(y.ftype)
 
-    lazy_x = finch.lazy(x)
-    lazy_y = finch.lazy(y)
+    lazy_x = finch.defer(x)
+    lazy_y = finch.defer(y)
     assert lazy_x.ftype == lazy_y.ftype
     assert hash(lazy_x.ftype) == hash(lazy_y.ftype)
 
@@ -588,7 +588,7 @@ def test_nan_fill_value_ftype_equality():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -671,7 +671,7 @@ def test_unary_operations(a, a_wrap, ops, np_op):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -737,7 +737,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -745,7 +745,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -753,7 +753,7 @@ def test_complex_operations(a, a_wrap, op, np_op):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -812,7 +812,7 @@ def test_ternary_operations(a, b, c, a_wrap, b_wrap, c_wrap, ops, np_op, caller)
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -865,11 +865,11 @@ def test_reduction_operations(a, a_wrap, op, np_op, axis):
 def test_std_nan_propagation():
     x = np.array([np.nan], dtype=np.float64)
     with np.errstate(invalid="ignore"):
-        result = finch.compute(finch.std(finch.lazy(x)))
+        result = finch.compute(finch.std(finch.defer(x)))
     assert np.isnan(result.item())
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.defer])
 @pytest.mark.parametrize(
     "op, np_op", [(finch.argmin, np.argmin), (finch.argmax, np.argmax)]
 )
@@ -885,7 +885,7 @@ def test_argmin_argmax(wrap, op, np_op, axis, keepdims):
     finch_assert_equal(result, np_op(x, axis=axis, keepdims=keepdims))
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.defer])
 @pytest.mark.parametrize("axis", [0, 1, -1])
 @pytest.mark.parametrize("descending", [False, True])
 def test_sort_argsort(wrap, axis, descending):
@@ -931,7 +931,7 @@ def test_argsort_stable_ties():
     )
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, TestOverrideTensor, finch.defer])
 @pytest.mark.parametrize("side", ["left", "right"])
 @pytest.mark.parametrize("use_sorter", [False, True])
 def test_searchsorted(wrap, side, use_sorter):
@@ -958,7 +958,7 @@ def test_searchsorted(wrap, side, use_sorter):
     finch_assert_equal(result, expected)
 
 
-@pytest.mark.parametrize("wrap", [lambda x: x, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, finch.defer])
 @pytest.mark.parametrize("op, np_op", [(finch.min, np.min), (finch.max, np.max)])
 @pytest.mark.parametrize("axis", [None, 0, 1])
 def test_min_max_nan_propagation(wrap, op, np_op, axis):
@@ -970,7 +970,7 @@ def test_min_max_nan_propagation(wrap, op, np_op, axis):
 
 
 @pytest.mark.parametrize("op", [finch.minimum, finch.maximum])
-@pytest.mark.parametrize("wrap", [lambda x: x, finch.lazy])
+@pytest.mark.parametrize("wrap", [lambda x: x, finch.defer])
 def test_minimum_maximum_python_scalar_promotion(wrap, op):
     x = np.array([1.0, 2.0], dtype=np.float32)
     result = op(wrap(x), 1.0)
@@ -1056,7 +1056,7 @@ def test_matmul_bufferized_ndarray(a, b):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -1064,7 +1064,7 @@ def test_matmul_bufferized_ndarray(a, b):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_matmul(a, b, a_wrap, b_wrap):
@@ -1133,7 +1133,7 @@ def test_linalg_outer_eager():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -1141,7 +1141,7 @@ def test_linalg_outer_eager():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_outer(a, b, a_wrap, b_wrap):
@@ -1162,8 +1162,8 @@ def test_outer(a, b, a_wrap, b_wrap):
 
 
 def test_outer_uses_single_logic_query():
-    a = finch.lazy(np.array([1, 2]))
-    b = finch.lazy(np.array([3, 4, 5]))
+    a = finch.defer(np.array([1, 2]))
+    b = finch.defer(np.array([3, 4, 5]))
 
     result = finch.outer(a, b)
     queries = [stmt for stmt in result.ctx.trace() if isinstance(stmt, Query)]
@@ -1225,7 +1225,7 @@ def test_matrix_power_bufferized_ndarray(a, n):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_matrix_power(a, n, wrap):
@@ -1260,7 +1260,7 @@ def test_matrix_power_negative_eager():
 
 
 def test_matrix_power_negative_lazy_requires_materialization():
-    a = finch.lazy(np.array([[1.0, 2.0], [3.0, 5.0]]))
+    a = finch.defer(np.array([[1.0, 2.0], [3.0, 5.0]]))
     expected = np.linalg.matrix_power(np.array([[1.0, 2.0], [3.0, 5.0]]), -1)
 
     with pytest.warns(RuntimeWarning, match="matrix_power|inv"):
@@ -1296,7 +1296,7 @@ def test_matrix_power_invalid_n(a, n):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_matrix_transpose(a, a_wrap):
@@ -1354,7 +1354,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -1362,7 +1362,7 @@ def test_matrix_transpose(a, a_wrap):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_tensordot(a, b, axes, a_wrap, b_wrap):
@@ -1449,7 +1449,7 @@ def test_tensordot_default_axes():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -1457,7 +1457,7 @@ def test_tensordot_default_axes():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
@@ -1511,7 +1511,7 @@ def test_vecdot_preserves_promoted_input_dtype():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_linalg_vector_norm(kw, wrap):
@@ -1532,7 +1532,7 @@ def test_linalg_vector_norm_large_values():
     x = np.array([1e308, 1e308], dtype=np.float64)
     expected = np.float64(math.sqrt(2.0) * 1e308)
 
-    result = finch.compute(finch.linalg.vector_norm(finch.lazy(x)))
+    result = finch.compute(finch.linalg.vector_norm(finch.defer(x)))
 
     assert np.isfinite(result.item())
     finch_assert_allclose(result, expected)
@@ -1541,15 +1541,15 @@ def test_linalg_vector_norm_large_values():
 @pytest.mark.usefixtures("interpreter_scheduler")
 def test_linalg_vector_norm_negative_ord_stable_values():
     tiny = np.array([1e-308, 1e308], dtype=np.float64)
-    tiny_result = finch.compute(finch.linalg.vector_norm(finch.lazy(tiny), ord=-2))
+    tiny_result = finch.compute(finch.linalg.vector_norm(finch.defer(tiny), ord=-2))
     finch_assert_allclose(tiny_result, np.float64(1e-308))
 
     zero = np.array([0.0, 2.0], dtype=np.float64)
-    zero_result = finch.compute(finch.linalg.vector_norm(finch.lazy(zero), ord=-2))
+    zero_result = finch.compute(finch.linalg.vector_norm(finch.defer(zero), ord=-2))
     finch_assert_allclose(zero_result, np.float64(0.0))
 
     nan = np.array([1.0, np.nan], dtype=np.float64)
-    nan_result = finch.compute(finch.linalg.vector_norm(finch.lazy(nan), ord=-2))
+    nan_result = finch.compute(finch.linalg.vector_norm(finch.defer(nan), ord=-2))
     assert np.isnan(nan_result.item())
 
 
@@ -1599,7 +1599,7 @@ def test_linalg_matrix_norm_lazy(kw):
     x = np.array([[3.0, 4.0], [5.0, 12.0]], dtype=np.float64)
     expected = np.linalg.matrix_norm(x, **kw)
 
-    result = finch.linalg.matrix_norm(finch.lazy(x), **kw)
+    result = finch.linalg.matrix_norm(finch.defer(x), **kw)
     result = finch.compute(result)
 
     assert finch.ftype(expected.dtype.type) == result.element_type
@@ -1611,7 +1611,7 @@ def test_linalg_matrix_norm_lazy_eager_only_warns_and_computes():
     expected = np.linalg.matrix_norm(x, ord=2)
 
     with pytest.warns(RuntimeWarning, match="matrix_norm"):
-        result = finch.linalg.matrix_norm(finch.lazy(x), ord=2)
+        result = finch.linalg.matrix_norm(finch.defer(x), ord=2)
 
     assert not isinstance(result, finch.LazyTensor)
     finch_assert_allclose(result, expected)
@@ -1622,7 +1622,7 @@ def test_linalg_inv_lazy_warns_and_computes():
     expected = np.linalg.inv(x)
 
     with pytest.warns(RuntimeWarning, match="inv"):
-        result = finch.linalg.inv(finch.lazy(x))
+        result = finch.linalg.inv(finch.defer(x))
 
     assert not isinstance(result, finch.LazyTensor)
     finch_assert_allclose(result, expected)
@@ -1689,7 +1689,7 @@ def test_linalg_cross_uses_lazy_formula():
     x = np.array([1.0, 2.0, 3.0])
     y = np.array([4.0, 5.0, 6.0])
 
-    result = finch.linalg.cross(finch.lazy(x), finch.lazy(y))
+    result = finch.linalg.cross(finch.defer(x), finch.defer(y))
 
     assert isinstance(result, finch.LazyTensor)
     finch_assert_allclose(finch.compute(result), np.cross(x, y))
@@ -1699,7 +1699,7 @@ def test_linalg_cross_supports_axis_lazy_formula():
     x = np.arange(6.0).reshape(3, 2)
     y = np.array([[1.0, 0.0], [0.0, 1.0], [0.0, 0.0]])
 
-    result = finch.linalg.cross(finch.lazy(x), y, axis=0)
+    result = finch.linalg.cross(finch.defer(x), y, axis=0)
 
     assert isinstance(result, finch.LazyTensor)
     finch_assert_allclose(finch.compute(result), np.cross(x, y, axis=0))
@@ -1816,9 +1816,9 @@ def test_new_eager_only_methods_warn_compute_lazy_operands():
     x = np.array([[3.0, 1.0], [1.0, 3.0]])
 
     with pytest.warns(RuntimeWarning, match="det"):
-        det_result = finch.linalg.det(finch.lazy(x))
+        det_result = finch.linalg.det(finch.defer(x))
     with pytest.warns(RuntimeWarning, match="fft"):
-        fft_result = finch.fft.fft(finch.lazy(x[0]))
+        fft_result = finch.fft.fft(finch.defer(x[0]))
 
     finch_assert_allclose(det_result, np.linalg.det(x))
     finch_assert_allclose(fft_result, np.fft.fft(x[0]))
@@ -1826,7 +1826,7 @@ def test_new_eager_only_methods_warn_compute_lazy_operands():
 
 def test_new_lazy_methods_error_directly():
     lazy_mod = importlib.import_module("finch.interface.lazy")
-    x = finch.lazy(np.eye(2))
+    x = finch.defer(np.eye(2))
 
     with pytest.raises(NotImplementedError, match="det is eager-only"):
         lazy_mod.det(x)
@@ -1971,7 +1971,7 @@ def test_scalar_coerce(x, func):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_concat(arrays, axis, array_wrap):
@@ -2013,7 +2013,7 @@ def test_concat_axis_none_lazy():
         np.arange(6, dtype=np.int64).reshape(2, 3),
         np.arange(6, 8, dtype=np.int64).reshape(1, 2),
     )
-    arrays = tuple(finch.lazy(array) for array in raw_arrays)
+    arrays = tuple(finch.defer(array) for array in raw_arrays)
 
     result = finch.compute(finch.concat(arrays, axis=None))
 
@@ -2047,7 +2047,7 @@ def test_concat_uses_first_fill_value():
         fill_value=7,
     )
 
-    result = finch.concat((finch.lazy(a), finch.lazy(b)), axis=0)
+    result = finch.concat((finch.defer(a), finch.defer(b)), axis=0)
 
     assert result.fill_value == a.fill_value
     result = finch.compute(result)
@@ -2066,23 +2066,23 @@ def test_lazy_shape_ops_use_symbolic_selectors():
 
     cases = [
         (
-            finch.flip(finch.lazy(array), axis=(0, 2)),
+            finch.flip(finch.defer(array), axis=(0, 2)),
             np.flip(array, axis=(0, 2)),
         ),
         (
-            finch.roll(finch.lazy(array), shift=(1, -2), axis=(0, 2)),
+            finch.roll(finch.defer(array), shift=(1, -2), axis=(0, 2)),
             np.roll(array, shift=(1, -2), axis=(0, 2)),
         ),
         (
-            finch.take(finch.lazy(array), finch.asarray([2, 0]), axis=1),
+            finch.take(finch.defer(array), finch.asarray([2, 0]), axis=1),
             np.take(array, [2, 0], axis=1),
         ),
         (
-            finch.repeat(finch.lazy(array), 2, axis=None),
+            finch.repeat(finch.defer(array), 2, axis=None),
             np.repeat(array, 2, axis=None),
         ),
         (
-            finch.tile(finch.lazy(array), (2, 1, 1)),
+            finch.tile(finch.defer(array), (2, 1, 1)),
             np.tile(array, (2, 1, 1)),
         ),
     ]
@@ -2095,7 +2095,7 @@ def test_lazy_shape_ops_use_symbolic_selectors():
 def test_repeat_rejects_data_dependent_repeats():
     with pytest.raises(NotImplementedError, match="data-dependent output shape"):
         finch.repeat(
-            finch.lazy(np.arange(6, dtype=np.int64).reshape(2, 3)),
+            finch.defer(np.arange(6, dtype=np.int64).reshape(2, 3)),
             finch.asarray([1, 2, 1]),
             axis=1,
         )
@@ -2108,7 +2108,7 @@ def test_lazy_stack_and_unstack():
         np.arange(6, 12, dtype=np.int64).reshape(2, 3),
     )
 
-    stacked = finch.stack(tuple(finch.lazy(array) for array in arrays), axis=1)
+    stacked = finch.stack(tuple(finch.defer(array) for array in arrays), axis=1)
 
     assert isinstance(stacked, finch.LazyTensor)
     finch_assert_equal(finch.compute(stacked), np.stack(arrays, axis=1))
@@ -2126,7 +2126,7 @@ def test_lazy_take_along_axis():
     array = np.arange(6, dtype=np.int64).reshape(2, 3)
     indices = np.array([[2, 0], [1, 1]], dtype=np.intp)
 
-    result = finch.take_along_axis(finch.lazy(array), indices, axis=1)
+    result = finch.take_along_axis(finch.defer(array), indices, axis=1)
 
     assert isinstance(result, finch.LazyTensor)
     finch_assert_equal(
@@ -2145,7 +2145,7 @@ def test_lazy_take_along_axis():
     ],
 )
 def test_lazy_reshape(array, shape):
-    result = finch.reshape(finch.lazy(array), shape)
+    result = finch.reshape(finch.defer(array), shape)
 
     assert isinstance(result, finch.LazyTensor)
     finch_assert_equal(finch.compute(result), np.reshape(array, shape))
@@ -2158,7 +2158,7 @@ def test_lazy_reshape_preserves_fill_value():
         fill_value=9,
     )
 
-    result = finch.reshape(finch.lazy(array), (4,))
+    result = finch.reshape(finch.defer(array), (4,))
 
     assert result.fill_value == array.fill_value
     result = finch.compute(result)
@@ -2178,7 +2178,7 @@ def test_lazy_reshape_uses_single_mask(monkeypatch):
     monkeypatch.setattr(lazy_module, "ReshapeMaskTensor", recording_mask)
     array = np.arange(24, dtype=np.int64).reshape(2, 3, 4)
 
-    result = finch.reshape(finch.lazy(array), (6, 4))
+    result = finch.reshape(finch.defer(array), (6, 4))
 
     assert mask_shapes == [((2, 3, 4), (6, 4))]
     finch_assert_equal(finch.compute(result), array.reshape(6, 4))
@@ -2186,7 +2186,7 @@ def test_lazy_reshape_uses_single_mask(monkeypatch):
 
 def test_lazy_reshape_rejects_invalid_shape():
     with pytest.raises(ValueError, match="Cannot reshape"):
-        finch.reshape(finch.lazy(np.arange(6)), (4,))
+        finch.reshape(finch.defer(np.arange(6)), (4,))
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -2229,7 +2229,7 @@ def test_lazy_reshape_rejects_invalid_shape():
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_broadcast_to(x, shape, x_wrap):
@@ -2262,7 +2262,7 @@ def test_meshgrid(indexing):
     expected = np.meshgrid(*arrays, indexing=indexing)
     result = finch.meshgrid(*arrays, indexing=indexing)
     lazy_result = finch.meshgrid(
-        *(finch.lazy(array) for array in arrays),
+        *(finch.defer(array) for array in arrays),
         indexing=indexing,
     )
 
@@ -2290,7 +2290,7 @@ def test_meshgrid(indexing):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
@@ -2338,7 +2338,7 @@ def test_broadcast_arrays(shapes, wrapper, rng, random_wrapper):
     [
         lambda x: x,
         TestOverrideTensor,
-        finch.lazy,
+        finch.defer,
     ],
 )
 def test_moveaxis(shape, source, destination, wrapper, rng):
@@ -2391,7 +2391,7 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
     "wrapper",
     [
         lambda x: x,
-        finch.lazy,
+        finch.defer,
     ],
 )
 @pytest.mark.parametrize(
@@ -2432,7 +2432,7 @@ def test_eager_compute():
     x = np.array([[1, 2], [3, 4]])
     eager_tensor = TestOverrideTensor(x)
     lazy_tensor = finch.add(
-        finch.lazy(eager_tensor), finch.lazy(eager_tensor)
+        finch.defer(eager_tensor), finch.defer(eager_tensor)
     )  # This should return an eager tensor
     eager_result, lazy_result = finch.compute((eager_tensor, lazy_tensor))
     assert eager_result is eager_tensor, (

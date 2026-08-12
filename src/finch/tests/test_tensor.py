@@ -84,7 +84,7 @@ def test_bufferized_ndarray_fill_value_dtype():
 
         assert a.fill_value.dtype == arr.dtype
         assert a.ftype.fill_value.dtype == arr.dtype
-        assert finch.lazy(a).fill_value.dtype == arr.dtype
+        assert finch.defer(a).fill_value.dtype == arr.dtype
         assert asarray(a, copy=True).fill_value.dtype == arr.dtype
         assert a[0:1].fill_value.dtype == arr.dtype
         assert a.reshape((3, 2)).fill_value.dtype == arr.dtype
@@ -154,7 +154,7 @@ def test_empty_like_preserves_fill_value():
     arr = np.ones((2, 3), dtype=np.int32)
     x = BufferizedNDArray.from_numpy(arr, fill_value=5)
 
-    lazy_x = finch.lazy(x)
+    lazy_x = finch.defer(x)
     lazy_out = lazy_interface.empty_like(lazy_x)
     out = finch.empty_like(x)
 
@@ -342,7 +342,7 @@ def test_matrix_pattern_tensors(make_tensor, expected):
 
 
 def test_lazy_matrix_pattern_tensor_compute():
-    tensor = finch.lazy(EyeTensor((2, 3), dtype=np.int32))
+    tensor = finch.defer(EyeTensor((2, 3), dtype=np.int32))
     result = finch.compute(tensor)
 
     assert tensor.shape == (2, 3)
@@ -424,7 +424,7 @@ def test_diff(arr, axis, n):
         expected,
     )
     np.testing.assert_array_equal(
-        finch.compute(finch.diff(finch.lazy(arr), axis=axis, n=n)).to_numpy(),
+        finch.compute(finch.diff(finch.defer(arr), axis=axis, n=n)).to_numpy(),
         expected,
     )
 
@@ -434,7 +434,7 @@ def test_diff_n_zero():
 
     np.testing.assert_array_equal(finch.diff(arr, n=0).to_numpy(), arr)
     np.testing.assert_array_equal(
-        finch.compute(finch.diff(finch.lazy(arr), n=0)).to_numpy(),
+        finch.compute(finch.diff(finch.defer(arr), n=0)).to_numpy(),
         arr,
     )
 
@@ -445,7 +445,7 @@ def test_diff_empty_axis():
 
     np.testing.assert_array_equal(finch.diff(arr, n=4).to_numpy(), expected)
     np.testing.assert_array_equal(
-        finch.compute(finch.diff(finch.lazy(arr), n=4)).to_numpy(),
+        finch.compute(finch.diff(finch.defer(arr), n=4)).to_numpy(),
         expected,
     )
 
@@ -484,7 +484,7 @@ def test_cumulative_sum(arr, axis, dtype, include_initial):
     )
     lazy_result = finch.compute(
         finch.cumulative_sum(
-            finch.lazy(arr),
+            finch.defer(arr),
             axis=axis,
             dtype=dtype,
             include_initial=include_initial,
@@ -523,7 +523,7 @@ def test_cumulative_prod(arr, axis, dtype, include_initial):
     )
     lazy_result = finch.compute(
         finch.cumulative_prod(
-            finch.lazy(arr),
+            finch.defer(arr),
             axis=axis,
             dtype=dtype,
             include_initial=include_initial,
@@ -545,7 +545,7 @@ def test_trace(offset):
 
 def test_lazy_array_api_matrix_functions():
     arr = np.arange(12, dtype=np.int32).reshape((3, 4))
-    x = finch.lazy(arr)
+    x = finch.defer(arr)
 
     np.testing.assert_array_equal(
         finch.compute(finch.triu(x, k=1)).to_numpy(), np.triu(arr, k=1)

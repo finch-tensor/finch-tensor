@@ -10,7 +10,7 @@ from finch.autoschedule.loop_ordering import DefaultLoopOrderer
 from finch.autoschedule.optimize import DefaultLogicOptimizer
 from finch.finch_einsum import MockEinsumLoader
 from finch.interface.fuse import compute
-from finch.interface.lazy import lazy
+from finch.interface.lazy import defer
 
 from .conftest import finch_assert_allclose
 
@@ -33,8 +33,8 @@ def ctx():
 
 def test_simple_addition(rng, ctx):
     """Test lowering of simple addition A + B"""
-    A = lazy(rng.random((3, 3)))
-    B = lazy(rng.random((3, 3)))
+    A = defer(rng.random((3, 3)))
+    B = defer(rng.random((3, 3)))
 
     C = finch.add(A, B)
 
@@ -48,7 +48,7 @@ def test_simple_addition(rng, ctx):
 
 def test_scalar_multiplication(rng, ctx):
     """Test lowering of scalar multiplication 2 * A"""
-    A = lazy(rng.random((4, 4)))
+    A = defer(rng.random((4, 4)))
 
     B = finch.multiply(2, A)
 
@@ -60,9 +60,9 @@ def test_scalar_multiplication(rng, ctx):
 
 def test_element_wise_operations(rng, ctx):
     """Test lowering of element-wise operations"""
-    A = lazy(rng.random((3, 3)))
-    B = lazy(rng.random((3, 3)))
-    C = lazy(rng.random((3, 3)))
+    A = defer(rng.random((3, 3)))
+    B = defer(rng.random((3, 3)))
+    C = defer(rng.random((3, 3)))
 
     D = finch.add(finch.multiply(A, B), C)
 
@@ -74,7 +74,7 @@ def test_element_wise_operations(rng, ctx):
 
 def test_sum_reduction(rng, ctx):
     """Test sum reduction using +="""
-    A = lazy(rng.random((3, 4)))
+    A = defer(rng.random((3, 4)))
 
     B = finch.sum(A, axis=1)
 
@@ -86,7 +86,7 @@ def test_sum_reduction(rng, ctx):
 
 def test_maximum_reduction(rng, ctx):
     """Test maximum reduction using max="""
-    A = lazy(rng.random((3, 4)))
+    A = defer(rng.random((3, 4)))
 
     B = finch.max(A, axis=1)
 
@@ -97,8 +97,8 @@ def test_maximum_reduction(rng, ctx):
 
 def test_batch_matrix_multiplication(rng, ctx):
     """Test batch matrix multiplication using +="""
-    A = lazy(rng.random((2, 3, 4)))
-    B = lazy(rng.random((2, 4, 5)))
+    A = defer(rng.random((2, 3, 4)))
+    B = defer(rng.random((2, 4, 5)))
 
     C = finch.matmul(A, B)
 
@@ -109,7 +109,7 @@ def test_batch_matrix_multiplication(rng, ctx):
 
 def test_minimum_reduction(rng, ctx):
     """Test minimum reduction using min="""
-    A = lazy(rng.random((3, 4)))
+    A = defer(rng.random((3, 4)))
 
     B = finch.min(A, axis=1)
 
