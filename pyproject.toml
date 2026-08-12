@@ -108,14 +108,21 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
 args = [
     { arg = "njobs", default = "logical" },
 ]
 depends-on = [
     { task = "compile", environment = "test" },
+    { task = "pre-commit", environment = "pre-commit" },
     "type-check",
     { task = "test-array-api", args = ["{{ njobs }}"] },
+    { task = "test-only", args = ["{{ njobs }}"] },
+]
+
+[tool.pixi.feature.test.tasks.test-only]
+cmd = "pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "logical" },
 ]
 default-environment = "test"
 
@@ -259,6 +266,8 @@ files = ["src"]
 
 [tool.pytest]
 addopts = [
+    "--doctest-modules",
+    "--doctest-ignore-import-errors",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",

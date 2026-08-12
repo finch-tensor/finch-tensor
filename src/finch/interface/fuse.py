@@ -18,10 +18,14 @@ Key Functions:
 Examples:
 ---------
 1. Basic Usage:
+    >>> rng = np.random.default_rng(42)
+    >>> A = rng.integers(0, 10, (10, 10))
+    >>> B = rng.integers(0, 10, (10, 10))
     >>> C = defer(A)
     >>> D = defer(B)
     >>> E = (C + D) / 2
     >>> compute(E)
+    BufferizedNDArray(shape=(10, 10))
 
     In this example, `E` represents a fused operation that adds `C` and `D` together and
     divides the result by 2. The `compute` function optimizes and executes the operation
@@ -35,8 +39,8 @@ Examples:
 
 3. Using the `fused` decorator:
     >>> @fused
-    >>> def add_and_divide(x, y):
-    >>>     return (x + y) / 2
+    ... def add_and_divide(x, y):
+    ...     return (x + y) / 2
     >>> result = add_and_divide(A, B)
 
     The `fused` decorator enables automatic fusion of operations within the function.

@@ -22,6 +22,9 @@ def julia_available() -> bool:
     )
 
 
+JULIA_AVAILABLE = julia_available()
+
+
 def _julia_exe_from_libjulia(libjulia: str) -> Path | None:
     libpath = Path(libjulia)
     exe_name = "julia.exe" if os.name == "nt" else "julia"
@@ -66,7 +69,7 @@ def _start_julia() -> tuple[Any, Any]:
 def init_julia() -> tuple[Any, Any]:
     """Starts Julia and loads required packages, exactly once per process."""
     global _jc, _jl
-    if _jl is None:
+    if _jl is None and JULIA_AVAILABLE:
         _jc, _jl = _start_julia()
     return _jc, _jl
 

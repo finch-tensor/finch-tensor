@@ -17,85 +17,93 @@ import finch
 import finch.finch_assembly as asm
 from finch.codegen import CCompiler, NumpyBuffer, SafeBuffer
 
-parser = argparse.ArgumentParser(
-    prog="safebufferaccess.py",
-)
-parser.add_argument(
-    "--size", "-s", type=int, help="the size of the array to initialize", default=3
-)
-subparser = parser.add_subparsers(required=True, dest="subparser_name")
 
-load = subparser.add_parser("load", help="attempt to load some element")
-load.add_argument("index", type=np.intp, help="the index to load")
+def setup_parser() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        prog="safebufferaccess.py",
+    )
+    parser.add_argument(
+        "--size", "-s", type=int, help="the size of the array to initialize", default=3
+    )
+    subparser = parser.add_subparsers(required=True, dest="subparser_name")
 
-store = subparser.add_parser("store", help="attempt to store into some element")
-store.add_argument("index", type=np.intp, help="the index to load")
-store.add_argument("value", type=np.int64, help="the value to store")
+    load = subparser.add_parser("load", help="attempt to load some element")
+    load.add_argument("index", type=np.intp, help="the index to load")
 
-args = parser.parse_args()
+    store = subparser.add_parser("store", help="attempt to store into some element")
+    store.add_argument("index", type=np.intp, help="the index to load")
+    store.add_argument("value", type=np.int64, help="the value to store")
+
+    return parser.parse_args()
 
 
-a = np.array(range(args.size), dtype=np.int64)
-ab = NumpyBuffer(a)
-ab_safe = SafeBuffer(ab)
-ab_v = asm.Variable("a", ab_safe.ftype)
-ab_slt = asm.Slot("a_", ab_safe.ftype)
-idx = asm.Variable("idx", finch.intp)
-val = asm.Variable("val", finch.int64)
+def main(args) -> None:
+    a = np.array(range(args.size), dtype=np.int64)
+    ab = NumpyBuffer(a)
+    ab_safe = SafeBuffer(ab)
+    ab_v = asm.Variable("a", ab_safe.ftype)
+    ab_slt = asm.Slot("a_", ab_safe.ftype)
+    idx = asm.Variable("idx", finch.intp)
+    val = asm.Variable("val", finch.int64)
 
-res_var = asm.Variable("val", ab_safe.ftype.element_type)
-res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
+    res_var = asm.Variable("val", ab_safe.ftype.element_type)
+    res_var2 = asm.Variable("val2", ab_safe.ftype.element_type)
 
-mod = CCompiler()(
-    asm.Module(
-        (
-            asm.Function(
-                asm.Variable("finch_access", ab_safe.ftype.element_type),
-                (ab_v, idx),
-                asm.Block(
-                    (
-                        asm.Unpack(ab_slt, ab_v),
-                        # we assign twice like this; this is intentional and
-                        # designed to check correct refreshing.
-                        asm.Assign(
-                            res_var,
-                            asm.Load(ab_slt, idx),
-                        ),
-                        asm.Assign(
-                            res_var2,
-                            asm.Load(ab_slt, idx),
-                        ),
-                        asm.Repack(ab_slt),
-                        asm.Return(res_var),
-                    )
+    mod = CCompiler()(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("finch_access", ab_safe.ftype.element_type),
+                    (ab_v, idx),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            # we assign twice like this; this is intentional and
+                            # designed to check correct refreshing.
+                            asm.Assign(
+                                res_var,
+                                asm.Load(ab_slt, idx),
+                            ),
+                            asm.Assign(
+                                res_var2,
+                                asm.Load(ab_slt, idx),
+                            ),
+                            asm.Repack(ab_slt),
+                            asm.Return(res_var),
+                        )
+                    ),
                 ),
-            ),
-            asm.Function(
-                asm.Variable("finch_change", ab_safe.ftype.element_type),
-                (ab_v, idx, val),
-                asm.Block(
-                    (
-                        asm.Unpack(ab_slt, ab_v),
-                        asm.Store(
-                            ab_slt,
-                            idx,
-                            val,
-                        ),
-                        asm.Repack(ab_slt),
-                        asm.Return(asm.Literal(0)),
-                    )
+                asm.Function(
+                    asm.Variable("finch_change", ab_safe.ftype.element_type),
+                    (ab_v, idx, val),
+                    asm.Block(
+                        (
+                            asm.Unpack(ab_slt, ab_v),
+                            asm.Store(
+                                ab_slt,
+                                idx,
+                                val,
+                            ),
+                            asm.Repack(ab_slt),
+                            asm.Return(asm.Literal(0)),
+                        )
+                    ),
                 ),
-            ),
+            )
         )
     )
-)
-access = mod.finch_access
-change = mod.finch_change
+    access = mod.finch_access
+    change = mod.finch_change
 
-match args.subparser_name:
-    case "load":
-        print(access(ab_safe, args.index))
-    case "store":
-        change(ab_safe, args.index, args.value)
-        arr = [str(ab_safe.load(i)) for i in range(args.size)]
-        print(f"[{' '.join(arr)}]")
+    match args.subparser_name:
+        case "load":
+            print(access(ab_safe, args.index))
+        case "store":
+            change(ab_safe, args.index, args.value)
+            arr = [str(ab_safe.load(i)) for i in range(args.size)]
+            print(f"[{' '.join(arr)}]")
+
+
+if __name__ == "__main__":
+    args = setup_parser()
+    main(args)

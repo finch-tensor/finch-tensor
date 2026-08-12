@@ -42,7 +42,6 @@ from finch.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finch.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 from .utils import mlir_backend

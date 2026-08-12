@@ -92,24 +92,31 @@ def tp_3():
     return (Field("A0"), Field("A3"), Field("A2"), Field("A1"))
 
 
-@pytest.fixture(scope="session", params=[
-    pytest.param(
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
+@pytest.fixture(
+    scope="session",
+    params=[
+        pytest.param(
+            lambda dtype: BufferizedNDArrayFType(
+                buffer_type=NumpyBufferFType(ftype(dtype)),
+                ndim=2,
+                dimension_type=(ftypes.intp, ftypes.intp),
+            ),
+            id="BufferizedNDArrayFType",
         ),
-        id="BufferizedNDArrayFType",
-    ),
-    pytest.param(
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
+        pytest.param(
+            lambda dtype: fiber_tensor(
+                dense(
+                    dense(
+                        element(
+                            dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType
+                        )
+                    )
+                )
+            ),
+            id="fiber_tensor",
         ),
-        id="fiber_tensor",
-    ),
-])
+    ],
+)
 def fmt_fn(request):
     yield request.param
 
