@@ -21,7 +21,7 @@ from finch.tensor import (
 )
 from finch.tensor.np_wrapper import NumPyWrapper
 
-from . import dtypes as jl_dtypes
+from . import types as jl_dtypes
 from .julia import jc, jl
 
 

@@ -1,5 +1,5 @@
 import hashlib
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -11,7 +11,8 @@ from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 
 from .interop import jl_tensor_to_python, tensor_to_jl
-from .julia import jl
+from .julia import get_jl, jl
+from .types import ftype_to_jl_prototype, ftype_to_jl_type_str
 
 # Single source of truth for Python ffunc name → Julia operator/function name.
 # max/min use Finch's <<op>> semiring syntax; they appear only as Aggregate
@@ -94,17 +95,40 @@ red_ops_map = _ops_for(_REDUCTION_OPS)
 ops_to_ignore = [make_tuple]
 
 
+class CompiledJLKernel:
+    def __init__(
+        self, func_name: str, jl_code: str, jl_globals: dict[str, Any] | None = None
+    ):
+        self.func_name = func_name
+        self.jl_code = jl_code
+        self.jl_globals = jl_globals or {}
+
+    def evaluate(self) -> "FinchJLKernel":
+        """Registers the prototype globals and defines the kernel function
+        in the running Julia session, returning the now-callable kernel."""
+        for name, value in self.jl_globals.items():
+            setattr(get_jl(), name, value)
+        jl.seval(self.jl_code)
+        return FinchJLKernel(self.func_name, self.jl_code)
+
+
 class FinchJLKernel(AssemblyKernel):
+    """A kernel already defined (evaluated) in the running Julia session."""
+
     def __init__(self, func_name, jl_code):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
-        jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
         raw_args = [tensor_to_jl(arg) for arg in args]
         result = finch_fn(*raw_args)
+
+        # @finch_kernel-generated functions return a NamedTuple keyed by the
+        # returned variable name(s), unlike @finch's bare Tensor/tuple.
+        if jl.isa(result, jl.NamedTuple):
+            result = jl.values(result)
 
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
@@ -125,10 +149,15 @@ class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
         self.names: dict[str, str] = {}
+        # Populated by the ntn.Function case: {non-underscore alias name ->
+        # live Julia prototype object}, to be bound as Julia globals before
+        # jl.seval-ing the generated source (see FinchJLKernel.__init__).
+        self.jl_globals: dict[str, Any] = {}
 
     def __call__(self, prgm: ntn.Module) -> str:
         self.pack_dict.clear()
         self.names.clear()
+        self.jl_globals.clear()
         return self.generate_julia(prgm)
 
     def emit_name(self, sym: str) -> str:
@@ -143,17 +172,31 @@ class FinchJLGenerator:
             case ntn.Function(name, args, body):
                 body_str = self.generate_julia(body, nestingLvl + 2)
                 arg_strs = []
+                proto_assign_strs = []
                 for arg in args:
                     match arg:
-                        case ntn.Variable(sym, type):
-                            # TODO later use finch_kernel and type the args
-                            arg_strs.append(self.emit_name(sym))
+                        case ntn.Variable(sym, type_):
+                            arg_name = self.emit_name(sym)
+                            # Leading-underscore names (all of ours) are
+                            # treated as Python-private by juliacall's
+                            # setattr and never forwarded to Julia's Main --
+                            # bind the prototype under a plain alias instead,
+                            # and let this (real Julia) assignment do the
+                            # rename @finch_kernel's macro then infers each
+                            # argument's type from these prototypes via
+                            # typeof(), not from a literal annotation.
+                            proto_name = f"proto{arg_name}"
+                            self.jl_globals[proto_name] = ftype_to_jl_prototype(type_)
+                            arg_strs.append(arg_name)
+                            proto_assign_strs.append(f"    {arg_name} = {proto_name}")
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
+                proto_str = "\n".join(proto_assign_strs)
                 return (
-                    f"function {name}({arg_str})\n    @finch begin\n"
-                    f"{body_str}\n    end\nend"
+                    f"begin\n{proto_str}\n"
+                    f"    eval(Finch.@finch_kernel function {name}({arg_str})\n"
+                    f"{body_str}\n    end)\nend"
                 )
 
             case ntn.Block(bodies):
@@ -279,7 +322,12 @@ class FinchJLGenerator:
 
 
 class FinchJLCompiler(NotationCompiler):
-    _kernels: ClassVar[dict[str, FinchJLKernel]] = {}
+    # Keyed by (generated source, per-arg Julia type strings): the generated
+    # source alone isn't self-describing here -- argument types are inferred
+    # by @finch_kernel from prototype *values*, not written into the source
+    # text, so two calls with identical bodies but different argument types
+    # would otherwise collide on the same cache entry.
+    _kernels: ClassVar[dict[tuple[str, tuple[str, ...]], FinchJLKernel]] = {}
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
@@ -287,16 +335,24 @@ class FinchJLCompiler(NotationCompiler):
         kernel_dict = {}
         for func in prgm.children:
             generated_prgm = generator(func)
-            kernel = self._kernels.get(generated_prgm)
+            jl_globals = dict(generator.jl_globals)
+            arg_type_strs = tuple(ftype_to_jl_type_str(arg.type_) for arg in func.args)
+            key = (generated_prgm, arg_type_strs)
+            kernel = self._kernels.get(key)
             if kernel is None:
                 # Give every distinct program its own Julia symbol to avoid
                 # conflicts in the julia runtime.
-                digest = hashlib.sha256(generated_prgm.encode()).hexdigest()
+                digest = hashlib.sha256(
+                    (generated_prgm + "|".join(arg_type_strs)).encode()
+                ).hexdigest()
                 jl_name = f"{func.name.name}_{digest}"
-                kernel = FinchJLKernel(
-                    jl_name, generated_prgm.replace(func.name.name, jl_name, 1)
+                compiled = CompiledJLKernel(
+                    jl_name,
+                    generated_prgm.replace(func.name.name, jl_name, 1),
+                    jl_globals=jl_globals,
                 )
-                self._kernels[generated_prgm] = kernel
+                kernel = compiled.evaluate()
+                self._kernels[key] = kernel
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)

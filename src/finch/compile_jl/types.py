@@ -5,9 +5,11 @@ from typing import Any
 import numpy as np
 
 import finch as ft
+from finch.algebra import TensorFType
 from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
+from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 
-from .julia import get_jl, jc
+from .julia import get_jl, jc, jl
 
 int8: FDTypeNumpy = ft.int8
 int16: FDTypeNumpy = ft.int16
@@ -155,3 +157,62 @@ def to_jl_vector(T, values, *, offset: int = 0):
             [to_jl_value(T, value, offset=offset) for value in values],
         )
     return get_jl().Vector(values)
+
+
+def _prototype(ftype: FType) -> Any:
+    if isinstance(ftype, LevelFType):
+        return ftype.construct(shape=tuple(1 for _ in range(ftype.ndim)), pos=0)
+    if isinstance(ftype, TensorFType):
+        return ftype.construct(tuple(1 for _ in range(ftype.ndim)))
+    raise NotImplementedError(
+        f"ftype_to_jl_type: unsupported ftype kind {type(ftype).__name__}"
+    )
+
+
+def _level_jl_type(level_ftype: LevelFType):
+    if isinstance(level_ftype, ElementLevelFType):
+        elem_t = to_jl_type(level_ftype.element_type)
+        return jl.ElementLevel[
+            _as_julia_scalar(level_ftype.fill_value),
+            elem_t,
+            to_jl_type(level_ftype.position_type),
+            jl.Vector[elem_t],
+        ]
+    if isinstance(level_ftype, DenseLevelFType):
+        return jl.DenseLevel[
+            to_jl_type(level_ftype.dimension_type),
+            _level_jl_type(level_ftype.lvl_t),
+        ]
+    from .interop import level_to_jl
+
+    return jl.typeof(level_to_jl(_prototype(level_ftype)))
+
+
+def ftype_to_jl_prototype(ftype: TensorFType):
+    from .interop import tensor_to_jl
+
+    return tensor_to_jl(_prototype(ftype))
+
+
+def ftype_to_jl_type(ftype: FType):
+    """Live Julia type object for a TensorFType/LevelFType."""
+    if isinstance(ftype, TensorFType):
+        return jl.typeof(ftype_to_jl_prototype(ftype))
+    if isinstance(ftype, LevelFType):
+        return _level_jl_type(ftype)
+    raise NotImplementedError(
+        f"ftype_to_jl_type: unsupported ftype kind {type(ftype).__name__}"
+    )
+
+
+_TYPE_STR_CACHE: dict[FType, str] = {}
+
+
+def ftype_to_jl_type_str(ftype: FType) -> str:
+    """Julia type as source text (e.g. for a cache key). Cached per ftype."""
+    cached = _TYPE_STR_CACHE.get(ftype)
+    if cached is not None:
+        return cached
+    type_str = str(jl.string(ftype_to_jl_type(ftype)))
+    _TYPE_STR_CACHE[ftype] = type_str
+    return type_str
