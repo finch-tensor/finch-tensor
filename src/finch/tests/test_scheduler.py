@@ -38,7 +38,7 @@ from finch.finch_logic import (
 from finch.symbolic.gensym import _sg
 
 from .conftest import reset_name_counts
-    
+
 
 def test_propagate_map_queries():
     plan = Plan(

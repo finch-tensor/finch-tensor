@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
 import logging
+from abc import abstractmethod
 from functools import reduce
 from itertools import chain as join_chains
 

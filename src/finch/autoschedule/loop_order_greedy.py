@@ -18,7 +18,7 @@ from .loop_order_cost import (
     get_prefix_cost,
     get_reformat_set,
 )
-from .loop_ordering import AbstractLoopOrderer, DefaultLoopOrderer
+from .loop_ordering import AbstractLoopOrderer
 
 
 def connected_loop_candidates(
