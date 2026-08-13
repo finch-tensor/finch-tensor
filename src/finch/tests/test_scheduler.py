@@ -10,7 +10,7 @@ from finch.autoschedule import (
     normalize_names,
 )
 from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_ordering import concordize, set_loop_order
+from finch.autoschedule.loop_ordering import concordize, heuristic_loop_order
 from finch.autoschedule.optimize import (
     isolate_aggregates,
     lift_fields,
@@ -523,7 +523,7 @@ def test_concordize():
     assert result == expected
 
 
-def test_set_loop_order():
+def test_heuristic_loop_order():
     plan = Plan(
         (
             Query(
@@ -558,36 +558,45 @@ def test_set_loop_order():
         (
             Query(
                 Alias("C"),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Reorder(
+                Reorder(
+                    Aggregate(
+                        Literal(ffuncs.add),
+                        Literal(0),
                         Reorder(
-                            MapJoin(
-                                Literal(ffuncs.mul),
-                                (
-                                    Reorder(
-                                        Table(Alias("A"), (Field("i0"), Field("i1"))),
-                                        (Field("i0"), Field("i1")),
-                                    ),
-                                    Reorder(
-                                        Table(Alias("B"), (Field("i1"), Field("i2"))),
-                                        (Field("i1"), Field("i2")),
+                            Reorder(
+                                MapJoin(
+                                    Literal(ffuncs.mul),
+                                    (
+                                        Reorder(
+                                            Table(
+                                                Alias("A"),
+                                                (Field("i0"), Field("i1")),
+                                            ),
+                                            (Field("i0"), Field("i1")),
+                                        ),
+                                        Reorder(
+                                            Table(
+                                                Alias("B"),
+                                                (Field("i1"), Field("i2")),
+                                            ),
+                                            (Field("i1"), Field("i2")),
+                                        ),
                                     ),
                                 ),
+                                (Field("i0"), Field("i2"), Field("i1")),
                             ),
-                            (Field("i0"), Field("i2"), Field("i1")),
+                            (Field("i0"), Field("i1"), Field("i2")),
                         ),
-                        (Field("i0"), Field("i1"), Field("i2")),
+                        (Field("i1"),),
                     ),
-                    (Field("i1"),),
+                    (Field("i0"), Field("i2")),
                 ),
             ),
             Produces((Alias("C"),)),
         )
     )
 
-    result = set_loop_order(plan)
+    result = heuristic_loop_order(plan)
     assert result == expected
 
 
