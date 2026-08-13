@@ -10,7 +10,7 @@ from finch.autoschedule import (
     normalize_names,
 )
 from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_ordering import concordize, set_loop_order
+from finch.autoschedule.loop_ordering import concordize, heuristic_loop_order
 from finch.autoschedule.optimize import (
     isolate_aggregates,
     lift_fields,
@@ -38,7 +38,7 @@ from finch.finch_logic import (
 from finch.symbolic.gensym import _sg
 
 from .conftest import reset_name_counts
-
+    
 
 def test_propagate_map_queries():
     plan = Plan(
@@ -523,7 +523,7 @@ def test_concordize():
     assert result == expected
 
 
-def test_set_loop_order():
+def test_heuristic_loop_order():
     plan = Plan(
         (
             Query(
@@ -596,7 +596,7 @@ def test_set_loop_order():
         )
     )
 
-    result = set_loop_order(plan)
+    result = heuristic_loop_order(plan)
     assert result == expected
 
 

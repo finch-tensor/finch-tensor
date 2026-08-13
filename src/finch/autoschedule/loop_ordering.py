@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import logging
 from functools import reduce
 from itertools import chain as join_chains
@@ -37,7 +38,7 @@ def concordize(
 ) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
-    
+
     def rule_0(ex):
         match ex:
             case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
@@ -227,7 +228,7 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
-def set_loop_order(
+def heuristic_loop_order(
     plan: Plan, *, output_fields: dict[Alias, tuple[Field, ...]] | None = None
 ) -> Plan:
     if output_fields is None:
@@ -264,13 +265,14 @@ def set_loop_order(
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class DefaultLoopOrderer(LogicLoopOrderOptimizer):
+class AbstractLoopOrderer(LogicLoopOrderOptimizer):
     def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    def _set_loop_order(
+    @abstractmethod
+    def set_loop_orders(
         self,
         prgm: Plan,
         stats: dict[Alias, TensorStats],
@@ -278,7 +280,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         *,
         output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        return set_loop_order(prgm, output_fields=output_fields)
+        pass
 
     def lower(
         self,
@@ -295,7 +297,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
                 if isinstance(body, Query)
             }
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = self._set_loop_order(
+            prgm = self.set_loop_orders(
                 prgm, stats, stats_factory, output_fields=output_fields
             )
             prgm = push_fields(prgm)
@@ -308,3 +310,15 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
         prgm = flatten_plans(prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)
+
+
+class DefaultLoopOrderer(AbstractLoopOrderer):
+    def set_loop_orders(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> Plan:
+        return heuristic_loop_order(prgm, output_fields=output_fields)

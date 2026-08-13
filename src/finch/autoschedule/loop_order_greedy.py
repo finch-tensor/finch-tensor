@@ -18,7 +18,7 @@ from .loop_order_cost import (
     get_prefix_cost,
     get_reformat_set,
 )
-from .loop_ordering import DefaultLoopOrderer
+from .loop_ordering import AbstractLoopOrderer, DefaultLoopOrderer
 
 
 def connected_loop_candidates(
@@ -168,8 +168,8 @@ def set_greedy_loop_order(
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class GreedyLoopOrderer(DefaultLoopOrderer):
-    def _set_loop_order(
+class GreedyLoopOrderer(AbstractLoopOrderer):
+    def set_loop_orders(
         self,
         prgm: Plan,
         stats: dict[Alias, TensorStats],
