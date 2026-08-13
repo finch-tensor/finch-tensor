@@ -1,4 +1,4 @@
-import hashlib
+import uuid
 from typing import Any, ClassVar
 
 import numpy as np
@@ -161,42 +161,25 @@ class FinchJLGenerator:
         return self.generate_julia(prgm)
 
     def emit_name(self, sym: str) -> str:
-        """
-        Canonical Julia identifier for each notation symbol. Avoids
-        issues with gensym making duplicate programs appear distinct.
-        """
-        return self.names.setdefault(sym, f"_v{len(self.names)}")
+        return self.names.setdefault(sym, f"v{len(self.names)}")
 
     def generate_julia(self, prgm, nestingLvl=0):
         match prgm:
             case ntn.Function(name, args, body):
                 body_str = self.generate_julia(body, nestingLvl + 2)
                 arg_strs = []
-                proto_assign_strs = []
                 for arg in args:
                     match arg:
                         case ntn.Variable(sym, type_):
                             arg_name = self.emit_name(sym)
-                            # Leading-underscore names (all of ours) are
-                            # treated as Python-private by juliacall's
-                            # setattr and never forwarded to Julia's Main --
-                            # bind the prototype under a plain alias instead,
-                            # and let this (real Julia) assignment do the
-                            # rename @finch_kernel's macro then infers each
-                            # argument's type from these prototypes via
-                            # typeof(), not from a literal annotation.
-                            proto_name = f"proto{arg_name}"
-                            self.jl_globals[proto_name] = ftype_to_jl_prototype(type_)
+                            self.jl_globals[arg_name] = ftype_to_jl_prototype(type_)
                             arg_strs.append(arg_name)
-                            proto_assign_strs.append(f"    {arg_name} = {proto_name}")
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
-                proto_str = "\n".join(proto_assign_strs)
                 return (
-                    f"begin\n{proto_str}\n"
-                    f"    eval(Finch.@finch_kernel function {name}({arg_str})\n"
-                    f"{body_str}\n    end)\nend"
+                    f"eval(Finch.@finch_kernel function {name}({arg_str})\n"
+                    f"{body_str}\n    end)"
                 )
 
             case ntn.Block(bodies):
@@ -340,12 +323,7 @@ class FinchJLCompiler(NotationCompiler):
             key = (generated_prgm, arg_type_strs)
             kernel = self._kernels.get(key)
             if kernel is None:
-                # Give every distinct program its own Julia symbol to avoid
-                # conflicts in the julia runtime.
-                digest = hashlib.sha256(
-                    (generated_prgm + "|".join(arg_type_strs)).encode()
-                ).hexdigest()
-                jl_name = f"{func.name.name}_{digest}"
+                jl_name = f"kernel_{uuid.uuid4().hex}"
                 compiled = CompiledJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
