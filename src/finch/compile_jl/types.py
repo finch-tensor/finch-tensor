@@ -5,11 +5,19 @@ from typing import Any
 import numpy as np
 
 import finch as ft
-from finch.algebra import TensorFType
 from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
+from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
+from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
+from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
+from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
+from finch.tensor.level.sparse_list_level import SparseListLevelFType
+from finch.tensor.scalar import ScalarFType
 
-from .julia import get_jl, jc, jl
+from .julia import get_jl, jc
+
+_py_bool = bool
 
 int8: FDTypeNumpy = ft.int8
 int16: FDTypeNumpy = ft.int16
@@ -159,49 +167,109 @@ def to_jl_vector(T, values, *, offset: int = 0):
     return get_jl().Vector(values)
 
 
-def _prototype(ftype: FType) -> Any:
-    if isinstance(ftype, LevelFType):
-        return ftype.construct(shape=tuple(1 for _ in range(ftype.ndim)), pos=0)
-    if isinstance(ftype, TensorFType):
-        return ftype.construct(tuple(1 for _ in range(ftype.ndim)))
+def _julia_literal(value: Any) -> str:
+    # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
+    # above), so `isinstance` must use `_py_bool` (captured before shadowing).
+    if isinstance(value, (_py_bool, np.bool_)):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _leaf_type_str(T: Any) -> str:
+    return str(get_jl().string(to_jl_type(T)))
+
+
+def _plus_one_ctor_str(elem_type_str: str) -> str:
+    return f"Finch.PlusOneVector({elem_type_str}[])"
+
+
+def _level_constructor_str(level_ftype: LevelFType) -> str:
+    """
+    Julia source text that constructs a minimal (empty-buffer, but real --
+    Finch's virtualize() needs an actual value, not just a type) instance of
+    `level_ftype`. Matches interop.py's level_to_jl buffer wrapping exactly
+    (e.g. index buffers as PlusOneVector, for the 0-based/1-based indexing
+    conversion), so the type this produces at eval time is identical to
+    what a real argument would have at call time.
+    """
+    if isinstance(level_ftype, ElementLevelFType):
+        elem_t = _leaf_type_str(level_ftype.element_type)
+        fill = _julia_literal(level_ftype.fill_value)
+        return f"Finch.ElementLevel({fill}, {elem_t}[])"
+    if isinstance(level_ftype, DenseLevelFType):
+        # interop.py's level_to_jl does `int(dimension)`, so the "shape"
+        # scalar (level type param Ti) is always plain Julia Int (Int64),
+        # regardless of the declared dimension_type -- only index/pointer
+        # *buffers* actually preserve dimension_type/position_type.
+        return f"Finch.DenseLevel({_level_constructor_str(level_ftype.lvl_t)}, 1)"
+    if isinstance(level_ftype, SparseListLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        return (
+            f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {_plus_one_ctor_str(pos_t)}, {_plus_one_ctor_str(dim_t)})"
+        )
+    if isinstance(level_ftype, SparseByteMapLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        return (
+            f"Finch.SparseByteMapLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
+            f"{_plus_one_ctor_str(dim_t)})"
+        )
+    if isinstance(level_ftype, SparseCOOLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_ts = [
+            _leaf_type_str(t)
+            for t in level_ftype.coo_shape_tuple_type.struct_fieldtypes
+        ]
+        dims = ",".join("1" for _ in dim_ts)
+        idxs = ",".join(_plus_one_ctor_str(t) for t in dim_ts)
+        return (
+            f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, ({dims},), "
+            f"{_plus_one_ctor_str(pos_t)}, ({idxs},))"
+        )
+    if isinstance(level_ftype, SparseHashLevelFType):
+        pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
+        single_writer = "true" if level_ftype.single_writer else "false"
+        tbl_entry_t = f"Tuple{{{pos_t},{dim_t},{pos_t}}}"
+        # interop.py derives Ti from `np.asarray(dimension).item()`, which
+        # (like DenseLevel above) always yields plain Julia Int (Int64).
+        return (
+            f"Finch.SparseHashLevel{{Int,{single_writer}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
+            f"{_plus_one_ctor_str(pos_t)}, UInt8[], {tbl_entry_t}[], {pos_t}[], "
+            f"{_plus_one_ctor_str(pos_t)})"
+        )
     raise NotImplementedError(
-        f"ftype_to_jl_type: unsupported ftype kind {type(ftype).__name__}"
+        f"ftype_to_jl_constructor_str: unsupported level ftype "
+        f"{type(level_ftype).__name__}"
     )
 
 
-def _level_jl_type(level_ftype: LevelFType):
-    if isinstance(level_ftype, ElementLevelFType):
-        elem_t = to_jl_type(level_ftype.element_type)
-        return jl.ElementLevel[
-            _as_julia_scalar(level_ftype.fill_value),
-            elem_t,
-            to_jl_type(level_ftype.position_type),
-            jl.Vector[elem_t],
-        ]
-    if isinstance(level_ftype, DenseLevelFType):
-        return jl.DenseLevel[
-            to_jl_type(level_ftype.dimension_type),
-            _level_jl_type(level_ftype.lvl_t),
-        ]
-    from .interop import level_to_jl
-
-    return jl.typeof(level_to_jl(_prototype(level_ftype)))
-
-
-def ftype_to_jl_prototype(ftype: TensorFType):
-    from .interop import tensor_to_jl
-
-    return tensor_to_jl(_prototype(ftype))
-
-
-def ftype_to_jl_type(ftype: FType):
-    """Live Julia type object for a TensorFType/LevelFType."""
-    if isinstance(ftype, TensorFType):
-        return jl.typeof(ftype_to_jl_prototype(ftype))
-    if isinstance(ftype, LevelFType):
-        return _level_jl_type(ftype)
+def ftype_to_jl_constructor_str(ftype: FType) -> str:
+    """Julia source text constructing a minimal instance of `ftype`, for
+    embedding directly in generated kernel source (see compiler.py)."""
+    if isinstance(ftype, ScalarFType):
+        elem_t = _leaf_type_str(ftype.element_type)
+        fill = _julia_literal(ftype.fill_value)
+        return f"Finch.Tensor(Finch.ElementLevel({fill}, {elem_t}[]))"
+    if isinstance(ftype, FiberTensorFType):
+        return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
+    if isinstance(ftype, BufferizedNDArrayFType):
+        # Matches interop.py's _ndarray_to_jl_tensor: a plain dense buffer
+        # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
+        # (regardless of the ftype's own dimension_type).
+        elem_t = _leaf_type_str(ftype.element_type)
+        fill = _julia_literal(ftype.fill_value)
+        ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
+        for _ in range(ftype.ndim):
+            ctor = f"Finch.DenseLevel({ctor}, 1)"
+        return f"Finch.Tensor({ctor})"
     raise NotImplementedError(
-        f"ftype_to_jl_type: unsupported ftype kind {type(ftype).__name__}"
+        f"ftype_to_jl_constructor_str: unsupported ftype kind {type(ftype).__name__}"
     )
 
 
@@ -213,6 +281,8 @@ def ftype_to_jl_type_str(ftype: FType) -> str:
     cached = _TYPE_STR_CACHE.get(ftype)
     if cached is not None:
         return cached
-    type_str = str(jl.string(ftype_to_jl_type(ftype)))
+    jl = get_jl()
+    ctor = ftype_to_jl_constructor_str(ftype)
+    type_str = str(jl.string(jl.typeof(jl.seval(ctor))))
     _TYPE_STR_CACHE[ftype] = type_str
     return type_str
