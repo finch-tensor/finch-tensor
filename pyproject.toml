@@ -19,6 +19,7 @@ dependencies = [
 julia = [
     "juliapkg>=0.1.16,<0.2.0",
     "juliacall>=0.9.24,<0.10.0",
+    "ssgetpy>=1.0rc2",
 ]
 
 [dependency-groups]
