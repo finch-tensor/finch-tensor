@@ -2,6 +2,8 @@
 Galley optimizer pipeline tests.
 """
 
+import pytest
+
 import numpy as np
 
 import finch.interface as fl_interface
@@ -366,3 +368,122 @@ def test_multiple_compute():
     expected = ((np.array(A) @ np.array(B)), (np.array(C) @ np.array(D)))
     assert np.allclose(np.array(out[0]), np.array(expected[0]))
     assert np.allclose(np.array(out[1]), np.array(expected[1]))
+
+
+# --- Scalar constants reduced via a repeat operator ---
+@pytest.mark.parametrize("scalar", [2, 2.0, 3, 3.0, 6.0])
+@pytest.mark.parametrize("axis", [None, 0, 1])
+def test_repeat_operator_scalar_literal(scalar, axis):
+    """
+    Reducing an expression whose scalar operand is a bare `Literal` sends galley
+    down the repeat-operator path (sum_i c = c*|Dom(i)|, prod_i c = c**|Dom(i)|).
+
+    The domain size is itself a Literal, and literals compare by value, so the
+    rewrite has to be applied in one pass with one combined factor. Rewriting
+    one reduction index at a time let the next index match inside the subtree
+    just inserted and square the result: prod(x*2) over a 2x3 tensor gave 2**24
+    instead of 2**6. `scalar=6.0` is the case where the constant equals the
+    combined factor exactly.
+    """
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.asarray(arr)
+
+    for reduce_fn, np_fn in (
+        (fl_interface.sum, np.sum),
+        (fl_interface.prod, np.prod),
+    ):
+        for expr, np_expr in (
+            (fl_interface.lazy(x) * scalar, arr * scalar),
+            (fl_interface.lazy(x) + scalar, arr + scalar),
+        ):
+            out = fl_interface.compute(
+                reduce_fn(expr, axis=axis), ctx=INTERPRET_NOTATION_GALLEY
+            )
+            assert np.allclose(np.array(out), np_fn(np_expr, axis=axis))
+
+
+def test_repeat_operator_repeated_scalar_literal():
+    """The same constant twice under one reduction: each occurrence is reduced
+    over, so each takes the combined factor."""
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 2.0 * 2.0), ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 2.0 * 2.0).prod())
+
+    out = fl_interface.compute(
+        fl_interface.sum(x + 2.0 + 2.0), ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr + 2.0 + 2.0).sum())
+
+
+def test_repeat_operator_scalar_outside_reduction():
+    """
+    A constant appearing both inside and outside the reduction: the two
+    occurrences are structurally equal, but only the inner one is reduced
+    over. Galley's rewrites address occurrences by path, so the repeat factor
+    applies to the inner occurrence only.
+    """
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 2.0) * 2.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 2.0).prod() * 2.0)
+
+    out = fl_interface.compute(
+        fl_interface.sum(x + 2.0) + 2.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr + 2.0).sum() + 2.0)
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 6.0) * 6.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 6.0).prod() * 6.0)
+
+
+@pytest.mark.parametrize("scalar", [2.0, 3.0, 6.0])
+def test_repeat_operator_under_nested_reduction(scalar):
+    """
+    A constant under two reductions with different operators. The repeat
+    compensation for the outer sum must not reach the constant that the inner
+    prod also reads: applying it up front scaled the constant by |Dom(i)|,
+    giving sum(prod(x + 2*scalar)) instead of sum(prod(x + scalar)).
+    """
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.prod(x + scalar, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + scalar).prod(axis=1).sum())
+
+
+def test_repeat_operator_nested_reduction_no_constant():
+    """The same nesting without a constant, as a control."""
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    other = np.arange(7.0, 13.0).reshape(2, 3)
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+    y = fl_interface.lazy(fl_interface.asarray(other))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.prod(x + y, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + other).prod(axis=1).sum())
+
+
+def test_repeat_operator_nested_reduction_swapped_ops():
+    """Outer prod over an inner sum, the mirror of the failing case."""
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    x = fl_interface.lazy(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(fl_interface.sum(x + 2.0, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + 2.0).sum(axis=1).prod())
