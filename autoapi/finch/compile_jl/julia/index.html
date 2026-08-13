@@ -12,7 +12,7 @@
         <link rel="prev" href="../interop/">
       
       
-        <link rel="next" href="../../finch_assembly/">
+        <link rel="next" href="../profiling/">
       
       
         
@@ -2584,34 +2584,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../dtypes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    dtypes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../interop/" class="md-nav__link">
         
   
@@ -2707,6 +2679,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.compile_jl.julia.init_julia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        init_julia
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.compile_jl.julia.julia_available" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2721,6 +2704,62 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    types
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -5043,6 +5082,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.compile_jl.julia.init_julia" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        init_julia
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.compile_jl.julia.julia_available" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5105,6 +5155,39 @@
 <div class="doc doc-object doc-function">
 
 
+<h2 id="finch.compile_jl.julia.init_julia" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">init_julia</span><span class="p">()</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Starts Julia and loads required packages, exactly once per process.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/julia.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">init_julia</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starts Julia and loads required packages, exactly once per process.&quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">_jc</span><span class="p">,</span> <span class="n">_jl</span>
+    <span class="k">if</span> <span class="n">_jl</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">_jc</span><span class="p">,</span> <span class="n">_jl</span> <span class="o">=</span> <span class="n">_start_julia</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">_jc</span><span class="p">,</span> <span class="n">_jl</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h2 id="finch.compile_jl.julia.julia_available" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">julia_available</span><span class="p">()</span></code>
 
@@ -5120,15 +5203,15 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/julia.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
-<span class="normal">14</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
 <span class="normal">15</span>
 <span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
-<span class="normal">21</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">julia_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">21</span>
+<span class="normal">22</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">julia_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Whether the Julia backend can be used, i.e. whether both Python packages</span>
 <span class="sd">    `init_julia` needs are installed. They are optional dependencies; see the</span>

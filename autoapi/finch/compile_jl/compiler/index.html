@@ -12,7 +12,7 @@
         <link rel="prev" href="../buffer/">
       
       
-        <link rel="next" href="../dtypes/">
+        <link rel="next" href="../interop/">
       
       
         
@@ -2623,22 +2623,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.compile_jl.compiler.FinchJLGenerator" class="md-nav__link">
+  <a href="#finch.compile_jl.compiler.CompiledJLKernel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        FinchJLGenerator
+        CompiledJLKernel
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="FinchJLGenerator">
+    <nav class="md-nav" aria-label="CompiledJLKernel">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finch.compile_jl.compiler.FinchJLGenerator.emit_name" class="md-nav__link">
+  <a href="#finch.compile_jl.compiler.CompiledJLKernel.evaluate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        emit_name
+        evaluate
       
     </span>
   </a>
@@ -2650,38 +2650,21 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.compiler.FinchJLKernel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FinchJLKernel
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../dtypes/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    dtypes
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2730,6 +2713,62 @@
     
   
     julia
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../profiling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../types/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    types
   
 
     
@@ -5060,22 +5099,22 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.compile_jl.compiler.FinchJLGenerator" class="md-nav__link">
+  <a href="#finch.compile_jl.compiler.CompiledJLKernel" class="md-nav__link">
     <span class="md-ellipsis">
       
-        FinchJLGenerator
+        CompiledJLKernel
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="FinchJLGenerator">
+    <nav class="md-nav" aria-label="CompiledJLKernel">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finch.compile_jl.compiler.FinchJLGenerator.emit_name" class="md-nav__link">
+  <a href="#finch.compile_jl.compiler.CompiledJLKernel.evaluate" class="md-nav__link">
     <span class="md-ellipsis">
       
-        emit_name
+        evaluate
       
     </span>
   </a>
@@ -5084,6 +5123,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.compiler.FinchJLKernel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FinchJLKernel
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5139,8 +5189,8 @@
 
 
 
-<h2 id="finch.compile_jl.compiler.FinchJLGenerator" class="doc doc-heading">
-            <code>FinchJLGenerator</code>
+<h2 id="finch.compile_jl.compiler.CompiledJLKernel" class="doc doc-heading">
+            <code>CompiledJLKernel</code>
 
 
 </h2>
@@ -5149,6 +5199,9 @@
     <div class="doc doc-contents ">
 
 
+
+        <p>Pure-data compiled-but-not-evaluated kernel: self-contained Julia
+source text, with no Python-side values left to inject.</p>
 
 
 
@@ -5159,315 +5212,31 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLGenerator</span><span class="p">:</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompiledJLKernel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pure-data compiled-but-not-evaluated kernel: self-contained Julia</span>
+<span class="sd">    source text, with no Python-side values left to inject.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span> <span class="o">=</span> <span class="n">func_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span> <span class="o">=</span> <span class="n">jl_code</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">emit_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sym</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Canonical Julia identifier for each notation symbol. Avoids</span>
-<span class="sd">        issues with gensym making duplicate programs appear distinct.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_v</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">generate_julia</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-        <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-                <span class="n">body_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">nestingLvl</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
-                <span class="n">arg_strs</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
-                    <span class="k">match</span> <span class="n">arg</span><span class="p">:</span>
-                        <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="nb">type</span><span class="p">):</span>
-                            <span class="c1"># TODO later use finch_kernel and type the args</span>
-                            <span class="n">arg_strs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">emit_name</span><span class="p">(</span><span class="n">sym</span><span class="p">))</span>
-                        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
-                <span class="n">arg_str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">arg_strs</span><span class="p">)</span>
-                <span class="k">return</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;function </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">arg_str</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">    @finch begin</span><span class="se">\n</span><span class="s2">&quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">body_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">    end</span><span class="se">\n</span><span class="s2">end&quot;</span>
-                <span class="p">)</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
-                <span class="n">body_str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
-                <span class="n">body_strs</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">]</span>
-                <span class="n">body_strs</span> <span class="o">=</span> <span class="p">[</span><span class="n">body_str</span> <span class="k">for</span> <span class="n">body_str</span> <span class="ow">in</span> <span class="n">body_strs</span> <span class="k">if</span> <span class="n">body_str</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">]</span>
-                <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">body_strs</span><span class="p">)</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
-                <span class="c1"># Ignore assigns used only to find loop bounds.</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Dimension</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
-                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">)</span> <span class="ow">and</span> <span class="n">rhs</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">val</span> <span class="o">==</span> <span class="n">dimension</span>
-                <span class="p">):</span>
-                    <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="n">stmt</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span><span class="w"> </span><span class="n">nestingLvl</span><span class="p">)</span><span class="si">}</span><span class="s2"> = &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span><span class="w"> </span><span class="n">nestingLvl</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}{</span><span class="n">stmt</span><span class="si">}</span><span class="s2">&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="k">return</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}{</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span><span class="w"> </span><span class="n">nestingLvl</span><span class="p">)</span><span class="si">}</span><span class="s2"> .= &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">init</span><span class="p">,</span><span class="w"> </span><span class="n">nestingLvl</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">return </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">val</span><span class="p">,</span><span class="w"> </span><span class="n">nestingLvl</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Loop</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="n">idx_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="n">loop_body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">nestingLvl</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">for </span><span class="si">{</span><span class="n">idx_str</span><span class="si">}</span><span class="s2"> = _</span><span class="se">\n</span><span class="si">{</span><span class="n">loop_body</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">end&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
-                <span class="n">tns_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="n">idx_str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
-                    <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">idxs</span><span class="p">)]</span>
-                <span class="p">)</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tns_str</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">idx_str</span><span class="si">}</span><span class="s2">]&quot;</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
-                <span class="n">arg_str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
-                    <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
-                <span class="p">)</span>
-                <span class="k">if</span> <span class="n">op</span><span class="o">.</span><span class="n">val</span> <span class="ow">in</span> <span class="n">ops_to_ignore</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">arg_str</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ops_map</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">]</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">arg_str</span><span class="si">}</span><span class="s2">)&quot;</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">If</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="n">cond_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="n">body_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">nestingLvl</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">if </span><span class="si">{</span><span class="n">cond_str</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">body_str</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">end&quot;</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">IfElse</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">then_body</span><span class="p">,</span> <span class="n">else_body</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="n">cond_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="n">then_body_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">then_body</span><span class="p">,</span> <span class="n">nestingLvl</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                <span class="n">else_body_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">else_body</span><span class="p">,</span> <span class="n">nestingLvl</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                <span class="k">return</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">if </span><span class="si">{</span><span class="n">cond_str</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">then_body_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">else</span><span class="se">\n</span><span class="si">{</span><span class="n">else_body_str</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}</span><span class="s2">end&quot;</span>
-                <span class="p">)</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Increment</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
-                <span class="n">tab_str</span> <span class="o">=</span> <span class="s2">&quot;    &quot;</span> <span class="o">*</span> <span class="n">nestingLvl</span>
-                <span class="n">lhs_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="n">rhs_str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">lhs</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">val</span> <span class="o">==</span> <span class="n">overwrite</span><span class="p">:</span>
-                    <span class="n">stmt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lhs_str</span><span class="si">}</span><span class="s2"> = </span><span class="si">{</span><span class="n">rhs_str</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">stmt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">lhs_str</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">red_ops_map</span><span class="p">[</span><span class="n">lhs</span><span class="o">.</span><span class="n">mode</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">]</span><span class="si">}</span><span class="s2">= </span><span class="si">{</span><span class="n">rhs_str</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">tab_str</span><span class="si">}{</span><span class="n">stmt</span><span class="si">}</span><span class="s2">&quot;</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unwrap</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
-                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">):</span>
-                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;The unpack was not called with variable as RHS.&quot;</span><span class="p">)</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span><span class="p">[</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_julia</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">nestingLvl</span><span class="p">)</span>
-                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Freeze</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Thaw</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Cached</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
-                <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> Slot does not exist in registry.&quot;</span><span class="p">)</span>
-                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pack_dict</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
-
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
-                <span class="c1"># Julia booleans are lowercase; numpy.bool_ is not a bool subclass.</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">bool</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">):</span>
-                    <span class="k">return</span> <span class="s2">&quot;true&quot;</span> <span class="k">if</span> <span class="n">val</span> <span class="k">else</span> <span class="s2">&quot;false&quot;</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">floating</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">val</span><span class="p">):</span>
-                    <span class="k">return</span> <span class="s2">&quot;Inf&quot;</span> <span class="k">if</span> <span class="n">val</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;-Inf&quot;</span>
-                <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
-                <span class="c1"># finch uses &#39;#&#39; in generated names; not valid Julia syntax.</span>
-                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">emit_name</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-
-            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                <span class="c1"># Dimension, Stack, Value are deliberately unimplemented.</span>
-                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unhandled node type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FinchJLKernel&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Defines the kernel function in the running Julia session,</span>
+<span class="sd">        returning the now-callable kernel.&quot;&quot;&quot;</span>
+        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5487,36 +5256,131 @@
 <div class="doc doc-object doc-function">
 
 
-<h3 id="finch.compile_jl.compiler.FinchJLGenerator.emit_name" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">emit_name</span><span class="p">(</span><span class="n">sym</span><span class="p">)</span></code>
+<h3 id="finch.compile_jl.compiler.CompiledJLKernel.evaluate" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">evaluate</span><span class="p">()</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Canonical Julia identifier for each notation symbol. Avoids
-issues with gensym making duplicate programs appear distinct.</p>
+        <p>Defines the kernel function in the running Julia session,
+returning the now-callable kernel.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">emit_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sym</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Canonical Julia identifier for each notation symbol. Avoids</span>
-<span class="sd">    issues with gensym making duplicate programs appear distinct.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_v</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">names</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FinchJLKernel&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Defines the kernel function in the running Julia session,</span>
+<span class="sd">    returning the now-callable kernel.&quot;&quot;&quot;</span>
+    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
 
 </div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.compile_jl.compiler.FinchJLKernel" class="doc doc-heading">
+            <code>FinchJLKernel</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="AssemblyKernel (finch.finch_assembly.AssemblyKernel)" href="../../finch_assembly/#finch.finch_assembly.AssemblyKernel">AssemblyKernel</a></code></p>
+
+
+
+        <p>A kernel already defined (evaluated) in the running Julia session.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A kernel already defined (evaluated) in the running Julia session.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">):</span>
+        <span class="c1"># We store this code so that we can verify it in pytest</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span> <span class="o">=</span> <span class="n">jl_code</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span> <span class="o">=</span> <span class="n">func_name</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">finch_fn</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">jl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">)</span>
+        <span class="n">raw_args</span> <span class="o">=</span> <span class="p">[</span><span class="n">tensor_to_jl</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">finch_fn</span><span class="p">(</span><span class="o">*</span><span class="n">raw_args</span><span class="p">)</span>
+
+        <span class="c1"># @finch_kernel-generated functions return a NamedTuple keyed by the</span>
+        <span class="c1"># returned variable name(s), unlike @finch&#39;s bare Tensor/tuple.</span>
+        <span class="k">if</span> <span class="n">jl</span><span class="o">.</span><span class="n">isa</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">jl</span><span class="o">.</span><span class="n">NamedTuple</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">jl</span><span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+        <span class="c1"># The finch function returns tuples when multiple values are returned</span>
+        <span class="c1"># or a non-tuple when a single value is returned.</span>
+        <span class="k">if</span> <span class="n">jl</span><span class="o">.</span><span class="n">isa</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">jl</span><span class="o">.</span><span class="n">Finch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">jl_tensor_to_python</span><span class="p">(</span><span class="n">result</span><span class="p">),)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">jl_tensor_to_python</span><span class="p">(</span><span class="n">res</span><span class="p">)</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">result</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
 
 
 
