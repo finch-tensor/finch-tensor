@@ -5,7 +5,6 @@ from typing import Any
 
 from .fill import AbstractFill, is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
-from .tensor import Tensor
 
 
 class FinchOperator(ABC):
