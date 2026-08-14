@@ -43,6 +43,8 @@ class FinchOperator(ABC):
         # Display as just the lowercase name
         return repr(self)
 
+def arity(op: FinchOperator) -> int | float:
+    return op.arity
 
 def is_associative(op: FinchOperator) -> bool:
     return op.is_associative
