@@ -7,10 +7,13 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    AbstractFill,
     DynamicFill,
     FType,
     ImmutableStructFType,
+    StaticFill,
     TensorFType,
+    as_fill,
     ffuncs,
     ftype,
     is_dynamic,
@@ -23,7 +26,7 @@ from .override_tensor import OverrideTensor
 class ScalarFType(TensorFType, ImmutableStructFType):
     def __init__(self, _element_type: FType, _fill_value: Any, _device=None):
         self._element_type = _element_type
-        self._fill_value = _fill_value
+        self._fill_value = as_fill(_fill_value)
         self._device = normalize_device(_device)
 
     def __eq__(self, other):
@@ -43,7 +46,7 @@ class ScalarFType(TensorFType, ImmutableStructFType):
     def construct(self, shape: tuple) -> Scalar:
         if shape != ():
             raise ValueError("ScalarFType can only be called with empty shape ()")
-        return self._element_type(self._fill_value)
+        return self._element_type(self._fill_value.value)
 
     def __call__(self, val: Any) -> Scalar:
         """
@@ -62,7 +65,7 @@ class ScalarFType(TensorFType, ImmutableStructFType):
         return self(arr)
 
     @property
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         return self._fill_value
 
     @property
@@ -112,23 +115,15 @@ class Scalar(OverrideTensor):
         if fill_value is None:
             fill_value = val
         self.val = val
-        self._fill_value = fill_value
+        self._fill_value = as_fill(fill_value)
         self._device = normalize_device(device)
 
     @property
     def ftype(self):
-        return ScalarFType(ftype(self.val), self._fill_value, self._device)
-
-    @property
-    def argument_ftype(self):
-        # A scalar's fill is not part of its kernel identity, so it never enters
-        # the cache key: `struct_fields` carries only `val`, and `lower_unwrap`
-        # reads only `val`, so no kernel body can observe the fill. It is used
-        # solely at bind time -- `infer_fill_value` reads it off the actual
-        # instance -- which is why one kernel serves every fill of a dtype.
-        # `ConstantScalar` overrides this to opt into value specialization.
         elem_t = ftype(self.val)
-        return ScalarFType(elem_t, DynamicFill(elem_t), self._device)
+        return ScalarFType(
+            elem_t, DynamicFill(self._fill_value.value, elem_t), self._device
+        )
 
     @property
     def shape(self):
@@ -137,7 +132,7 @@ class Scalar(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the scalar."""
-        return self.ftype.fill_value
+        return self._fill_value.value
 
     @property
     def device(self):
@@ -195,7 +190,5 @@ class ConstantScalar(Scalar):
         super().__init__(val)
 
     @property
-    def argument_ftype(self):
-        # Constants opt into value specialization; normally they are inlined
-        # before ever becoming a binding, so this is defensive.
-        return self.ftype
+    def ftype(self):
+        return ScalarFType(ftype(self.val), StaticFill(self._fill_value), self._device)

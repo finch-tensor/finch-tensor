@@ -11,7 +11,7 @@ from .algebra import (
     type_max,
     type_min,
 )
-from .fill import is_dynamic
+from .fill import DynamicFill, StaticFill, is_dynamic
 from .ftypes import (
     FDType,
     FDTypeBoolean,
@@ -1392,7 +1392,16 @@ class _InitWrite(FinchOperator):
 
 
 def init_write(value):
-    return _InitWrite(value)
+    # `_InitWrite` carries its value into the IR and into kernel identity, so it
+    # takes a raw value, or a DynamicFill sentinel when nothing may specialize
+    # on it. A StaticFill wrapper must not get that far.
+    match value:
+        case DynamicFill():
+            raise ValueError("init_write cannot be used with DynamicFill")
+        case StaticFill():
+            return _InitWrite(value.value)
+        case _:
+            return _InitWrite(value)
 
 
 class _Overwrite(FinchOperator):

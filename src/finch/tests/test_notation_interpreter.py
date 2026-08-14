@@ -159,6 +159,7 @@ def test_matrix_multiplication(a, b):
             **vars(finch.codegen),
             **vars(finch.compile),
             **vars(finch.tensor),
+            **vars(finch.algebra),
             **vars(ffuncs),
             **globals(),
         },

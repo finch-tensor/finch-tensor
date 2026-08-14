@@ -6,8 +6,11 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    DynamicFill,
     FType,
     ImmutableStructFType,
+    StaticFill,
+    as_fill,
     ftype,
     is_dynamic,
 )
@@ -55,8 +58,10 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             self.position_type = np.intp
         self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
-        if not is_dynamic(self.fill_value):
-            self.fill_value = self.element_type(self.fill_value)
+        fill = as_fill(self.fill_value)
+        self.fill_value = (
+            fill if is_dynamic(fill) else StaticFill(self.element_type(fill.value))
+        )
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "ElementLevel":
         """
@@ -86,7 +91,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def __str__(self):
-        return f"ElementLevelFType(fv={self.fill_value})"
+        match self.fill_value:
+            case DynamicFill() as fill:
+                return f"ElementLevelFType(fv={fill})"
+            case StaticFill() as fill:
+                return f"ElementLevelFType(fv={fill.value})"
+            case fill:
+                return f"ElementLevelFType(fv={fill})"
 
     @property
     def ndim(self):
@@ -238,7 +249,7 @@ class ElementLevel(Level):
     def fill(self) -> Any:
         """The fill value as a struct field, for marshaling to kernels
         compiled against a dynamic fill."""
-        return self._format.fill_value
+        return self._format.fill_value.value
 
     def __str__(self):
         return f"ElementLevel(val={self._val})"

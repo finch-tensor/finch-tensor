@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .fill import is_dynamic
+from .fill import AbstractFill, is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
 from .tensor import Tensor
 
@@ -57,28 +57,20 @@ def is_idempotent(op: FinchOperator) -> bool:
     return op.is_idempotent
 
 
-def arity(op: FinchOperator) -> int | float:
-    return op.arity
-
-
-"""
-Operators answer `is_identity` and `is_annihilator` about constants.
-These properties cannot always hold for mutable objects (e.g. Scalars) or
-dynamic fill so we fail for both.
-TODO: In the future, we may want to raise on Scalar.
-"""
+def _specializable(val: Any) -> tuple[bool, Any]:
+    if isinstance(val, AbstractFill):
+        return not is_dynamic(val), val.value
+    return True, val
 
 
 def is_identity(op: FinchOperator, val: Any) -> bool:
-    if is_dynamic(val) or isinstance(val, Tensor):
-        return False
-    return op.is_identity(val)
+    ok, value = _specializable(val)
+    return ok and op.is_identity(value)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    if is_dynamic(val) or isinstance(val, Tensor):
-        return False
-    return op.is_annihilator(val)
+    ok, value = _specializable(val)
+    return ok and op.is_annihilator(value)
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:

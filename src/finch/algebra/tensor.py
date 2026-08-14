@@ -7,6 +7,7 @@ import numpy as np
 import scipy.sparse as sps
 
 from .devices import normalize_device, serial
+from .fill import AbstractFill
 from .ftypes import FType, FTyped
 
 
@@ -41,8 +42,8 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> Any:
-        """Default value to fill the tensor."""
+    def fill_value(self) -> AbstractFill:
+        """AbstractFill value of the tensor, either static or dynamic."""
         ...
 
     @property
@@ -117,19 +118,13 @@ class Tensor(FTyped, ABC):
         ...
 
     @property
-    def argument_ftype(self) -> TensorFType:
-        """FType to compile kernels against when this tensor is bound as an
-        argument. May generalize `ftype` (e.g. with a dynamic fill) so one
-        kernel serves many instances."""
-        return self.ftype
-
-    @property
     def fill_value(self) -> Any:
         """The fill value for the tensor.  The fill value is the
         default value for a tensor when it is created with a given shape and dtype,
         as well as the background value for sparse tensors.
+        Note: this is the raw value NOT the AbstractFill.
         """
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:

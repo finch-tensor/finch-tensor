@@ -44,7 +44,7 @@ def _requires_julia_backend():
 def test_julia_element_ftype_can_customize_vector_lowering():
     _requires_julia_backend()
     from finch.compile_jl import JuliaElementFType
-    from finch.compile_jl import dtypes as jl_dtypes
+    from finch.compile_jl import types as jl_dtypes
     from finch.compile_jl.julia import jl
 
     class PairFType(ft.FType, JuliaElementFType):
