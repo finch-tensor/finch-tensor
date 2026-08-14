@@ -15,11 +15,13 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 
 from finch import finch_einsum as ein
 from finch.algebra import (
+    AbstractFill,
     FinchOperator,
     FType,
     Tensor,
     TensorFType,
     apply_fill,
+    as_fill,
     common_device,
     ffuncs,
     fixpoint_type,
@@ -79,7 +81,7 @@ def _shape_size(shape: tuple) -> int:
 
 
 class LazyTensorFType(TensorFType):
-    _fill_value: Any
+    _fill_value: AbstractFill
     _element_type: FType
     _shape_type: tuple[FType, ...]
 
@@ -90,7 +92,7 @@ class LazyTensorFType(TensorFType):
         _shape_type: tuple[FType | type, ...],
         _device=None,
     ):
-        self._fill_value = _fill_value
+        self._fill_value = as_fill(_fill_value)
         self._element_type = ftype(_element_type)
         self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
         self._device = normalize_device(_device)
@@ -143,7 +145,7 @@ class LazyTensorFType(TensorFType):
         )
 
     @property
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         return self._fill_value
 
     @property
@@ -242,7 +244,8 @@ class LazyTensor(OverrideTensor):
         self.data: Alias = data
         self.ctx = ctx
         self._shape = shape
-        self._fill_value = fill_value
+        # Held as an AbstractFill so a dynamic fill survives ftype round trips.
+        self._fill_value = as_fill(fill_value)
         self._element_type = element_type
         self._device = normalize_device(device)
 
@@ -269,7 +272,7 @@ class LazyTensor(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self.ftype.fill_value
+        return self._fill_value.value
 
     @property
     def device(self):
@@ -927,7 +930,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
     expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
-    new_fill_value = apply_fill(f, *[a.fill_value for a in args])
+    new_fill_value = apply_fill(f, *[a.ftype.fill_value for a in args])
     new_element_type = return_type(f, *[a.element_type for a in args])
     tensors = [a for a, s in zip(args, is_constant, strict=True) if not s]
     ctx = tensors[0].ctx.join(*[x.ctx for x in tensors[1:]])
@@ -2915,7 +2918,7 @@ def outer(x1, x2) -> LazyTensor:
         data,
         ctx,
         (x1.shape[0], x2.shape[0]),
-        apply_fill(ffuncs.mul, x1.fill_value, x2.fill_value),
+        apply_fill(ffuncs.mul, x1.ftype.fill_value, x2.ftype.fill_value),
         return_type(ffuncs.mul, x1.element_type, x2.element_type),
         common_device(x1.device, x2.device),
     )

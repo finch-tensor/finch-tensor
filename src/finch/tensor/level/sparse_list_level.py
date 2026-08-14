@@ -211,7 +211,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 ScalarFType(self.element_type, self.fill_value),
             )
         else:
-            scalar = Scalar(self.fill_value, self.fill_value)
+            scalar = Scalar(self.fill_value.value, self.fill_value)
 
         tmp_locals = locals()
 

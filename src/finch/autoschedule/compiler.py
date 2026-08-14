@@ -5,7 +5,14 @@ from collections.abc import Iterable
 
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
-from finch.algebra import FinchOperator, FType, ffuncs, ftypes
+from finch.algebra import (
+    DynamicFill,
+    FinchOperator,
+    FType,
+    StaticFill,
+    ffuncs,
+    ftypes,
+)
 from finch.algebra.tensor import TensorFType
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyLibrary
@@ -256,11 +263,16 @@ class NotationContext:
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
                 body = self._lower_query_of_reorder(lhs, ffuncs.overwrite, arg, idxs_2)
+                match self.bindings[lhs].fill_value:
+                    case DynamicFill() as fill:
+                        init = ntn.Literal(fill)
+                    case StaticFill() as fill:
+                        init = ntn.Literal(fill.value)
                 return ntn.Block(
                     (
                         ntn.Declare(
                             self.slots[lhs],
-                            ntn.Literal(self.bindings[lhs].fill_value),
+                            init,
                             ntn.Literal(ffuncs.overwrite),
                             (),
                         ),

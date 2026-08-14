@@ -1,11 +1,10 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import FType, TensorFType, TupleFType, ftype
+from finch.algebra import AbstractFill, FType, TensorFType, TupleFType, ftype
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.codegen import NumpyBufferFType
 from finch.finch_logic import (
@@ -33,7 +32,9 @@ class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
 
 class MonoLogicFormatter(LogicFormatter):
     @abstractmethod
-    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]): ...
+    def get_tensor_ftype(
+        self, fill_value: AbstractFill, shape_type: tuple[FType, ...]
+    ) -> TensorFType: ...
 
     def lower(
         self,
@@ -85,7 +86,9 @@ class MonoLogicFormatter(LogicFormatter):
 
 
 class BufferizedNDArrayFormatter(MonoLogicFormatter):
-    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+    def get_tensor_ftype(
+        self, fill_value: AbstractFill, shape_type: tuple[FType, ...]
+    ):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.

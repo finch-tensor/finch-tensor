@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
 from finch.algebra import (
+    AbstractFill,
     FType,
     FTyped,
     apply_fill,
+    as_fill,
     ffuncs,
     fixpoint_type,
     ftype,
@@ -44,11 +46,14 @@ def reduce_element_type(op, z: Any, t: FType) -> FType:
     return fixpoint_type(op, z, t)
 
 
-def merge_fill_value(op, *args):
+def merge_fill_value(op, *args) -> AbstractFill:
     return apply_fill(op, *args)
 
 
-def reduce_fill_value(op, z, t):
+def reduce_fill_value(op, z, t) -> AbstractFill:
+    # `z` arrives from the IR, so it is a raw value or a Dynamic sentinel;
+    # normalize it, or fills would be compared against raw values downstream.
+    z = as_fill(z)
     # An overwrite reduction's background is the argument's background when
     # the init is not compile-time data.
     if is_dynamic(z) and op is ffuncs.overwrite:
@@ -209,7 +214,7 @@ class LogicExpression(LogicNode):
         """Returns element type of the node."""
         return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
-    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
+    def fill_value(self, bindings: dict[Alias, AbstractFill]) -> AbstractFill:
         """Returns fill value of the node."""
         return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
@@ -266,7 +271,9 @@ class LogicStatement(LogicNode):
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
 
-    def infer_fill_value(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:
+    def infer_fill_value(
+        self, bindings: dict[Alias, AbstractFill]
+    ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)

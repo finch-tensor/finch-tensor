@@ -1,4 +1,4 @@
-from finch.algebra import ffuncs
+from finch.algebra import DynamicFill, StaticFill, ffuncs
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
@@ -138,26 +138,28 @@ def add_aggregates(
             case Query(lhs, Reorder(Aggregate(_, _, arg, idxs), _)):
                 return node
             case Query(lhs, Reorder(arg, idxs)):
+                match fill_values[lhs]:
+                    case DynamicFill() as fill:
+                        init = Literal(fill)
+                    case StaticFill() as fill:
+                        init = Literal(fill.value)
                 return Query(
                     lhs,
                     Reorder(
-                        Aggregate(
-                            Literal(ffuncs.overwrite),
-                            Literal(fill_values[lhs]),
-                            arg,
-                            (),
-                        ),
+                        Aggregate(Literal(ffuncs.overwrite), init, arg, ()),
                         idxs,
                     ),
                 )
             case Query(lhs, Aggregate(_, _, arg, idxs)):
                 return node
             case Query(lhs, arg):
+                match fill_values[lhs]:
+                    case DynamicFill() as fill:
+                        init = Literal(fill)
+                    case StaticFill() as fill:
+                        init = Literal(fill.value)
                 return Query(
-                    lhs,
-                    Aggregate(
-                        Literal(ffuncs.overwrite), Literal(fill_values[lhs]), arg, ()
-                    ),
+                    lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
                 )
 
     return Rewrite(PostWalk(rule_0))(root)

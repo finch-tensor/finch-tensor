@@ -6,6 +6,7 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch.algebra import (
+    AbstractFill,
     FType,
     FTyped,
 )
@@ -37,9 +38,10 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         """
-        Fill value of the fibers, or `None` if dynamic.
+        Fill value of the fibers, and whether kernels may specialize on it.
+        Use `.value` for the value itself.
         """
         ...
 
@@ -192,7 +194,9 @@ class Level(FTyped, ABC):
 
     @property
     def fill_value(self):
-        return self.ftype.fill_value
+        """The fill value itself; see `self.ftype.fill_value` for 
+        dynamic vs static."""
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self):

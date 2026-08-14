@@ -23,7 +23,7 @@ class UniformStatsFactory(
         base = super().__call__(tensor, fields)
 
         if tensor.ndim == 0:
-            nnz = float(tensor.item() != base.fill_value)
+            nnz = float(tensor.item() != base.fill_value.value)
         else:
             lps = get_lp_norms(tensor, fields, norms=(1.0,))
             nnz = lps[fields[0]][0]
