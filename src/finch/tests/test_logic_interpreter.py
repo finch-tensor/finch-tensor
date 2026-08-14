@@ -18,8 +18,10 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    Relabel,
     Reorder,
     Table,
+    TableValue,
 )
 
 from .conftest import finch_assert_equal
@@ -155,3 +157,23 @@ def test_materialize():
 
     assert (result.to_numpy() == expected.to_numpy()).all()
     finch_assert_equal(C, ft.asarray(np.array([[1, 1], [1, 1]])))
+
+
+@pytest.mark.parametrize(
+    "node",
+    [
+        Literal(6.0),
+        Reorder(Literal(6.0), ()),
+        Relabel(Literal(6.0), ()),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), Literal(6.0), ()),
+        MapJoin(Literal(ffuncs.add), (Literal(2.0), Literal(4.0))),
+    ],
+    ids=["literal", "reorder", "relabel", "aggregate", "mapjoin"],
+)
+def test_bare_literal_is_zero_dimensional(node):
+    """A bare Literal evaluates to a rank-0 TableValue, so every node type can
+    consume it without special-casing raw scalars."""
+    result = LogicInterpreter()(node)
+    assert isinstance(result, TableValue)
+    assert result.idxs == ()
+    assert float(np.asarray(result.tns)) == 6.0

@@ -299,12 +299,12 @@ def test_timed_boeing():
     for i, a in enumerate(captured["raw_args"]):
         # print(f"Type of {a} is {type(a)}")
         setattr(Main, f"bencharg{i}", a)
-    countstored = jl.seval("Finch.countstored")
+    # countstored = jl.seval("Finch.countstored")
     # Test to check whether writing to a fresh or filled arguments accounts
     # for the time difference
     # Baically checking if sparsehash fresh or being written to when
     # filled creates a big difference
-
+    """"
     v1_python = jl_tensor_to_python(Main.bencharg1)
     v2_python = jl_tensor_to_python(Main.bencharg2)
 
@@ -329,7 +329,6 @@ def test_timed_boeing():
     print("fresh args @time:")
     jl.seval(f"@time {captured['func_name']}(bencharg0, v1_fresh, v2_fresh);")
 
-    """
     arglist = ", ".join(f"$bencharg{i}" for i in range(len(captured["raw_args"])))
     bench_kernel = jl.seval(f"@benchmark {captured['func_name']}({arglist})")
     print(jl.seval("string")(bench_kernel))

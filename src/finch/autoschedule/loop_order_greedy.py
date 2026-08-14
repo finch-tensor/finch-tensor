@@ -18,7 +18,7 @@ from .loop_order_cost import (
     get_prefix_cost,
     get_reformat_set,
 )
-from .loop_ordering import DefaultLoopOrderer
+from .loop_ordering import AbstractLoopOrderer
 
 
 def connected_loop_candidates(
@@ -123,7 +123,11 @@ def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory,
     stats: dict[Alias, TensorStats],
+    *,
+    output_fields: dict[Alias, tuple[Field, ...]] | None = None,
 ) -> Plan:
+    if output_fields is None:
+        output_fields = {}
     stats_bindings = dict(stats)
     cache: dict[object, TensorStats] = {}
 
@@ -136,14 +140,20 @@ def set_greedy_loop_order(
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, rhs.fields()
                 )
-                aggregate_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
+                output_idxs = output_fields.get(lhs, rhs.fields())
+                aggregate_2 = Reorder(
+                    Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                    output_idxs,
+                )
                 new_queries.append(Query(lhs, aggregate_2))
             case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, rhs.fields()
                 )
+                output_idxs = output_fields.get(lhs, rhs.fields())
                 reorder_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
+                    Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                    output_idxs,
                 )
                 new_queries.append(Query(lhs, reorder_2))
             case Query(_, Reorder(Table(Alias(), _), _)) as q:
@@ -158,11 +168,15 @@ def set_greedy_loop_order(
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class GreedyLoopOrderer(DefaultLoopOrderer):
-    def _set_loop_order(
+class GreedyLoopOrderer(AbstractLoopOrderer):
+    def set_loop_orders(
         self,
         prgm: Plan,
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        return set_greedy_loop_order(prgm, stats_factory, stats)
+        return set_greedy_loop_order(
+            prgm, stats_factory, stats, output_fields=output_fields
+        )
