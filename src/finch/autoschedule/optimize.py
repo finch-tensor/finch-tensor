@@ -158,9 +158,7 @@ def add_aggregates(
                         init = Literal(fill)
                     case StaticFill() as fill:
                         init = Literal(fill.value)
-                return Query(
-                    lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
-                )
+                return Query(lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ()))
 
     return Rewrite(PostWalk(rule_0))(root)
 

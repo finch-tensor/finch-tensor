@@ -9,9 +9,9 @@ from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     DynamicFill,
-    StaticFill,
     FType,
     ImmutableStructFType,
+    StaticFill,
     TensorFType,
     as_fill,
     ffuncs,

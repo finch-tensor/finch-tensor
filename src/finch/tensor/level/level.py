@@ -194,7 +194,7 @@ class Level(FTyped, ABC):
 
     @property
     def fill_value(self):
-        """The fill value itself; see `self.ftype.fill_value` for 
+        """The fill value itself; see `self.ftype.fill_value` for
         dynamic vs static."""
         return self.ftype.fill_value.value
 

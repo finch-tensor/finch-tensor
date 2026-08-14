@@ -86,9 +86,7 @@ class MonoLogicFormatter(LogicFormatter):
 
 
 class BufferizedNDArrayFormatter(MonoLogicFormatter):
-    def get_tensor_ftype(
-        self, fill_value: AbstractFill, shape_type: tuple[FType, ...]
-    ):
+    def get_tensor_ftype(self, fill_value: AbstractFill, shape_type: tuple[FType, ...]):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.
