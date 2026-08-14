@@ -201,6 +201,8 @@ class CycleInFields(Exception): ...
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
     # chains = [c for c in chains if len(c) > 0]
     chains = deepcopy(chains)
+    chains = [c for c in chains if len(c) > 0]
+    print(chains)
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
         for f in chain[1:]:
@@ -280,14 +282,6 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
-    def _set_loop_order(
-        self,
-        prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> Plan:
-        return set_loop_order(prgm)
-
     def lower(
         self,
         prgm: LogicStatement,
@@ -298,7 +292,7 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = self._set_loop_order(prgm, stats, stats_factory)
+            prgm = set_loop_order(prgm)
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
