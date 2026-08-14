@@ -66,6 +66,7 @@ def init_julia() -> tuple[Any, Any]:
             "TensorMarket",
             "Random",
             "Statistics, BenchmarkTools",
+            "Profile",
         ):
             _jl.seval(f"using {pkg}")
         _packages_loaded = True

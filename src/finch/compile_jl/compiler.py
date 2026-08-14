@@ -151,10 +151,17 @@ class FinchJLGenerator:
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
+
                 return (
-                    f"function {name}({arg_str})\n    @finch begin\n"
-                    f"{body_str}\n    end\nend"
+                    f"function {name}({arg_str}) \n @finch begin\n"
+                    f"{body_str}\n  end \n end"
                 )
+                #
+                # return (
+                #    f"function {name}({arg_str})\n Profile.clear()\n
+                # x = @profile begin @finch begin\n"
+                #   f"{body_str}\n    end\nend\n Profile.print() \n return x \n end\n"
+                # )
 
             case ntn.Block(bodies):
                 body_str = ""

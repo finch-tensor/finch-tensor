@@ -231,6 +231,8 @@ def test_timed_boeing():
         captured["func_name"] = self.func_name
         return out
 
+    orig_init = FinchJLKernel.__init__
+    orig_call = FinchJLKernel.__call__
     FinchJLKernel.__init__ = timed_init
     FinchJLKernel.__call__ = timed_call
 
@@ -261,8 +263,8 @@ def test_timed_boeing():
         print(f"\n{kernel.jl_code}")
 
     finally:
-        del FinchJLKernel.__init__
-        del FinchJLKernel.__call__
+        FinchJLKernel.__init__ = orig_init
+        FinchJLKernel.__call__ = orig_call
 
     julia_seval_time = timings["seval"][0]
     cold_arg_conv, warm_arg_conv = timings["arg_conversion"]
@@ -295,21 +297,52 @@ def test_timed_boeing():
 
     Main = get_jl()
     for i, a in enumerate(captured["raw_args"]):
+        # print(f"Type of {a} is {type(a)}")
         setattr(Main, f"bencharg{i}", a)
+    countstored = jl.seval("Finch.countstored")
+    # Test to check whether writing to a fresh or filled arguments accounts
+    # for the time difference
+    # Baically checking if sparsehash fresh or being written to when
+    # filled creates a big difference
 
+    v1_python = jl_tensor_to_python(Main.bencharg1)
+    v2_python = jl_tensor_to_python(Main.bencharg2)
+
+    print("\n --------------------------------------------- \n")
+    print(
+        "stored counts in prefilled args :",
+        countstored(Main.bencharg1),
+        countstored(Main.bencharg2),
+    )
+    print("@time for prefilled args ")
+    jl.seval(f"@time {captured['func_name']}(bencharg0, bencharg1, bencharg2);")
+
+    v1_fresh = tensor_to_jl(v1_python.ftype.construct(v1_python.shape))
+    v2_fresh = tensor_to_jl(v2_python.ftype.construct(v2_python.shape))
+    Main.v1_fresh = v1_fresh
+    Main.v2_fresh = v2_fresh
+    print(
+        "fresh args stored counts :",
+        countstored(Main.v1_fresh),
+        countstored(Main.v2_fresh),
+    )
+    print("fresh args @time:")
+    jl.seval(f"@time {captured['func_name']}(bencharg0, v1_fresh, v2_fresh);")
+
+    """
     arglist = ", ".join(f"$bencharg{i}" for i in range(len(captured["raw_args"])))
     bench_kernel = jl.seval(f"@benchmark {captured['func_name']}({arglist})")
     print(jl.seval("string")(bench_kernel))
+    countstored = jl.seval("Finch.countstored")
+    #print(f"bencharg stored entries : {countstored(Main.bencharg1)}")
+    #print(f"bencharg stored entries : {countstored(Main.bencharg2)}")
 
-    """
     #To check if calling the same function through python adds an overhead
     finch_fn_fresh = getattr(jl, captured["func_name"])
     t0 = time.time()
     _ = finch_fn_fresh(*captured["raw_args"])
     print("fresh python-side recall next to benchmark:", time.time() - t0)
-    """
 
-    """
     #To check the difference between the types of argument we provide in the
     # pipeline and manually
     #Made single_write = True -> improvement
@@ -328,31 +361,7 @@ def test_timed_boeing():
     typeof = jl.seval("typeof")
     print("our pipeline's _v1 type:", typeof(Main.bencharg1))
     print("manual v1_fresh type:", typeof(Main.v1_fresh))
-    """
 
-    """
-    #Test to check whether writing to a fresh or filled arguments accounts
-    # for the time difference
-    #Baically checking if sparsehash fresh or being written to when
-    #filled creates a big difference
-    v1_python = jl_tensor_to_python(Main.bencharg1)
-    v2_python = jl_tensor_to_python(Main.bencharg2)
-
-    v1_fresh_py = v1_python.ftype.construct(v1_python.shape)
-    v2_fresh_py = v2_python.ftype.construct(v2_python.shape)
-
-    v1_fresh_jl = tensor_to_jl(v1_fresh_py)
-    v2_fresh_jl = tensor_to_jl(v2_fresh_py)
-
-    setattr(Main,"v1_fresh_correct",v1_fresh_jl)
-    setattr(Main,"v2_fresh_correct",v2_fresh_jl)
-
-    bench_fresh_correct = jl.seval(f"@benchmark {
-    captured["func_name"]}($bencharg0, $v1_fresh_correct, $v2_fresh_correct)")
-    print(jl.seval("string")(bench_fresh_correct))
-    """
-
-    """
     #Checking if the call overhead is accounting for the time difference
     jl.seval("_noop(x,y,z)=(x,y,z)")
     noop_fn = jl.seval("_noop")
@@ -362,4 +371,24 @@ def test_timed_boeing():
 
     bench_noop = jl.seval("@benchmark _noop($bencharg0, $bencharg1, $bencharg2)")
     print(jl.seval("string")(bench_noop))
+
+    #Tiny example to check julia roundtrip time
+    A = np.arange(9,dtype=np.float64).reshape(3,3)
+    jl_func = '''
+    function identity_kernel(x)
+        return x
+    end
+
+    '''
+
+    kernel = FinchJLKernel("identity_kernel",jl_func)
+    t0 = time.perf_counter()
+    (out,) = kernel(A)
+    t1 = time.perf_counter()
+    print(f"time for cold call : {t1-t0}")
+
+    t2 = time.perf_counter()
+    (out,) = kernel(A)
+    t3 = time.perf_counter()
+    print(f"time for warm call : {t3-t2}")
     """
