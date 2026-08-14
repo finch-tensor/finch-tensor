@@ -1,4 +1,6 @@
 import logging
+from abc import abstractmethod
+from copy import deepcopy
 from functools import reduce
 from itertools import chain as join_chains
 
@@ -178,6 +180,7 @@ class CycleInFields(Exception): ...
 
 
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
+    chains = deepcopy(chains)
     chains = [c for c in chains if len(c) > 0]
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
@@ -223,7 +226,6 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
             for f in chain:
                 counts[f] = counts.get(f, 0) + 1
         result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
-        result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
     return result
 
 
@@ -268,6 +270,17 @@ class AbstractLoopOrderer(LogicLoopOrderOptimizer):
             ctx = MockLogicLoader()
         self.ctx = ctx
 
+    @abstractmethod
+    def set_loop_orders(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> Plan:
+        pass
+
     def lower(
         self,
         prgm: LogicStatement,
@@ -283,7 +296,9 @@ class AbstractLoopOrderer(LogicLoopOrderOptimizer):
                 if isinstance(body, Query)
             }
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = set_loop_order(prgm)
+            prgm = self.set_loop_orders(
+                prgm, stats, stats_factory, output_fields=output_fields
+            )
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)

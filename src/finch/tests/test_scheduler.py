@@ -558,38 +558,31 @@ def test_heuristic_loop_order():
         (
             Query(
                 Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Reorder(
                         Reorder(
-                            Reorder(
-                                MapJoin(
-                                    Literal(ffuncs.mul),
-                                    (
-                                        Reorder(
-                                            Table(
-                                                Alias("A"),
-                                                (Field("i0"), Field("i1")),
-                                            ),
-                                            (Field("i0"), Field("i1")),
-                                        ),
-                                        Reorder(
-                                            Table(
-                                                Alias("B"),
-                                                (Field("i1"), Field("i2")),
-                                            ),
-                                            (Field("i1"), Field("i2")),
-                                        ),
+                            MapJoin(
+                                Literal(ffuncs.mul),
+                                (
+                                    Reorder(
+                                        Table(Alias("A"), (Field("i0"), Field("i1"))),
+                                        (Field("i0"), Field("i1")),
+                                    ),
+                                    Reorder(
+                                        Table(Alias("B"), (Field("i1"), Field("i2"))),
+                                        (Field("i1"), Field("i2")),
                                     ),
                                 ),
-                                (Field("i0"), Field("i2"), Field("i1")),
                             ),
-                            (Field("i0"), Field("i1"), Field("i2")),
+                            (Field("i0"), Field("i2"), Field("i1")),
                         ),
-                        (Field("i1"),),
+                        # The contracted index `i1` is shared by both inputs,
+                        # so it is placed outermost for an outer-product order.
+                        (Field("i1"), Field("i0"), Field("i2")),
                     ),
-                    (Field("i0"), Field("i2")),
+                    (Field("i1"),),
                 ),
             ),
             Produces((Alias("C"),)),
