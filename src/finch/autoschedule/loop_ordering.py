@@ -1,5 +1,4 @@
 import logging
-from copy import deepcopy
 from functools import reduce
 from itertools import chain as join_chains
 
@@ -199,8 +198,7 @@ class CycleInFields(Exception): ...
 
 
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
-    # chains = [c for c in chains if len(c) > 0]
-    chains = deepcopy(chains)
+    chains = [c for c in chains if len(c) > 0]
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
         for f in chain[1:]:
