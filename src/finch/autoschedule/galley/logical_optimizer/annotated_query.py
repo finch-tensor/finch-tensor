@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -20,25 +20,23 @@ from finch.finch_logic import (
     Literal,
     LogicExpression,
     LogicNode,
+    LogicTree,
     MapJoin,
-    Plan,
     Query,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
 )
-from finch.symbolic import (
-    Chain,
-    PostWalk,
-    PreOrderDFS,
-    Rewrite,
-    gensym,
-    intree,
-    isdescendant,
-)
+from finch.symbolic import gensym
+from finch.tensor import Scalar
 
 from .logic_to_stats import insert_statistics
+
+# A location in an expression tree. Unlike a node value, a path identifies one
+# occurrence, so rewrites addressed by path cannot confuse structurally equal
+# subexpressions (e.g. two `Literal(2.0)` constants, repeated tables, ...).
+Path = tuple[int, ...]
 
 
 @dataclass
@@ -47,7 +45,7 @@ class AnnotatedQuery:
     output_name: Alias
     reduce_idxs: list[Field]
     point_expr: LogicExpression
-    idx_lowest_root: OrderedDict[Field, LogicExpression]
+    idx_lowest_path: OrderedDict[Field, Path]
     idx_op: OrderedDict[Field, Any]
     idx_init: OrderedDict[Field, Any]
     parent_idxs: OrderedDict[Field, list[Field]]
@@ -103,35 +101,56 @@ class AnnotatedQuery:
         else:
             output_order = None
         starting_reduce_idxs: list[Field] = []
-        idx_starting_root: OrderedDict[Field, LogicExpression] = OrderedDict()
+        idx_starting_path: OrderedDict[Field, Path] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
         top_counter = 1
         idx_op: OrderedDict[Field, FinchOperator] = OrderedDict()
         idx_init: OrderedDict[Field, Any] = OrderedDict()
 
-        def aggregate_annotation_rule(node: LogicNode) -> LogicNode:
-            nonlocal top_counter
+        def strip_aggregates(
+            node: LogicNode,
+        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal, LogicNode]]]:
+            """Remove Aggregate nodes bottom-up, recording each reduction index
+            together with the path of the aggregate's argument in the stripped
+            tree."""
             match node:
                 case Aggregate(Literal() as op, Literal() as init, arg, idxs):
+                    new_arg, records = strip_aggregates(arg)
                     for idx in idxs:
-                        idx_starting_root[idx] = arg
-                        idx_top_order[idx] = top_counter
-                        top_counter += 1
-
-                        if op.val is None:
-                            idx_op[idx] = ffuncs.init_write(cache[arg].fill_value)
-                            idx_init[idx] = cache[arg].fill_value
-                        else:
-                            idx_op[idx] = op.val
-                            idx_init[idx] = init.val
-
-                        starting_reduce_idxs.append(idx)
-                    return arg
-
+                        records.append((idx, (), op, init, new_arg))
+                    return new_arg, records
+                case LogicTree():
+                    children = node.children
+                    new_children = []
+                    records = []
+                    for i, child in enumerate(children):
+                        new_child, child_records = strip_aggregates(child)
+                        new_children.append(new_child)
+                        records.extend(
+                            (idx, (i, *path), op, init, arg)
+                            for idx, path, op, init, arg in child_records
+                        )
+                    if new_children != children:
+                        node = type(node).from_children(*new_children)
+                    return node, records
                 case _:
-                    return node
+                    return node, []
 
-        point_expr = Rewrite(PostWalk(Chain([aggregate_annotation_rule])))(expr)
+        point_expr, agg_records = strip_aggregates(expr)
+        for idx, agg_path, op_lit, init_lit, agg_arg in agg_records:
+            idx_starting_path[idx] = agg_path
+            idx_top_order[idx] = top_counter
+            top_counter += 1
+
+            if op_lit.val is None:
+                idx_op[idx] = ffuncs.init_write(cache[agg_arg].fill_value)
+                idx_init[idx] = cache[agg_arg].fill_value
+            else:
+                idx_op[idx] = op_lit.val
+                idx_init[idx] = init_lit.val
+
+            starting_reduce_idxs.append(idx)
+
         cache_point: dict[object, TensorStats] = {}
         insert_statistics(
             self.stats_factory,
@@ -146,57 +165,39 @@ class AnnotatedQuery:
         original_idx: OrderedDict[Field, Field] = OrderedDict(
             (idx, idx) for idx in cache[q.rhs].index_order
         )
-        idx_lowest_root: OrderedDict[Field, LogicExpression] = OrderedDict()
+        idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
+        stats_point = cache_point[point_expr]
+        self.idx_dim_size: dict[Field, Any] = dict(stats_point.dim_sizes)
         for idx in starting_reduce_idxs:
             agg_op = idx_op[idx]
-            stats_point = cache_point[point_expr]
-            idx_dim_size = stats_point.dim_sizes[idx]
-            lowest_roots = AnnotatedQuery.find_lowest_roots(
-                agg_op, idx, idx_starting_root[idx]
+            starting_path = idx_starting_path[idx]
+            lowest_paths = AnnotatedQuery.find_lowest_roots(
+                agg_op,
+                idx,
+                cast(
+                    LogicExpression,
+                    AnnotatedQuery.node_at(point_expr, starting_path),
+                ),
+                base=starting_path,
             )
             original_idx[idx] = idx
-            if len(lowest_roots) == 1:
-                idx_lowest_root[idx] = cast(LogicExpression, lowest_roots[0])
+            if len(lowest_paths) == 1:
+                idx_lowest_path[idx] = lowest_paths[0]
                 reduce_idxs.append(idx)
             else:
                 new_idxs = [
                     Field(f"{idx.name}_{i}")
-                    for i, _ in enumerate(lowest_roots, start=1)
+                    for i, _ in enumerate(lowest_paths, start=1)
                 ]
-                for i, node in enumerate(lowest_roots):
-                    if idx not in cache_point[node].index_order:
-                        # If the lowest root doesn't contain the reduction index, we
-                        # attempt to remove the reduction via a repeat_operator, i.e.
-                        # ∑_i B_j = B_j*|Dom(i)|
-                        f = repeat_operator(agg_op)
-                        if f is None:
-                            continue
-                        dim_val = Table(
-                            Literal(idx_dim_size),
-                            (),
-                        )
-                        cache_point[dim_val] = self.stats_factory(idx_dim_size, ())
-                        new_node = MapJoin(Literal(f), (node, dim_val))
-                        cache_point[new_node] = self.stats_factory.mapjoin(
-                            f, cache_point[node], cache_point[dim_val]
-                        )
-                        point_expr = cast(
-                            LogicExpression,
-                            AnnotatedQuery.replace_and_remove_nodes(
-                                point_expr,
-                                node_to_replace=node,
-                                new_node=new_node,
-                                nodes_to_remove=set(),
-                            ),
-                        )
-                        continue
+                for i, path in enumerate(lowest_paths):
                     new_idx = new_idxs[i]
                     idx_op[new_idx] = agg_op
                     idx_init[new_idx] = idx_init[idx]
-                    idx_lowest_root[new_idx] = cast(LogicExpression, node)
-                    idx_starting_root[new_idx] = idx_starting_root[idx]
+                    idx_lowest_path[new_idx] = path
+                    idx_starting_path[new_idx] = starting_path
                     original_idx[new_idx] = idx
                     reduce_idxs.append(new_idx)
+
         parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict(
             (i, []) for i in reduce_idxs
         )
@@ -205,12 +206,13 @@ class AnnotatedQuery:
         )
         for idx1 in reduce_idxs:
             idx1_op = idx_op[idx1]
-            idx1_bottom_root = idx_lowest_root[idx1]
+            idx1_bottom = idx_lowest_path[idx1]
             for idx2 in reduce_idxs:
                 idx2_op = idx_op[idx2]
-                idx2_top_root = idx_starting_root[idx2]
-                idx2_bottom_root = idx_lowest_root[idx2]
-                if intree(idx2_bottom_root, idx1_bottom_root):
+                idx2_top = idx_starting_path[idx2]
+                idx2_bottom = idx_lowest_path[idx2]
+                # idx2's lowest root lies within idx1's lowest root subtree.
+                if idx2_bottom[: len(idx1_bottom)] == idx1_bottom:
                     connected_idxs[idx1].add(idx2)
                 mergeable_agg_op = (
                     idx1_op == idx2_op
@@ -218,8 +220,12 @@ class AnnotatedQuery:
                     and is_commutative(idx1_op)
                 )
                 # If idx1 isn't a parent of idx2, then idx2 can't restrict the
-                # summation of idx1
-                if isdescendant(idx2_top_root, idx1_bottom_root) or (
+                # summation of idx1. idx2 is a parent when its starting root
+                # lies strictly within idx1's lowest root subtree.
+                if (
+                    len(idx2_top) > len(idx1_bottom)
+                    and idx2_top[: len(idx1_bottom)] == idx1_bottom
+                ) or (
                     not mergeable_agg_op
                     and idx_top_order[original_idx[idx2]]
                     < idx_top_order[original_idx[idx1]]
@@ -232,8 +238,8 @@ class AnnotatedQuery:
 
         self.output_name = output_name
         self.reduce_idxs = reduce_idxs
-        self.point_expr = point_expr
-        self.idx_lowest_root = idx_lowest_root
+        self.point_expr = cast(LogicExpression, point_expr)
+        self.idx_lowest_path = idx_lowest_path
         self.idx_op = idx_op
         self.idx_init = idx_init
         self.parent_idxs = parent_idxs
@@ -251,7 +257,7 @@ class AnnotatedQuery:
         new.output_name = self.output_name
         new.point_expr = self.point_expr
         new.reduce_idxs = list(self.reduce_idxs)
-        new.idx_lowest_root = OrderedDict(self.idx_lowest_root.items())
+        new.idx_lowest_path = OrderedDict(self.idx_lowest_path.items())
         new.idx_op = OrderedDict(self.idx_op.items())
         new.idx_init = OrderedDict(self.idx_init.items())
         new.parent_idxs = OrderedDict((m, list(n)) for m, n in self.parent_idxs.items())
@@ -266,6 +272,7 @@ class AnnotatedQuery:
         new.bindings = OrderedDict(self.bindings.items())
         new.cache = OrderedDict(self.cache.items())
         new.cache_point = OrderedDict(self.cache_point.items())
+        new.idx_dim_size = dict(self.idx_dim_size)
 
         return new
 
@@ -401,117 +408,161 @@ class AnnotatedQuery:
         return components
 
     @staticmethod
-    def replace_and_remove_nodes(
-        expr: LogicExpression,
-        node_to_replace: LogicExpression,
-        new_node: LogicExpression,
-        nodes_to_remove: Collection[LogicExpression],
-    ) -> LogicExpression:
+    def node_at(root: LogicNode, path: Path) -> LogicNode:
         """
-        Replace and/or remove arguments of a pointwise MapJoin expression.
+        Return the node at `path`, a sequence of child indices from `root`.
+        """
+        node = root
+        for i in path:
+            node = cast(LogicTree, node).children[i]
+        return node
+
+    @staticmethod
+    def replace_at(
+        root: LogicNode,
+        transforms: Mapping[Path, Callable[[LogicNode], LogicNode | None]],
+    ) -> LogicNode:
+        """
+        Rebuild `root`, applying each transform to the node at its path.
 
         Parameters
         ----------
-        expr : LogicExpression
-            The expression to transform. Typically a `MapJoin` in a pointwise
-            subexpression.
-        node_to_replace : LogicExpression
-            The node to replace when it appears as an argument to `expr`, or as
-            `expr` itself.
-        new_node : LogicExpression
-            The node that replaces `node_to_replace` wherever it is found.
-        nodes_to_remove : Collection[LogicExpression]
-            A collection of nodes that, if present as arguments to a `MapJoin`,
-            should be removed from its argument list.
+        root : LogicNode
+            The expression to transform.
+        transforms : Mapping[Path, Callable[[LogicNode], LogicNode | None]]
+            For each path, a function from the node at that position to its
+            replacement. Returning None removes the node, which is only
+            meaningful for MapJoin arguments. All paths address positions in
+            the original tree.
 
         Returns
         -------
-        LogicExpression
-            A `MapJoin` node with updated arguments if `expr` is a `MapJoin`,
-            `new_node` if `expr == node_to_replace`, or the original `expr`
-            otherwise.
+        LogicNode
+            `root` with every transform applied.
+
+        Notes
+        -----
+        Children are rebuilt before a node's own transform runs, so nested
+        transform paths compose (an outer transform receives the node with
+        inner transforms already applied), and the single traversal never
+        descends into subtrees a transform inserted -- an inserted node can
+        never itself be matched, which is what makes wrapping a node in an
+        expression that contains it safe.
         """
-        nodes_to_remove_set = set(nodes_to_remove)
 
-        def replace_remove_rule(node: LogicExpression) -> LogicExpression | None:
-            match node:
-                case Plan(_) | Query(_, _) | Aggregate(_, _, _, _) as illegal:
-                    raise ValueError(
-                        f"There should be no {type(illegal).__name__} "
-                        "nodes in a pointwise expression."
-                    )
-                case node if (
-                    node == node_to_replace and node not in nodes_to_remove_set
-                ):
-                    return new_node
-                case node if node in nodes_to_remove_set:
-                    return None
-                case MapJoin(op, args) if any(
-                    (arg == node_to_replace) or (arg in nodes_to_remove_set)
-                    for arg in args
-                ):
-                    new_args = []
-                    for arg in args:
-                        if arg in nodes_to_remove_set:
-                            continue
-                        if arg == node_to_replace:
-                            new_args.append(new_node)
-                        else:
-                            new_args.append(arg)
-                    if len(new_args) == 1:
-                        return new_args[0]
-                    return MapJoin(op, tuple(new_args))
-                case _:
-                    return None
+        def rebuild(node: LogicNode, path: Path) -> LogicNode | None:
+            if isinstance(node, LogicTree) and any(
+                len(p) > len(path) and p[: len(path)] == path for p in transforms
+            ):
+                children = node.children
+                new_children = []
+                for i, child in enumerate(children):
+                    new_child = rebuild(child, (*path, i))
+                    if new_child is None:
+                        if not isinstance(node, MapJoin):
+                            raise ValueError(
+                                "Only MapJoin arguments can be removed, not "
+                                f"children of {type(node).__name__}."
+                            )
+                        continue
+                    new_children.append(new_child)
+                if new_children != children:
+                    node = type(node).from_children(*new_children)
+            transform = transforms.get(path)
+            if transform is not None:
+                return transform(node)
+            return node
 
-        return Rewrite(PostWalk(Chain([replace_remove_rule])))(expr)
+        result = rebuild(root, ())
+        if result is None:
+            raise ValueError("Cannot remove the root of an expression.")
+        return result
+
+    @staticmethod
+    def splice_paths(
+        path: Path, replace_path: Path, removal_paths: Iterable[Path]
+    ) -> Path:
+        """
+        Remap `path` through a splice: the node at `replace_path` was replaced
+        and the MapJoin arguments at `removal_paths` (siblings of
+        `replace_path`) were removed, shifting the positions of the arguments
+        after them. Paths inside the replaced or removed subtrees map to the
+        replacement's position, since the kernel they addressed now lives
+        behind it.
+        """
+        removal_paths = list(removal_paths)
+        if path[: len(replace_path)] == replace_path or any(
+            path[: len(r)] == r for r in removal_paths
+        ):
+            path = replace_path
+        for parent in {r[:-1] for r in removal_paths}:
+            if len(path) > len(parent) and path[: len(parent)] == parent:
+                child = path[len(parent)]
+                child -= sum(
+                    1 for r in removal_paths if r[:-1] == parent and r[-1] < child
+                )
+                path = (*parent, child, *path[len(parent) + 1 :])
+        return path
 
     @staticmethod
     def find_lowest_roots(
-        op: FinchOperator, idx: Field, root: LogicExpression
-    ) -> list[LogicExpression]:
+        op: FinchOperator, idx: Field, root: LogicExpression, base: Path = ()
+    ) -> list[Path]:
         """
-        Compute the lowest MapJoin / leaf nodes that a reduction over `idx` can be
-        safely pushed down to in a logical expression.
+        Compute the lowest MapJoin / leaf positions that a reduction over `idx`
+        can be safely pushed down to in a logical expression.
 
         Parameters
         ----------
-        op : Literal
-            The reduction operator node (e.g., Literal(ffunc.add))
-            that we are trying to push down.
+        op : FinchOperator
+            The reduction operator (e.g., ffuncs.add) that we are trying to
+            push down.
         idx : Field
             The index (dimension) being reduced over.
         root : LogicExpression
             The root logical expression under which we search for the lowest
             pushdown positions for the reduction.
+        base : Path
+            The path of `root` in the enclosing expression; returned paths
+            extend it.
 
         Returns
         -------
-        list[LogicExpression]
-            A list of expression nodes representing the lowest positions in
-            the expression tree where the reduction over `idx` with operator
-            `op` can be safely pushed down.
+        list[Path]
+            The paths of the lowest positions in the expression tree where the
+            reduction over `idx` with operator `op` can be safely pushed down.
+            Paths address occurrences, so structurally equal subexpressions at
+            different positions are reported separately.
         """
         match root:
-            case MapJoin(Literal(FinchOperator() as mj_op), args) as mj:
-                args_with = [arg for arg in args if idx in arg.fields()]
-                args_without = [arg for arg in args if idx not in arg.fields()]
+            case MapJoin(Literal(FinchOperator() as mj_op), args):
+                with_idx = [
+                    (i, arg) for i, arg in enumerate(args) if idx in arg.fields()
+                ]
+                without_idx = [
+                    (i, arg) for i, arg in enumerate(args) if idx not in arg.fields()
+                ]
 
-                if len(args_with) == 1 and is_distributive(mj_op, op):
-                    return AnnotatedQuery.find_lowest_roots(op, idx, args_with[0])
+                if len(with_idx) == 1 and is_distributive(mj_op, op):
+                    i, arg = with_idx[0]
+                    return AnnotatedQuery.find_lowest_roots(
+                        op, idx, arg, (*base, i + 1)
+                    )
 
                 if cansplitpush(op, mj_op):
-                    roots_without: list[LogicExpression] = list(args_without)
-                    roots_with: list[LogicExpression] = []
-                    for arg in args_with:
+                    roots_without = [(*base, i + 1) for i, _ in without_idx]
+                    roots_with: list[Path] = []
+                    for i, arg in with_idx:
                         roots_with.extend(
-                            AnnotatedQuery.find_lowest_roots(op, idx, arg)
+                            AnnotatedQuery.find_lowest_roots(
+                                op, idx, arg, (*base, i + 1)
+                            )
                         )
                     return roots_without + roots_with
 
-                return [mj]
-            case Alias(_) | Table(_, _) | Reorder(_, _) as root:
-                return [root]
+                return [base]
+            case Alias(_) | Table(_, _) | Reorder(_, _) | Literal(_):
+                return [base]
             case _:
                 raise ValueError(
                     f"There shouldn't be nodes of type {type(root).__name__} "
@@ -520,7 +571,7 @@ class AnnotatedQuery:
 
     def get_reduce_query(
         self, reduce_idx: Field
-    ) -> tuple[Query, LogicExpression, set[LogicExpression], list[Field]]:
+    ) -> tuple[Query, Path, list[Path], list[Field]]:
         """
         Extract the maximal kernel that depends on `reduce_idx` into a standalone
         reduction query, and return the information needed to splice the result
@@ -530,35 +581,37 @@ class AnnotatedQuery:
         ----------
         reduce_idx : Field
             The index being reduced.
-        aq : AnnotatedQuery
-            The annotated query class
 
         Returns
         -------
         query : Query
             A new Query whose RHS is an Aggregate over the kernel that depends on
             `reduce_idx`.
-        node_to_replace : LogicExpression
-            The subexpression in `aq.point_expr` that will be replaced with the
+        replace_path : Path
+            The position in `self.point_expr` that will be replaced with the
             alias produced by `query`.
-        nodes_to_remove : set[LogicExpression]
-            Child nodes that become redundant after replacing `node_to_replace`.
+        removal_paths : list[Path]
+            Positions of MapJoin arguments (siblings of `replace_path`) that
+            become redundant after the replacement.
         reduced_idxs : list[Field]
             The list of indices actually reduced in `query`.
         """
         original_idx = self.original_idx[reduce_idx]
         reduce_op = self.idx_op[reduce_idx]
-        root_node: LogicExpression = self.idx_lowest_root[reduce_idx]
+        root_path = self.idx_lowest_path[reduce_idx]
+        root_node = cast(
+            LogicExpression, AnnotatedQuery.node_at(self.point_expr, root_path)
+        )
         query_expr: LogicExpression
         idxs_to_be_reduced: set[Field] = set()
-        nodes_to_remove: set[LogicExpression] = set()
-        node_to_replace: LogicExpression = root_node
+        replace_path: Path = root_path
+        removal_paths: list[Path] = []
         reducible_idxs = self.get_reducible_idxs()
         stats_cache = self.cache_point
 
         use_root = False
         match root_node:
-            case MapJoin(Literal(FinchOperator() as op), args) as mj if is_distributive(
+            case MapJoin(Literal(FinchOperator() as op), args) if is_distributive(
                 op, reduce_op
             ):
                 # If you're already reducing one index, then it may
@@ -571,49 +624,48 @@ class AnnotatedQuery:
                 kernel_idxs = set().union(
                     *(stats_cache[arg].index_order for arg in args_with_reduce_idx)
                 )
-                relevant_args = [
-                    arg
-                    for arg in args
+                relevant_pos = [
+                    i
+                    for i, arg in enumerate(args)
                     if set(stats_cache[arg].index_order).issubset(kernel_idxs)
                 ]
-                if len(relevant_args) == len(args):
-                    node_to_replace = mj
+                relevant_args = [args[i] for i in relevant_pos]
+                if len(relevant_pos) == len(args):
+                    replace_path = root_path
                 else:
-                    node_to_replace = relevant_args[0]
-                    for arg in relevant_args[1:]:
-                        for node in PreOrderDFS(arg):
-                            nodes_to_remove.add(cast(LogicExpression, node))
+                    replace_path = (*root_path, relevant_pos[0] + 1)
+                    removal_paths = [(*root_path, i + 1) for i in relevant_pos[1:]]
                 query_expr = MapJoin(Literal(op), tuple(relevant_args))
                 stats_cache[query_expr] = self.stats_factory.mapjoin(
                     op, *[stats_cache[arg] for arg in relevant_args]
                 )
-                relevant_args_set = set(relevant_args)
+                relevant_pos_set = set(relevant_pos)
                 for idx in reducible_idxs:
                     if self.idx_op[idx] != self.idx_op[reduce_idx]:
                         continue
 
-                    args_with_idx = [
-                        arg
-                        for arg in args
+                    pos_with_idx = {
+                        i
+                        for i, arg in enumerate(args)
                         if self.original_idx[idx] in stats_cache[arg].index_order
-                    ]
+                    }
                     if idx in self.connected_idxs[
                         reduce_idx
-                    ] and relevant_args_set.issuperset(args_with_idx):
+                    ] and relevant_pos_set.issuperset(pos_with_idx):
                         idxs_to_be_reduced.add(idx)
             case _:
                 use_root = True
 
         if use_root:
             query_expr = root_node
-            node_to_replace = root_node
+            replace_path = root_path
             reducible_idxs = self.get_reducible_idxs()
             for idx in reducible_idxs:
                 if self.idx_op[idx] != self.idx_op[reduce_idx]:
                     continue
                 if (
                     idx in self.connected_idxs[reduce_idx]
-                    or self.idx_lowest_root[idx] == node_to_replace
+                    or self.idx_lowest_path[idx] == root_path
                 ):
                     idxs_to_be_reduced.add(idx)
 
@@ -628,22 +680,45 @@ class AnnotatedQuery:
         agg_op = self.idx_op[self.original_idx[reduce_idx]]
         agg_init = self.idx_init[self.original_idx[reduce_idx]]
 
+        # An index absent from the extracted kernel is not reduced by iterating:
+        # applying the operator over |Dom(idx)| identical values is the repeat
+        # operator, i.e. sum_i B = B * |Dom(i)|.
+        kernel_order = stats_cache[query_expr].index_order
+        repeat_op = repeat_operator(agg_op)
+        repeated = (
+            []
+            if repeat_op is None
+            else [i for i in final_idxs_to_be_reduced if i not in kernel_order]
+        )
+        aggregated = [i for i in final_idxs_to_be_reduced if i not in repeated]
+
+        # The repeat factor goes under the aggregate, which is equivalent for
+        # these power-like operators (sum_j(K*n) == (sum_j K)*n) and keeps an
+        # Aggregate at the root, as the rest of the optimizer expects.
+        for idx in repeated:
+            factor = Literal(self.idx_dim_size[idx])
+            stats_cache[factor] = self.stats_factory(Scalar(factor.val), ())
+            repeated_expr = MapJoin(Literal(repeat_op), (query_expr, factor))
+            stats_cache[repeated_expr] = self.stats_factory.mapjoin(
+                repeat_op, stats_cache[query_expr], stats_cache[factor]
+            )
+            query_expr = repeated_expr
+
         query_expr = Aggregate(
             Literal(agg_op),
             Literal(agg_init),
             query_expr,
-            tuple(final_idxs_to_be_reduced),
+            tuple(aggregated),
         )
-
         stats_cache[query_expr] = self.stats_factory.aggregate(
             agg_op,
             agg_init,
-            tuple(final_idxs_to_be_reduced),
+            tuple(aggregated),
             stats_cache[query_expr.arg],
         )
 
         query = Query(Alias(gensym("A")), query_expr)
-        return query, node_to_replace, nodes_to_remove, reduced_idxs
+        return query, replace_path, removal_paths, reduced_idxs
 
     def reduce_idx(self, reduce_idx: Field, do_condense: bool = False) -> Query:
         """
@@ -674,7 +749,7 @@ class AnnotatedQuery:
             The newly created `Query` whose RHS computes the reduced kernel; its
             alias is used in the updated `aq.point_expr`.
         """
-        query, node_to_replace, nodes_to_remove, reduced_idxs = self.get_reduce_query(
+        query, replace_path, removal_paths, reduced_idxs = self.get_reduce_query(
             reduce_idx
         )
 
@@ -689,34 +764,28 @@ class AnnotatedQuery:
         )
         alias_idxs = list(self.bindings[alias_expr].index_order)
 
-        new_point_expr: LogicExpression = AnnotatedQuery.replace_and_remove_nodes(
-            expr=cast(LogicExpression, self.point_expr),
-            node_to_replace=node_to_replace,
-            new_node=Table(alias_expr, tuple(alias_idxs)),
-            nodes_to_remove=nodes_to_remove,
+        alias_table = Table(alias_expr, tuple(alias_idxs))
+        transforms: dict[Path, Callable[[LogicNode], LogicNode | None]] = {
+            replace_path: lambda _node: alias_table
+        }
+        for removal_path in removal_paths:
+            transforms[removal_path] = lambda _node: None
+        new_point_expr = cast(
+            LogicExpression,
+            AnnotatedQuery.replace_at(self.point_expr, transforms),
         )
         new_reduce_idxs = [x for x in self.reduce_idxs if x not in reduced_idxs]
-        new_idx_lowest_root: OrderedDict[Field, LogicExpression] = OrderedDict()
+        new_idx_lowest_path: OrderedDict[Field, Path] = OrderedDict()
         new_idx_op: OrderedDict[Field, Any] = OrderedDict()
         new_idx_init: OrderedDict[Field, Any] = OrderedDict()
         new_parent_idxs: OrderedDict[Field, list[Field]] = OrderedDict()
         new_connected_idxs: OrderedDict[Field, set[Field]] = OrderedDict()
-        alias_table = Table(alias_expr, tuple(alias_idxs))
-        for idx in self.idx_lowest_root:
+        for idx in self.idx_lowest_path:
             if idx in reduced_idxs:
                 continue
-            root = self.idx_lowest_root[idx]
-            if root == node_to_replace or root in nodes_to_remove:
-                root = alias_table
-            else:
-                root = AnnotatedQuery.replace_and_remove_nodes(
-                    root,
-                    node_to_replace,
-                    alias_table,
-                    nodes_to_remove,
-                )
-
-            new_idx_lowest_root[idx] = root
+            new_idx_lowest_path[idx] = AnnotatedQuery.splice_paths(
+                self.idx_lowest_path[idx], replace_path, removal_paths
+            )
             new_idx_op[idx] = self.idx_op[idx]
             new_idx_init[idx] = self.idx_init[idx]
             new_idx_op[self.original_idx[idx]] = self.idx_op[idx]
@@ -728,9 +797,9 @@ class AnnotatedQuery:
                 x for x in self.connected_idxs.get(idx, set()) if x not in reduced_idxs
             }
 
-        for idx in new_idx_lowest_root:
-            for idx2 in new_idx_lowest_root:
-                if new_idx_lowest_root[idx] is new_idx_lowest_root[idx2]:
+        for idx in new_idx_lowest_path:
+            for idx2 in new_idx_lowest_path:
+                if new_idx_lowest_path[idx] == new_idx_lowest_path[idx2]:
                     new_connected_idxs[idx].add(idx2)
                     new_connected_idxs[idx2].add(idx)
 
@@ -748,7 +817,7 @@ class AnnotatedQuery:
 
         self.reduce_idxs = new_reduce_idxs
         self.point_expr = new_point_expr
-        self.idx_lowest_root = new_idx_lowest_root
+        self.idx_lowest_path = new_idx_lowest_path
         self.idx_op = new_idx_op
         self.idx_init = new_idx_init
         self.parent_idxs = new_parent_idxs

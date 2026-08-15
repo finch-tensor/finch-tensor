@@ -19,6 +19,7 @@ dependencies = [
 julia = [
     "juliapkg>=0.1.16,<0.2.0",
     "juliacall>=0.9.24,<0.10.0",
+    "ssgetpy>=1.0rc2",
 ]
 
 [dependency-groups]
@@ -88,6 +89,7 @@ c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
+benchmark-julia = { features = ["test", "julia", "benchmark"], solve-group = "julia" }
 docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
@@ -95,6 +97,9 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 [tool.pixi.dependencies]
 finch-tensor.path = "."
+
+[tool.pixi.target.macos-arm64.dependencies]
+libblas = { version = "*", build = "*newaccelerate" }
 
 [tool.pixi.dev]
 finch-tensor.path = "."
@@ -142,6 +147,11 @@ default-environment = "test-julia"
 cmd = "pytest --codspeed benchmarks/"
 depends-on = [{task = "compile", environment = "benchmark"}]
 default-environment = "benchmark"
+
+[tool.pixi.feature.julia.tasks.benchmark-julia]
+cmd = "pytest --codspeed benchmarks/test_julia_boeing.py"
+depends-on = [{task = "compile", environment = "benchmark-julia"}]
+default-environment = "benchmark-julia"
 
 [tool.pixi.feature.test.tasks.type-check]
 cmd = "python -m mypy"
