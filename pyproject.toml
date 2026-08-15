@@ -81,7 +81,7 @@ test = { features = ["test"], solve-group = "default" }
 test-c = { features = ["test", "c"], solve-group = "default" }
 test-mlir = { features = ["test", "mlir"], solve-group = "mlir" }
 mindeps = { features = ["test", "mindeps"], solve-group = "mindeps" }
-benchmark = { features = ["test", "benchmark"], solve-group = "default" }
+benchmark = { features = ["test", "benchmark", "mlir"], solve-group = "mlir" }
 c = { features = ["c"], solve-group = "default" }
 mlir = { features = ["mlir"], solve-group = "mlir" }
 c-gcc = { features = ["c-gcc"], solve-group = "default" }
