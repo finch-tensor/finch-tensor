@@ -201,7 +201,7 @@ class LogicExpression(LogicNode):
 
     def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
-        return self.valmap(merge_element_type, reduce_element_type, bindings)
+        return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
     def fill_value(self, bindings: dict[Alias, Any]) -> Any:
         """Returns fill value of the node."""
@@ -267,9 +267,12 @@ class LogicStatement(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicNode):
+class Literal(LogicExpression):
     """
     Represents a logical AST expression for the literal value `val`.
+
+    A literal behaves as a zero-dimensional tensor: it has no fields, and its
+    element type and fill value are those of `val` itself.
 
     Attributes:
         val: The literal value.
@@ -297,6 +300,25 @@ class Literal(LogicNode):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return ()
+
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        return ()
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.val
 
 
 @dataclass(eq=True, frozen=True)
