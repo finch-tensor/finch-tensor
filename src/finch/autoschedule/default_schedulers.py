@@ -71,7 +71,8 @@ COMPILE_NUMBA = LogicNormalizer(
                     )
                 )
             )
-        )
+        ),
+        cache=True,
     )
 )
 
@@ -121,7 +122,8 @@ COMPILE_MLIR = LogicNormalizer(
                     )
                 )
             )
-        )
+        ),
+        cache=True,
     )
 )
 
