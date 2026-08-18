@@ -3,6 +3,7 @@ from typing import cast
 from finch.interface import compute, lazy
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
+from finch.tensor.scalar import ConstantScalar
 
 from .cfg_builder import (
     NumberedStatement,
@@ -143,7 +144,15 @@ def _insert_compute(
 
 
 def maybelazy(arrs):
-    return tuple(lazy(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
+    # A ConstantScalar is skipped even though it is 0-dimensional: `lazy` would
+    # bind it as a table, and `elementwise` only inlines a constant it receives
+    # directly, so lazifying one silently downgrades it to a runtime operand.
+    return tuple(
+        lazy(arr)
+        if hasattr(arr, "ndim") and not isinstance(arr, ConstantScalar)
+        else arr
+        for arr in arrs
+    )
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
