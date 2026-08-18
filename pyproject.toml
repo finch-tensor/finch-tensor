@@ -109,12 +109,13 @@ compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
 args = [
+    { arg = "pre_commit_skip", default = "" },
     { arg = "njobs", default = "logical" },
 ]
 depends-on = [
     { task = "compile", environment = "test" },
-    { task = "pre-commit", environment = "pre-commit" },
-    "type-check",
+    { task = "pre-commit", environment = "pre-commit", args = ["{{ pre_commit_skip }}"] },
+    { task = "type-check", environment = "test", args = [] },
     { task = "test-array-api", args = ["{{ njobs }}"] },
     { task = "test-only", args = ["{{ njobs }}"] },
 ]
@@ -225,7 +226,13 @@ pre-commit = "*"
 
 [tool.pixi.feature.pre-commit.tasks]
 pre-commit-install = "pre-commit install"
-pre-commit = "pre-commit run -a"
+
+[tool.pixi.feature.pre-commit.tasks.pre-commit]
+args = [
+    { arg = "skip", default = "" },
+]
+env = { "SKIP" = "{{ skip }}" }
+cmd = "pre-commit run -a"
 
 
 [tool.ruff]
