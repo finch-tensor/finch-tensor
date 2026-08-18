@@ -1,8 +1,10 @@
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch
+from finch.tensor import FiberTensor
 
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
@@ -26,3 +28,32 @@ def test_issue_50():
     # n = finch.lazy(np.array([[2, 2, 2, 2], [2, 2, 2, 2]]))
     o = finch.lazy(np.array([[3, 3, 3, 3], [3, 3, 3, 3]]))
     finch.add(finch.add(finch.subtract(x, m), n), o)
+
+
+@pytest.mark.parametrize(
+    ("shapes", "density"),
+    [
+        ((2, 2, 2, 2), 0.01),  # the exact repro from the issue: all-empty matrices
+        ((2, 2, 2, 2), 0.9),
+        ((8, 5, 7, 6), 0.4),
+        ((20, 30, 25, 15), 0.15),
+    ],
+)
+@pytest.mark.usefixtures("numba_compiler")
+def test_issue_620(rng, shapes, density):
+    """Chained matmul over scipy CSR inputs, whose indices are int32."""
+    n, m, k, ell = shapes
+    a, b, c = (
+        sps.random(i, j, density=density, format="csr", random_state=rng)
+        for i, j in ((n, m), (m, k), (k, ell))
+    )
+    a_f, b_f, c_f = (FiberTensor.from_scipy_csr(x) for x in (a, b, c))
+
+    result = finch.compute(
+        finch.matmul(
+            finch.matmul(finch.lazy(a_f), finch.lazy(b_f)),
+            finch.lazy(c_f),
+        )
+    )
+
+    np.testing.assert_allclose(np.asarray(result), (a @ b @ c).toarray())
