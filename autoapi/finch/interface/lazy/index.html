@@ -4255,6 +4255,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.interface.lazy.defer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        defer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.interface.lazy.elementwise" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4342,17 +4353,6 @@
     <span class="md-ellipsis">
       
         is_broadcastable_directional
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.interface.lazy.lazy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        lazy
       
     </span>
   </a>
@@ -5907,6 +5907,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.interface.lazy.defer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        defer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.interface.lazy.elementwise" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5994,17 +6005,6 @@
     <span class="md-ellipsis">
       
         is_broadcastable_directional
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.interface.lazy.lazy" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        lazy
       
     </span>
   </a>
@@ -7391,7 +7391,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Test whether all elements of input array ``x`` along given axis are True.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span>
         <span class="n">ffuncs</span><span class="o">.</span><span class="n">and_</span><span class="p">,</span>
         <span class="n">elementwise</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">truth</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
@@ -7450,7 +7450,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Test whether any element of input array ``x`` along given axis is True.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span>
         <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span>
         <span class="n">elementwise</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">truth</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
@@ -7837,7 +7837,7 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 <span class="sd">    Returns:</span>
 <span class="sd">        A new lazy tensor with the specified shape.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">tensor</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
+    <span class="n">tensor</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">is_broadcastable_directional</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -7901,7 +7901,89 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 <span class="sd">    LazyTensor</span>
 <span class="sd">        A new LazyTensor with the complex conjugate of `x`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">elementwise</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">conjugate</span><span class="p">,</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">elementwise</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">conjugate</span><span class="p">,</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.interface.lazy.defer" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span></code>
+
+</h2>
+          <div class="doc-overloads">
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span>
+</code></pre></div>          </div>
+
+
+    <div class="doc doc-contents ">
+
+        <ul>
+<li>defer(arr) -&gt; LazyTensor:
+Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
+returned as-is.
+Otherwise, it creates a LazyTensor representation of the input array.</li>
+</ul>
+<p>Parameters:
+- arr: The input array to be converted into a LazyTensor.</p>
+<p>Returns:
+- LazyTensor: A lazy representation of the input array.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    - defer(arr) -&gt; LazyTensor:</span>
+<span class="sd">    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is</span>
+<span class="sd">    returned as-is.</span>
+<span class="sd">    Otherwise, it creates a LazyTensor representation of the input array.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - arr: The input array to be converted into a LazyTensor.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - LazyTensor: A lazy representation of the input array.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">defer</span><span class="p">(</span><span class="n">arr_i</span><span class="p">)</span> <span class="k">for</span> <span class="n">arr_i</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">LazyTensor</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">arr</span>
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">complex</span><span class="p">)</span> <span class="k">else</span> <span class="n">asarray</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+    <span class="n">tns</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">))</span>
+    <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">EffectBlob</span><span class="p">(</span><span class="n">stmt</span><span class="o">=</span><span class="n">Query</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">LazyTensor</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8015,7 +8097,7 @@ each index <code>i</code>, <code>out[*i] = f(args[0][*i], args[1][*i], ...)</cod
 <span class="sd">    the input tensors.  After broadcasting the arguments to the same shape, for</span>
 <span class="sd">    each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">lazy</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">defer</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">_broadcast_shape</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">))</span>
     <span class="n">ndim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndim</span><span class="p">))</span>
@@ -8178,7 +8260,7 @@ axis: int
 <span class="sd">    IndexError</span>
 <span class="sd">        If provided an invalid ``axis`` position, an ``IndexError`` should be raised.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
         <span class="n">axis</span> <span class="o">=</span> <span class="p">(</span><span class="n">axis</span><span class="p">,)</span>
     <span class="n">axis</span> <span class="o">=</span> <span class="n">normalize_axis_tuple</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">ndim</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">axis</span><span class="p">))</span>
@@ -8395,88 +8477,6 @@ This is a directional check, so it allows only shape_a to be changed</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="finch.interface.lazy.lazy" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">lazy</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span></code>
-
-</h2>
-          <div class="doc-overloads">
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">lazy</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">lazy</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span>
-</code></pre></div>          </div>
-
-
-    <div class="doc doc-contents ">
-
-        <ul>
-<li>lazy(arr) -&gt; LazyTensor:
-Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
-returned as-is.
-Otherwise, it creates a LazyTensor representation of the input array.</li>
-</ul>
-<p>Parameters:
-- arr: The input array to be converted into a LazyTensor.</p>
-<p>Returns:
-- LazyTensor: A lazy representation of the input array.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
-<span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lazy</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    - lazy(arr) -&gt; LazyTensor:</span>
-<span class="sd">    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is</span>
-<span class="sd">    returned as-is.</span>
-<span class="sd">    Otherwise, it creates a LazyTensor representation of the input array.</span>
-
-<span class="sd">    Parameters:</span>
-<span class="sd">    - arr: The input array to be converted into a LazyTensor.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">    - LazyTensor: A lazy representation of the input array.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">lazy</span><span class="p">(</span><span class="n">arr_i</span><span class="p">)</span> <span class="k">for</span> <span class="n">arr_i</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">)</span>
-
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">LazyTensor</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">arr</span>
-    <span class="n">arr</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">complex</span><span class="p">)</span> <span class="k">else</span> <span class="n">asarray</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
-    <span class="n">tns</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">))</span>
-    <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
-    <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
-    <span class="n">ctx</span> <span class="o">=</span> <span class="n">EffectBlob</span><span class="p">(</span><span class="n">stmt</span><span class="o">=</span><span class="n">Query</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
-    <span class="k">return</span> <span class="n">LazyTensor</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
 <h2 id="finch.interface.lazy.matmul" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span></code>
 
@@ -8559,8 +8559,8 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
             <span class="n">axis</span><span class="o">=-</span><span class="mi">2</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="n">x1</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
-    <span class="n">x2</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">x1</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">x2</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Both inputs must be at least 1D arrays&quot;</span><span class="p">)</span>
@@ -8643,7 +8643,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="sd">    LazyTensor</span>
 <span class="sd">        A new LazyTensor with the axes of `x` transposed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">x</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="c1"># this is following numpy&#39;s behavior.</span>
         <span class="c1"># data-apis specification assumes that input is atleast 2D</span>
@@ -8697,7 +8697,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the maximum of input array ``arr`` along given axis.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="n">keepdims</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8736,7 +8736,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculates the arithmetic mean of the input array ``x``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">axis</span><span class="p">))</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
@@ -8789,7 +8789,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the minimum of input array ``arr`` along given axis.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">min</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="n">keepdims</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="n">init</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8835,7 +8835,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Moves axes of an array to new positions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 
     <span class="c1"># argument validation</span>
     <span class="c1"># handles uniqueness, int -&gt; tuple, and bound check</span>
@@ -8930,7 +8930,7 @@ axes: Tuple[int, ...]
 <span class="sd">        an array containing the axes permutation. The returned array must have the same</span>
 <span class="sd">        data type as ``x``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">arg</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+    <span class="n">arg</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
     <span class="n">axis</span> <span class="o">=</span> <span class="n">normalize_axis_tuple</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="n">arg</span><span class="o">.</span><span class="n">ndim</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">))</span>
     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
     <span class="n">expr</span> <span class="o">=</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idxs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">axis</span><span class="p">))</span>
@@ -9128,7 +9128,7 @@ calculated. The initial value must be compatible with the operation defined by
 <span class="sd">        reduction. The returned array must have a data type as described by the</span>
 <span class="sd">        ``dtype`` parameter above.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">FinchOperator</span><span class="p">)</span>
     <span class="n">explicit_dtype</span> <span class="o">=</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
     <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -9266,7 +9266,7 @@ axis: Union[int, Tuple[int, ...]]
 <span class="sd">        If a specified axis has a size greater than one (i.e., it is not a</span>
 <span class="sd">        singleton dimension), a ``ValueError`` should be raised.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
         <span class="n">axis</span> <span class="o">=</span> <span class="p">(</span><span class="n">axis</span><span class="p">,)</span>
     <span class="n">axis</span> <span class="o">=</span> <span class="n">normalize_axis_tuple</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
@@ -9337,7 +9337,7 @@ axis: Union[int, Tuple[int, ...]]
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculates the standard deviation of the input array ``x``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">axis</span><span class="p">))</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
@@ -9442,8 +9442,8 @@ Otherwise, computes the result eagerly.</p>
 <span class="sd">    Returns a LazyTensor if either x1 or x2 is a LazyTensor.</span>
 <span class="sd">    Otherwise, computes the result eagerly.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x1</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
-    <span class="n">x2</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
 
     <span class="c1"># Parse axes</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axes</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -9549,7 +9549,7 @@ Otherwise, computes the result eagerly.</p>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calculates the variance of the input array ``x``.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">axis</span><span class="p">))</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">axis</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
@@ -9606,8 +9606,8 @@ Otherwise, computes the result eagerly.</p>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Computes the vector dot product along the specified axis.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">x1</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
-    <span class="n">x2</span> <span class="o">=</span> <span class="n">lazy</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
+    <span class="n">x1</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x1</span><span class="p">)</span>
+    <span class="n">x2</span> <span class="o">=</span> <span class="n">defer</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span>
 
     <span class="c1"># check broadcastability</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">is_broadcastable</span><span class="p">(</span><span class="n">x1</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">x2</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>

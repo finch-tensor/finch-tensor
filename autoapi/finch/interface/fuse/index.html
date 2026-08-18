@@ -5262,7 +5262,7 @@ significant performance optimizations by letting the compiler optimize the entir
 operation at once.</p>
 <h3 id="finch.interface.fuse--key-functions">Key Functions:</h3>
 <ul>
-<li><code>lazy</code>: Marks an array as an input to a fused operation.</li>
+<li><code>defer</code>: Marks an array as an input to a fused operation.</li>
 <li><code>compute</code>: Executes the fused operation efficiently.</li>
 <li><code>fuse</code>: Combines multiple operations into a single kernel.</li>
 <li><code>fused</code>: A decorator for marking functions as fused.</li>
@@ -5271,8 +5271,8 @@ operation at once.</p>
 <ol>
 <li>
 <p>Basic Usage:
-    &gt;&gt;&gt; C = lazy(A)
-    &gt;&gt;&gt; D = lazy(B)
+    &gt;&gt;&gt; C = defer(A)
+    &gt;&gt;&gt; D = defer(B)
     &gt;&gt;&gt; E = (C + D) / 2
     &gt;&gt;&gt; compute(E)</p>
 <p>In this example, <code>E</code> represents a fused operation that adds <code>C</code> and <code>D</code> together and
@@ -5296,7 +5296,7 @@ kernel.</p>
 </ol>
 <h3 id="finch.interface.fuse--performance">Performance:</h3>
 <ul>
-<li>Using <code>lazy</code> and <code>compute</code> results in faster execution due to operation fusion.</li>
+<li>Using <code>defer</code> and <code>compute</code> results in faster execution due to operation fusion.</li>
 <li>Different optimizers can be used with <code>compute</code>, such as the Galley optimizer, which
   adapts to the sparsity patterns of the inputs.</li>
 <li>The optimizer can be set using the <code>ctx</code> argument in <code>compute</code>, or via <code>set_scheduler</code>
@@ -5611,7 +5611,7 @@ tuple of tensor results.</p>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
 
-    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">lazy</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">defer</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">),</span> <span class="n">ctx</span><span class="o">=</span><span class="n">ctx</span><span class="p">)</span>

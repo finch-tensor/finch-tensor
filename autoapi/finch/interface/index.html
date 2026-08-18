@@ -5367,6 +5367,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.interface.defer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        defer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.interface.einop" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7591,6 +7602,88 @@ entire operation in an optimized manner using the provided scheduler.</p>
                 <span class="n">outputs</span><span class="p">[</span><span class="n">out_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">asarray</span><span class="p">(</span><span class="n">res</span><span class="p">[</span><span class="n">lazy_idx</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="n">device</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.interface.defer" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span></code>
+
+</h2>
+          <div class="doc-overloads">
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span>
+</code></pre></div>          </div>
+
+
+    <div class="doc doc-contents ">
+
+        <ul>
+<li>defer(arr) -&gt; LazyTensor:
+Converts an array into a LazyTensor. If the input is already a LazyTensor, it is
+returned as-is.
+Otherwise, it creates a LazyTensor representation of the input array.</li>
+</ul>
+<p>Parameters:
+- arr: The input array to be converted into a LazyTensor.</p>
+<p>Returns:
+- LazyTensor: A lazy representation of the input array.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    - defer(arr) -&gt; LazyTensor:</span>
+<span class="sd">    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is</span>
+<span class="sd">    returned as-is.</span>
+<span class="sd">    Otherwise, it creates a LazyTensor representation of the input array.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - arr: The input array to be converted into a LazyTensor.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - LazyTensor: A lazy representation of the input array.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">defer</span><span class="p">(</span><span class="n">arr_i</span><span class="p">)</span> <span class="k">for</span> <span class="n">arr_i</span> <span class="ow">in</span> <span class="n">arr</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="n">LazyTensor</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">arr</span>
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arr</span><span class="p">,</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">complex</span><span class="p">)</span> <span class="k">else</span> <span class="n">asarray</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+    <span class="n">tns</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">))</span>
+    <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+    <span class="n">ctx</span> <span class="o">=</span> <span class="n">EffectBlob</span><span class="p">(</span><span class="n">stmt</span><span class="o">=</span><span class="n">Query</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">LazyTensor</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
