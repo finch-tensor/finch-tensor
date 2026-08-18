@@ -29,7 +29,7 @@ jobs:
             default
             ${{ matrix.suite.environment }}
       - name: Run tests
-        run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} -- --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
+        run: pixi run -e ${{ matrix.suite.environment }} ${{ matrix.suite.task }} ${{ matrix.suite.task == 'test' && 'no-commit-to-branch' || '' }} -- --junit-xml=test-${{ matrix.os }}-Env-${{ matrix.suite.environment }}.xml
       - uses: codecov/codecov-action@v7
 
   test-julia:

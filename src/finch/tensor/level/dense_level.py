@@ -238,9 +238,10 @@ class DenseLevel(Level):
 
     @property
     def stride(self) -> np.integer:
+        dim_t = ftype(self.dimension)
         if self.lvl.ndim == 0 or self.lvl.stride == 0:
-            return np.intp(1)
-        return self.lvl.shape[0] * self.lvl.stride
+            return dim_t(1)
+        return dim_t(self.lvl.shape[0] * self.lvl.stride)
 
     @property
     def ftype(self) -> DenseLevelFType:

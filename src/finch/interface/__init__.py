@@ -147,7 +147,7 @@ from .fuse import (
 from .lazy import (
     LazyTensor,
     asarray,
-    lazy,
+    defer,
 )
 
 __all__ = [
@@ -193,6 +193,7 @@ __all__ = [
     "count_nonzero",
     "cumulative_prod",
     "cumulative_sum",
+    "defer",
     "diag",
     "diff",
     "divide",
@@ -222,7 +223,6 @@ __all__ = [
     "isfinite",
     "isinf",
     "isnan",
-    "lazy",
     "less",
     "less_equal",
     "linalg",

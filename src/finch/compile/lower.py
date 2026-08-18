@@ -179,7 +179,7 @@ class SymbolicExtent(FTyped):
                 raise Exception(node)
 
     def get_unit(self):
-        return ntn.Literal(np.intp(1))
+        return ntn.Literal(self.end_sym.result_type(1))
 
     def get_start(self):
         return self.start_sym
@@ -189,9 +189,8 @@ class SymbolicExtent(FTyped):
 
     @staticmethod
     def point(idx):
-        return SymbolicExtent(
-            idx, ntn.Call(ntn.Literal(ffuncs.add), (idx, ntn.Literal(np.intp(1))))
-        )
+        one = ntn.Literal(idx.result_type(1))
+        return SymbolicExtent(idx, ntn.Call(ntn.Literal(ffuncs.add), (idx, one)))
 
     # TODO: Make it more robust
     def is_sym_point(self):
@@ -272,18 +271,17 @@ class ExtentFType(ImmutableStructFType):
                         )
             return
 
-        map(assert_lowered, PostOrderDFS(body))
+        for node in PostOrderDFS(body):
+            assert_lowered(node)
 
-        idx = asm.Variable(ctx.freshen(idx.name), idx.result_type)
         ctx_2 = ctx.scope()
-        ctx_2.bindings[idx.name] = idx
         ctx_2(body)
         body_3 = asm.Block(ctx_2.emit())
         ctx.exec(
             asm.ForLoop(
-                idx,
-                ext.get_start(),
-                ext.get_end(),
+                ctx(idx),
+                ctx(ext.get_start()),
+                ctx(ext.get_end()),
                 body_3,
             )
         )
@@ -727,11 +725,11 @@ class DefaultPass(LoopletPass):
     def priority(self):
         return float("-inf")
 
-    def __call__(self, ctx, idx, ext, body):
+    def __call__(self, ctx: "LoopletContext", idx, ext: SymbolicExtent, body):
         """
         Default pass that does nothing. This is used when no other pass is selected.
         """
-        ext.result_type.default_loop(ctx, idx, ext, body)
+        ext.ftype.default_loop(ctx.ctx, idx, ext, body)
 
 
 class LoopletContext(Context):

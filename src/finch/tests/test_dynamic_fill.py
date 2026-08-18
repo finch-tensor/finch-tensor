@@ -130,7 +130,7 @@ def test_predicates_conservative_on_dynamic():
 def test_compiled_scalar_operand(ctx):
     arr = np.array([1.0, 2.0, 3.0])
     x = finch.asarray(arr)
-    out = finch.compute(finch.lazy(x) * 2.0, ctx=ctx)
+    out = finch.compute(finch.defer(x) * 2.0, ctx=ctx)
     finch_assert_allclose(out, arr * 2.0)
 
 
@@ -151,7 +151,7 @@ def test_constant_scalar_compiles_per_value():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for v in [1.0, 2.0, 3.0, 4.0, 5.0]:
-        out = finch.compute(finch.lazy(x) + ConstantScalar(v), ctx=ctx)
+        out = finch.compute(finch.defer(x) + ConstantScalar(v), ctx=ctx)
         finch_assert_allclose(out, arr + v)
     assert len(executor.cached_kernels) == 5
 
@@ -161,7 +161,7 @@ def test_constant_scalar_caches_same_value():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for _ in range(5):
-        out = finch.compute(finch.lazy(x) + ConstantScalar(2.0), ctx=ctx)
+        out = finch.compute(finch.defer(x) + ConstantScalar(2.0), ctx=ctx)
         finch_assert_allclose(out, arr + 2.0)
     assert len(executor.cached_kernels) == 1
 
@@ -173,13 +173,13 @@ def test_plain_scalar_single_kernel():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for v in [1.0, 2.0, 3.0, 4.0, 5.0]:
-        out = finch.compute(finch.lazy(x) + v, ctx=ctx)
+        out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
     assert len(executor.cached_kernels) == 1
 
 
 def test_constant_scalar_inlines_to_literal():
-    x = finch.lazy(finch.asarray(np.arange(3.0)))
+    x = finch.defer(finch.asarray(np.arange(3.0)))
     y = x + ConstantScalar(2.0)
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     # One query binds the input table, one the mapjoin; no scalar binding.
@@ -193,7 +193,7 @@ def test_constant_scalar_inlines_to_literal():
 
 
 def test_plain_scalar_becomes_binding():
-    x = finch.lazy(finch.asarray(np.arange(3.0)))
+    x = finch.defer(finch.asarray(np.arange(3.0)))
     y = x + 2.0
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     # The plain scalar is a real 0-d tensor binding: input table, scalar
@@ -213,7 +213,7 @@ def test_scalar_annihilator_keeps_known_fill():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for v in [1.0, 2.0, 3.0]:
-        out = finch.compute(finch.lazy(x) * v, ctx=ctx)
+        out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
     assert len(executor.cached_kernels) == 1
@@ -240,7 +240,7 @@ def test_scalar_correctness_matrix(ctx, op, np_op, values):
     arr = np.array([[1.0, 0.0], [-2.0, 4.0]])
     x = finch.asarray(arr)
     for v in values:
-        out = finch.compute(op(finch.lazy(x), v), ctx=ctx)
+        out = finch.compute(op(finch.defer(x), v), ctx=ctx)
         result = out.to_numpy()
         expected = np_op(arr, v)
         np.testing.assert_array_equal(result, expected)
@@ -257,8 +257,8 @@ def test_stale_fill_regression():
     executor, ctx = _cached_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
-    out_a = finch.compute(finch.lazy(x) + 2.0, ctx=ctx)
-    out_b = finch.compute(finch.lazy(x) + 7.0, ctx=ctx)
+    out_a = finch.compute(finch.defer(x) + 2.0, ctx=ctx)
+    out_b = finch.compute(finch.defer(x) + 7.0, ctx=ctx)
     finch_assert_allclose(out_b, arr + 7.0)
     assert out_b.fill_value == 7.0
     finch_assert_allclose(out_a, arr + 2.0)
@@ -272,7 +272,9 @@ def test_order_independence():
         executor, ctx = _cached_scheduler()
         arr = np.arange(3.0)
         x = finch.asarray(arr)
-        outs = {v: finch.compute(finch.lazy(x) * v, ctx=ctx).to_numpy() for v in values}
+        outs = {
+            v: finch.compute(finch.defer(x) * v, ctx=ctx).to_numpy() for v in values
+        }
         return outs, len(executor.cached_kernels)
 
     outs_a, kernels_a = run([0.0, 2.0])
@@ -301,11 +303,11 @@ def test_galley_scalar_cache_counts():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for v in [1.0, 2.0, 3.0]:
-        out = finch.compute(finch.lazy(x) + v, ctx=ctx)
+        out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
         assert out.fill_value == v
     for v in [0.0, 2.0, 5.0]:
-        out = finch.compute(finch.lazy(x) * v, ctx=ctx)
+        out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
     # one kernel for the adds, one for the muls
@@ -317,7 +319,9 @@ def test_galley_order_independence():
         executor, ctx = _cached_galley_scheduler()
         arr = np.arange(3.0)
         x = finch.asarray(arr)
-        outs = {v: finch.compute(finch.lazy(x) * v, ctx=ctx).to_numpy() for v in values}
+        outs = {
+            v: finch.compute(finch.defer(x) * v, ctx=ctx).to_numpy() for v in values
+        }
         return outs, len(executor.cached_kernels)
 
     outs_a, kernels_a = run([0.0, 2.0])
@@ -395,7 +399,7 @@ def test_sparse_dynamic_fill_channel(backend):
     b = finch.asarray(b_np)
     for fill in [3.0, 7.0]:
         a, a_np = _sparse_fiber(fill, cls=_DynamicFillFiber)
-        out = finch.compute(finch.lazy(a) + finch.lazy(b), ctx=sched)
+        out = finch.compute(finch.defer(a) + finch.defer(b), ctx=sched)
         np.testing.assert_array_equal(out.to_numpy(), a_np + b_np)
     assert len(executor.cached_kernels) == 1
 
@@ -426,7 +430,7 @@ def test_backend_refusal_propagates():
     ctx = LogicNormalizer(LogicExecutor(loader, cache=True))
     x = finch.asarray(np.arange(3.0))
     with pytest.raises(DynamicFillError):
-        finch.compute(finch.lazy(x) + 2.0, ctx=ctx)
+        finch.compute(finch.defer(x) + 2.0, ctx=ctx)
 
 
 def test_ftype_reports_a_fill_and_tensor_reports_a_value():
@@ -455,7 +459,7 @@ def test_executor_output_keeps_a_dynamic_fill():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
 
-    out = finch.compute(finch.lazy(x) + 5.0, ctx=ctx)
+    out = finch.compute(finch.defer(x) + 5.0, ctx=ctx)
     finch_assert_allclose(out, arr + 5.0)
 
     # The value resolved, and it is the right one ...
@@ -473,9 +477,9 @@ def test_dynamic_output_feeds_a_reusable_kernel():
     x = finch.asarray(arr)
 
     for v in [1.0, 2.0, 3.0]:
-        step1 = finch.compute(finch.lazy(x) + v, ctx=ctx)
+        step1 = finch.compute(finch.defer(x) + v, ctx=ctx)
         assert is_dynamic(step1.ftype.fill_value)
-        step2 = finch.compute(finch.lazy(step1) * 2.0, ctx=ctx)
+        step2 = finch.compute(finch.defer(step1) * 2.0, ctx=ctx)
         finch_assert_allclose(step2, (arr + v) * 2.0)
 
     # One kernel for the add, one for the multiply -- not one per fill value.
