@@ -7,8 +7,17 @@ import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
 from finch.algebra.algebra import FinchOperator
 from finch.algebra.ffuncs import make_tuple, overwrite
+from finch.algebra.fill import (
+    AbstractFill,
+    DynamicFill,
+    DynamicFillError,
+    StaticFill,
+    is_dynamic,
+)
+from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finch.symbolic import PostWalk, Rewrite
 
 from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
@@ -99,28 +108,39 @@ class CompiledJLKernel:
     """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
     source text, with no Python-side values left to inject."""
 
-    def __init__(self, func_name: str, jl_code: str):
+    def __init__(
+        self, func_name: str, jl_code: str, dynamic_args: tuple[int, ...] = ()
+    ):
         self.func_name = func_name
         self.jl_code = jl_code
+        self.dynamic_args = dynamic_args
 
     def evaluate(self) -> "FinchJLKernel":
         """Defines the kernel function in the running Julia session,
         returning the now-callable kernel."""
         jl.seval(self.jl_code)
-        return FinchJLKernel(self.func_name, self.jl_code)
+        return FinchJLKernel(self.func_name, self.jl_code, self.dynamic_args)
 
 
 class FinchJLKernel(AssemblyKernel):
     """A kernel already defined (evaluated) in the running Julia session."""
 
-    def __init__(self, func_name, jl_code):
+    def __init__(self, func_name, jl_code, dynamic_args: tuple[int, ...] = ()):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
+        # Argument positions with dynamic fill values that are
+        # arbitrarily set to zero. Other arguments keep their
+        # Known fills.
+        self.dynamic_args = dynamic_args
+        jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args = [tensor_to_jl(arg) for arg in args]
+        raw_args = [
+            tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            for i, arg in enumerate(args)
+        ]
         result = finch_fn(*raw_args)
 
         # @finch_kernel-generated functions return a NamedTuple keyed by the
@@ -148,7 +168,7 @@ class FinchJLGenerator:
         self.pack_dict = {}
         self.names: dict[str, str] = {}
 
-    def __call__(self, prgm: ntn.Module) -> str:
+    def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
         self.names.clear()
         return self.generate_julia(prgm)
@@ -289,6 +309,11 @@ class FinchJLGenerator:
                 return self.pack_dict[name]
 
             case ntn.Literal(val):
+                if isinstance(val, AbstractFill):
+                    # str() would silently emit broken source.
+                    raise DynamicFillError(
+                        "cannot emit a wrapped fill as a Julia literal"
+                    )
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"
@@ -305,28 +330,60 @@ class FinchJLGenerator:
                 raise Exception(f"Unhandled node type: {type(prgm)}")
 
 
+def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
+    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
+    which argument positions carried a Dynamic fill. This is a necessary but
+    potentially unsound rewrite which should be removed eventually.
+    """
+    dynamic_args = tuple(
+        i
+        for i, arg in enumerate(func.args)
+        if is_dynamic(getattr(arg.type_, "fill_value", None))
+    )
+
+    def rule(node):
+        match node:
+            case ntn.Literal(DynamicFill() as fill):
+                return ntn.Literal(ftype(fill.value)(0))
+            case ntn.Literal(StaticFill() as fill):
+                return ntn.Literal(fill.value)
+        return None
+
+    return Rewrite(PostWalk(rule))(func), dynamic_args
+
+
 class FinchJLCompiler(NotationCompiler):
     # Keyed by (generated source, per-arg Julia type strings): the generated
     # source alone isn't self-describing here -- argument types are inferred
     # by @finch_kernel from prototype *values*, not written into the source
     # text, so two calls with identical bodies but different argument types
     # would otherwise collide on the same cache entry.
-    _kernels: ClassVar[dict[tuple[str, tuple[str, ...]], FinchJLKernel]] = {}
+    _kernels: ClassVar[
+        dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
+    ] = {}
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
 
         kernel_dict = {}
-        for func in prgm.children:
+        for orig_func in prgm.children:
+            func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
-            arg_type_strs = tuple(ftype_to_jl_type_str(arg.type_) for arg in func.args)
-            key = (generated_prgm, arg_type_strs)
+            arg_type_strs = tuple(
+                ftype_to_jl_type_str(arg.type_)
+                for arg in func.args
+                if arg.type_ is not None
+            )
+            # Flat key: source, argument types, and which fills were pinned. All
+            # three vary independently, so none may be folded into another.
+            key = (generated_prgm, arg_type_strs, dynamic_args)
             kernel = self._kernels.get(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
                 compiled = CompiledJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
+                    dynamic_args=dynamic_args,
                 )
                 kernel = compiled.evaluate()
                 self._kernels[key] = kernel

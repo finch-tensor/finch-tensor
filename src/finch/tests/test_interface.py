@@ -154,7 +154,7 @@ class TestOverrideTensor(finch.OverrideTensor):
 
     @property
     def fill_value(self):
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self):

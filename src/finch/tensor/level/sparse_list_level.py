@@ -5,12 +5,19 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finch.algebra import (
+    FType,
+    ImmutableStructFType,
+    ffuncs,
+    ftype,
+    ftypes,
+    is_dynamic,
+)
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.level import Level, LevelFType
-from finch.tensor.scalar import Scalar
+from finch.tensor.scalar import Scalar, ScalarFType
 
 
 @dataclass(unsafe_hash=True)
@@ -195,7 +202,16 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
         pos = tns.pos
-        scalar = Scalar(self.fill_value, self.fill_value)
+        scalar: ntn.Value | Scalar
+        if is_dynamic(self.fill_value):
+            # The fill arrives at bind time: gap reads load it from the leaf
+            # level's fill field rather than baking a literal.
+            scalar = ntn.Value(
+                self.lower_fill(lvl_asm),
+                ScalarFType(self.element_type, self.fill_value),
+            )
+        else:
+            scalar = Scalar(self.fill_value.value, self.fill_value)
 
         tmp_locals = locals()
 

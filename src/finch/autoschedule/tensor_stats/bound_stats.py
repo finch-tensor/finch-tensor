@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 # Default ell_p norm orders kept by LPStats.
-DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
+DEFAULT_PS: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
 
 
 @dataclass(frozen=True)
