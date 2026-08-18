@@ -41,7 +41,7 @@ def boeing_tensor():
 
 def test_julia_matmul_ct20stif(boeing_tensor, benchmark):
     with with_default_scheduler(COMPILE_JULIA):
-        expr = ft.matmul(ft.lazy(boeing_tensor), ft.lazy(boeing_tensor))
+        expr = ft.matmul(ft.defer(boeing_tensor), ft.defer(boeing_tensor))
 
         # Warmup: JIT-compile the kernel once, outside the timed region.
         ft.compute(expr)

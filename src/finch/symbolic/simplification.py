@@ -24,6 +24,7 @@ from finch.algebra import (
     is_commutative,
     is_idempotent,
     is_identity,
+    return_type,
 )
 
 from .rewriters import RwCallable
@@ -70,9 +71,12 @@ def _run_of_literals(args: Sequence[Term]) -> tuple[int, int]:
 
 
 def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
-    """Run `op` on literal `args` now."""
+    """
+    Run `op` on literal `args`. Apply `return_type` to ensure that we
+    don't alter the type of the output.
+    """
     vals = [arg.val for arg in args if isinstance(arg, LiteralTerm)]
-    return op.make_term(op.head(), op.val(*vals))
+    return op.make_term(op.head(), return_type(op.val, *vals)(op.val(*vals)))
 
 
 def _lift_nested_literals(node: CallTerm) -> Term | None:

@@ -44,7 +44,8 @@ class BufferizedNDArray(OverrideTensor):
     ):
         self.val = val
         self._shape = shape
-        self.strides = strides
+        pos_t = val.ftype.length_type
+        self.strides = tuple(pos_t(stride) for stride in strides)
         elem_t = val.ftype.element_type
         self._fill_value = (
             fill_value
@@ -102,7 +103,7 @@ class BufferizedNDArray(OverrideTensor):
         return BufferizedNDArrayFType(
             buffer_type=ftype(self.val),
             ndim=self.ndim,
-            dimension_type=ftype(self.strides),
+            dimension_type=ftype(self._shape),
             fill_value=self._fill_value,
             device=self._device,
         )
@@ -313,7 +314,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self.buf_t = buffer_type
         self._ndim = ndim
         self.shape_t = dimension_type
-        self.strides_t = dimension_type  # assuming strides is the same type as shape
+        self.strides_t = TupleFType.from_tuple((self.buf_t.length_type,) * ndim)
         fill = as_fill(fill_value)
         elem_t = self.buf_t.element_type
         self._fill_value = (
