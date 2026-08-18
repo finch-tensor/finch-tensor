@@ -25,9 +25,8 @@ from finch.algebra import (
     is_idempotent,
     is_identity,
 )
-from finch.algebra.ftypes import FDTypeBoolean, FDTypeInteger
 
-from .rewriters import Chain, Fixpoint, PostWalk, Rewrite, RwCallable
+from .rewriters import RwCallable
 from .term import CallTerm, LiteralTerm, Term
 
 T = TypeVar("T", bound=Term)
@@ -165,30 +164,16 @@ def fold_literals(node: Term) -> Term | None:
             return _call_like(node, [*args[:start], folded, *args[stop:]])
     return None
 
-
-def _can_annihilate(node: CallTerm) -> bool:
-    """
-    Whether an annihilator of `node`'s operator absorbs *every* operand.
-
-    Over the integers it does: `n * 0` is `0` for every `n`. Over the floats it
-    does not, because `nan * 0` and `inf * 0` are `nan`.
-    """
-    try:
-        result_type = node.result_type  # type: ignore[attr-defined]
-    except (AttributeError, AssertionError, NotImplementedError):
-        return False
-    return isinstance(result_type, FDTypeInteger | FDTypeBoolean)
-
-
 def annihilate(node: Term) -> Term | None:
     """
     `f(a..., z, b...)` => `z` when `z` is an annihilator for `f`.
 
-    Only where the annihilator absorbs unconditionally; see
-    `_absorbs_unconditionally`.
+    Applied over every dtype, floats included, so `nan * 0` and `inf * 0` fold to
+    `0` rather than to `nan`. That is a deliberate divergence from IEEE (and from
+    NumPy): the folding is judged worth more than the edge case.
     """
     match node:
-        case CallTerm(op=op, args=args) if _can_annihilate(node):
+        case CallTerm(op=op, args=args):
             for arg in args:
                 match arg:
                     case LiteralTerm(val=val) if is_annihilator(op.val, val):

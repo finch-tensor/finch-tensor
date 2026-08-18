@@ -9,7 +9,7 @@ from .rewriters import (
     PreWalk,
     Rewrite,
 )
-from .simplification import simplify, simplify_rules
+from .simplification import simplify_rules
 from .stage import Form, Stage, UnvalidatedForm
 from .term import (
     CallTerm,
@@ -48,6 +48,5 @@ __all__ = [
     "intree",
     "isdescendant",
     "literal_repr",
-    "simplify",
     "simplify_rules",
 ]
