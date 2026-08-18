@@ -84,8 +84,15 @@ class BufferizedNDArray(OverrideTensor):
             device=device,
         )
 
-    def __array__(self):
-        return self.to_numpy()
+    def __array__(self, dtype=None, copy=None):
+        out = self.to_numpy()
+        if dtype is not None and out.dtype != dtype:
+            if copy is not None and not copy:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            out = out.astype(dtype)
+        return out
 
     @property
     def ftype(self):
