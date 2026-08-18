@@ -71,6 +71,23 @@ class TermTree(Term, ABC):
         ...
 
 
+class LiteralTerm(Term, ABC):
+    """
+    A leaf term which wraps the constant `val`.
+    """
+
+    val: Any
+
+
+class CallTerm(TermTree, ABC):
+    """
+    A tree term which applies the operator held by the literal `op` to `args`.
+    """
+
+    op: LiteralTerm
+    args: tuple[Term, ...]
+
+
 def _get_repr(val: Any) -> str:
     if isbuiltin(val) or isclass(val) or isfunction(val):
         return f"{val.__module__}.{val.__qualname__}"

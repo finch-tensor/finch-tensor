@@ -4,7 +4,15 @@ from typing import Any
 
 from finch.algebra import ftype, return_type
 from finch.algebra.ftypes import FType
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.symbolic import (
+    CallTerm,
+    Context,
+    LiteralTerm,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_repr,
+)
 from finch.util import qual_str
 
 from .buffer import length_type
@@ -76,7 +84,7 @@ class AssemblyStatement(AssemblyNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(AssemblyExpression):
+class Literal(AssemblyExpression, LiteralTerm):
     """
     Represents the literal value `val`.
 
@@ -255,7 +263,7 @@ class SetAttr(AssemblyTree, AssemblyStatement):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(AssemblyExpression, AssemblyTree):
+class Call(AssemblyExpression, AssemblyTree, CallTerm):
     """
     Represents an expression for calling the function `op` on `args...`.
 
