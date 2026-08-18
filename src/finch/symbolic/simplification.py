@@ -164,6 +164,7 @@ def fold_literals(node: Term) -> Term | None:
             return _call_like(node, [*args[:start], folded, *args[stop:]])
     return None
 
+
 def annihilate(node: Term) -> Term | None:
     """
     `f(a..., z, b...)` => `z` when `z` is an annihilator for `f`.

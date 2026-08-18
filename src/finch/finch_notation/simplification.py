@@ -10,7 +10,7 @@ from .stages import NotationTransform
 class LoopletSimplify(UnvalidatedForm, NotationTransform):
     def lower(self, term: ntn.Module) -> ntn.Module:
         rules = [*simplify_rules(), self.simplify]
-        return  Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
 
     @staticmethod
     def simplify(term: ntn.NotationNode):

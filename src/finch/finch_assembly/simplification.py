@@ -9,7 +9,7 @@ from .stages import AssemblyTransform
 class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
     def lower(self, term: asm.Module) -> asm.Module:
         rules = [*simplify_rules(), self.simplify]
-        return  Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):

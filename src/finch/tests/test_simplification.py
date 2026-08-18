@@ -9,7 +9,6 @@ from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
-    COMPILE_NUMBA,
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
     DefaultLoopOrderer,
@@ -42,6 +41,7 @@ c = ntn.Variable("c", bool_)
 
 def simplify(term):
     return Rewrite(Fixpoint(PostWalk(Chain(simplify_rules()))))(term)
+
 
 def call(op, *args):
     return ntn.Call(ntn.Literal(op), args)
@@ -312,9 +312,10 @@ def test_simplify_logic_mapjoin():
 
 
 def test_annihilator_folds():
-    term = ntn.Call(ntn.Literal(ffuncs.mul), (ntn.Variable("x", ftype(0)),  ntn.Literal(0)))
+    term = ntn.Call(
+        ntn.Literal(ffuncs.mul), (ntn.Variable("x", ftype(0)), ntn.Literal(0))
+    )
     assert_simplifies_to(term, ntn.Literal(0))
-
 
 
 def _capturing_scheduler():
