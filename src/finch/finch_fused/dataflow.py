@@ -1,6 +1,6 @@
 from typing import cast
 
-from finch.interface import compute, lazy
+from finch.interface import compute, defer
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
 
@@ -101,7 +101,7 @@ def _insert_compute(
                 lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
-                    Assign(lazy_vars_tuple, Call(Literal(lazy), (lazy_vars_tuple,))),
+                    Assign(lazy_vars_tuple, Call(Literal(defer), (lazy_vars_tuple,))),
                 )
                 exprs_to_compute = ()
                 return_vars = ()
@@ -142,8 +142,8 @@ def _insert_compute(
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
-def maybelazy(arrs):
-    return tuple(lazy(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
+def maybedefer(arrs):
+    return tuple(defer(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
@@ -156,7 +156,7 @@ def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNo
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
                     Assign(
-                        lazy_vars_tuple, Call(Literal(maybelazy), (lazy_vars_tuple,))
+                        lazy_vars_tuple, Call(Literal(maybedefer), (lazy_vars_tuple,))
                     ),
                 )
                 return Block(lazies + (node,))

@@ -9,8 +9,8 @@ from finch.tensor import FiberTensor
 
 @pytest.mark.usefixtures("interpreter_scheduler")  # TODO: remove
 def test_issue_64():
-    a = finch.lazy(np.arange(1 * 2).reshape(1, 2, 1))
-    b = finch.lazy(np.arange(4 * 2 * 3).reshape(4, 2, 3))
+    a = finch.defer(np.arange(1 * 2).reshape(1, 2, 1))
+    b = finch.defer(np.arange(4 * 2 * 3).reshape(4, 2, 3))
 
     c = finch.multiply(a, b)
     result = finch.compute(c).shape
@@ -19,14 +19,14 @@ def test_issue_64():
 
 
 def test_issue_50():
-    x = finch.lazy(np.array([[2, 4, 6, 8], [1, 3, 5, 7]]))
-    m = finch.lazy(np.array([[1, 1, 1, 1], [1, 1, 1, 1]]))
-    n = finch.lazy(
+    x = finch.defer(np.array([[2, 4, 6, 8], [1, 3, 5, 7]]))
+    m = finch.defer(np.array([[1, 1, 1, 1], [1, 1, 1, 1]]))
+    n = finch.defer(
         np.array([[2.0, 2.0, 2.0, 2.0], [2.0, 2.0, 2.0, 2.0]])
     )  # Int -> Float caused return_type error
     # If replaced above with below line, no error
-    # n = finch.lazy(np.array([[2, 2, 2, 2], [2, 2, 2, 2]]))
-    o = finch.lazy(np.array([[3, 3, 3, 3], [3, 3, 3, 3]]))
+    # n = finch.defer(np.array([[2, 2, 2, 2], [2, 2, 2, 2]]))
+    o = finch.defer(np.array([[3, 3, 3, 3], [3, 3, 3, 3]]))
     finch.add(finch.add(finch.subtract(x, m), n), o)
 
 
@@ -51,8 +51,8 @@ def test_issue_620(rng, shapes, density):
 
     result = finch.compute(
         finch.matmul(
-            finch.matmul(finch.lazy(a_f), finch.lazy(b_f)),
-            finch.lazy(c_f),
+            finch.matmul(finch.defer(a_f), finch.defer(b_f)),
+            finch.defer(c_f),
         )
     )
 

@@ -65,7 +65,7 @@ def _build_expr(empty_last):
     mats = [rng.standard_normal((MAT_DIM, MAT_DIM)) for _ in range(CHAIN_LEN)]
     if empty_last:
         mats[-1].fill(0)
-    lazies = [fl_interface.lazy(fl_interface.asarray(m)) for m in mats]
+    lazies = [fl_interface.defer(fl_interface.asarray(m)) for m in mats]
     return reduce(lambda a, b: a @ b, lazies)
 
 
