@@ -5329,11 +5329,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">297</span>
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
@@ -5365,7 +5361,13 @@
 <span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
-<span class="normal">329</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class representing sparse list level.</span>
@@ -5388,7 +5390,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">stride</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># `stride` is a struct field of type `dimension_type`, so it must be</span>
+        <span class="c1"># returned with that exact type rather than the default `intp`.</span>
+        <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">)(</span><span class="mi">0</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SparseListLevelFType</span><span class="p">:</span>
@@ -5726,7 +5730,11 @@
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
     <span class="n">dimension_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
@@ -5877,7 +5885,7 @@
 <span class="s2">        resize(lvl_idx, qos_stop)</span>
 <span class="s2">        &quot;&quot;&quot;</span>
 
-        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">locals</span><span class="p">()))</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">locals</span><span class="p">(),</span> <span class="n">position_type</span><span class="o">=</span><span class="n">p_t</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_freeze</span><span class="p">(</span>
             <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
@@ -5924,7 +5932,7 @@
 <span class="s2">                i_last = 0</span>
 <span class="s2">            end</span>
 <span class="s2">            &quot;&quot;&quot;</span>
-            <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">tmp_locals</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">tmp_locals</span><span class="p">,</span> <span class="n">position_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">seek_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ext</span><span class="p">):</span>
             <span class="n">start</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">())</span>
@@ -5935,7 +5943,11 @@
 <span class="s2">            end</span>
 <span class="s2">            &quot;&quot;&quot;</span>
 
-            <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">tmp_locals</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">get_vars_in_expr</span><span class="p">(</span><span class="n">start</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span>
+                <span class="n">code</span><span class="p">,</span>
+                <span class="n">tmp_locals</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">get_vars_in_expr</span><span class="p">(</span><span class="n">start</span><span class="p">),</span>
+                <span class="n">position_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">,</span>
+            <span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">chunk_tail_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
             <span class="n">pos_2</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>

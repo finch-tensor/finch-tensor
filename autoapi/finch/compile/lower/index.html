@@ -5646,7 +5646,9 @@ compilation process.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">342</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
 <span class="normal">343</span>
 <span class="normal">344</span>
 <span class="normal">345</span>
@@ -5944,9 +5946,7 @@ compilation process.</p>
 <span class="normal">637</span>
 <span class="normal">638</span>
 <span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
+<span class="normal">640</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compiles Finch Notation to Finch Assembly. Holds the state of the</span>
 <span class="sd">    compilation process.</span>
@@ -6290,7 +6290,9 @@ node.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">497</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
 <span class="normal">498</span>
 <span class="normal">499</span>
 <span class="normal">500</span>
@@ -6433,9 +6435,7 @@ node.</p>
 <span class="normal">637</span>
 <span class="normal">638</span>
 <span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">):</span>
+<span class="normal">640</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Lower Finch Notation to Finch Assembly. First we check for early</span>
 <span class="sd">    simplifications, then we call the normal lowering for the outermost</span>
@@ -6604,7 +6604,9 @@ This is used to create a new context for compiling a block of code.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">405</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
 <span class="normal">406</span>
 <span class="normal">407</span>
 <span class="normal">408</span>
@@ -6613,9 +6615,7 @@ This is used to create a new context for compiling a block of code.</p>
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
-<span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">block</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">block</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Create a new block. Preambles and epilogues will stay within this block.</span>
 <span class="sd">    This is used to create a new context for compiling a block of code.</span>
@@ -6649,16 +6649,16 @@ This is used to create a new context for compiling a block of code.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
 <span class="normal">421</span>
 <span class="normal">422</span>
 <span class="normal">423</span>
 <span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">425</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Create a new scoped context that inherits from this one.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -6691,12 +6691,12 @@ This is used to determine if the function has returned.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">429</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">432</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Check if the current function should halt.</span>
 <span class="sd">    This is used to determine if the function has returned.</span>
@@ -6744,7 +6744,9 @@ This is used to determine if the function has returned.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">329</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
 <span class="normal">330</span>
 <span class="normal">331</span>
 <span class="normal">332</span>
@@ -6752,9 +6754,7 @@ This is used to determine if the function has returned.</p>
 <span class="normal">334</span>
 <span class="normal">335</span>
 <span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyGenerator</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLowerer</span><span class="p">):</span>
+<span class="normal">337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyGenerator</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLowerer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compiles Finch Notation to Finch Assembly.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -6815,25 +6815,25 @@ This is used to determine if the function has returned.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">721</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">719</span>
+<span class="normal">720</span>
+<span class="normal">721</span>
 <span class="normal">722</span>
 <span class="normal">723</span>
 <span class="normal">724</span>
 <span class="normal">725</span>
 <span class="normal">726</span>
 <span class="normal">727</span>
-<span class="normal">728</span>
-<span class="normal">729</span>
-<span class="normal">730</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultPass</span><span class="p">(</span><span class="n">LoopletPass</span><span class="p">):</span>
+<span class="normal">728</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultPass</span><span class="p">(</span><span class="n">LoopletPass</span><span class="p">):</span>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">priority</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;-inf&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">&quot;LoopletContext&quot;</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Default pass that does nothing. This is used when no other pass is selected.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">ext</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+        <span class="n">ext</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6866,15 +6866,15 @@ This is used to determine if the function has returned.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">726</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">724</span>
+<span class="normal">725</span>
+<span class="normal">726</span>
 <span class="normal">727</span>
-<span class="normal">728</span>
-<span class="normal">729</span>
-<span class="normal">730</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+<span class="normal">728</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">&quot;LoopletContext&quot;</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Default pass that does nothing. This is used when no other pass is selected.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">ext</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+    <span class="n">ext</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7027,7 +7027,8 @@ will take on values from start to end-1.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">229</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">228</span>
+<span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span>
 <span class="normal">232</span>
@@ -7086,9 +7087,7 @@ will take on values from start to end-1.</p>
 <span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ExtentFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">start_t</span><span class="p">:</span> <span class="n">FType</span>
     <span class="n">end_t</span><span class="p">:</span> <span class="n">FType</span>
@@ -7134,18 +7133,17 @@ will take on values from start to end-1.</p>
                         <span class="p">)</span>
             <span class="k">return</span>
 
-        <span class="nb">map</span><span class="p">(</span><span class="n">assert_lowered</span><span class="p">,</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">body</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">body</span><span class="p">):</span>
+            <span class="n">assert_lowered</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 
-        <span class="n">idx</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="p">),</span> <span class="n">idx</span><span class="o">.</span><span class="n">result_type</span><span class="p">)</span>
         <span class="n">ctx_2</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
-        <span class="n">ctx_2</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">idx</span>
         <span class="n">ctx_2</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
         <span class="n">body_3</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="n">ctx_2</span><span class="o">.</span><span class="n">emit</span><span class="p">())</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
             <span class="n">asm</span><span class="o">.</span><span class="n">ForLoop</span><span class="p">(</span>
-                <span class="n">idx</span><span class="p">,</span>
-                <span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">(),</span>
-                <span class="n">ext</span><span class="o">.</span><span class="n">get_end</span><span class="p">(),</span>
+                <span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">),</span>
+                <span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">()),</span>
+                <span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_end</span><span class="p">()),</span>
                 <span class="n">body_3</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="p">)</span>
@@ -7183,7 +7181,8 @@ This is used to compile the loop into assembly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">250</span>
+<span class="normal">251</span>
 <span class="normal">252</span>
 <span class="normal">253</span>
 <span class="normal">254</span>
@@ -7194,8 +7193,7 @@ This is used to compile the loop into assembly.</p>
 <span class="normal">259</span>
 <span class="normal">260</span>
 <span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_loop</span><span class="p">(</span>
+<span class="normal">262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_loop</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">ctx</span><span class="p">:</span> <span class="s2">&quot;AssemblyContext&quot;</span><span class="p">,</span>
     <span class="n">idx</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">,</span>
@@ -7713,15 +7711,15 @@ These programs can't break, but calling return sets a special return value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
 <span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">HaltState</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class to represent the halt state of a notation program.</span>
