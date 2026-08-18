@@ -2398,9 +2398,9 @@ def test_moveaxis(shape, source, destination, wrapper, rng):
 @pytest.mark.parametrize(
     "op",
     [
-        lambda xp, x, y: xp.multiply(x, y),
-        lambda xp, x, y: xp.add(x, y),
-        lambda xp, x, _: xp.sum(x, axis=0),
+        pytest.param(lambda xp, x, y: xp.multiply(x, y), id="multiply"),
+        pytest.param(lambda xp, x, y: xp.add(x, y), id="add"),
+        pytest.param(lambda xp, x, _: xp.sum(x, axis=0), id="sum"),
     ],
 )
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
