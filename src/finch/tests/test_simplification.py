@@ -370,7 +370,7 @@ def test_logic_simplify_drops_identity_operands(build, ids):
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
     x = finch.asarray(arr)
     capture, ctx = _capturing_scheduler()
-    out = finch.compute(build(finch.lazy(x)), ctx=ctx)
+    out = finch.compute(build(finch.defer(x)), ctx=ctx)
 
     np.testing.assert_array_equal(out.to_numpy(), arr)
     assert not _mapjoins(capture.last_prgm)
@@ -385,7 +385,7 @@ def test_logic_simplify_leaves_annihilators_to_notation():
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
     x = finch.asarray(arr)
     capture, ctx = _capturing_scheduler()
-    out = finch.compute(finch.lazy(x) * ConstantScalar(0), ctx=ctx)
+    out = finch.compute(finch.defer(x) * ConstantScalar(0), ctx=ctx)
 
     assert out.to_numpy().shape == arr.shape
     np.testing.assert_array_equal(out.to_numpy(), arr * 0)
@@ -428,7 +428,7 @@ def _assembly_for(build):
         )
     )
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
-    out = finch.compute(build(finch.lazy(finch.asarray(arr)), arr), ctx=ctx)
+    out = finch.compute(build(finch.defer(finch.asarray(arr)), arr), ctx=ctx)
     return str(capture.last), out.to_numpy(), arr
 
 
