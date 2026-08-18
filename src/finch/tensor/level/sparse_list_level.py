@@ -164,7 +164,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         resize(lvl_idx, qos_stop)
         """
 
-        ctx.exec(parse_assembly(expr, locals()))
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_freeze(
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
         )
@@ -211,7 +211,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 i_last = 0
             end
             """
-            return parse_assembly(expr, tmp_locals)
+            return parse_assembly(expr, tmp_locals, position_type=self.position_type)
 
         def seek_fn(ctx, ext):
             start = ctx.ctx(ext.get_start())
@@ -222,7 +222,11 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             end
             """
 
-            return parse_assembly(code, tmp_locals | asm.get_vars_in_expr(start))
+            return parse_assembly(
+                code,
+                tmp_locals | asm.get_vars_in_expr(start),
+                position_type=self.position_type,
+            )
 
         def chunk_tail_fn(ctx, idx):
             pos_2 = asm.Variable(
@@ -313,7 +317,9 @@ class SparseListLevel(Level):
 
     @property
     def stride(self) -> np.integer:
-        return np.intp(0)
+        # `stride` is a struct field of type `dimension_type`, so it must be
+        # returned with that exact type rather than the default `intp`.
+        return ftype(self.dimension)(0)
 
     @property
     def ftype(self) -> SparseListLevelFType:
