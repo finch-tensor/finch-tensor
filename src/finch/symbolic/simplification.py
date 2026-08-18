@@ -232,21 +232,3 @@ def simplify_rules() -> list[RwCallable]:
         drop_identities,
         unwrap_singleton,
     ]
-
-
-def simplify(root: T, rules: Sequence[RwCallable] | None = None) -> T:
-    """
-    Algebraically simplify `root` and every term below it.
-
-    Args:
-        root: The term to simplify.
-        rules: The rewrite rules to apply, defaulting to `simplify_rules()`.
-            Pass an extended list to add IR-specific rules to the algebraic
-            ones.
-
-    Returns:
-        The simplified term, or `root` itself if no rule applied anywhere.
-    """
-    if rules is None:
-        rules = simplify_rules()
-    return Rewrite(Fixpoint(PostWalk(Chain(rules))))(root)

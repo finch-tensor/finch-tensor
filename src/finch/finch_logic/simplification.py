@@ -1,6 +1,7 @@
 from finch.algebra.tensor import TensorFType
 from finch.symbolic import UnvalidatedForm
-from finch.symbolic.simplification import annihilate, simplify, simplify_rules
+from finch.symbolic.simplification import annihilate, simplify_rules
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 
 from . import nodes as lgc
 from .stages import LogicLoader
@@ -32,7 +33,7 @@ def simplify_logic(prgm: lgc.LogicStatement) -> lgc.LogicStatement:
     dimension: annihilating `A * 0` here returns a tensor of shape `(1, 1)`.
     """
     rules = [rule for rule in simplify_rules() if rule is not annihilate]
-    return simplify(prgm, [*rules, unwrap_literal])
+    return Rewrite(Fixpoint(PostWalk(Chain(rules))))([*rules, unwrap_literal])(prgm)
 
 
 class LogicSimplify(UnvalidatedForm, LogicLoader):
