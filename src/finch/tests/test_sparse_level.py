@@ -52,8 +52,8 @@ def test_selected_ops(dtype):
     b_np = np.array([[10, 10, 10], [10, 10, 10], [10, 10, 10]], dtype=dtype)
     b = ft.asarray(b_np, format=fmt)
 
-    la = ft.lazy(a)
-    lb = ft.lazy(b)
+    la = ft.defer(a)
+    lb = ft.defer(b)
 
     plan = ft.sum(la, axis=0)
     res = ft.compute(plan)
@@ -112,8 +112,8 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
             np.intp(3),
         )
     )
-    la = ft.lazy(a)
-    lb = ft.lazy(b)
+    la = ft.defer(a)
+    lb = ft.defer(b)
 
     class DummyHandler(logging.Handler):
         def __init__(self, level):
