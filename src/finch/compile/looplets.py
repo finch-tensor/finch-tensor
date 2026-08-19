@@ -348,15 +348,17 @@ class RunPass(LoopletPass):
             match node:
                 case ntn.Access(tns, mode, (j, *idxs)):
                     if j == idx and isinstance(tns, Run):
-                        return ntn.Access(
-                            Leaf(
-                                lambda ctx: ntn.Value(
-                                    asm.Literal(tns.body), tns.body.ftype
+                        if isinstance(tns.body, ntn.Value):
+                            # The body is already a lowered expression (e.g. a
+                            # runtime fill read).
+                            leaf = Leaf(lambda ctx, body=tns.body: body)
+                        else:
+                            leaf = Leaf(
+                                lambda ctx, body=tns.body: ntn.Value(
+                                    asm.Literal(body), body.ftype
                                 )
-                            ),
-                            mode,
-                            (j, *idxs),
-                        )
+                            )
+                        return ntn.Access(leaf, mode, (j, *idxs))
             return None
 
         body_2 = PostWalk(run_node)(body)
