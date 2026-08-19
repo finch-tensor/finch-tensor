@@ -1,4 +1,4 @@
-from finch.algebra import ffuncs
+from finch.algebra import ffuncs, is_annihilator
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
@@ -69,7 +69,7 @@ def get_conjunctive_and_disjunctive_inputs(
                 arg_stats = insert_statistics(
                     stats_factory, arg, stats_bindings, replace=False, cache=cache
                 )
-                arg_is_conjunct = op_node.val.is_annihilator(arg_stats.fill_value)
+                arg_is_conjunct = is_annihilator(op_node.val, arg_stats.fill_value)
                 arg_conjuncts, arg_disjuncts = get_conjunctive_and_disjunctive_inputs(
                     arg,
                     stats_factory,

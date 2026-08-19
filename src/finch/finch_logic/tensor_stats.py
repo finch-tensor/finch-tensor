@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
-from finch.algebra import FinchOperator
+from finch.algebra import AbstractFill, FinchOperator
 
 from .nodes import Field
 
@@ -24,7 +24,7 @@ class TensorStats(ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> Any: ...
+    def fill_value(self) -> AbstractFill: ...
 
 
 T = TypeVar("T", bound=TensorStats)

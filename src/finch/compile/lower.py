@@ -394,8 +394,12 @@ class AssemblyContext(Context):
         fields = dict(type_.struct_fields)
         if "pos" in fields:
             pos_t = fields["pos"]
-        elif "val" in fields:
+        elif "val" in fields and hasattr(fields["val"], "length_type"):
             pos_t = fields["val"].length_type
+        elif getattr(type_, "shape_type", None) == ():
+            # 0-d tensors store their value directly rather than in a
+            # positioned buffer; the cursor position is unused.
+            pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")
         return ntn.Fiber(slot, ntn.Root(), asm.Literal(pos_t(0)), type_)

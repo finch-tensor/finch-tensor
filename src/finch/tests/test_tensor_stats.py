@@ -947,7 +947,7 @@ def test_dummy_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value == 0
+    assert stats.fill_value.value == 0
 
 
 def test_dummy_mapjoin_same_axes():
@@ -1014,7 +1014,7 @@ def test_dummy_mapjoin_non_same_axes():
     )
 
     assert set(stats.index_order) == {i, j, k}
-    assert stats.fill_value == 0.0
+    assert stats.fill_value.value == 0.0
 
 
 def test_dummy_aggregate():
@@ -1103,7 +1103,7 @@ def test_vp_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value == 0
+    assert stats.fill_value.value == 0
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1386,7 +1386,7 @@ def test_uniform_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value == 0
+    assert stats.fill_value.value == 0
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1454,7 +1454,7 @@ def test_uniform_mapjoin_mul_and_add():
         cache=cache,
     )
     assert us_mul.estimate_non_fill_values() == pytest.approx(25.0)
-    assert us_mul.fill_value == 0.0
+    assert us_mul.fill_value.value == 0.0
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
     node_add = MapJoin(Literal(ffuncs.add), (ta, tb))
@@ -1696,7 +1696,7 @@ def test_copy_and_getters():
     assert td_copy.index_order == (Field("i"), Field("j"))
     assert td_copy.dim_sizes == {Field("i"): 2.0, Field("j"): 3.0}
     assert td_copy.get_dim_size(Field("j")) == 3.0
-    assert td_copy.fill_value == 42
+    assert td_copy.fill_value.value == 42
 
 
 @pytest.mark.parametrize(
@@ -1761,7 +1761,7 @@ def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
     out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value == expected_fill
+    assert out.fill_value.value == expected_fill
 
 
 @pytest.mark.parametrize(
@@ -1861,7 +1861,7 @@ def test_base_aggregate(
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value == expected_fill
+    assert out.fill_value.value == expected_fill
 
 
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
@@ -1880,7 +1880,7 @@ def test_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value == 0
+    assert stats.fill_value.value == 0
 
 
 @pytest.mark.parametrize(
@@ -1953,7 +1953,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("i")) == 2.0
     assert dsm.get_dim_size(Field("j")) == 3.0
     assert dsm.get_dim_size(Field("k")) == 4.0
-    assert dsm.fill_value == 1.0
+    assert dsm.fill_value.value == 1.0
 
     node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
     ds_sum = insert_statistics(
@@ -1967,7 +1967,7 @@ def test_mapjoin_mul_and_add():
     assert ds_sum.index_order == (Field("i"), Field("j"))
     assert ds_sum.get_dim_size(Field("i")) == 2.0
     assert ds_sum.get_dim_size(Field("j")) == 3.0
-    assert ds_sum.fill_value == 1.0 + 2.0
+    assert ds_sum.fill_value.value == 1.0 + 2.0
 
 
 def test_aggregate():

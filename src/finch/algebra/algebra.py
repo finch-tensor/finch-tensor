@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .fill import AbstractFill, is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
 
 
@@ -54,12 +55,20 @@ def is_idempotent(op: FinchOperator) -> bool:
     return op.is_idempotent
 
 
+def _specializable(val: Any) -> tuple[bool, Any]:
+    if isinstance(val, AbstractFill):
+        return not is_dynamic(val), val.value
+    return True, val
+
+
 def is_identity(op: FinchOperator, val: Any) -> bool:
-    return op.is_identity(val)
+    ok, value = _specializable(val)
+    return ok and op.is_identity(value)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    return op.is_annihilator(val)
+    ok, value = _specializable(val)
+    return ok and op.is_annihilator(value)
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:

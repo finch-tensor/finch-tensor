@@ -2,7 +2,14 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import FType, ftype, intp, normalize_device
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    StaticFill,
+    ftype,
+    intp,
+    normalize_device,
+)
 from finch.algebra.tensor import Tensor, TensorFType
 
 
@@ -13,8 +20,8 @@ class NumPyFType(TensorFType):
         self._device = normalize_device(device)
 
     @property
-    def fill_value(self) -> Any:
-        return self._dtype.type(0)
+    def fill_value(self) -> AbstractFill:
+        return StaticFill(self._dtype.type(0))
 
     @property
     def element_type(self) -> FType:
@@ -77,7 +84,7 @@ class NumPyWrapper(Tensor):
     @property
     def fill_value(self) -> Any:
         """Default fill value."""
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:

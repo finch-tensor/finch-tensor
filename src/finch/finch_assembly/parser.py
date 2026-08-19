@@ -102,7 +102,6 @@ def parse_assembly(
 
     Example:
         >>> from finch.finch_assembly import nodes as asm
-        >>> import numpy as np
         >>> vars = {"i": asm.Variable("i", int), "arr": asm.Variable("arr", np.ndarray)}
         >>> code = '''finch
         ... arr[i] = 42

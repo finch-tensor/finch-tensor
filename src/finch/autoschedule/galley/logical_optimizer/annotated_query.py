@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from finch.algebra import (
+    DynamicFill,
+    StaticFill,
     cansplitpush,
     ffuncs,
     is_associative,
@@ -144,7 +146,11 @@ class AnnotatedQuery:
 
             if op_lit.val is None:
                 idx_op[idx] = ffuncs.init_write(cache[agg_arg].fill_value)
-                idx_init[idx] = cache[agg_arg].fill_value
+                match cache[agg_arg].fill_value:
+                    case DynamicFill() as fill:
+                        idx_init[idx] = fill
+                    case StaticFill() as fill:
+                        idx_init[idx] = fill.value
             else:
                 idx_op[idx] = op_lit.val
                 idx_init[idx] = init_lit.val
@@ -834,9 +840,14 @@ class AnnotatedQuery:
         expr = self.point_expr
         output_order = tuple(self.output_order or expr.fields())
         if not isinstance(expr, Table):
+            match self.cache_point[expr].fill_value:
+                case DynamicFill() as fill:
+                    init = Literal(fill)
+                case StaticFill() as fill:
+                    init = Literal(fill.value)
             expr = Aggregate(
                 Literal(ffuncs.overwrite),
-                Literal(self.cache_point[expr].fill_value),
+                init,
                 cast(LogicExpression, expr),
                 (),
             )

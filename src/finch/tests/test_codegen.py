@@ -42,7 +42,6 @@ from finch.codegen.numba_codegen import (
     deserialize_from_numba,
     serialize_to_numba,
 )
-from finch.tensor import BufferizedNDArrayFType
 
 from .conftest import finch_assert_equal
 from .utils import mlir_backend
@@ -950,21 +949,6 @@ def test_np_numba_serialization(value, np_type):
     assert deserialize_from_numba(fmt, constructed, serialized) is None
 
 
-@pytest.mark.parametrize(
-    "fmt_fn",
-    [
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
-        ),
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
-        ),
-    ],
-)
 @pytest.mark.usefixtures("numba_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
 def test_e2e_numba(fmt_fn, dtype):
@@ -975,8 +959,8 @@ def test_e2e_numba(fmt_fn, dtype):
     aa = finch.asarray(a, format=fmt)
     bb = finch.asarray(b, format=fmt)
 
-    wa = finch.lazy(aa)
-    wb = finch.lazy(bb)
+    wa = finch.defer(aa)
+    wb = finch.defer(bb)
 
     plan = finch.matmul(wa, wb)
     result = finch.compute(plan)
@@ -1006,26 +990,11 @@ def test_e2e_transpose_numba(a, dtype):
     ``test_notation_compiler.test_if_in_loop_is_lowered``.
     """
     a = a.astype(dtype)
-    wa = finch.lazy(finch.asarray(a))
+    wa = finch.defer(finch.asarray(a))
     result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
     finch_assert_equal(result, a.T)
 
 
-@pytest.mark.parametrize(
-    "fmt_fn",
-    [
-        lambda dtype: BufferizedNDArrayFType(
-            buffer_type=NumpyBufferFType(ftype(dtype)),
-            ndim=2,
-            dimension_type=(ftypes.intp, ftypes.intp),
-        ),
-        lambda dtype: fiber_tensor(
-            dense(
-                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
-            )
-        ),
-    ],
-)
 @mlir_backend
 @pytest.mark.usefixtures("mlir_compiler")
 @pytest.mark.parametrize("dtype", [np.float64, np.int64])
@@ -1041,8 +1010,8 @@ def test_e2e_mlir_dense_matmul(fmt_fn, dtype):
     )
 
     fmt = fmt_fn(dtype)
-    wa = finch.lazy(finch.asarray(a, format=fmt))
-    wb = finch.lazy(finch.asarray(b, format=fmt))
+    wa = finch.defer(finch.asarray(a, format=fmt))
+    wb = finch.defer(finch.asarray(b, format=fmt))
 
     plan = finch.matmul(wa, wb)
     result = finch.compute(plan)
@@ -1180,8 +1149,8 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
     with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.matmul(
-                finch.lazy(finch.asarray(a, format=fmt)),
-                finch.lazy(finch.asarray(b, format=fmt)),
+                finch.defer(finch.asarray(a, format=fmt)),
+                finch.defer(finch.asarray(b, format=fmt)),
             )
         )
 
@@ -1266,8 +1235,8 @@ def test_sparse_matmul_mlir_regression(file_regression, caplog):
     with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.matmul(
-                finch.lazy(sparse_mat[0]),
-                finch.lazy(sparse_mat[1]),
+                finch.defer(sparse_mat[0]),
+                finch.defer(sparse_mat[1]),
             )
         )
 
@@ -1332,10 +1301,10 @@ def test_sddmm_mlir_regression(file_regression, caplog):
     with caplog.at_level(logging.DEBUG):
         result = finch.compute(
             finch.multiply(
-                finch.lazy(sparse_s),
+                finch.defer(sparse_s),
                 finch.matmul(
-                    finch.lazy(finch.asarray(a, format=dense_fmt)),
-                    finch.lazy(finch.asarray(b, format=dense_fmt)),
+                    finch.defer(finch.asarray(a, format=dense_fmt)),
+                    finch.defer(finch.asarray(b, format=dense_fmt)),
                 ),
             )
         )
@@ -1402,7 +1371,7 @@ def test_ctypes_mlir_serialization(value, fmt, c_type):
 )
 def test_e2e_transpose_mlir(a, dtype):
     a = a.astype(dtype)
-    wa = finch.lazy(finch.asarray(a))
+    wa = finch.defer(finch.asarray(a))
     result = finch.compute(finch.permute_dims(wa, axes=(1, 0)))
     finch_assert_equal(result, a.T)
 
