@@ -354,7 +354,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             shape = tuple(int(base.dim_sizes[f]) for f in fields)
             arr = np.zeros(shape, dtype=float)
 
-        fill = base.fill_value
+        fill = base.fill_value.value
 
         # defining one Bernoulli mask per dimension, an entry will survive
         # only if all its indices are kept

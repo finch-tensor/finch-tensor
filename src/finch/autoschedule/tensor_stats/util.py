@@ -20,12 +20,6 @@ from finch.finch_logic import (
     Query,
     Table,
 )
-from finch.tensor import BufferizedNDArray
-
-
-def _scalar(value) -> Table:
-    """A 0-d table holding ``value``, so it broadcasts against any MapJoin arg."""
-    return Table(Literal(BufferizedNDArray.from_numpy(np.asarray(value))), ())
 
 
 def get_lp_norms(
@@ -63,7 +57,7 @@ def get_lp_norms(
     # rather than bound to its own alias, so no full-size temporary is built.
     non_fill = MapJoin(
         Literal(ffuncs.ne),
-        (Table(Literal(arr), fields), _scalar(arr.fill_value)),
+        (Table(Literal(arr), fields), Literal(arr.fill_value)),
     )
 
     bodies: list[Query] = []
@@ -90,7 +84,7 @@ def get_lp_norms(
                 rhs = Aggregate(
                     Literal(ffuncs.add),
                     int_zero,
-                    MapJoin(Literal(ffuncs.ne), (degree_table, _scalar(np.int64(0)))),
+                    MapJoin(Literal(ffuncs.ne), (degree_table, Literal(np.int64(0)))),
                     (field,),
                 )
             elif np.isinf(norm):
@@ -102,7 +96,7 @@ def get_lp_norms(
                     Literal(ffuncs.add),
                     float_zero,
                     MapJoin(
-                        Literal(ffuncs.pow), (degree_table, _scalar(np.float64(norm)))
+                        Literal(ffuncs.pow), (degree_table, Literal(np.float64(norm)))
                     ),
                     (field,),
                 )

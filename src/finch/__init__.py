@@ -242,6 +242,7 @@ from .interface import (
 from .tensor import (
     BufferizedNDArray,
     BufferizedNDArrayFType,
+    ConstantScalar,
     EyeTensor,
     FiberTensor,
     FiberTensorFType,
@@ -311,6 +312,7 @@ __all__ = [
     "CPUFType",
     "CPUThread",
     "CPUThreadFType",
+    "ConstantScalar",
     "DCStats",
     "DenseLevel",
     "DenseLevelFType",

@@ -5,7 +5,8 @@ from typing import Any
 import numpy as np
 
 import finch as ft
-from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
+from finch.algebra.fill import DynamicFill, StaticFill
+from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType, ftype
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType
@@ -168,6 +169,11 @@ def to_jl_vector(T, values, *, offset: int = 0):
 
 
 def _julia_literal(value: Any) -> str:
+    match value:
+        case DynamicFill() as fill:
+            value = ftype(fill.value)(0)
+        case StaticFill() as fill:
+            value = fill.value
     # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
