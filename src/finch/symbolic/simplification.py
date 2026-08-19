@@ -1,21 +1,25 @@
 """
 Basic algebraic simplification.
 
-This module provides an IR-agnostic algebraic simplification pass.
-It applies to any Finch IR whose call and literal nodes implement the
-`CallTerm` and `LiteralTerm` interfaces, which today means
-FinchLogic (`MapJoin`), FinchNotation (`Call`), and FinchAssembly (`Call`).
+This module is a standard library of IR-agnostic rewrite rules. They apply to
+any Finch IR whose call and literal nodes implement the `CallTerm` and
+`LiteralTerm` interfaces, which today means FinchLogic (`MapJoin`),
+FinchNotation (`Call`), and FinchAssembly (`Call`).
 
-No rule mentions a particular operator. Rules are triggered by algebraic properties
-`is_associative`, `is_commutative`, `is_idempotent`, `is_identity`,
-`is_annihilator`, and `arity`. Rules which need to know about specific operators,
-or about IR nodes other than calls, belong in that IR's own simplification pass.
-Rules are applied until fixpoint.
+No rule mentions a particular operator. Rules are triggered by algebraic
+properties `is_associative`, `is_commutative`, `is_idempotent`, `is_identity`,
+`is_annihilator`, and `arity`. Rules which need to know about specific
+operators, or about IR nodes other than calls, belong in that IR's own
+simplification pass.
+
+Each rule takes one small step and leaves the rest to iteration: the IR passes
+run these rules with `Rewrite(Fixpoint(PostWalk(Chain(...))))`, so a rule may
+assume its node's children are already simplified and rewrite only the node at
+hand.
 """
 
 import math
 from collections.abc import Sequence
-from typing import TypeVar
 
 from finch.algebra import (
     arity,
@@ -30,44 +34,10 @@ from finch.algebra import (
 from .rewriters import RwCallable
 from .term import CallTerm, LiteralTerm, Term
 
-T = TypeVar("T", bound=Term)
-
 
 def _call_like(node: CallTerm, args: Sequence[Term]) -> Term:
     """Rebuild `node` with the same operator but new arguments."""
     return node.make_term(node.head(), node.op, *args)
-
-
-def _same_op_leaves(node: CallTerm) -> list[Term]:
-    """Flatten the maximal subtree of same-operator calls into its leaves."""
-    leaves: list[Term] = []
-    for arg in node.args:
-        match arg:
-            case CallTerm(op=inner_op) if inner_op == node.op:
-                leaves.extend(_same_op_leaves(arg))
-            case _:
-                leaves.append(arg)
-    return leaves
-
-
-def _nest(node: CallTerm, args: Sequence[Term]) -> Term:
-    """Rebuild `args` as a left-nested chain of two-argument calls."""
-    result = args[0]
-    for arg in args[1:]:
-        result = _call_like(node, [result, arg])
-    return result
-
-
-def _run_of_literals(args: Sequence[Term]) -> tuple[int, int]:
-    """Return the bounds of the longest run of adjacent literal arguments."""
-    best_start, best_stop = 0, 0
-    start = 0
-    for i, arg in enumerate(args):
-        if not isinstance(arg, LiteralTerm):
-            start = i + 1
-        elif i + 1 - start > best_stop - best_start:
-            best_start, best_stop = start, i + 1
-    return best_start, best_stop
 
 
 def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
@@ -79,42 +49,55 @@ def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
     return op.make_term(op.head(), return_type(op.val, *vals)(op.val(*vals)))
 
 
-def _lift_nested_literals(node: CallTerm) -> Term | None:
-    """
-    `f(x, f(k, y))` => `f(f(k, x), y)` for literal `k` and abelian `f`.
-    """
-    leaves = _same_op_leaves(node)
-    if len(leaves) == len(node.args):
-        return None  # nothing is nested, so the flat branch covers it
-    literals = [leaf for leaf in leaves if isinstance(leaf, LiteralTerm)]
-    if not literals:
-        return None
-    rest = [leaf for leaf in leaves if not isinstance(leaf, LiteralTerm)]
-    rebuilt = _nest(node, [*literals, *rest])
-    return rebuilt if rebuilt != node else None
-
-
 def canonicalize_associative(node: Term) -> Term | None:
     """
-    Bring a nest of same-operator calls into canonical form.
+    Take one step toward the canonical form of a nest of abelian calls.
 
-    - An n-ary `f` absorbs the whole nest into one wide call:
-      `f(a..., f(b...), c...)` => `f(a..., b..., c...)`.
-    - A fixed-arity `f` is re-associated instead, using
-     `_lift_nested_literals`.
+    An n-ary `f` absorbs its immediate `f`-children and moves literals to the
+    front, next to each other: `f(a..., f(b...), c...)` => `f(k..., rest...)`.
+
+    A fixed-arity `f` is instead rotated one step at a time so that literals
+    bubble up and to the left, where adjacent ones merge:
+
+    - `f(x, k)`         => `f(k, x)`
+    - `f(k1, f(k2, y))` => `f(f(k1, k2), y)`
+    - `f(f(k, x), y)`   => `f(k, f(x, y))`
+    - `f(x, f(k, y))`   => `f(k, f(x, y))`
     """
     match node:
-        case CallTerm(op=op):
-            if not (is_associative(op.val) and is_commutative(op.val)):
-                return None
-            if not math.isinf(arity(op.val)):
-                return _lift_nested_literals(node)
-            leaves = _same_op_leaves(node)
-            leaves = [
-                *(arg for arg in leaves if isinstance(arg, LiteralTerm)),
-                *(arg for arg in leaves if not isinstance(arg, LiteralTerm)),
-            ]
-            return _call_like(node, leaves)
+        case CallTerm(op=op, args=args) if is_associative(op.val) and is_commutative(
+            op.val
+        ):
+            if math.isinf(arity(op.val)):
+                # Children were already flattened when they were visited, so
+                # one level of splicing completes the job.
+                flat = [
+                    leaf
+                    for arg in args
+                    for leaf in (
+                        arg.args
+                        if isinstance(arg, CallTerm) and arg.op == op
+                        else (arg,)
+                    )
+                ]
+                flat = sorted(flat, key=lambda leaf: not isinstance(leaf, LiteralTerm))
+                return _call_like(node, flat) if flat != list(args) else None
+            match args:
+                case (x, LiteralTerm() as k) if not isinstance(x, LiteralTerm):
+                    return _call_like(node, [k, x])
+                case (
+                    LiteralTerm() as k1,
+                    CallTerm(op=inner, args=(LiteralTerm() as k2, y)),
+                ) if inner == op:
+                    return _call_like(node, [_evaluate(op, (k1, k2)), y])
+                case (CallTerm(op=inner, args=(LiteralTerm() as k, x)), y) if (
+                    inner == op
+                ):
+                    return _call_like(node, [k, _call_like(node, [x, y])])
+                case (x, CallTerm(op=inner, args=(LiteralTerm() as k, y))) if (
+                    inner == op and not isinstance(x, LiteralTerm)
+                ):
+                    return _call_like(node, [k, _call_like(node, [x, y])])
     return None
 
 
@@ -125,10 +108,7 @@ def dedup_idempotent(node: Term) -> Term | None:
             is_idempotent(op.val) and is_associative(op.val) and is_commutative(op.val)
         ):
             # Does not use set because arg may be unhashable.
-            unique: list[Term] = []
-            for arg in args:
-                if arg not in unique:
-                    unique.append(arg)
+            unique = [arg for i, arg in enumerate(args) if arg not in args[:i]]
             if len(unique) != len(args):
                 return _call_like(node, unique)
     return None
@@ -138,34 +118,35 @@ def fold_literals(node: Term) -> Term | None:
     """
     Evaluate literal arguments at compile time.
 
-    Three branches, each asking more of the operator than the last:
-
     - `f(x, y)` => `literal(f(x, y))` when every argument is a literal. The
       call disappears, so this is sound for any operator.
-    - `f(a..., x, b..., y, c...)` => `f(f(x, y), a..., b..., c...)` when `f` is
-      commutative as well as associative.
-    - `f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` when `f` is only
-      associative, so nothing is reordered and only adjacent literals fold.
+    - `f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` folds adjacent
+      literal pairs of an associative n-ary `f`.
     """
     match node:
         case CallTerm(op=op, args=args) if args:
-            literals = [arg for arg in args if isinstance(arg, LiteralTerm)]
-            if len(literals) == len(args):
+            if all(isinstance(arg, LiteralTerm) for arg in args):
                 return _evaluate(op, args)
-            if (
-                not math.isinf(arity(op.val))
-                or len(literals) < 2
-                or not is_associative(op.val)
-            ):
+            if not (math.isinf(arity(op.val)) and is_associative(op.val)):
                 return None
-            if is_commutative(op.val):
-                rest = [arg for arg in args if not isinstance(arg, LiteralTerm)]
-                return _call_like(node, [_evaluate(op, literals), *rest])
-            start, stop = _run_of_literals(args)
-            if stop - start < 2:
-                return None
-            folded = _evaluate(op, args[start:stop])
-            return _call_like(node, [*args[:start], folded, *args[stop:]])
+            new_args = []
+            running_literal = op.head()(None)
+            on_run = False
+            for x in args:
+                if isinstance(x, LiteralTerm):
+                    running_literal = (
+                        x if not on_run else _evaluate(op, (running_literal, x))
+                    )
+                    on_run = True
+                else:
+                    if on_run:
+                        new_args.append(running_literal)
+                        on_run = False
+                    new_args.append(x)
+            if on_run:
+                new_args.append(running_literal)
+            if new_args != list(args):
+                return _call_like(node, new_args)
     return None
 
 
@@ -174,15 +155,19 @@ def annihilate(node: Term) -> Term | None:
     `f(a..., z, b...)` => `z` when `z` is an annihilator for `f`.
 
     Applied over every dtype, floats included, so `nan * 0` and `inf * 0` fold to
-    `0` rather than to `nan`. That is a deliberate divergence from IEEE (and from
-    NumPy): the folding is judged worth more than the edge case.
+    `0` rather than to `nan`.
+    TODO: add a safe mode for nan
     """
     match node:
         case CallTerm(op=op, args=args):
-            for arg in args:
-                match arg:
-                    case LiteralTerm(val=val) if is_annihilator(op.val, val):
-                        return arg
+            return next(
+                (
+                    arg
+                    for arg in args
+                    if isinstance(arg, LiteralTerm) and is_annihilator(op.val, arg.val)
+                ),
+                None,
+            )
     return None
 
 
@@ -201,7 +186,7 @@ def drop_identities(node: Term) -> Term | None:
                 return None
             # Every argument was an identity, so the call is worth exactly one
             # of them.
-            return _call_like(node, kept or [args[-1]])
+            return _call_like(node, kept or args[-1:])
     return None
 
 
