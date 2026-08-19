@@ -4,6 +4,7 @@ import tempfile
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+from types import FunctionType
 from uuid import UUID
 
 from .config import config, get_version
@@ -22,7 +23,7 @@ def file_cache(*, ext: str, domain: str) -> Callable:
         A wrapper function that caches the result of the original function.
     """
 
-    def decorator(f: Callable) -> Callable:
+    def decorator(f: FunctionType) -> FunctionType:
         nonlocal domain
         nonlocal ext
         ext = ext.lstrip(".")

@@ -4,7 +4,7 @@ import copy
 import math
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
@@ -23,6 +23,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
+from finch.finch_logic.tensor_stats import StatsFactory
 
 TS = TypeVar("TS", bound="BaseTensorStats")
 
@@ -76,7 +77,7 @@ class BaseTensorStats(TensorStats):
         return new
 
     @property
-    def dim_sizes(self) -> Mapping[Field, float]:
+    def dim_sizes(self) -> MutableMapping[Field, float]:
         return self._dim_sizes
 
     @dim_sizes.setter
@@ -115,7 +116,7 @@ class BaseTensorStats(TensorStats):
         return float(prod)
 
 
-class BaseTensorStatsFactory(ABC, Generic[TS]):
+class BaseTensorStatsFactory(StatsFactory[TS]):
     def __init__(self, stats_cls: type[TS]):
         self.stats_cls = stats_cls
 

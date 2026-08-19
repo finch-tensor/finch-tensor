@@ -139,7 +139,7 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
             tbl = idx
         return SparseCOOLevel(lvl, shape, ptr, tbl)
 
-    def from_fields(self, lvl, coo_shape, ptr, idx, tbl=None) -> "SparseCOOLevel":
+    def from_fields(self, lvl, coo_shape, ptr, idx, tbl=None) -> "SparseCOOLevel":  # ty: ignore[invalid-method-override]
         if tbl is None:
             tbl = idx
         return SparseCOOLevel(lvl, coo_shape, ptr, tbl)
@@ -192,7 +192,7 @@ class SparseCOOLevel(Level):
     ptr: Any
     tbl: tuple[Any, ...]
 
-    def __init__(self, lvl, shape, ptr=None, tbl=None):
+    def __init__(self, lvl: Level, shape: tuple[Any, ...], ptr: Any | None = None, tbl: tuple[Any, ...] | None = None):
         self.lvl = lvl
         self.coo_shape = tuple(shape)
         self.ptr = ptr

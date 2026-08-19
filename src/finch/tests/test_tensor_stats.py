@@ -18,17 +18,23 @@ from finch.autoschedule.tensor_stats import (
     BlockedStatsFactory,
     DCStats,
     DCStatsFactory,
+    DenseStats,
     DenseStatsFactory,
+    DummyStats,
     DummyStatsFactory,
+    ExactStats,
+    ExactStatsFactory,
     FDStats,
     FDStatsFactory,
     LPStats,
     LPStatsFactory,
+    SamplingStats,
     SamplingStatsFactory,
+    UniformStats,
     UniformStatsFactory,
+    VPStats,
     VPStatsFactory,
 )
-from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.autoschedule.tensor_stats.sampling_stats import _duj1
 from finch.finch_logic import (
     Aggregate,
@@ -184,7 +190,7 @@ def test_sampling_aggregate():
 
     node = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(k,),
     )
@@ -234,6 +240,7 @@ def test_sampling_reorder():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, SamplingStats)
     reordered = SamplingStatsFactory(sample_prob=1.0).reorder(stats, (j, i))
     assert reordered.index_order == (j, i)
     assert reordered.estimate_non_fill_values() == pytest.approx(
@@ -878,6 +885,7 @@ def test_exact_relabel():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, ExactStats)
     row, col = Field("row"), Field("col")
     relabeled = ExactStatsFactory().relabel(stats, (row, col))
 
@@ -897,6 +905,7 @@ def test_exact_reorder():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, ExactStats)
     reordered = ExactStatsFactory().reorder(stats, (j, i))
 
     assert reordered.index_order == (j, i)
@@ -915,6 +924,7 @@ def test_exact_embedding():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, ExactStats)
     emb = stats.get_embedding()
 
     assert emb.shape == (3,)
@@ -1021,7 +1031,7 @@ def test_dummy_aggregate():
     i, j = Field("i"), Field("j")
     table = Table(Literal(ft.asarray(np.eye(10))), (i, j))
 
-    node_sum = Aggregate(op=Literal(ffuncs.add), init=None, arg=table, idxs=(j,))
+    node_sum = Aggregate(op=Literal(ffuncs.add), init=Literal(0.0), arg=table, idxs=(j,))
     stats = insert_statistics(
         stats_factory=DummyStatsFactory(),
         node=node_sum,
@@ -1061,8 +1071,9 @@ def test_dummy_relabel():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, DummyStats)
     relabeled = DummyStatsFactory().relabel(stats, (Field("m"), Field("n")))
-
+    assert isinstance(relabeled, DummyStats)
     assert relabeled.get_dim_size(Field("m")) == stats.get_dim_size(Field("i"))
     assert relabeled.get_dim_size(Field("n")) == stats.get_dim_size(Field("j"))
 
@@ -1077,6 +1088,7 @@ def test_dummy_reorder():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, DummyStats)
     reordered = DummyStatsFactory().reorder(stats, (Field("j"), Field("i")))
 
     assert reordered.get_dim_size(Field("i")) == stats.get_dim_size(Field("i"))
@@ -1247,6 +1259,7 @@ def test_vp_mapjoin_broadcast():
         replace=False,
         cache=cache,
     )
+    assert isinstance(stats, VPStats)
     assert stats.estimate_non_fill_values() == pytest.approx(2 * 3 + 4 * 3)
     assert stats.V[i] == pytest.approx(4.0)
     assert stats.V[j] == pytest.approx(5.0)
@@ -1260,7 +1273,7 @@ def test_vp_aggregate():
 
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(j,),
     )
@@ -1288,6 +1301,8 @@ def test_vp_copy():
         cache={},
     )
     copy = VPStatsFactory().copy(stats)
+    assert isinstance(stats, VPStats)
+    assert isinstance(copy, VPStats)
     assert copy.nnz == stats.nnz
     assert copy.V == stats.V
     assert copy is not stats
@@ -1304,7 +1319,9 @@ def test_vp_relabel():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, VPStats)
     relabeled = VPStatsFactory().relabel(stats, (Field("row"), Field("col")))
+    assert isinstance(relabeled, VPStats)
     assert relabeled.index_order == (Field("row"), Field("col"))
     assert relabeled.nnz == stats.nnz
     assert relabeled.V[Field("row")] == stats.V[Field("i")]
@@ -1324,6 +1341,7 @@ def test_vp_reorder():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, VPStats)
     reordered = VPStatsFactory().reorder(stats, (Field("j"), Field("i")))
     assert reordered.index_order == (Field("j"), Field("i"))
     assert reordered.nnz == stats.nnz
@@ -1474,7 +1492,7 @@ def test_uniform_aggregate():
     table = Table(Literal(ft.asarray(data)), (Field("i"), Field("j")))
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )
@@ -1664,7 +1682,7 @@ def test_benchmark_structured_comparison():
             g_a = impl_factory(tns_a, (i, k))
             g_b = impl_factory(tns_b, (k, j))
             g_res = impl_factory.aggregate(
-                ffuncs.add, 0.0, (k,), impl_factory.mapjoin(ffuncs.mul, g_a, g_b)
+                ffuncs.add, 0.0, (k,), impl_factory.mapjoin(ffuncs.mul, g_a, g_b)  # ty: ignore[invalid-argument-type]
             )
             g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
 
@@ -1985,7 +2003,7 @@ def test_aggregate():
 
     node_add = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )
@@ -2014,6 +2032,7 @@ def test_relabel_dense_stats():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, DenseStats)
 
     new_stats = DenseStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
@@ -2570,6 +2589,7 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
             replace=False,
             cache={},
         )
+        assert isinstance(s, DCStats)
         _overwrite_def(s, BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0))
         s.dcs = set(dcs)
         stats_objs.append(s)
@@ -3371,6 +3391,7 @@ def test_lp_scalar_tensor():
         replace=False,
         cache={},
     )
+    assert isinstance(stats, LPStats)
     assert stats.estimate_non_fill_values() == 1.0
 
 

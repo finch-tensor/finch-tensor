@@ -6,7 +6,6 @@ import numpy as np
 
 import finch
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
-from finch.autoschedule.default_schedulers import get_default_scheduler
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -94,6 +93,8 @@ class ExactStats(NumericStats):
         self.nnz = self.estimate_non_fill_values()
 
     def estimate_non_fill_values(self) -> float:
+        from finch.autoschedule.default_schedulers import get_default_scheduler
+
         if self.expr is None:
             return 0.0
 

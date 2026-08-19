@@ -1,5 +1,6 @@
 from collections import namedtuple
 
+from numba.core.types.abstract import Literal
 import pytest
 
 import numpy as np
@@ -28,7 +29,7 @@ def test_var_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Variable("x", finch.float32))
     with pytest.raises(asm.AssemblyTypeError):
-        checker(asm.Variable("x", 42))
+        checker(asm.Variable("x", 42))  # ty: ignore[invalid-argument-type]
 
 
 def test_slot_basic():
@@ -58,7 +59,7 @@ def test_getattr_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.GetAttr(asm.Literal("not a struct"), asm.Literal("element_0")))
     with pytest.raises(ValueError):
-        checker(asm.GetAttr(p_var, "x"))
+        checker(asm.GetAttr(p_var, "x"))  # ty: ignore[invalid-argument-type]
 
 
 def test_call_basic():
@@ -131,7 +132,7 @@ def test_repack_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.Repack(slot_a))
     with pytest.raises(ValueError):
-        checker(asm.Repack(asm.Literal(np.int64(42))))
+        checker(asm.Repack(asm.Literal(np.int64(42))))  # ty: ignore[invalid-argument-type]
 
 
 def test_assign_basic():
@@ -146,7 +147,7 @@ def test_assign_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.Assign(
-                asm.Variable("x", asm.Literal(np.float64(2.0))),
+                asm.Variable("x", asm.Literal(np.float64(2.0))),  # ty: ignore[invalid-argument-type]
                 asm.Literal(np.float64(2.0)),
             )
         )
@@ -170,7 +171,7 @@ def test_setattr_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(asm.SetAttr(p_var, asm.Literal("z"), asm.Literal(1)))
     with pytest.raises(ValueError):
-        checker(asm.SetAttr(p_var, "x", asm.Literal(np.float64(3.0))))
+        checker(asm.SetAttr(p_var, Literal("x"), asm.Literal(np.float64(3.0))))
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.SetAttr(
@@ -259,7 +260,7 @@ def test_forloop_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.ForLoop(
-                asm.Variable("x", int),
+                asm.Variable("x", ftype(int)),
                 asm.Literal(np.int64(0)),
                 asm.Literal(np.int64(10)),
                 asm.Assign(
@@ -271,7 +272,7 @@ def test_forloop_basic():
     with pytest.raises(asm.AssemblyTypeError):
         checker(
             asm.ForLoop(
-                asm.Variable("x", int),
+                asm.Variable("x", ftype(int)),
                 asm.Literal(0),
                 asm.Literal(np.int64(10)),
                 asm.Assign(

@@ -150,7 +150,7 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def from_fields(
+    def from_fields(  # ty: ignore[invalid-method-override]
         self, lvl, dimension, subtables, ptr, tbl_ctrl, tbl, pool, perm
     ) -> "SparseHashLevel":
         return SparseHashLevel(

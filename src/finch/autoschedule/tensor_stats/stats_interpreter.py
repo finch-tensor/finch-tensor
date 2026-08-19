@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import overload
+from typing import MutableMapping, TypeVar, overload, Generic
 
 import numpy as np
 
@@ -28,21 +28,23 @@ from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
-from .tensor_stats import TensorStats
+from .tensor_stats import BaseTensorStats, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
+T = TypeVar("T", bound=TensorStats)
 
-class StatsInterpreter:
+
+class StatsInterpreter(Generic[T]):
     def __init__(
         self,
-        stats_factory: StatsFactory,
+        stats_factory: StatsFactory[T],
     ):
         self.stats_factory = stats_factory
 
     def __call__(
-        self, node: LogicNode, bindings: OrderedDict[Alias, TensorStats]
-    ) -> TensorStats | tuple[TensorStats, ...]:
+        self, node: LogicNode, bindings: MutableMapping[Alias, T]
+    ) -> T | tuple[T, ...]:
         machine = StatsMachine(
             stats_factory=self.stats_factory,
             bindings=bindings,
@@ -50,10 +52,10 @@ class StatsInterpreter:
         return machine(node)
 
 
-class StatsMachine:
+class StatsMachine(Generic[T]):
     def __init__(
         self,
-        stats_factory: StatsFactory,
+        stats_factory: T,
         bindings=None,
     ):
         self.stats_factory = stats_factory
@@ -62,22 +64,22 @@ class StatsMachine:
         self.bindings = bindings
 
     @overload
-    def __call__(self, node: LogicExpression) -> TensorStats: ...
+    def __call__(self, node: LogicExpression) -> T: ...
 
     @overload
-    def __call__(self, node: Alias) -> TensorStats: ...
+    def __call__(self, node: Alias) -> T: ...
 
     @overload
-    def __call__(self, node: LogicStatement) -> tuple[TensorStats, ...]: ...
+    def __call__(self, node: LogicStatement) -> tuple[T, ...]: ...
 
     @overload
-    def __call__(self, node: LogicNode) -> TensorStats | tuple[TensorStats, ...]: ...
+    def __call__(self, node: LogicNode) -> T | tuple[T, ...]: ...
 
-    def __call__(self, node) -> TensorStats | tuple[TensorStats, ...]:
+    def __call__(self, node) -> T | tuple[T, ...]:
         logger.debug("Evaluating: %s", node)
         match node:
             case Plan():
-                last_result: TensorStats | tuple[TensorStats, ...] = ()
+                last_result: T | tuple[T, ...] = ()
                 for body in node.bodies:
                     last_result = self(body)
                 return last_result
@@ -143,9 +145,9 @@ class StatsMachine:
 
 def calculate_estimated_error(
     node: LogicNode,
-    stats_factory: StatsFactory,
-    logic_bindings: OrderedDict[Alias, TensorFType],
-    stats_bindings: OrderedDict[Alias, TensorStats],
+    stats_factory: StatsFactory[T],
+    logic_bindings: MutableMapping[Alias, TensorFType] | None,
+    stats_bindings: MutableMapping[Alias, T] | None,
 ) -> tuple[float, ...]:
     if logic_bindings is None:
         logic_bindings = OrderedDict()

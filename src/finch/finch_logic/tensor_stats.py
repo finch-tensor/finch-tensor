@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any, Generic, TypeVar
+from collections.abc import Iterable, Mapping
+from typing import TYPE_CHECKING, Any, Generic, MutableMapping, TypeVar
 
 from finch.algebra import FinchOperator
 
 from .nodes import Field
 
+if TYPE_CHECKING:
+    from finch.autoschedule.tensor_stats.bound_stats import DC
+
 
 class TensorStats(ABC):
+    dcs: Iterable[DC]
+
     @property
     @abstractmethod
     def idxs(self) -> tuple[Field, ...]: ...
@@ -20,11 +25,14 @@ class TensorStats(ABC):
 
     @property
     @abstractmethod
-    def dim_sizes(self) -> Mapping[Field, float]: ...
+    def dim_sizes(self) -> MutableMapping[Field, float]: ...
 
     @property
     @abstractmethod
     def fill_value(self) -> Any: ...
+
+    @abstractmethod
+    def get_dim_size(self, field: Field) -> float: ...
 
 
 T = TypeVar("T", bound=TensorStats)

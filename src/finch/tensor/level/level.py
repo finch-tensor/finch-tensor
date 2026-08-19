@@ -7,12 +7,15 @@ from finch.algebra import (
     FType,
     FTyped,
 )
+from finch.finch_notation.nodes import Fiber
+from finch.tensor.fiber_tensor import FiberTensorFType
 
 
 class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
+    dimension_type: FType
 
     @property
     @abstractmethod
@@ -156,6 +159,9 @@ class Level(FTyped, ABC):
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
     """
+    @property
+    @abstractmethod
+    def ftype(self) -> LevelFType: ...
 
     @property
     @abstractmethod
@@ -200,3 +206,6 @@ class Level(FTyped, ABC):
     @property
     def buffer_type(self):
         return self.ftype.buffer_type
+
+    @property
+    def dimension(self) -> int: ...

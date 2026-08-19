@@ -130,27 +130,27 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def from_numpy(self, shape, val):
         raise NotImplementedError("sparse list level doesn't support from_numpy")
 
-    def level_lower_dim(self, ctx, lvl, r):
+    def level_lower_dim(self, ctx, obj, r):
         if r == 0:
-            return asm.GetAttr(lvl, asm.Literal("dimension"))
+            return asm.GetAttr(obj, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
-    def level_lower_thaw(self, ctx, lvl, op, pos):
+    def level_lower_thaw(self, ctx, tns, op, pos):
         return self.lvl_t.level_lower_thaw(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), op, pos
         )
 
-    def level_lower_freeze(self, ctx, lvl, op, pos):
+    def level_lower_freeze(self, ctx, tns, op, pos):
         p_t = self.position_type
-        lvl_ptr = asm.GetAttr(lvl, asm.Literal("ptr"))
-        lvl_idx = asm.GetAttr(lvl, asm.Literal("idx"))
+        lvl_ptr = asm.GetAttr(tns, asm.Literal("ptr"))
+        lvl_idx = asm.GetAttr(tns, asm.Literal("idx"))
         pos_stop = asm.Variable("pos_stop", p_t)
         qos_stop = asm.Variable("qos_stop", p_t)
         p = asm.Variable("p", p_t)
@@ -166,7 +166,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
 
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_freeze(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), op, pos
         )
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -180,12 +180,11 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_unfurl(
-        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
+        self, ctx, tns: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        if not isinstance(fiber.type, FiberTensorFType):
-            raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
-        tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
+        if not isinstance(tns.type, FiberTensorFType):
+            raise TypeError(f"Expected FiberTensorFType, got: {tns.type}")
+        ft_ftype: FiberTensorFType = tns.type
         lvl_asm = ctx.fiber_level(tns)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
@@ -286,11 +285,13 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             ),
         )
 
-    def from_fields(self, lvl, dimension, ptr, idx) -> "SparseListLevel":
+    def from_fields(self, lvl, dimension, ptr, idx) -> "SparseListLevel":  # ty: ignore[invalid-method-override]
         return SparseListLevel(lvl, dimension, ptr, idx)
 
 
-def sparse_list(lvl_t, dimension_type=None):
+def sparse_list(lvl_t, dimension_type: FType | None =None):
+    if dimension_type is None:
+        return SparseListLevelFType(lvl_t)
     return SparseListLevelFType(lvl_t, dimension_type)
 
 
@@ -302,8 +303,8 @@ class SparseListLevel(Level):
 
     lvl: Level
     dimension: np.integer
-    ptr: Any | None = None
-    idx: Any | None = None
+    ptr: Any = None
+    idx: Any = None
 
     @property
     def shape(self) -> tuple:
