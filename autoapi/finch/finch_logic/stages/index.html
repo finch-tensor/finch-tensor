@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -5394,7 +5422,10 @@
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5406,11 +5437,14 @@
         <span class="n">AssemblyLibrary</span><span class="p">,</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+        <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">        single method called `main` which implements the logic. Also return a</span>
-<span class="sd">        dictionary including additional tables needed to run the kernel.</span>
+<span class="sd">        dictionary including additional tables needed to run the kernel, and</span>
+<span class="sd">        the final program as lowered, for bind-time inference (e.g. resolving</span>
+<span class="sd">        dynamic output fills against actual argument fills).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5445,7 +5479,9 @@
 
         <p>Generate Finch Library from the given logic and input types, with a
 single method called <code>main</code> which implements the logic. Also return a
-dictionary including additional tables needed to run the kernel.</p>
+dictionary including additional tables needed to run the kernel, and
+the final program as lowered, for bind-time inference (e.g. resolving
+dynamic output fills against actual argument fills).</p>
 
 
             <details class="mkdocstrings-source">
@@ -5466,7 +5502,10 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
@@ -5477,11 +5516,14 @@ dictionary including additional tables needed to run the kernel.</p>
     <span class="n">AssemblyLibrary</span><span class="p">,</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+    <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">    single method called `main` which implements the logic. Also return a</span>
-<span class="sd">    dictionary including additional tables needed to run the kernel.</span>
+<span class="sd">    dictionary including additional tables needed to run the kernel, and</span>
+<span class="sd">    the final program as lowered, for bind-time inference (e.g. resolving</span>
+<span class="sd">    dynamic output fills against actual argument fills).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 </code></pre></div></td></tr></table></div>
             </details>

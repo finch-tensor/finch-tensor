@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -5839,10 +5867,7 @@ output orders set. There are three valid forms for a query in FormattedForm:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">379</span>
 <span class="normal">380</span>
 <span class="normal">381</span>
 <span class="normal">382</span>
@@ -5851,7 +5876,10 @@ output orders set. There are three valid forms for a query in FormattedForm:
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
-<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicEinsumLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicEinsumLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5901,10 +5929,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">380</span>
 <span class="normal">381</span>
 <span class="normal">382</span>
 <span class="normal">383</span>
@@ -5912,7 +5937,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">385</span>
 <span class="normal">386</span>
 <span class="normal">387</span>
-<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -5964,9 +5992,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">345</span>
 <span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
@@ -5979,7 +6005,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">355</span>
 <span class="normal">356</span>
 <span class="normal">357</span>
-<span class="normal">358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFormatOptimizer</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFormatOptimizer</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5991,6 +6020,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
         <span class="n">AssemblyLibrary</span><span class="p">,</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+        <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Optimize the tensor formats and output orders for each query.</span>
@@ -6031,9 +6061,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
@@ -6045,7 +6073,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">355</span>
 <span class="normal">356</span>
 <span class="normal">357</span>
-<span class="normal">358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6056,6 +6087,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="n">AssemblyLibrary</span><span class="p">,</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+    <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Optimize the tensor formats and output orders for each query.</span>
@@ -6116,7 +6148,8 @@ return a dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFusionOptimizer</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+<span class="normal">321</span>
+<span class="normal">322</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFusionOptimizer</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6128,6 +6161,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
         <span class="n">AssemblyLibrary</span><span class="p">,</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+        <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Optimize the aggregate structure of the given logic statement and</span>
@@ -6185,7 +6219,8 @@ make decisions about materialization.</p>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">321</span>
+<span class="normal">322</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6196,6 +6231,7 @@ make decisions about materialization.</p>
     <span class="n">AssemblyLibrary</span><span class="p">,</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+    <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Optimize the aggregate structure of the given logic statement and</span>
@@ -6241,8 +6277,7 @@ make decisions about materialization.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
-<span class="normal">325</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
@@ -6257,7 +6292,9 @@ make decisions about materialization.</p>
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
-<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoopOrderOptimizer</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoopOrderOptimizer</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6269,6 +6306,7 @@ make decisions about materialization.</p>
         <span class="n">AssemblyLibrary</span><span class="p">,</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+        <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Optimize the loop order of each query and add transposes where</span>
@@ -6311,8 +6349,7 @@ necessary.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
-<span class="normal">326</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">326</span>
 <span class="normal">327</span>
 <span class="normal">328</span>
 <span class="normal">329</span>
@@ -6326,7 +6363,9 @@ necessary.</p>
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
-<span class="normal">340</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6337,6 +6376,7 @@ necessary.</p>
     <span class="n">AssemblyLibrary</span><span class="p">,</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
+    <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Optimize the loop order of each query and add transposes where</span>
@@ -6382,10 +6422,7 @@ necessary.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
@@ -6394,7 +6431,10 @@ necessary.</p>
 <span class="normal">370</span>
 <span class="normal">371</span>
 <span class="normal">372</span>
-<span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicNotationLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicNotationLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6444,10 +6484,7 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
 <span class="normal">368</span>
@@ -6455,7 +6492,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">370</span>
 <span class="normal">371</span>
 <span class="normal">372</span>
-<span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>

@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../compiler/">
+        <link rel="prev" href="../ffuncs/">
       
       
-        <link rel="next" href="../einsum/">
+        <link rel="next" href="../ftypes/">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>default_schedulers - Finch Tensor</title>
+        <title>fill - Finch Tensor</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#finch.autoschedule.default_schedulers" class="md-skip">
+        <a href="#finch.algebra.fill" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              default_schedulers
+              fill
             
           </span>
         </div>
@@ -359,18 +359,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_1" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2_1" id="__nav_3_2_1_label" tabindex="0">
@@ -391,7 +393,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -409,7 +411,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/algebra/" class="md-nav__link">
+      <a href="../algebra/" class="md-nav__link">
         
   
   
@@ -437,7 +439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/devices/" class="md-nav__link">
+      <a href="../devices/" class="md-nav__link">
         
   
   
@@ -465,7 +467,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ffuncs/" class="md-nav__link">
+      <a href="../ffuncs/" class="md-nav__link">
         
   
   
@@ -490,10 +492,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../algebra/fill/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -509,6 +536,140 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AbstractFill
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AbstractFill">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.ftype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ftype
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.as_dynamic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dynamic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.DynamicFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DynamicFill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.DynamicFillError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DynamicFillError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.StaticFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StaticFill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.apply_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_fill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.as_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_fill
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -521,7 +682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ftypes/" class="md-nav__link">
+      <a href="../ftypes/" class="md-nav__link">
         
   
   
@@ -549,7 +710,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/tensor/" class="md-nav__link">
+      <a href="../tensor/" class="md-nav__link">
         
   
   
@@ -577,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/utils/" class="md-nav__link">
+      <a href="../utils/" class="md-nav__link">
         
   
   
@@ -638,20 +799,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3" >
         
           
           <label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
@@ -672,7 +831,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -690,7 +849,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cache/" class="md-nav__link">
+      <a href="../../autoschedule/cache/" class="md-nav__link">
         
   
   
@@ -718,7 +877,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../capture/" class="md-nav__link">
+      <a href="../../autoschedule/capture/" class="md-nav__link">
         
   
   
@@ -746,7 +905,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compiler/" class="md-nav__link">
+      <a href="../../autoschedule/compiler/" class="md-nav__link">
         
   
   
@@ -771,35 +930,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    default_schedulers
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../autoschedule/default_schedulers/" class="md-nav__link">
         
   
   
@@ -815,35 +949,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.default_schedulers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        default_schedulers
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -856,7 +961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../einsum/" class="md-nav__link">
+      <a href="../../autoschedule/einsum/" class="md-nav__link">
         
   
   
@@ -884,7 +989,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../executor/" class="md-nav__link">
+      <a href="../../autoschedule/executor/" class="md-nav__link">
         
   
   
@@ -912,7 +1017,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../formatter/" class="md-nav__link">
+      <a href="../../autoschedule/formatter/" class="md-nav__link">
         
   
   
@@ -1034,7 +1139,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/annotated_query/" class="md-nav__link">
+      <a href="../../autoschedule/galley/logical_optimizer/annotated_query/" class="md-nav__link">
         
   
   
@@ -1062,7 +1167,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/branch_and_bound/" class="md-nav__link">
+      <a href="../../autoschedule/galley/logical_optimizer/branch_and_bound/" class="md-nav__link">
         
   
   
@@ -1090,7 +1195,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/greedy_optimizer/" class="md-nav__link">
+      <a href="../../autoschedule/galley/logical_optimizer/greedy_optimizer/" class="md-nav__link">
         
   
   
@@ -1118,7 +1223,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/logic_to_stats/" class="md-nav__link">
+      <a href="../../autoschedule/galley/logical_optimizer/logic_to_stats/" class="md-nav__link">
         
   
   
@@ -1146,7 +1251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/query_normalization/" class="md-nav__link">
+      <a href="../../autoschedule/galley/logical_optimizer/query_normalization/" class="md-nav__link">
         
   
   
@@ -1190,7 +1295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley_optimize/" class="md-nav__link">
+      <a href="../../autoschedule/galley_optimize/" class="md-nav__link">
         
   
   
@@ -1218,7 +1323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_order_cost/" class="md-nav__link">
+      <a href="../../autoschedule/loop_order_cost/" class="md-nav__link">
         
   
   
@@ -1246,7 +1351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_order_greedy/" class="md-nav__link">
+      <a href="../../autoschedule/loop_order_greedy/" class="md-nav__link">
         
   
   
@@ -1274,7 +1379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_ordering/" class="md-nav__link">
+      <a href="../../autoschedule/loop_ordering/" class="md-nav__link">
         
   
   
@@ -1302,7 +1407,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../normalize/" class="md-nav__link">
+      <a href="../../autoschedule/normalize/" class="md-nav__link">
         
   
   
@@ -1330,7 +1435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../optimize/" class="md-nav__link">
+      <a href="../../autoschedule/optimize/" class="md-nav__link">
         
   
   
@@ -1358,7 +1463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../smart_formatter/" class="md-nav__link">
+      <a href="../../autoschedule/smart_formatter/" class="md-nav__link">
         
   
   
@@ -1386,7 +1491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../stages/" class="md-nav__link">
+      <a href="../../autoschedule/stages/" class="md-nav__link">
         
   
   
@@ -1461,7 +1566,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/blocked_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/blocked_stats/" class="md-nav__link">
         
   
   
@@ -1489,7 +1594,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/bound_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/bound_stats/" class="md-nav__link">
         
   
   
@@ -1517,7 +1622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/dense_stat/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/dense_stat/" class="md-nav__link">
         
   
   
@@ -1545,7 +1650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/dummy_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/dummy_stats/" class="md-nav__link">
         
   
   
@@ -1573,7 +1678,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/exact_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/exact_stats/" class="md-nav__link">
         
   
   
@@ -1601,7 +1706,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/fd_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/fd_stats/" class="md-nav__link">
         
   
   
@@ -1629,7 +1734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/numeric_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/numeric_stats/" class="md-nav__link">
         
   
   
@@ -1657,7 +1762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/sampling_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/sampling_stats/" class="md-nav__link">
         
   
   
@@ -1685,7 +1790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/stats_interpreter/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/stats_interpreter/" class="md-nav__link">
         
   
   
@@ -1713,7 +1818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/tensor_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/tensor_stats/" class="md-nav__link">
         
   
   
@@ -1741,7 +1846,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/uniform_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/uniform_stats/" class="md-nav__link">
         
   
   
@@ -1769,7 +1874,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/util/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/util/" class="md-nav__link">
         
   
   
@@ -1797,7 +1902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/vp_stats/" class="md-nav__link">
+      <a href="../../autoschedule/tensor_stats/vp_stats/" class="md-nav__link">
         
   
   
@@ -1833,7 +1938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../util/" class="md-nav__link">
+      <a href="../../autoschedule/util/" class="md-nav__link">
         
   
   
@@ -5105,10 +5210,115 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#finch.autoschedule.default_schedulers" class="md-nav__link">
+  <a href="#finch.algebra.fill" class="md-nav__link">
     <span class="md-ellipsis">
       
-        default_schedulers
+        fill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AbstractFill
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AbstractFill">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.ftype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ftype
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        value
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.algebra.fill.AbstractFill.as_dynamic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_dynamic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.DynamicFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DynamicFill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.DynamicFillError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DynamicFillError
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.StaticFill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StaticFill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.apply_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_fill
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.algebra.fill.as_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        as_fill
       
     </span>
   </a>
@@ -5135,14 +5345,26 @@
   
 
 
-  <h1>default_schedulers</h1>
+  <h1>fill</h1>
 
 <div class="doc doc-object doc-module">
 
 
 
-<a id="finch.autoschedule.default_schedulers"></a>
+<a id="finch.algebra.fill"></a>
     <div class="doc doc-contents first">
+
+        <p>Static/Dynamic fill values.</p>
+<p>Every tensor has a fill value: the background value of a sparse tensor, and the
+value a newly constructed tensor is filled with. A fill is always a real value,
+but a tensor's <em>ftype</em> additionally records whether a kernel may specialize on
+that value:</p>
+<ul>
+<li><code>StaticFill</code> -- compile against this value. It may be folded into generated
+  code.</li>
+<li><code>DynamicFill</code> -- do not compile against this value. The value is may change across
+  invocations, so one compiled kernel serves every fill of the same dtype.</li>
+</ul>
 
 
 
@@ -5163,6 +5385,581 @@
 
 
 
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.algebra.fill.AbstractFill" class="doc doc-heading">
+            <code>AbstractFill</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FTyped (finch.algebra.ftypes.FTyped)" href="../ftypes/#finch.algebra.ftypes.FTyped">FTyped</a></code>, <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+
+
+
+        <p>A tensor's fill value, and whether kernels may specialize on it.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AbstractFill</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A tensor&#39;s fill value, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The dtype of the fill value, always known.&quot;&quot;&quot;</span>
+        <span class="o">...</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill value itself, always known.&quot;&quot;&quot;</span>
+        <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="finch.algebra.fill.AbstractFill.ftype" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">ftype</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The dtype of the fill value, always known.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="finch.algebra.fill.AbstractFill.value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">value</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The fill value itself, always known.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.algebra.fill.AbstractFill.as_dynamic" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">as_dynamic</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>This fill, marked so that kernels will not specialize on its value.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.algebra.fill.DynamicFill" class="doc doc-heading">
+            <code>DynamicFill</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="AbstractFill (finch.algebra.fill.AbstractFill)" href="#finch.algebra.fill.AbstractFill">AbstractFill</a></code></p>
+
+
+
+        <p>A fill value which kernels must not specialize on. The value is known and is
+bound to the kernel at call time.</p>
+<p>Equality and hashing are by dtype <em>only</em>, i.e. two equal <code>DynamicFill</code>s may have
+different <code>.value</code>'s.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A fill value which kernels must not specialize on. The value is known and is</span>
+<span class="sd">    bound to the kernel at call time.</span>
+
+<span class="sd">    Equality and hashing are by dtype *only*, i.e. two equal `DynamicFill`s may have</span>
+<span class="sd">    different `.value`&#39;s.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)</span> <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ftype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">DynamicFill</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_dtype</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="n">DynamicFill</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__same__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__rsame__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__samehash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;DynamicFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.algebra.fill.DynamicFillError" class="doc doc-heading">
+            <code>DynamicFillError</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#Exception">Exception</a></code></p>
+
+
+
+        <p>Raised when a fill value must be specialized on at compile time but the fill
+is Dynamic. Callers may catch this to fall back to value-specialized
+compilation.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFillError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Raised when a fill value must be specialized on at compile time but the fill</span>
+<span class="sd">    is Dynamic. Callers may catch this to fall back to value-specialized</span>
+<span class="sd">    compilation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.algebra.fill.StaticFill" class="doc doc-heading">
+            <code>StaticFill</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="AbstractFill (finch.algebra.fill.AbstractFill)" href="#finch.algebra.fill.AbstractFill">AbstractFill</a></code></p>
+
+
+
+        <p>A fill value which kernels may specialize on. Equality and hashing are by
+value, so ftypes carrying different static fills are distinct and get
+distinct kernels.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StaticFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A fill value which kernels may specialize on. Equality and hashing are by</span>
+<span class="sd">    value, so ftypes carrying different static fills are distinct and get</span>
+<span class="sd">    distinct kernels.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="c1"># Values are compared with `same` rather than `==` because of NaN.</span>
+        <span class="c1"># ftypes filled with NaN must compare equal or they get separate</span>
+        <span class="c1"># kernels and fail each other&#39;s type checks. Imported lazily: `ffuncs`</span>
+        <span class="c1"># depends on this module.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.ffuncs</span><span class="w"> </span><span class="kn">import</span> <span class="n">same</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">StaticFill</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">same</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">_value</span><span class="p">)))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">.ffuncs</span><span class="w"> </span><span class="kn">import</span> <span class="n">samehash</span>
+
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="n">StaticFill</span><span class="p">,</span> <span class="n">samehash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="p">)))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__same__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__rsame__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span> <span class="o">==</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__samehash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;StaticFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.algebra.fill.apply_fill" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Compute the fill value of mapping <code>op</code> over tensors with fills <code>fills</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the fill value of mapping `op` over tensors with fills `fills`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">fills</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">as_fill</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">is_dynamic</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">and</span> <span class="n">op</span><span class="o">.</span><span class="n">is_annihilator</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">f</span>
+    <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">),</span> <span class="n">op</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">ftype</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">)))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.algebra.fill.as_fill" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">as_fill</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Normalize a raw value to a <code>StaticFill</code>, passing an <code>AbstractFill</code> through.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/algebra/fill.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_fill</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">fill</span>
+    <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

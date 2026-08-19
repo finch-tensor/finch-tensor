@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -5217,8 +5245,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/formatter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
-<span class="normal"> 88</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
@@ -5231,8 +5258,9 @@
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
-<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFormatter</span><span class="p">(</span><span class="n">MonoLogicFormatter</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
+<span class="normal">101</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFormatter</span><span class="p">(</span><span class="n">MonoLogicFormatter</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the FType of the output tensor produced within the</span>
 <span class="sd">        autoscheduler.</span>
@@ -5279,8 +5307,7 @@ autoscheduler.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/formatter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 88</span>
-<span class="normal"> 89</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
 <span class="normal"> 92</span>
@@ -5292,7 +5319,8 @@ autoscheduler.</p>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
 <span class="normal">100</span>
-<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
+<span class="normal">101</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the FType of the output tensor produced within the</span>
 <span class="sd">    autoscheduler.</span>

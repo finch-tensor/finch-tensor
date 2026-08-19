@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -2683,6 +2711,17 @@
     <span class="md-ellipsis">
       
         FinchJLKernel
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.compiler.handle_fills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handle_fills
       
     </span>
   </a>
@@ -5165,6 +5204,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.compiler.handle_fills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        handle_fills
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5240,31 +5290,37 @@ source text, with no Python-side values left to inject.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
-<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompiledJLKernel</span><span class="p">:</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompiledJLKernel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Pure-data compiled-but-not-evaluated kernel: self-contained Julia</span>
 <span class="sd">    source text, with no Python-side values left to inject.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">dynamic_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span> <span class="o">=</span> <span class="n">func_name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span> <span class="o">=</span> <span class="n">jl_code</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_args</span> <span class="o">=</span> <span class="n">dynamic_args</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FinchJLKernel&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Defines the kernel function in the running Julia session,</span>
 <span class="sd">        returning the now-callable kernel.&quot;&quot;&quot;</span>
         <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_args</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5298,15 +5354,15 @@ returning the now-callable kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FinchJLKernel&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;FinchJLKernel&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Defines the kernel function in the running Julia session,</span>
 <span class="sd">    returning the now-callable kernel.&quot;&quot;&quot;</span>
     <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">FinchJLKernel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_args</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5349,19 +5405,7 @@ returning the now-callable kernel.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
@@ -5371,17 +5415,45 @@ returning the now-callable kernel.</p>
 <span class="normal">132</span>
 <span class="normal">133</span>
 <span class="normal">134</span>
-<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A kernel already defined (evaluated) in the running Julia session.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">,</span> <span class="n">dynamic_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()):</span>
         <span class="c1"># We store this code so that we can verify it in pytest</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span> <span class="o">=</span> <span class="n">jl_code</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span> <span class="o">=</span> <span class="n">func_name</span>
+        <span class="c1"># Argument positions with dynamic fill values that are</span>
+        <span class="c1"># arbitrarily set to zero. Other arguments keep their</span>
+        <span class="c1"># Known fills.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_args</span> <span class="o">=</span> <span class="n">dynamic_args</span>
+        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
         <span class="n">finch_fn</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">jl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_name</span><span class="p">)</span>
-        <span class="n">raw_args</span> <span class="o">=</span> <span class="p">[</span><span class="n">tensor_to_jl</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+        <span class="n">raw_args</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">tensor_to_jl</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">pin_fill</span><span class="o">=</span><span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dynamic_args</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+        <span class="p">]</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">finch_fn</span><span class="p">(</span><span class="o">*</span><span class="n">raw_args</span><span class="p">)</span>
 
         <span class="c1"># @finch_kernel-generated functions return a NamedTuple keyed by the</span>
@@ -5418,6 +5490,69 @@ returning the now-callable kernel.</p>
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.compile_jl.compiler.handle_fills" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">handle_fills</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rewrite every Dynamic fill in <code>func</code> to a zero of its dtype, and report
+which argument positions carried a Dynamic fill. This is a necessary but
+potentially unsound rewrite which should be removed eventually.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_fills</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rewrite every Dynamic fill in `func` to a zero of its dtype, and report</span>
+<span class="sd">    which argument positions carried a Dynamic fill. This is a necessary but</span>
+<span class="sd">    potentially unsound rewrite which should be removed eventually.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dynamic_args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">i</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">type_</span><span class="p">,</span> <span class="s2">&quot;fill_value&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">rule</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+        <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">DynamicFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)(</span><span class="mi">0</span><span class="p">))</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">StaticFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">Rewrite</span><span class="p">(</span><span class="n">PostWalk</span><span class="p">(</span><span class="n">rule</span><span class="p">))(</span><span class="n">func</span><span class="p">),</span> <span class="n">dynamic_args</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

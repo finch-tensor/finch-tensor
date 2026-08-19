@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -5611,7 +5639,7 @@
             <span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_unfurl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">body_view</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
 
-        <span class="n">scalar</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="n">scalar</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
         <span class="n">visited_idxs</span> <span class="o">=</span> <span class="n">tns</span><span class="o">.</span><span class="n">idxs</span>
         <span class="k">return</span> <span class="n">lplt</span><span class="o">.</span><span class="n">Sequence</span><span class="p">(</span>
             <span class="n">head</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">child_accessor</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span>

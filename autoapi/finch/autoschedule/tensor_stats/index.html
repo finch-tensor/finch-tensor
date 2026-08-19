@@ -493,6 +493,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../algebra/fill/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    fill
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../algebra/ftypes/" class="md-nav__link">
         
   
@@ -5044,6 +5072,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="BaseTensorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.tensor_stats.BaseTensorStats.fill_value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill_value
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -5272,13 +5317,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/tensor_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 30</span>
-<span class="normal"> 31</span>
-<span class="normal"> 32</span>
-<span class="normal"> 33</span>
-<span class="normal"> 34</span>
-<span class="normal"> 35</span>
-<span class="normal"> 36</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 36</span>
 <span class="normal"> 37</span>
 <span class="normal"> 38</span>
 <span class="normal"> 39</span>
@@ -5357,7 +5396,16 @@
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span>
-<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for tensor statistics.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -5389,7 +5437,9 @@
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_index_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index_order</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">dim_sizes</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">fill_value</span>
+        <span class="c1"># Stats always carry an AbstractFill: propagation must be able to say</span>
+        <span class="c1"># &quot;this fill exists but must not be specialized on&quot;.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span>
@@ -5429,12 +5479,13 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_order</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
 
     <span class="nd">@fill_value</span><span class="o">.</span><span class="n">setter</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_dim_space_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="n">prod</span> <span class="o">=</span> <span class="mi">1</span>
@@ -5455,6 +5506,29 @@
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="finch.autoschedule.tensor_stats.BaseTensorStats.fill_value" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fill_value</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The fill, and whether kernels may specialize on it.</p>
+
+    </div>
+
+</div>
 
 
 
@@ -7275,7 +7349,7 @@ q = n/N</p>
             <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">f</span><span class="p">])</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">)</span>
             <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
 
-        <span class="n">fill</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">fill_value</span>
+        <span class="n">fill</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
 
         <span class="c1"># defining one Bernoulli mask per dimension, an entry will survive</span>
         <span class="c1"># only if all its indices are kept</span>
