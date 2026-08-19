@@ -125,7 +125,6 @@ __all__ = [
     "Tensor",
     "TensorFType",
     "TupleFType",
-    "TupleFType",
     "apply_fill",
     "arity",
     "as_fill",
