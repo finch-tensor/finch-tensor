@@ -55,7 +55,7 @@ def canonicalize_associative(node: Term) -> Term | None:
     """
     match node:
         case CallTerm(op=op, args=args) if is_associative(op.val):
-            if len(args) < 2:
+            if len(args) == 1:
                 return args[0]
             if math.isinf(arity(op.val)):
                 flat = [
@@ -101,7 +101,7 @@ def dedup_idempotent(node: Term) -> Term | None:
         ):
             unique = [arg for i, arg in enumerate(args) if arg not in args[:i]]
             if len(unique) != len(args):
-                return _call_like(node, unique)
+                return unique[0] if len(unique) == 1 else _call_like(node, unique)
     return None
 
 
@@ -167,17 +167,29 @@ def drop_identities(node: Term) -> Term | None:
     `f(a..., e, b...)` => `f(a..., b...)` when `e` is an identity for `f`.
     """
     match node:
-        case CallTerm(op=op, args=args) if len(args) > 1 and is_associative(op.val):
-            kept = [
-                arg
-                for arg in args
-                if not (isinstance(arg, LiteralTerm) and is_identity(op.val, arg.val))
-            ]
-            if len(kept) == len(args):
-                return None
-            # Every argument was an identity, so the call is worth exactly one
-            # of them.
-            return _call_like(node, kept or args[-1:])
+        case CallTerm(op=op, args=args) if is_associative(op.val):
+            if len(args) == 2 and arity(op.val) == 2:
+                if isinstance(args[0], LiteralTerm) and is_identity(
+                    op.val, args[0].val
+                ):
+                    return args[1]
+                if isinstance(args[1], LiteralTerm) and is_identity(
+                    op.val, args[1].val
+                ):
+                    return args[0]
+            if math.isinf(arity(op.val)):
+                kept = [
+                    arg
+                    for arg in args
+                    if not (
+                        isinstance(arg, LiteralTerm) and is_identity(op.val, arg.val)
+                    )
+                ]
+                if len(kept) == len(args):
+                    return None
+                # Every argument was an identity, so the call is worth exactly one
+                # of them.
+                return _call_like(node, kept or args[-1:])
     return None
 
 
