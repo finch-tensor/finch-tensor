@@ -5,17 +5,6 @@ This module is a standard library of IR-agnostic rewrite rules. They apply to
 any Finch IR whose call and literal nodes implement the `CallTerm` and
 `LiteralTerm` interfaces, which today means FinchLogic (`MapJoin`),
 FinchNotation (`Call`), and FinchAssembly (`Call`).
-
-No rule mentions a particular operator. Rules are triggered by algebraic
-properties `is_associative`, `is_commutative`, `is_idempotent`, `is_identity`,
-`is_annihilator`, and `arity`. Rules which need to know about specific
-operators, or about IR nodes other than calls, belong in that IR's own
-simplification pass.
-
-Each rule takes one small step and leaves the rest to iteration: the IR passes
-run these rules with `Rewrite(Fixpoint(PostWalk(Chain(...))))`, so a rule may
-assume its node's children are already simplified and rewrite only the node at
-hand.
 """
 
 import math
@@ -55,22 +44,20 @@ def canonicalize_associative(node: Term) -> Term | None:
 
     An n-ary `f` absorbs its immediate `f`-children and moves literals to the
     front, next to each other: `f(a..., f(b...), c...)` => `f(k..., rest...)`.
+    Unwraps singleton n-ary function calls.
 
     A fixed-arity `f` is instead rotated one step at a time so that literals
     bubble up and to the left, where adjacent ones merge:
-
     - `f(x, k)`         => `f(k, x)`
     - `f(k1, f(k2, y))` => `f(f(k1, k2), y)`
     - `f(f(k, x), y)`   => `f(k, f(x, y))`
     - `f(x, f(k, y))`   => `f(k, f(x, y))`
     """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val) and is_commutative(
-            op.val
-        ):
+        case CallTerm(op=op, args=args) if is_associative(op.val):
+            if len(args) < 2:
+                return args[0]
             if math.isinf(arity(op.val)):
-                # Children were already flattened when they were visited, so
-                # one level of splicing completes the job.
                 flat = [
                     leaf
                     for arg in args
@@ -80,7 +67,12 @@ def canonicalize_associative(node: Term) -> Term | None:
                         else (arg,)
                     )
                 ]
-                flat = sorted(flat, key=lambda leaf: not isinstance(leaf, LiteralTerm))
+                if len(flat) == 1:
+                    return flat[0]
+                if is_commutative(op.val):
+                    flat = sorted(
+                        flat, key=lambda leaf: not isinstance(leaf, LiteralTerm)
+                    )
                 return _call_like(node, flat) if flat != list(args) else None
             match args:
                 case (x, LiteralTerm() as k) if not isinstance(x, LiteralTerm):
@@ -107,7 +99,6 @@ def dedup_idempotent(node: Term) -> Term | None:
         case CallTerm(op=op, args=args) if (
             is_idempotent(op.val) and is_associative(op.val) and is_commutative(op.val)
         ):
-            # Does not use set because arg may be unhashable.
             unique = [arg for i, arg in enumerate(args) if arg not in args[:i]]
             if len(unique) != len(args):
                 return _call_like(node, unique)
@@ -190,20 +181,11 @@ def drop_identities(node: Term) -> Term | None:
     return None
 
 
-def unwrap_singleton(node: Term) -> Term | None:
-    """`f(x)` => `x`, the one-argument reduction of an associative `f`."""
-    match node:
-        case CallTerm(op=op, args=(arg,)) if is_associative(op.val):
-            return arg
-    return None
-
-
 def simplify_rules() -> list[RwCallable]:
     return [
-        fold_literals,
-        annihilate,
         canonicalize_associative,
+        annihilate,
         dedup_idempotent,
+        fold_literals,
         drop_identities,
-        unwrap_singleton,
     ]
