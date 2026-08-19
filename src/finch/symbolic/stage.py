@@ -3,7 +3,8 @@ from abc import ABC, abstractmethod
 
 class Stage(ABC):
     @abstractmethod
-    def validate_inputs(self, *inputs): ...
+    @classmethod
+    def validate_inputs(cls, *inputs): ...
 
     @abstractmethod
     def lower(self, *inputs): ...
@@ -22,6 +23,7 @@ class Form(ABC):
     """
 
     @abstractmethod
+    @classmethod
     def validate_inputs(cls, *inputs): ...
 
 

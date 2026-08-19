@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import pytest
 
 import numpy as np
@@ -66,7 +68,10 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
     )
 
     interpreter = StatsInterpreter(stats_factory=DCStatsFactory())
-    result_stats = interpreter(p, {})[0]
+    result_stats_tuple = interpreter(p, {})
+    assert isinstance(result_stats_tuple, tuple)
+    assert len(result_stats_tuple) == 1
+    result_stats = result_stats_tuple[0]
 
     expected_rows = shape_a[0]
     expected_cols = shape_b[1]
@@ -164,7 +169,10 @@ def test_vp_stats_matrix_multiplication(shape_a, shape_b):
     )
 
     interpreter = StatsInterpreter(stats_factory=VPStatsFactory())
-    result_stats = interpreter(p, {})[0]
+    result_stats_tuple = interpreter(p, {})
+    assert isinstance(result_stats_tuple, tuple)
+    assert len(result_stats_tuple) == 1
+    result_stats = result_stats_tuple[0]
 
     expected_rows = shape_a[0]
     expected_cols = shape_b[1]

@@ -1467,7 +1467,7 @@ def test_vecdot(x1, x2, axis, x1_wrap, x2_wrap):
     wx1 = x1_wrap(x1)
     wx2 = x2_wrap(x2)
     try:
-        expected = np.linalg.vecdot(x1, x2, axis=axis)
+        expected = np.linalg.vecdot(x1, x2, axis=axis)  # ty: ignore[no-matching-overload]
     except ValueError:
         with pytest.raises(ValueError):
             finch.vecdot(wx1, wx2, axis=axis)

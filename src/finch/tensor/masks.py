@@ -64,8 +64,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, arr):
-        return LoTriMask(self.lvl_t.from_numpy(shape, arr))
+    def from_numpy(self, shape, val):
+        return LoTriMask(self.lvl_t.from_numpy(shape, val))
 
     def level_lower_freeze(self, ctx, tns, op, pos):
         return self.body.level_lower_freeze(
@@ -112,9 +112,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             ctx, asm.GetAttr(tns, asm.Literal("body")), init, op, shape, pos
         )
 
-    def level_unfurl(self, ctx, fiber: ntn.Fiber, ext, mode, proto, pos):
-        tns = fiber
-
+    def level_unfurl(self, ctx, tns: ntn.Fiber, ext, mode, proto, pos):
         def child_accessor(ctx, idx):
             body_view = ntn.Fiber(
                 tns.root,
@@ -138,7 +136,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def level_lower_dim(self, ctx, obj, r):
         return self.body.level_lower_dim(ctx, asm.GetAttr(obj, asm.Literal("body")), r)
 
-    def from_fields(self, lvl) -> "LoTriMask":
+    def from_fields(self, lvl) -> "LoTriMask":  # ty: ignore[invalid-method-override]
         return LoTriMask(lvl)
 
     def __str__(self):

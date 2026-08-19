@@ -161,7 +161,7 @@ def test_aggregate():
     stats_factory = SamplingStatsFactory(sample_prob=0.25, estimator="schlosser")
     node = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(j,),
     )

@@ -110,15 +110,15 @@ class Variable(AssemblyExpression, NamedTerm):
     """
 
     name: str
-    type: FType
+    type_: FType
 
     @property
     def result_type(self) -> FType:
         """Returns the type of the expression."""
-        return self.type
+        return ftype(self.type_)
 
     def __repr__(self) -> str:
-        return literal_repr(type(self).__name__, {"name": self.name, "type": self.type})
+        return literal_repr(type(self).__name__, {"name": self.name, "type_": self.type_})
 
     @property
     def symbol(self) -> str:
@@ -556,7 +556,7 @@ class Block(AssemblyTree, AssemblyStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyStatement, ...] = ()
+    bodies: tuple[AssemblyNode, ...] = ()
 
     @property
     def children(self):

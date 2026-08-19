@@ -17,10 +17,10 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 
 class FType(ABC):
     @abstractmethod
-    def __eq__(self, other): ...
+    def __eq__(self, other) -> builtins.bool: ...
 
     @abstractmethod
-    def __hash__(self): ...
+    def __hash__(self) -> builtins.int: ...
 
     @abstractmethod
     def __call__(self, val: Any) -> Any:
@@ -38,7 +38,7 @@ class FType(ABC):
         """
         ...
 
-    def fisinstance(self, other):
+    def fisinstance(self, other) -> builtins.bool:
         """
         Check if `other` is an instance of this ftype.
         """
@@ -695,7 +695,7 @@ class FTyped:
 
     @property
     @abstractmethod
-    def ftype(self):
+    def ftype(self) -> FType:
         """
         The ftype of the object.
         """

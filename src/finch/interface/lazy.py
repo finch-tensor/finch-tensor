@@ -367,7 +367,7 @@ def asarray(
     device=None,
     copy=None,
     format: TensorFType | None = None,
-) -> Any:
+) -> Tensor:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.

@@ -355,7 +355,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicExpression, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -462,7 +462,7 @@ class MapJoin(LogicTree, LogicExpression):
         args: The arguments to map the function across.
     """
 
-    op: Literal
+    op: Literal | Field
     args: tuple[LogicExpression, ...]
 
     @property
@@ -708,7 +708,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[Alias, ...]
+    args: tuple[LogicExpression, ...]
 
     @property
     def children(self):
@@ -749,7 +749,7 @@ class Plan(LogicTree, LogicStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[LogicStatement, ...] = ()
+    bodies: tuple[LogicNode, ...] = ()
 
     def infer_dimmap(
         self,

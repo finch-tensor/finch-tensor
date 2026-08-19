@@ -13,6 +13,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.finch_logic.nodes import MapJoin
+from typing import TypeVar
 
 # Cost parameters ported from Julia
 # TODO: Julia comments says these need to be adjusted.
@@ -23,6 +24,9 @@ RANDOM_READ_COST = 5
 RANDOM_WRITE_COST = 10
 DENSE_ALLOCATE_COST = 0.5
 SPARSE_ALLOCATE_COST = 60
+
+
+T = TypeVar("T", bound=TensorStats)
 
 
 def stats_with_false_fill(
@@ -234,11 +238,11 @@ def loop_order_cost(
     expr: LogicExpression,
     loop_order: tuple[Field, ...],
     stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_bindings: dict[Alias, T],
     output_vars: tuple[Field, ...] | None = None,
 ) -> float:
     stats_bindings_2 = stats_bindings.copy()
-    cache: dict[object, TensorStats] = {}
+    cache: dict[object, T] = {}
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
         expr, stats_factory, stats_bindings_2, cache
     )

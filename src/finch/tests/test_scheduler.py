@@ -666,8 +666,8 @@ def test_scheduler_e2e_matmul(file_regression):
     plan_opt, bindings = optimize(
         plan,
         {
-            Alias("A"): ftype(finch.asarray(a)),
-            Alias("B"): ftype(finch.asarray(b)),
+            Alias("A"): finch.asarray(a).ftype,
+            Alias("B"): finch.asarray(b).ftype,
         },
     )
 

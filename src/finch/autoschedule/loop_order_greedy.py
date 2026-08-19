@@ -11,6 +11,8 @@ from finch.finch_logic import (
     TensorStats,
 )
 
+from typing import TypeVar
+
 from .galley.logical_optimizer import insert_statistics
 from .loop_order_cost import (
     cost_of_reformat,
@@ -20,12 +22,14 @@ from .loop_order_cost import (
 )
 from .loop_ordering import AbstractLoopOrderer
 
+T = TypeVar("T", bound=TensorStats)
+
 
 def connected_loop_candidates(
     prefix: tuple[Field, ...],
     remaining: list[Field],
-    conjunct_stats: list[TensorStats],
-    disjunct_stats: list[TensorStats],
+    conjunct_stats: list[T],
+    disjunct_stats: list[T],
 ) -> list[Field]:
     """Fields in ``remaining`` that share a tensor with ``prefix``.
 
@@ -49,7 +53,7 @@ def connected_loop_candidates(
 
 
 def transpose_penalty(
-    input_stats: list[TensorStats],
+    input_stats: list[T],
     prefix: tuple[Field, ...],
     charged: frozenset[int],
 ) -> float:
@@ -70,7 +74,7 @@ def transpose_penalty(
 def greedy_loop_order(
     expr: LogicExpression,
     stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_bindings: dict[Alias, T],
     output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
     """Build a loop order one index at a time, appending the cheapest candidate.
@@ -122,14 +126,14 @@ def greedy_loop_order(
 def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory,
-    stats: dict[Alias, TensorStats],
+    stats: dict[Alias, T],
     *,
     output_fields: dict[Alias, tuple[Field, ...]] | None = None,
 ) -> Plan:
     if output_fields is None:
         output_fields = {}
     stats_bindings = dict(stats)
-    cache: dict[object, TensorStats] = {}
+    cache: dict[object, T] = {}
 
     new_queries = []
     for query in plan.bodies[:-1]:

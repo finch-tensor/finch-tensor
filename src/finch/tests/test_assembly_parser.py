@@ -1,6 +1,7 @@
 import numpy as np
 
 from finch import ffuncs
+from finch.algebra.ftypes import ftype
 from finch.finch_assembly import (
     Assign,
     Block,
@@ -16,11 +17,11 @@ from finch.finch_assembly import (
 
 
 def test_for_loop():
-    lvl_ptr = Variable("lvl_ptr", np.ndarray)
-    pos_stop = Variable("pos_stop", int)
-    qos_stop = Variable("qos_stop", int)
-    lvl_idx = Variable("lvl_idx", np.ndarray)
-    p = Variable("p", int)
+    lvl_ptr = Variable("lvl_ptr", ftype(np.ndarray))
+    pos_stop = Variable("pos_stop", ftype(int))
+    qos_stop = Variable("qos_stop", ftype(int))
+    lvl_idx = Variable("lvl_idx", ftype(np.ndarray))
+    p = Variable("p", ftype(int))
 
     expr = """finch
     resize(lvl_ptr, pos_stop + 1)
@@ -39,45 +40,45 @@ def test_for_loop():
             Call(
                 op=Literal(val=np.resize),
                 args=(
-                    Variable(name="lvl_ptr", type=np.ndarray),
+                    Variable(name="lvl_ptr", type_=ftype(np.ndarray)),
                     Call(
                         op=Literal(val=ffuncs.add),
-                        args=(Variable(name="pos_stop", type=int), Literal(val=1)),
+                        args=(Variable(name="pos_stop", type_=ftype(int)), Literal(val=1)),
                     ),
                 ),
             ),
             ForLoop(
-                var=Variable(name="p", type=int),
+                var=Variable(name="p", type_=ftype(int)),
                 start=Literal(val=0),
-                end=Variable(name="pos_stop", type=int),
+                end=Variable(name="pos_stop", type_=ftype(int)),
                 body=Block(
                     bodies=(
                         Store(
-                            buffer=Variable(name="lvl_ptr", type=np.ndarray),
+                            buffer=Variable(name="lvl_ptr", type_=ftype(np.ndarray)),
                             index=Call(
                                 op=Literal(val=ffuncs.add),
-                                args=(Variable(name="p", type=int), Literal(val=1)),
+                                args=(Variable(name="p", type_=ftype(int)), Literal(val=1)),
                             ),
                             value=Call(
                                 op=Literal(val=ffuncs.add),
                                 args=(
                                     Load(
                                         buffer=Variable(
-                                            name="lvl_ptr", type=np.ndarray
+                                            name="lvl_ptr", type_=ftype(np.ndarray)
                                         ),
                                         index=Call(
                                             op=Literal(val=ffuncs.add),
                                             args=(
-                                                Variable(name="p", type=int),
+                                                Variable(name="p", type_=ftype(int)),
                                                 Literal(val=1),
                                             ),
                                         ),
                                     ),
                                     Load(
                                         buffer=Variable(
-                                            name="lvl_ptr", type=np.ndarray
+                                            name="lvl_ptr", type_=ftype(np.ndarray)
                                         ),
-                                        index=Variable(name="p", type=int),
+                                        index=Variable(name="p", type_=ftype(int)),
                                     ),
                                 ),
                             ),
@@ -86,13 +87,13 @@ def test_for_loop():
                 ),
             ),
             Assign(
-                lhs=Variable(name="qos_stop", type=int),
+                lhs=Variable(name="qos_stop", type_=ftype(int)),
                 rhs=Call(
                     op=Literal(val=ffuncs.sub),
                     args=(
                         Load(
-                            buffer=Variable(name="lvl_ptr", type=np.ndarray),
-                            index=Variable(name="pos_stop", type=int),
+                            buffer=Variable(name="lvl_ptr", type_=ftype(np.ndarray)),
+                            index=Variable(name="pos_stop", type_=ftype(int)),
                         ),
                         Literal(val=1),
                     ),
@@ -101,8 +102,8 @@ def test_for_loop():
             Call(
                 op=Literal(val=np.resize),
                 args=(
-                    Variable(name="lvl_idx", type=np.ndarray),
-                    Variable(name="qos_stop", type=int),
+                    Variable(name="lvl_idx", type_=ftype(np.ndarray)),
+                    Variable(name="qos_stop", type_=ftype(int)),
                 ),
             ),
         )
@@ -112,13 +113,13 @@ def test_for_loop():
 
 
 def test_if_statement():
-    lvl_ptr = Variable("lvl_ptr", np.ndarray)
-    lvl_idx = Variable("lvl_idx", np.ndarray)
-    pos = Variable("pos", int)
-    q = Variable("q", int)
-    q_stop = Variable("q_stop", int)
-    i = Variable("i", int)
-    i1 = Variable("i1", int)
+    lvl_ptr = Variable("lvl_ptr", ftype(np.ndarray))
+    lvl_idx = Variable("lvl_idx", ftype(np.ndarray))
+    pos = Variable("pos", ftype(int))
+    q = Variable("q", ftype(int))
+    q_stop = Variable("q_stop", ftype(int))
+    i = Variable("i", ftype(int))
+    i1 = Variable("i1", ftype(int))
 
     expr = """finch
     q = lvl_ptr[pos]

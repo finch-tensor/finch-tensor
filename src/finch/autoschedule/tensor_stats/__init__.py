@@ -12,6 +12,7 @@ from .bound_stats import (
 )
 from .dense_stat import DenseStats, DenseStatsFactory
 from .dummy_stats import DummyStats, DummyStatsFactory
+from .exact_stats import ExactStats, ExactStatsFactory
 from .fd_stats import FDStats, FDStatsFactory
 from .sampling_stats import SamplingStats, SamplingStatsFactory
 from .stats_interpreter import StatsInterpreter
@@ -33,6 +34,8 @@ __all__ = [
     "DenseStatsFactory",
     "DummyStats",
     "DummyStatsFactory",
+    "ExactStats",
+    "ExactStatsFactory",
     "FDStats",
     "FDStatsFactory",
     "LPStats",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 
@@ -14,13 +14,15 @@ from finch.finch_logic.tensor_stats import StatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
+T = TypeVar("T", bound=NumericStats)
+
 
 class BlockedStatsFactory(
     BaseTensorStatsFactory["BlockedStats"], StatsFactory["BlockedStats"]
 ):
     def __init__(
         self,
-        stats_factory: StatsFactory[NumericStats],
+        stats_factory: BaseTensorStatsFactory[T],
         block_count: int = 5,
         block_width: int = 5,
         blocks_per_dim: Mapping[Field, int] | None = None,

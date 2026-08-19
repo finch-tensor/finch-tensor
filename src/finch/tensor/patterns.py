@@ -461,7 +461,7 @@ class EyeTensor(PatternTensor):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j - i == self._k
 
 
@@ -474,7 +474,7 @@ class UpperTriangleTensor(PatternTensor):
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
         return [Blocked((0,), (1,)), Blocked((1,), (0,))]
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j - i >= self._k
 
 
@@ -487,7 +487,7 @@ class LowerTriangleTensor(PatternTensor):
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
         return [Blocked((0,), (1,)), Blocked((1,), (0,))]
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j - i <= self._k
 
 
@@ -499,7 +499,7 @@ class PairSumTensor(PatternTensor):
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
         return [Blocked((0,), (1,))]
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j == i * 2 or j == i * 2 + 1
 
 
@@ -511,7 +511,7 @@ class PairCarryTensor(PatternTensor):
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
         return [Blocked((1,), (0,))]
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return i > 0 and j == (i - 1) // 2
 
 
@@ -519,7 +519,7 @@ class ReverseTensor(PatternTensor):
     def __init__(self, shape, *, dtype=None):
         super().__init__(shape, dtype=dtype)
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j == self.shape[1] - i - 1
 
 
@@ -528,7 +528,7 @@ class RollTensor(PatternTensor):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         axis_size = self.shape[1]
         return axis_size > 0 and j == (i - self._k) % axis_size
 
@@ -542,7 +542,7 @@ class RepeatTensor(PatternTensor):
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
         return [Blocked((1,), (0,)), Repeated((1,), (0,))]
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return self._k > 0 and j == i // self._k
 
 
@@ -578,7 +578,7 @@ class OddEvenMergeSortPartnerMaskTensor(PatternTensor):
             return i - self._k
         return i
 
-    def contains(self, i, j) -> bool:
+    def contains(self, i, j) -> bool:  # ty: ignore[invalid-method-override]
         return j == self._partner_index(i)
 
 
@@ -607,7 +607,7 @@ class OddEvenMergeSortLowerMaskTensor(PatternTensor):
             and i // (2 * self._p) == (i + self._k) // (2 * self._p)
         )
 
-    def contains(self, i) -> bool:
+    def contains(self, i) -> bool:  # ty: ignore[invalid-method-override]
         return self._is_left(i)
 
 
@@ -624,7 +624,7 @@ class OneHotMaskTensor(PatternTensor):
             index=self._index,
         )
 
-    def contains(self, i) -> bool:
+    def contains(self, i) -> bool:  # ty: ignore[invalid-method-override]
         return i == self._index
 
 
@@ -641,5 +641,5 @@ class ParityMaskTensor(PatternTensor):
             parity=self._parity,
         )
 
-    def contains(self, i) -> bool:
+    def contains(self, i) -> bool:  # ty: ignore[invalid-method-override]
         return i % 2 == self._parity

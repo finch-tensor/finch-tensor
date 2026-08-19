@@ -54,6 +54,7 @@ def test_fiber_tensor_attributes():
     shape = (3, 4)
     arr = np.ones(shape)
     a = asarray(arr, format=fmt)
+    assert isinstance(a, FiberTensor)
 
     # Check shape attribute
     assert a.shape == shape
@@ -578,6 +579,7 @@ def test_asarray_scipy_sparse(csr_type):
     np.testing.assert_array_equal(tensor.lvl.lvl.ptr.arr, csr.indptr)
 
     scipy_tensor = tensor.to_scipy()
+    assert isinstance(scipy_tensor, scipy.sparse.csr_array)
     np.testing.assert_array_equal(scipy_tensor.data, csr.data)
     np.testing.assert_array_equal(scipy_tensor.indices, csr.indices)
     np.testing.assert_array_equal(scipy_tensor.indptr, csr.indptr)

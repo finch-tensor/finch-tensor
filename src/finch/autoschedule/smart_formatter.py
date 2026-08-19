@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
-from typing import Any
+from typing import Any, TypeVar
 
 from finch import finch_logic as lgc
 from finch.algebra import FType, TensorFType, ftype, ftypes
 from finch.finch_logic import LogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
-from finch.tensor import dense, element, fiber_tensor, sparse_hash
+from finch.tensor import FiberTensorFType, dense, element, fiber_tensor, sparse_hash
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
@@ -17,6 +17,8 @@ from .tensor_stats import FDStats, StatsInterpreter
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
+
+T = TypeVar("T", bound=TensorStats)
 
 class SmartFormatter(LogicFormatter):
     def __init__(self, loader: LogicLoader | None = None):
@@ -34,8 +36,8 @@ class SmartFormatter(LogicFormatter):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
-        stats_factory: StatsFactory,
+        stats: dict[lgc.Alias, T],
+        stats_factory: StatsFactory[T],
     ):
         bindings = bindings.copy()
         stats_bindings: OrderedDict[lgc.Alias, TensorStats] = OrderedDict(stats)
@@ -93,7 +95,7 @@ class FDFormatter(SmartFormatter):
         fill_value: Any,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
-    ) -> TensorFType:
+    ) -> FiberTensorFType:
         if not isinstance(stats, FDStats):
             raise TypeError("FDFormatter requires FDStats.")
         if len(shape_type) != len(stats.index_order):
