@@ -11,6 +11,7 @@ class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    arity: int | float = 2
 
     @abstractmethod
     def __call__(self, *args: Any) -> Any:
@@ -41,6 +42,10 @@ class FinchOperator(ABC):
         """Return qualified string for printing/display purposes."""
         # Display as just the lowercase name
         return repr(self)
+
+
+def arity(op: FinchOperator) -> int | float:
+    return op.arity
 
 
 def is_associative(op: FinchOperator) -> bool:
