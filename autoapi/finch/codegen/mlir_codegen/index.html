@@ -3590,6 +3590,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../finch_logic/simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../finch_logic/stages/" class="md-nav__link">
         
   
@@ -4211,6 +4239,34 @@
     
   
     rewriters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../symbolic/simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
   
 
     
@@ -5295,20 +5351,7 @@ the data in an Buffer is organized and accessed.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">742</span>
-<span class="normal">743</span>
-<span class="normal">744</span>
-<span class="normal">745</span>
-<span class="normal">746</span>
-<span class="normal">747</span>
-<span class="normal">748</span>
-<span class="normal">749</span>
-<span class="normal">750</span>
-<span class="normal">751</span>
-<span class="normal">752</span>
-<span class="normal">753</span>
-<span class="normal">754</span>
-<span class="normal">755</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">755</span>
 <span class="normal">756</span>
 <span class="normal">757</span>
 <span class="normal">758</span>
@@ -5320,7 +5363,20 @@ the data in an Buffer is organized and accessed.</p>
 <span class="normal">764</span>
 <span class="normal">765</span>
 <span class="normal">766</span>
-<span class="normal">767</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRBufferFType</span><span class="p">(</span><span class="n">BufferFType</span><span class="p">,</span> <span class="n">MLIRArgumentFType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">767</span>
+<span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span>
+<span class="normal">780</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRBufferFType</span><span class="p">(</span><span class="n">BufferFType</span><span class="p">,</span> <span class="n">MLIRArgumentFType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Abstract base class for the ftype of datastructures. The ftype defines how</span>
 <span class="sd">    the data in an Buffer is organized and accessed.</span>
@@ -5382,12 +5438,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">748</span>
-<span class="normal">749</span>
-<span class="normal">750</span>
-<span class="normal">751</span>
-<span class="normal">752</span>
-<span class="normal">753</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">761</span>
+<span class="normal">762</span>
+<span class="normal">763</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return MLIR code which loads a named buffer at the given index.</span>
@@ -5419,12 +5475,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">755</span>
-<span class="normal">756</span>
-<span class="normal">757</span>
-<span class="normal">758</span>
-<span class="normal">759</span>
-<span class="normal">760</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return MLIR code which loads a named buffer at the given index.</span>
@@ -5456,12 +5512,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">762</span>
-<span class="normal">763</span>
-<span class="normal">764</span>
-<span class="normal">765</span>
-<span class="normal">766</span>
-<span class="normal">767</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span>
+<span class="normal">780</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return MLIR code which stores a named buffer to the given index.</span>
@@ -5509,9 +5565,7 @@ the data in an Buffer is organized and accessed.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
@@ -5542,7 +5596,9 @@ the data in an Buffer is organized and accessed.</p>
 <span class="normal">288</span>
 <span class="normal">289</span>
 <span class="normal">290</span>
-<span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRCompiler</span><span class="p">(</span><span class="n">MLIRForm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLoader</span><span class="p">):</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRCompiler</span><span class="p">(</span><span class="n">MLIRForm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class to compile and run FinchAssembly.</span>
 
@@ -5630,20 +5686,7 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 795</span>
-<span class="normal"> 796</span>
-<span class="normal"> 797</span>
-<span class="normal"> 798</span>
-<span class="normal"> 799</span>
-<span class="normal"> 800</span>
-<span class="normal"> 801</span>
-<span class="normal"> 802</span>
-<span class="normal"> 803</span>
-<span class="normal"> 804</span>
-<span class="normal"> 805</span>
-<span class="normal"> 806</span>
-<span class="normal"> 807</span>
-<span class="normal"> 808</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 808</span>
 <span class="normal"> 809</span>
 <span class="normal"> 810</span>
 <span class="normal"> 811</span>
@@ -6201,7 +6244,21 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
 <span class="normal">1363</span>
 <span class="normal">1364</span>
 <span class="normal">1365</span>
-<span class="normal">1366</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
+<span class="normal">1366</span>
+<span class="normal">1367</span>
+<span class="normal">1368</span>
+<span class="normal">1369</span>
+<span class="normal">1370</span>
+<span class="normal">1371</span>
+<span class="normal">1372</span>
+<span class="normal">1373</span>
+<span class="normal">1374</span>
+<span class="normal">1375</span>
+<span class="normal">1376</span>
+<span class="normal">1377</span>
+<span class="normal">1378</span>
+<span class="normal">1379</span>
+<span class="normal">1380</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A context for generating MLIR code.</span>
 
@@ -6289,12 +6346,13 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
         <span class="n">feed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feed</span>
         <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
-                <span class="n">t</span> <span class="o">=</span> <span class="n">mlir_type</span><span class="p">(</span><span class="n">prgm</span><span class="o">.</span><span class="n">result_type</span><span class="p">)</span>
-                <span class="n">new</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">MLIROperator</span><span class="o">.</span><span class="n">is_float</span><span class="p">(</span><span class="n">prgm</span><span class="o">.</span><span class="n">result_type</span><span class="p">)</span>
-                    <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-                <span class="p">)</span>
+                <span class="c1"># A Scalar-wrapped literal (a sparse gap read) carries its dtype</span>
+                <span class="c1"># in element_type; the Scalar&#39;s own ftype is a struct, which is</span>
+                <span class="c1"># not a type `arith.constant` can be given.</span>
+                <span class="n">value_type</span> <span class="o">=</span> <span class="n">_promote_type_helper</span><span class="p">([</span><span class="n">prgm</span><span class="p">])</span>
+                <span class="n">value</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;val&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="n">mlir_type</span><span class="p">(</span><span class="n">value_type</span><span class="p">)</span>
+                <span class="n">new</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">MLIROperator</span><span class="o">.</span><span class="n">is_float</span><span class="p">(</span><span class="n">value_type</span><span class="p">)</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
 
             <span class="k">case</span><span class="w"> </span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
@@ -6827,9 +6885,7 @@ instead of failing deep inside code generation.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
@@ -6917,7 +6973,9 @@ instead of failing deep inside code generation.</p>
 <span class="normal">252</span>
 <span class="normal">253</span>
 <span class="normal">254</span>
-<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Validates that a FinchAssembly program only uses constructs the MLIR</span>
 <span class="sd">    backend can lower, raising a named error for each known limitation</span>
@@ -7061,9 +7119,7 @@ invokes the compiled function, and reconstructs the result.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
 <span class="normal"> 78</span>
@@ -7110,7 +7166,9 @@ invokes the compiled function, and reconstructs the result.</p>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
-<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class to represent MLIR kernel. It validates and serializes arguments,</span>
 <span class="sd">    invokes the compiled function, and reconstructs the result.</span>
@@ -7212,9 +7270,7 @@ invokes the compiled function, and reconstructs the result.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
@@ -7227,7 +7283,9 @@ invokes the compiled function, and reconstructs the result.</p>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
-<span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A class to represent MLIR module.</span>
 
@@ -7385,20 +7443,7 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
-<span class="normal">623</span>
-<span class="normal">624</span>
-<span class="normal">625</span>
-<span class="normal">626</span>
-<span class="normal">627</span>
-<span class="normal">628</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">628</span>
 <span class="normal">629</span>
 <span class="normal">630</span>
 <span class="normal">631</span>
@@ -7426,7 +7471,20 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 <span class="normal">653</span>
 <span class="normal">654</span>
 <span class="normal">655</span>
-<span class="normal">656</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="nb">str</span><span class="p">):</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span>
+<span class="normal">666</span>
+<span class="normal">667</span>
+<span class="normal">668</span>
+<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the ctypes equivalent of an FType or MLIR type string, so Python</span>
 <span class="sd">    can pass arguments to and read results from a compiled MLIR kernel.</span>
@@ -7490,18 +7548,7 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">563</span>
-<span class="normal">564</span>
-<span class="normal">565</span>
-<span class="normal">566</span>
-<span class="normal">567</span>
-<span class="normal">568</span>
-<span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
 <span class="normal">577</span>
@@ -7522,7 +7569,20 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 <span class="normal">592</span>
 <span class="normal">593</span>
 <span class="normal">594</span>
-<span class="normal">595</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_type</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_type</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert an FType into the MLIR type string</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -7531,10 +7591,12 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
             <span class="k">return</span> <span class="n">t</span><span class="o">.</span><span class="n">mlir_type</span><span class="p">()</span>
         <span class="k">case</span><span class="w"> </span><span class="n">algebra</span><span class="o">.</span><span class="n">bool</span><span class="k">_</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;i1&quot;</span>
-        <span class="k">case</span> <span class="n">algebra</span><span class="o">.</span><span class="n">intp</span><span class="p">:</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">algebra</span><span class="o">.</span><span class="n">intp</span> <span class="o">|</span> <span class="n">algebra</span><span class="o">.</span><span class="n">int</span><span class="k">_</span><span class="p">:</span>
+            <span class="c1"># A Python `int` is a 64-bit integer, which this backend represents</span>
+            <span class="c1"># as `index` like every other one. Mapping it to `i64` instead made</span>
+            <span class="c1"># the emitted type depend on whether a literal or a variable came</span>
+            <span class="c1"># first in a commutative call.</span>
             <span class="k">return</span> <span class="s2">&quot;index&quot;</span>
-        <span class="k">case</span><span class="w"> </span><span class="n">algebra</span><span class="o">.</span><span class="n">int</span><span class="k">_</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;i64&quot;</span>
         <span class="k">case</span><span class="w"> </span><span class="n">algebra</span><span class="o">.</span><span class="n">float</span><span class="k">_</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;f64&quot;</span>
         <span class="k">case</span> <span class="n">algebra</span><span class="o">.</span><span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeNumpy</span><span class="p">():</span>

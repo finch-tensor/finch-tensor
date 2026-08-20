@@ -3586,6 +3586,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../finch_logic/simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../finch_logic/stages/" class="md-nav__link">
         
   
@@ -4207,6 +4235,34 @@
     
   
     rewriters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../symbolic/simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
   
 
     
@@ -6378,7 +6434,8 @@
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
-<span class="normal">243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArray</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">243</span>
+<span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArray</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">val</span><span class="p">:</span> <span class="n">NumpyBuffer</span><span class="p">,</span>
@@ -6389,7 +6446,8 @@
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">val</span> <span class="o">=</span> <span class="n">val</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="n">shape</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">strides</span> <span class="o">=</span> <span class="n">strides</span>
+        <span class="n">pos_t</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">length_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strides</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">pos_t</span><span class="p">(</span><span class="n">stride</span><span class="p">)</span> <span class="k">for</span> <span class="n">stride</span> <span class="ow">in</span> <span class="n">strides</span><span class="p">)</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">fill_value</span>
@@ -6447,7 +6505,7 @@
         <span class="k">return</span> <span class="n">BufferizedNDArrayFType</span><span class="p">(</span>
             <span class="n">buffer_type</span><span class="o">=</span><span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">),</span>
             <span class="n">ndim</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="p">,</span>
-            <span class="n">dimension_type</span><span class="o">=</span><span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">strides</span><span class="p">),</span>
+            <span class="n">dimension_type</span><span class="o">=</span><span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">),</span>
             <span class="n">fill_value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span>
             <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
         <span class="p">)</span>
@@ -6730,8 +6788,7 @@ This allows for indexing into the bufferized array.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
-<span class="normal">185</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
 <span class="normal">188</span>
@@ -6766,7 +6823,8 @@ This allows for indexing into the bufferized array.</p>
 <span class="normal">217</span>
 <span class="normal">218</span>
 <span class="normal">219</span>
-<span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="normal">220</span>
+<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get an item from the bufferized NDArray.</span>
 <span class="sd">    This allows for indexing into the bufferized array.</span>
@@ -6826,15 +6884,15 @@ This allows for indexing into the bufferized array.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">222</span>
-<span class="normal">223</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
 <span class="normal">226</span>
 <span class="normal">227</span>
 <span class="normal">228</span>
 <span class="normal">229</span>
-<span class="normal">230</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="normal">230</span>
+<span class="normal">231</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Set an item in the bufferized NDArray.</span>
 <span class="sd">    This allows for indexing into the bufferized array.</span>
@@ -6866,8 +6924,7 @@ operation, and shape.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">157</span>
-<span class="normal">158</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">158</span>
 <span class="normal">159</span>
 <span class="normal">160</span>
 <span class="normal">161</span>
@@ -6876,7 +6933,8 @@ operation, and shape.</p>
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
-<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="normal">167</span>
+<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Declare a bufferized NDArray with the given initialization value,</span>
 <span class="sd">    operation, and shape.</span>
@@ -6910,12 +6968,12 @@ This is used to get the underlying NumPy array from the bufferized NDArray.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">57</span>
-<span class="normal">58</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">58</span>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">62</span>
+<span class="normal">63</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert the bufferized NDArray to a NumPy array.</span>
 <span class="sd">    This is used to get the underlying NumPy array from the bufferized NDArray.</span>
@@ -6964,8 +7022,7 @@ This includes the fill value, element type, and shape type.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">246</span>
-<span class="normal">247</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">247</span>
 <span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
@@ -7209,7 +7266,8 @@ This includes the fill value, element type, and shape type.</p>
 <span class="normal">488</span>
 <span class="normal">489</span>
 <span class="normal">490</span>
-<span class="normal">491</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFType</span><span class="p">(</span><span class="n">FinchTensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+<span class="normal">491</span>
+<span class="normal">492</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFType</span><span class="p">(</span><span class="n">FinchTensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A ftype for bufferized NumPy arrays that provides metadata about the array.</span>
 <span class="sd">    This includes the fill value, element type, and shape type.</span>
@@ -7279,7 +7337,7 @@ This includes the fill value, element type, and shape type.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">buf_t</span> <span class="o">=</span> <span class="n">buffer_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ndim</span> <span class="o">=</span> <span class="n">ndim</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape_t</span> <span class="o">=</span> <span class="n">dimension_type</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">strides_t</span> <span class="o">=</span> <span class="n">dimension_type</span>  <span class="c1"># assuming strides is the same type as shape</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strides_t</span> <span class="o">=</span> <span class="n">TupleFType</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">buf_t</span><span class="o">.</span><span class="n">length_type</span><span class="p">,)</span> <span class="o">*</span> <span class="n">ndim</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buf_t</span><span class="o">.</span><span class="n">element_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="p">(</span>
@@ -7520,8 +7578,7 @@ This includes the fill value, element type, and shape type.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
-<span class="normal">337</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
 <span class="normal">340</span>
@@ -7534,7 +7591,8 @@ This includes the fill value, element type, and shape type.</p>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
-<span class="normal">350</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
+<span class="normal">350</span>
+<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BufferizedNDArray</span><span class="p">:</span>

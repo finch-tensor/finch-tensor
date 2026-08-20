@@ -3586,6 +3586,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../finch_logic/simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../finch_logic/stages/" class="md-nav__link">
         
   
@@ -4229,6 +4257,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../simplification/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    simplification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../stage/" class="md-nav__link">
         
   
@@ -4317,6 +4373,28 @@
     <span class="md-ellipsis">
       
         term
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.symbolic.term.CallTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CallTerm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.symbolic.term.LiteralTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LiteralTerm
       
     </span>
   </a>
@@ -5183,6 +5261,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.symbolic.term.CallTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CallTerm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.symbolic.term.LiteralTerm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LiteralTerm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.symbolic.term.Term" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5296,6 +5396,143 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.symbolic.term.CallTerm" class="doc doc-heading">
+            <code>CallTerm</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="TermTree
+
+
+  
+      dataclass
+   (finch.symbolic.term.TermTree)" href="#finch.symbolic.term.TermTree">TermTree</a></code>, <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+
+
+
+        <p>A tree term which applies the operator held by the literal <code>op</code> to <code>args</code>.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/symbolic/term.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CallTerm</span><span class="p">(</span><span class="n">TermTree</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A tree term which applies the operator held by the literal `op` to `args`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">op</span><span class="p">:</span> <span class="n">LiteralTerm</span>
+    <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Term</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.symbolic.term.LiteralTerm" class="doc doc-heading">
+            <code>LiteralTerm</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Term (finch.symbolic.term.Term)" href="#finch.symbolic.term.Term">Term</a></code>, <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+
+
+
+        <p>A leaf term which wraps the constant <code>val</code>.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/symbolic/term.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LiteralTerm</span><span class="p">(</span><span class="n">Term</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A leaf term which wraps the constant `val`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">val</span><span class="p">:</span> <span class="n">Any</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
