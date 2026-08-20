@@ -24,6 +24,7 @@ from .nodes import (
     TableValueFType,
     Value,
 )
+from .simplification import LogicSimplify
 from .stages import (
     LogicEvaluator,
     LogicLoader,
@@ -41,6 +42,7 @@ __all__ = [
     "LogicInterpreter",
     "LogicLoader",
     "LogicNode",
+    "LogicSimplify",
     "LogicStatement",
     "LogicTree",
     "MapJoin",
