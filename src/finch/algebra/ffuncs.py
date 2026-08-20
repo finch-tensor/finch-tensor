@@ -1,4 +1,5 @@
 import builtins
+import math
 import operator
 from functools import reduce
 from typing import Any
@@ -30,6 +31,8 @@ from .ftypes import (
 
 
 class NAryFinchOperator(FinchOperator):
+    arity = math.inf
+
     def return_type(self, *args) -> FType:  # type: ignore[override]
         new_args: list[Any] = []
         for arg in args:
@@ -40,18 +43,24 @@ class NAryFinchOperator(FinchOperator):
 
 
 class BinaryFinchOperator(FinchOperator):
+    arity = 2
+
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType) and isinstance(b, FDType)
         return ftype(self(a(True), b(True)))
 
 
 class UnaryFinchOperator(FinchOperator):
+    arity = 1
+
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType)
         return ftype(self(a(True)))
 
 
 class ComparisonFinchOperator(FinchOperator):
+    arity = 2
+
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType) and isinstance(b, FDType)
         return bool
@@ -640,6 +649,8 @@ max = _Max()
 
 
 class _MinBy(FinchOperator):
+    arity = 2
+
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -674,6 +685,8 @@ minby = _MinBy()
 
 
 class _MaxBy(FinchOperator):
+    arity = 2
+
     is_associative = True
     is_commutative = True
     is_idempotent = True
@@ -848,6 +861,8 @@ conj = _Conj()
 
 
 class _Clip(FinchOperator):
+    arity = 3
+
     def __call__(self, a: Any, b: Any, c: Any):
         return ftype(a)(np.clip(a, b, c))
 
@@ -862,6 +877,8 @@ clip = _Clip()
 
 
 class _Cast(FinchOperator):
+    arity = 1
+
     def __init__(self, dtype: FType):
         self.dtype = dtype
 
@@ -1006,6 +1023,8 @@ class _GreaterEqual(ComparisonFinchOperator):
 
 
 class _Where(FinchOperator):
+    arity = 3
+
     def __call__(self, a: Any, b: Any, c: Any):
         if isinstance(b, tuple) and isinstance(c, tuple):
             return b if builtins.bool(a) else c
@@ -1347,6 +1366,8 @@ class _InitWrite(FinchOperator):
     a specific value.
     """
 
+    arity = 2
+
     def __init__(self, value):
         self.value = value
 
@@ -1388,6 +1409,8 @@ class _Overwrite(FinchOperator):
     Overwrite(x, y) returns y always.
     """
 
+    arity = 2
+
     def __call__(self, x: Any, y: Any):
         return y
 
@@ -1406,6 +1429,8 @@ class _FirstArg(FinchOperator):
     Returns the first argument passed to it.
     """
 
+    arity = math.inf
+
     def __call__(self, *args):
         return args[0] if args else None
 
@@ -1420,6 +1445,8 @@ first_arg = _FirstArg()
 
 
 class _Choose(FinchOperator):
+    arity = math.inf
+
     is_associative = True
 
     def __init__(self, fill_value):
@@ -1470,6 +1497,8 @@ class _Identity(FinchOperator):
     Returns the input value unchanged.
     """
 
+    arity = 1
+
     is_idempotent = True
 
     def __call__(self, x: Any):
@@ -1490,6 +1519,8 @@ class _Conjugate(FinchOperator):
     Returns the complex conjugate of the input value.
     """
 
+    arity = 1
+
     def __call__(self, x: Any):
         return np.conjugate(x)
 
@@ -1504,6 +1535,8 @@ conjugate = _Conjugate()
 
 
 class _MakeTuple(FinchOperator):
+    arity = math.inf
+
     is_commutative = False
     is_associative = False
 
@@ -1521,6 +1554,8 @@ make_tuple = _MakeTuple()
 
 
 class _Last(FinchOperator):
+    arity = 1
+
     def __call__(self, x: tuple) -> Any:
         return x[-1]
 
@@ -1536,6 +1571,8 @@ last = _Last()
 
 
 class _ScaledSquare(FinchOperator):
+    arity = 1
+
     def __call__(self, x: Any) -> tuple:
         if x == 0:
             return (np.true_divide(type(x)(0), type(x)(1)), x)
@@ -1553,6 +1590,8 @@ scaled_square = _ScaledSquare()
 
 
 class _ScaledPower(FinchOperator):
+    arity = 1
+
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1579,6 +1618,8 @@ def scaled_power(exponent: float):
 
 
 class _AddScaledPower(FinchOperator):
+    arity = 2
+
     is_associative = True
     is_commutative = True
 
@@ -1631,6 +1672,8 @@ class _AddScaledPower(FinchOperator):
 
 
 class _AddScaledSquare(FinchOperator):
+    arity = 2
+
     is_associative = True
     is_commutative = True
 
@@ -1680,6 +1723,8 @@ def add_scaled_power(exponent: float):
 
 
 class _ScaledNegativePower(FinchOperator):
+    arity = 1
+
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1710,6 +1755,8 @@ def scaled_negative_power(exponent: float):
 
 
 class _AddScaledNegativePower(FinchOperator):
+    arity = 2
+
     is_associative = True
     is_commutative = True
 
@@ -1771,6 +1818,8 @@ def add_scaled_negative_power(exponent: float):
 
 
 class _RootScaledPower(FinchOperator):
+    arity = 1
+
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1797,6 +1846,8 @@ class _RootScaledPower(FinchOperator):
 
 
 class _RootScaledSquare(FinchOperator):
+    arity = 1
+
     def __call__(self, x: tuple) -> Any:
         arg, scale = x
         return np.sqrt(arg) * scale
@@ -1823,6 +1874,8 @@ def root_scaled_power(exponent: float):
 
 
 class _RootScaledNegativePower(FinchOperator):
+    arity = 1
+
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1867,6 +1920,8 @@ class _Scansearch(FinchOperator):
     the index of the smallest element in `arr` that is greater than or equal to `x`.
     If all elements in `arr` are less than `x`, it returns `hi`.
     """
+
+    arity = 4
 
     @staticmethod
     def _func(
@@ -1917,6 +1972,8 @@ class _ResizeIfSmaller(FinchOperator):
     If `new_size` is less than or equal to the current size of `arr`, it
     returns `arr` unchanged.
     """
+
+    arity = 3
 
     @staticmethod
     def _func(
