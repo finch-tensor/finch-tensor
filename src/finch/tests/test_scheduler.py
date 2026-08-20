@@ -585,7 +585,9 @@ def test_heuristic_loop_order():
                                 ),
                                 (Field("i0"), Field("i2"), Field("i1")),
                             ),
-                            (Field("i0"), Field("i1"), Field("i2")),
+                            # The contracted index `i1` is shared by both inputs,
+                            # so it is placed outermost for an outer-product order.
+                            (Field("i1"), Field("i0"), Field("i2")),
                         ),
                         (Field("i1"),),
                     ),
