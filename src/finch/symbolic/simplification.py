@@ -40,56 +40,58 @@ def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
 
 def canonicalize_associative(node: Term) -> Term | None:
     """
-    Take one step toward the canonical form of a nest of abelian calls.
+    Unwraps singleton n-ary function calls.
+    - `f(x)` => `x`
 
     An n-ary `f` absorbs its immediate `f`-children and moves literals to the
-    front, next to each other: `f(a..., f(b...), c...)` => `f(k..., rest...)`.
-    Unwraps singleton n-ary function calls.
+    front, next to each other:
+    - `f(a..., f(b...), c...)` => `f(k..., rest...)`.
 
     A fixed-arity `f` is instead rotated one step at a time so that literals
     bubble up and to the left, where adjacent ones merge:
-    - `f(x, k)`         => `f(k, x)`
     - `f(k1, f(k2, y))` => `f(f(k1, k2), y)`
     - `f(f(k, x), y)`   => `f(k, f(x, y))`
     - `f(x, f(k, y))`   => `f(k, f(x, y))`
+    - `f(x, k)`         => `f(k, x)`
     """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val):
-            if len(args) == 1:
-                return args[0]
-            if math.isinf(arity(op.val)):
-                flat = [
-                    leaf
-                    for arg in args
-                    for leaf in (
-                        arg.args
-                        if isinstance(arg, CallTerm) and arg.op == op
-                        else (arg,)
-                    )
-                ]
-                if len(flat) == 1:
-                    return flat[0]
-                if is_commutative(op.val):
-                    flat = sorted(
-                        flat, key=lambda leaf: not isinstance(leaf, LiteralTerm)
-                    )
-                return _call_like(node, flat) if flat != list(args) else None
-            match args:
-                case (x, LiteralTerm() as k) if not isinstance(x, LiteralTerm):
-                    return _call_like(node, [k, x])
-                case (
+        case CallTerm(op=op, args=args) if not is_associative(op.val):
+            return None
+        case CallTerm(op=op, args=(x,)):
+            return x
+        case CallTerm(op=op, args=args) if math.isinf(arity(op.val)):
+            flat = [
+                leaf
+                for arg in args
+                for leaf in (
+                    arg.args if isinstance(arg, CallTerm) and arg.op == op else (arg,)
+                )
+            ]
+            if is_commutative(op.val):
+                flat = sorted(flat, key=lambda leaf: not isinstance(leaf, LiteralTerm))
+            return _call_like(node, flat) if flat != list(args) else None
+        case CallTerm(
+            op=op,
+            args=(
+                (
                     LiteralTerm() as k1,
                     CallTerm(op=inner, args=(LiteralTerm() as k2, y)),
-                ) if inner == op:
-                    return _call_like(node, [_evaluate(op, (k1, k2)), y])
-                case (CallTerm(op=inner, args=(LiteralTerm() as k, x)), y) if (
-                    inner == op
-                ):
-                    return _call_like(node, [k, _call_like(node, [x, y])])
-                case (x, CallTerm(op=inner, args=(LiteralTerm() as k, y))) if (
-                    inner == op and not isinstance(x, LiteralTerm)
-                ):
-                    return _call_like(node, [k, _call_like(node, [x, y])])
+                )
+            ),
+        ) if inner == op:
+            return _call_like(node, [_evaluate(op, (k1, k2)), y])
+        case CallTerm(
+            op=op, args=(CallTerm(op=inner, args=(LiteralTerm() as k, x)), y)
+        ) if inner == op:
+            return _call_like(node, [k, _call_like(node, [x, y])])
+        case CallTerm(
+            op=op, args=(x, CallTerm(op=inner, args=(LiteralTerm() as k, y)))
+        ) if inner == op and is_commutative(op.val):
+            return _call_like(node, [k, _call_like(node, [x, y])])
+        case CallTerm(op=op, args=(x, LiteralTerm() as k)) if not isinstance(
+            x, LiteralTerm
+        ) and is_commutative(op.val):
+            return _call_like(node, [k, x])
     return None
 
 
@@ -187,8 +189,6 @@ def drop_identities(node: Term) -> Term | None:
                 ]
                 if len(kept) == len(args):
                     return None
-                # Every argument was an identity, so the call is worth exactly one
-                # of them.
                 return _call_like(node, kept or args[-1:])
     return None
 
