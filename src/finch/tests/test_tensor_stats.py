@@ -290,7 +290,7 @@ def test_stats_estimator_isolated():
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
-    """Overwrite a stßat's BaseTensorStats state in place.
+    """Overwrite a stat's BaseTensorStats state in place.
 
     Stats now inherit from :class:`BaseTensorStats`, so we copy ``base``'s state
     onto the stat directly.
