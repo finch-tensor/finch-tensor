@@ -57,7 +57,6 @@ def test_sampling_from_tensor():
         replace=False,
         cache={},
     )
-    assert stats.sketch.shape == (20, 20)
     assert stats.remainder_dims == set()
     assert stats.remainder_dim_sizes == {}
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
@@ -291,7 +290,7 @@ def test_stats_estimator_isolated():
 
 
 def _overwrite_def(stat, base: BaseTensorStats):
-    """Overwrite a stat's BaseTensorStats state in place.
+    """Overwrite a stßat's BaseTensorStats state in place.
 
     Stats now inherit from :class:`BaseTensorStats`, so we copy ``base``'s state
     onto the stat directly.

@@ -5,11 +5,30 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import FinchOperator, is_annihilator, is_identity
-from finch.finch_logic import Field
+from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Relabel,
+    Reorder,
+    Table,
+)
+from finch.finch_logic.nodes import LogicExpression
+from finch.tensor import BufferizedNDArray
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import _scalar
+
+
+def mask_table(field: Field, mask: np.ndarray) -> Table:
+    return Table(Literal(BufferizedNDArray.from_numpy(mask)), (field,))
 
 
 def _dgood1(d_n: float, frequencies: dict, n: float, N: float) -> float:
@@ -263,67 +282,6 @@ def _dsh3(d_n: float, f_1: float, frequencies: dict, q: float, n: float):
     return d_n + f_1 * ratio1 * (K_raw**2)
 
 
-def _outer_multiply(
-    a: np.ndarray, a_order: list, b: np.ndarray, b_order: list
-) -> tuple[np.ndarray, list]:
-    "multiplying sketches and keeping their index order"
-    combined_order = list(a_order)
-    for f in b_order:
-        if f not in combined_order:
-            combined_order.append(f)
-
-    a_exp = a
-    a_cur = list(a_order)
-    for i, f in enumerate(combined_order):
-        if f not in a_cur:
-            a_exp = np.expand_dims(a_exp, axis=i)
-            a_cur.insert(i, f)
-
-    b_exp = b
-    b_cur = list(b_order)
-    for i, f in enumerate(combined_order):
-        if f not in b_cur:
-            b_exp = np.expand_dims(b_exp, axis=i)
-            b_cur.insert(i, f)
-
-    shape = tuple(
-        max(a_exp.shape[combined_order.index(f)], b_exp.shape[combined_order.index(f)])
-        for f in combined_order
-    )
-
-    a_exp = np.broadcast_to(a_exp, shape).copy()
-    b_exp = np.broadcast_to(b_exp, shape).copy()
-
-    return a_exp * b_exp, combined_order
-
-
-def _expand_sketch_to(
-    sketch: np.ndarray,
-    current_order: list,
-    target_order: list,
-    new_def: BaseTensorStats,
-) -> np.ndarray:
-    result = sketch
-    current = list(current_order)
-    for i, f in enumerate(target_order):
-        if f not in current:
-            result = np.expand_dims(result, axis=i)
-            current.insert(i, f)
-    target_shape = tuple(int(new_def.dim_sizes[f]) for f in target_order)
-    return np.broadcast_to(result, target_shape).copy()
-
-
-def _reorder_to(
-    sketch: np.ndarray, current_order: list, target_order: list
-) -> np.ndarray:
-    if current_order == target_order:
-        return sketch
-    perm = [current_order.index(f) for f in target_order if f in current_order]
-    if len(perm) != len(current_order):
-        return sketch
-    return np.transpose(sketch, perm)
-
-
 class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
     def __init__(self, sample_prob: float = 0.5, estimator: str = "uj1"):
         super().__init__(SamplingStats)
@@ -343,32 +301,20 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> SamplingStats:
         base = super().__call__(tensor, fields)
-        val = tensor
-        if hasattr(val, "tns"):
-            val = val.tns.val
-        if hasattr(val, "val") and not hasattr(val, "to_numpy"):
-            val = val.val
-        if hasattr(val, "to_numpy"):
-            arr = val.to_numpy()
-        else:
-            shape = tuple(int(base.dim_sizes[f]) for f in fields)
-            arr = np.zeros(shape, dtype=float)
-
         fill = base.fill_value
 
         # defining one Bernoulli mask per dimension, an entry will survive
         # only if all its indices are kept
         # masks has the 0's 1's combination for each entry in a dimension
         masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
-        # combining the masks to create a filter to sample
-        combined = masks[0]
-        for mask in masks[1:]:
-            combined = np.multiply.outer(combined, mask)
+        non_fill = MapJoin(
+            Literal(ffuncs.ne), (Table(Literal(tensor), fields), _scalar(fill))
+        )
+        mask_tables = [
+            mask_table(field, mask) for field, mask in zip(fields, masks, strict=True)
+        ]
 
-        # keeping the nnz in the tensor intact
-        # sketch is creating the sample with the filter over the tensor
-        non_fill = (arr != fill).astype(float)
-        sketch = non_fill * combined
+        sketch = MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables))
 
         return SamplingStats(
             base,
@@ -389,13 +335,9 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             return self.copy(join_args[0])
 
         base_stats = super()._mapjoin_defs(op, *join_args)
-        result = join_args[0].sketch.copy()
-        result_order = list(join_args[0].index_order)
-
-        for arg in join_args[1:]:
-            result, result_order = _outer_multiply(
-                result, result_order, arg.sketch, list(arg.index_order)
-            )
+        result_sketch = MapJoin(
+            Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args)
+        )
 
         new_remainder: set[Field] = set()
         new_remainder_sizes: dict = {}
@@ -403,11 +345,9 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             new_remainder |= arg.remainder_dims
             new_remainder_sizes.update(arg.remainder_dim_sizes)
 
-        result = _reorder_to(result, result_order, list(base_stats.index_order))
-
         return SamplingStats(
             base_stats,
-            sketch=result,
+            sketch=result_sketch,
             remainder_dims=new_remainder,
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
@@ -422,13 +362,10 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         """
         base_stats = super()._mapjoin_defs(op, *union_args)
         output_indices = set(base_stats.index_order)
-        result_shape = tuple(
-            int(base_stats.dim_sizes[f]) for f in base_stats.index_order
-        )
-        result = np.zeros(result_shape, dtype=float)
         new_remainder: set[Field] = set()
         new_remainder_sizes: dict = {}
 
+        terms = []
         for arg in union_args:
             new_remainder_sizes.update(arg.remainder_dim_sizes)
             arg_indices = set(arg.index_order)
@@ -441,36 +378,21 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
                         other_free_size *= other.dim_sizes.get(f, 1.0)
                 for f in other.remainder_dims:
                     other_free_size *= other.dim_sizes.get(f, 1.0)
-
-            expanded = _expand_sketch_to(
-                arg.sketch,
-                list(arg.index_order),
-                list(base_stats.index_order),
-                base_stats,
+            terms.append(
+                MapJoin(Literal(ffuncs.mul), (arg.sketch, _scalar(other_free_size)))
             )
-
-            result = result + expanded * other_free_size
             new_remainder |= arg.remainder_dims
 
-        if len(union_args) >= 2:
-            inter = union_args[0].sketch.copy()
-            inter_order = list(union_args[0].index_order)
-            for arg in union_args[1:]:
-                inter, inter_order = _outer_multiply(
-                    inter,
-                    inter_order,
-                    arg.sketch,
-                    list(arg.index_order),
-                )
+        result = terms[0]
+        for term in terms[1:]:
+            result = MapJoin(Literal(ffuncs.add), (result, term))
 
-            inter_expanded = _expand_sketch_to(
-                inter,
-                inter_order,
-                list(base_stats.index_order),
-                base_stats,
+        if len(union_args) >= 2:
+            inter = MapJoin(
+                Literal(ffuncs.mul), tuple(arg.sketch for arg in union_args)
             )
 
-            result = result - inter_expanded
+            result = MapJoin(Literal(ffuncs.sub), (result, inter))
 
         return SamplingStats(
             base_stats,
@@ -497,28 +419,37 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
         base_stats = self.aggregate_def(op, init, reduce_indices, stats)
         reduce_set = set(reduce_indices) & set(stats.index_order)
-        index_order = list(stats.index_order)
-        reduce_axes = tuple(
-            index_order.index(f) for f in index_order if f in reduce_set
-        )
+        reduce_fields = tuple(reduce_set)
+
         # check is_annihilator
         if is_identity(op, stats.fill_value):
             new_sketch = (
-                np.sum(stats.sketch, axis=reduce_axes)
-                if reduce_axes
-                else stats.sketch.copy()
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(np.float64(0.0)),
+                    stats.sketch,
+                    reduce_fields,
+                )
+                if reduce_fields
+                else stats.sketch
             )
+
         elif is_annihilator(op, stats.fill_value):
-            exists = (stats.sketch > 0).astype(float)
-            if reduce_axes:
-                exists = np.min(exists, axis=reduce_axes)
-            new_sketch = exists * math.prod(int(stats.dim_sizes[f]) for f in reduce_set)
+            exists = MapJoin(Literal(ffuncs.gt), (stats.sketch, _scalar(0.0)))
+            if reduce_fields:
+                exists = Aggregate(
+                    Literal(ffuncs.min), Literal(np.float64(1.0)), exists, reduce_fields
+                )
+            prod_n = math.prod(int(stats.dim_sizes[f]) for f in reduce_set)
+            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, _scalar(prod_n)))
         else:
             prod_n = math.prod(int(stats.dim_sizes[f]) for f in reduce_set)
-            exists = (stats.sketch > 0).astype(float)
-            if reduce_axes:
-                exists = np.max(exists, axis=reduce_axes)
-            new_sketch = prod_n * exists
+            exists = MapJoin(Literal(ffuncs.gt), (stats.sketch, _scalar(0.0)))
+            if reduce_fields:
+                exists = Aggregate(
+                    Literal(ffuncs.max), Literal(np.float64(0.0)), exists, reduce_fields
+                )
+            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, _scalar(prod_n)))
 
         new_remainder = stats.remainder_dims | reduce_set
         new_remainder_sizes = dict(stats.remainder_dim_sizes)
@@ -541,7 +472,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         base_stats = self.relabel_def(stats, relabel_indices)
         return SamplingStats(
             base_stats,
-            sketch=stats.sketch.copy(),
+            sketch=Relabel(stats.sketch, relabel_indices),
             remainder_dims=set(stats.remainder_dims),
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
@@ -553,11 +484,9 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         self, stats: SamplingStats, reorder_indices: tuple[Field, ...]
     ) -> SamplingStats:
         base_stats = self.reorder_def(stats, reorder_indices)
-        old_order = list(stats.index_order)
-        new_sketch = _reorder_to(stats.sketch.copy(), old_order, list(reorder_indices))
         return SamplingStats(
             base_stats,
-            sketch=new_sketch,
+            sketch=Reorder(stats.sketch, reorder_indices),
             remainder_dims=set(stats.remainder_dims),
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
@@ -580,7 +509,7 @@ class SamplingStats(NumericStats):
     def __init__(
         self,
         base: BaseTensorStats,
-        sketch: np.ndarray,
+        sketch: LogicExpression,
         sample_prob: float = 0.5,
         estimator: str = "uj1",
         remainder_dims: set | None = None,
@@ -597,10 +526,97 @@ class SamplingStats(NumericStats):
             dict(remainder_dim_sizes) if remainder_dim_sizes else {}
         )
         self.masks_ref = masks_ref if masks_ref is not None else {}
+        self.scan_cache: tuple[float, float, float, np.ndarray | None] | None = None
+
+    def scan(self, needs_freq: bool) -> tuple[float, float, float, dict]:
+        from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
+        if self.scan_cache is not None and (
+            not needs_freq or self.scan_cache[3] is not None
+        ):
+            n, d_n, f_1, frequencies = self.scan_cache
+        else:
+            fields = tuple(self.index_order)
+            n_a, dn_a, f1_a = Alias("n"), Alias("d_n"), Alias("f_1")
+            bodies = [
+                Query(
+                    n_a,
+                    Aggregate(Literal(ffuncs.add), Literal(0.0), self.sketch, fields),
+                ),
+                Query(
+                    dn_a,
+                    Aggregate(
+                        Literal(ffuncs.add),
+                        Literal(0.0),
+                        MapJoin(Literal(ffuncs.gt), (self.sketch, _scalar(0.0))),
+                        fields,
+                    ),
+                ),
+                Query(
+                    f1_a,
+                    Aggregate(
+                        Literal(ffuncs.add),
+                        Literal(0.0),
+                        MapJoin(Literal(ffuncs.eq), (self.sketch, _scalar(1.0))),
+                        fields,
+                    ),
+                ),
+            ]
+
+            outputs = [n_a, dn_a, f1_a]
+            max_a = None
+            if needs_freq:
+                frequencies = {}
+                max_a = Alias("max_val")
+                bodies.append(
+                    Query(
+                        max_a,
+                        Aggregate(
+                            Literal(ffuncs.max), Literal(0.0), self.sketch, fields
+                        ),
+                    )
+                )
+                outputs.append(max_a)
+
+            prgm = Plan((*bodies, Produces(tuple(outputs))))
+            results = NON_RECURSIVE_SCHEDULER(prgm)
+            n = float(np.asarray(results[0])[()])
+            d_n = float(np.asarray(results[1])[()])
+            f_1 = float(np.asarray(results[2])[()])
+
+            frequencies: dict | None = None
+            if needs_freq:
+                max_val = int(round(float(np.asarray(results[3])[()])))
+                if max_val >= 1:
+                    freq_alias = [Alias(f"f_{i}") for i in range(1, max_val + 1)]
+                    freq_bodies = [
+                        Query(
+                            a,
+                            Aggregate(
+                                Literal(ffuncs.add),
+                                Literal(0.0),
+                                MapJoin(
+                                    Literal(ffuncs.eq), (self.sketch, _scalar(float(i)))
+                                ),
+                                fields,
+                            ),
+                        )
+                        for i, a in enumerate(freq_alias, start=1)
+                    ]
+                    freq_prgm = Plan((*freq_bodies, Produces(tuple(freq_alias))))
+                    freq_result = NON_RECURSIVE_SCHEDULER(freq_prgm)
+                    frequencies = {
+                        i: float(np.asarray(r)[()])
+                        for i, r in enumerate(freq_result, start=1)
+                        if float(np.asarray(r)[()]) > 0
+                    }
+
+            self.scan_cache = (n, d_n, f_1, frequencies)
+        return n, d_n, f_1, frequencies
 
     def coverage_correction(self) -> float:
 
-        d_n_raw = float((self.sketch > 0).sum())
+        _, d_n_raw, _, _ = self.scan(needs_freq=False)
         coverage = 1.0
         for field in self.index_order:
             size = int(self.dim_sizes[field])
@@ -627,11 +643,8 @@ class SamplingStats(NumericStats):
         N = population size [Total without sampling]
         q = n/N
         """
-
-        flat = self.sketch.flatten()
-        d_n = float(np.sum(flat > 0))
-        f_1 = float(np.sum(flat == 1))
-        n = float(np.sum(flat))
+        needs_freq = self.estimator in ("uj2", "schlosser", "sh2", "sh3", "good1")
+        n, d_n, f_1, frequencies = self.scan(needs_freq)
         bound_size = (
             math.prod(int(self.dim_sizes[f]) for f in self.index_order)
             if self.index_order
@@ -649,15 +662,6 @@ class SamplingStats(NumericStats):
         ndims = len(all_dims)
         q = self.sample_prob**ndims
 
-        needs_freq = self.estimator in ("uj2", "schlosser", "sh2", "sh3", "good1")
-        if needs_freq:
-            nonzero_vals = flat[flat > 0]
-            unique_vals, counts = np.unique(nonzero_vals, return_counts=True)
-            frequencies = {
-                int(v): float(c) for v, c in zip(unique_vals, counts, strict=True)
-            }
-        else:
-            frequencies = {}
         if self.estimator == "uj1":
             formula_est = _duj1(d_n, f_1, q, n)
 
