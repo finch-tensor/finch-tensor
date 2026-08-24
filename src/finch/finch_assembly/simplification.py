@@ -1,13 +1,15 @@
 from finch import finch_assembly as asm
 from finch.algebra import ffuncs, is_annihilator, is_identity
-from finch.symbolic import Fixpoint, PostWalk, Rewrite, UnvalidatedForm
+from finch.symbolic import UnvalidatedForm, simplify_rules
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 
 from .stages import AssemblyTransform
 
 
 class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
     def lower(self, term: asm.Module) -> asm.Module:
-        return Rewrite(PostWalk(Fixpoint(lambda x: self.simplify(x))))(term)
+        rules = [*simplify_rules(), self.simplify]
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):
@@ -17,14 +19,6 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
             # overwrite(x, y) => y
             case asm.Call(asm.Literal(fn), (_, y)) if fn is ffuncs.overwrite:
                 return y
-            # max(x) => x, min(x) => x
-            case asm.Call(asm.L(op), (arg,)) if op in (ffuncs.min, ffuncs.max):
-                return arg
-            # max(x, y) => x if x == y, min(x, y) => x if x == y
-            case asm.Call(asm.L(op), (arg1, arg2)) if (
-                op in (ffuncs.min, ffuncs.max) and arg1 == arg2
-            ):
-                return arg1
             # op(..., arg, ...) where arg is anihilator => arg
             case asm.Call(asm.Literal(_) as op, args):
                 for arg in args:
@@ -51,9 +45,10 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
                     ),
                 ) as bodies
             ) if s1 == s2 and idx1 == idx2:
-                if op == ffuncs.init_write(arg.val):
+                arg_val = arg.val if isinstance(arg, Scalar) else arg
+                if op == ffuncs.init_write(arg_val):
                     return asm.Block(bodies[:-1])
-                if is_identity(op, arg.val):
+                if is_identity(op, arg_val):
                     return asm.Block(bodies[:-1])
             # loop(...) {} is removed
             case asm.ForLoop(_, _, _, asm.Block(())):

@@ -15,7 +15,6 @@ def file_cache(*, ext: str, domain: str) -> Callable:
     """Caches the result of a function to a file.
 
     Args:
-        f: The function to cache.
         ext: The file extension for the cache file.
         domain: The domain name for the cache file.
 

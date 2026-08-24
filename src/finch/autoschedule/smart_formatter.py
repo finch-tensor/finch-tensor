@@ -3,10 +3,9 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
-from typing import Any
 
 from finch import finch_logic as lgc
-from finch.algebra import FType, TensorFType, ftype, ftypes
+from finch.algebra import AbstractFill, FType, TensorFType, ftype, ftypes
 from finch.finch_logic import LogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
 from finch.tensor import dense, element, fiber_tensor, sparse_hash
@@ -26,7 +25,7 @@ class SmartFormatter(LogicFormatter):
     @abstractmethod
     def get_tensor_ftype(
         self,
-        fill_value: Any,
+        fill_value: AbstractFill,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType: ...
@@ -91,7 +90,7 @@ class SmartFormatter(LogicFormatter):
 class FDFormatter(SmartFormatter):
     def get_tensor_ftype(
         self,
-        fill_value: Any,
+        fill_value: AbstractFill,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType:

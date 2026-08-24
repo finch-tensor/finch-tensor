@@ -1,4 +1,6 @@
 import logging
+from abc import abstractmethod
+from copy import deepcopy
 from functools import reduce
 from itertools import chain as join_chains
 
@@ -37,29 +39,9 @@ def concordize(
 ) -> LogicStatement:
     needed_swizzles: dict[Alias, dict[tuple[int, ...], Alias]] = {}
     namespace = Namespace(root)
-    field_orders: dict[Alias, tuple[Field, ...]] = {}
-
-    match root:
-        case Plan(bodies):
-            for body in bodies:
-                match body:
-                    case Query(lhs, rhs):
-                        field_orders[lhs] = rhs.fields()
 
     def rule_0(ex):
         match ex:
-            case Table(Alias(_) as var, idxs) if (
-                var in field_orders
-                and idxs != field_orders[var]
-                and set(idxs) == set(field_orders[var])
-            ):
-                perm = tuple(field_orders[var].index(idx) for idx in idxs)
-                return Table(
-                    needed_swizzles.setdefault(var, {}).setdefault(
-                        perm, Alias(namespace.freshen(var.name))
-                    ),
-                    idxs,
-                )
             case Reorder(Table(Alias(_) as var, idxs_1), idxs_2):
                 if not is_subsequence(intersect(idxs_1, idxs_2), idxs_2):
                     idxs_subseq = with_subsequence(intersect(idxs_2, idxs_1), idxs_1)
@@ -198,6 +180,7 @@ class CycleInFields(Exception): ...
 
 
 def toposort(chains: list[list[Field]]) -> tuple[Field, ...]:
+    chains = deepcopy(chains)
     chains = [c for c in chains if len(c) > 0]
     parents = {chain[0]: 0 for chain in chains}
     for chain in chains:
@@ -235,7 +218,6 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
         logger.warning("Cycle in fields detected, need to permute.")
         need_fix = True
         result = root.fields()
-
     if need_fix or reduce(max, [len(c) for c in chains], 0) < len(
         set(join_chains(*chains))
     ):
@@ -243,25 +225,36 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
         for chain in chains:
             for f in chain:
                 counts[f] = counts.get(f, 0) + 1
-        result = tuple(sorted(result, key=lambda x: counts[x] == 1))
+        result = tuple(sorted(result, key=lambda x: counts[x], reverse=True))
     return result
 
 
-def set_loop_order(plan: Plan) -> Plan:
+def heuristic_loop_order(
+    plan: Plan, *, output_fields: dict[Alias, tuple[Field, ...]] | None = None
+) -> Plan:
+    if output_fields is None:
+        output_fields = {}
     new_queries = []
     for query in plan.bodies[:-1]:
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs)):
-                    assert isinstance(arg, LogicExpression)
+                case Query(lhs, Aggregate(op, init, arg, idxs) as agg):
                     idxs_2 = _heuristic_loop_order(arg)
-                    rhs_2 = Aggregate(op, init, Reorder(arg, idxs_2), idxs)
-                    return Query(lhs, rhs_2)
-                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs)):
-                    idxs_2 = _heuristic_loop_order(arg)
+                    output_idxs = output_fields.get(lhs, agg.fields())
                     rhs_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs), idxs
+                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                        output_idxs,
+                    )
+                    return Query(lhs, rhs_2)
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
+                    idxs_2 = _heuristic_loop_order(arg)
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    rhs_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                        output_idxs,
                     )
                     return Query(lhs, rhs_2)
                 case Query(lhs, Reorder(Table(Alias(), _), idxs)) as q:
@@ -273,11 +266,22 @@ def set_loop_order(plan: Plan) -> Plan:
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class DefaultLoopOrderer(LogicLoopOrderOptimizer):
+class AbstractLoopOrderer(LogicLoopOrderOptimizer):
     def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = MockLogicLoader()
         self.ctx = ctx
+
+    @abstractmethod
+    def set_loop_orders(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> Plan:
+        pass
 
     def lower(
         self,
@@ -288,8 +292,15 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
     ):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
+            output_fields = {
+                body.lhs: body.rhs.fields()
+                for body in prgm.bodies
+                if isinstance(body, Query)
+            }
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
-            prgm = set_loop_order(prgm)
+            prgm = self.set_loop_orders(
+                prgm, stats, stats_factory, output_fields=output_fields
+            )
             prgm = push_fields(prgm)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
@@ -300,3 +311,15 @@ class DefaultLoopOrderer(LogicLoopOrderOptimizer):
         prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
         prgm = flatten_plans(prgm)
         return self.ctx(prgm, bindings, stats, stats_factory)
+
+
+class DefaultLoopOrderer(AbstractLoopOrderer):
+    def set_loop_orders(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> Plan:
+        return heuristic_loop_order(prgm, output_fields=output_fields)

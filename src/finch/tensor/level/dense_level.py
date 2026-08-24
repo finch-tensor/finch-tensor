@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -9,12 +11,10 @@ from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.fiber_tensor import (
-    FiberTensorFType,
-    Level,
-    LevelFType,
-)
+from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
+
+from .level import Level, LevelFType
 
 
 @dataclass(unsafe_hash=True)
@@ -50,7 +50,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def __post_init__(self):
         self.dimension_type = ftype(self.dimension_type)
 
-    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "DenseLevel":
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> DenseLevel:
         """
         Creates an instance of DenseLevel with the given ftype.
 
@@ -66,7 +66,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         )
         return DenseLevel(lvl, dimension)
 
-    def __call__(self, val: Any) -> "DenseLevel":
+    def __call__(self, val: Any) -> DenseLevel:
         """
         Convert a level to this dense level type.
 
@@ -79,7 +79,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, val):
+    def from_numpy(self, shape: tuple[Any, ...], val: Any) -> DenseLevel:
         """
         Creates an instance of DenseLevel with the given shape.
 
@@ -228,7 +228,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             )
         )
 
-    def from_fields(self, lvl, dimension, stride) -> "DenseLevel":
+    def from_fields(self, lvl, dimension, stride) -> DenseLevel:
         return DenseLevel(lvl=lvl, dimension=dimension)
 
 
@@ -251,9 +251,10 @@ class DenseLevel(Level):
 
     @property
     def stride(self) -> np.integer:
+        dim_t = ftype(self.dimension)
         if self.lvl.ndim == 0 or self.lvl.stride == 0:
-            return np.intp(1)
-        return self.lvl.shape[0] * self.lvl.stride
+            return dim_t(1)
+        return dim_t(self.lvl.shape[0] * self.lvl.stride)
 
     @property
     def ftype(self) -> DenseLevelFType:

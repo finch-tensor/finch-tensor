@@ -1570,7 +1570,7 @@ def std(
     return compute(lazy.std(x, axis=axis, correction=correction, keepdims=keepdims))
 
 
-def einop(prgm: str, /, **kwargs):
+def einop(prgm: str, /, **kwargs: Any) -> Any:
     """Execute an einsum expression using the specified array framework.
 
     This function parses and executes einsum-like expressions with extended syntax
@@ -1597,15 +1597,15 @@ def einop(prgm: str, /, **kwargs):
         The result array from executing the einsum expression.
 
     Examples:
-        >>> import numpy as np
-        >>> A = np.random.rand(3, 4)
-        >>> B = np.random.rand(4, 3)
+        >>> rng = np.random.default_rng(42)
+        >>> A = rng.integers(0, 10, size=(3, 4))
+        >>> B = rng.integers(0, 10, size=(4, 3))
         >>> # Matrix addition with transpose
         >>> C = einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)
         >>> # Matrix multiplication
         >>> D = einop("D[i,j] += A[i,k] * B[k,j]", A=A, B=B)
         >>> # Min-Plus multiplication with shift
-        >>> E = einop("E[i] min= A[i,k] + D[k,j] << 1", A=A, D=D)
+        >>> E = einop("E[i] min= A[k,i] + D[k,j] << 1", A=A, D=D)
     """
     if builtins.any(isinstance(v, lazy.LazyTensor) for v in kwargs.values()):
         return lazy.einop(prgm, **kwargs)
@@ -1726,11 +1726,11 @@ def einsum(*args, **kwargs):
     Trace of a matrix:
 
     >>> np.einsum("ii", a)
-    60
+    np.int64(60)
     >>> np.einsum(a, [0, 0])
-    60
+    np.int64(60)
     >>> np.trace(a)
-    60
+    np.int64(60)
 
     Extract the diagonal (requires explicit form):
 
@@ -1780,11 +1780,11 @@ def einsum(*args, **kwargs):
     Vector inner products:
 
     >>> np.einsum("i,i", b, b)
-    30
+    np.int64(30)
     >>> np.einsum(b, [0], b, [0])
-    30
+    np.int64(30)
     >>> np.inner(b, b)
-    30
+    np.int64(30)
 
     Matrix vector multiplication:
 

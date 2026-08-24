@@ -83,6 +83,8 @@ pixi run test
 pixi run --environment=mindeps test
 # or to test the C backend:
 pixi run test-c
+# or to test the MLIR backend:
+pixi run test-mlir
 # or to test the Julia backend:
 pixi run test-julia
 ```
@@ -92,11 +94,19 @@ pixi run test-julia
 
 #### Optional Static Type Checking
 
-The pytest will run mypy to check for type errors, so you shouldn't need to run it manually.
+The usual test command also runs mypy to check for type errors, so you shouldn't need to run it manually.
 In case you do need to run mypy manually, you can do so with:
 
 ```bash
 pixi run type-check
+```
+
+#### Optional Array API Tests
+The usual test command also runs the Array API test to check for compliance with the Array API standard, so you shouldn't need to run it manually.
+In case you do need to run mypy manually, you can do so with:
+
+```bash
+pixi run array-api-tests
 ```
 
 #### Regression Tests
@@ -105,6 +115,21 @@ pixi run type-check
 changes, and to better understand the impacts of compiler changes on the test outputs.
 To regenerate regression test outputs, run pytest with the `--regen-all` flag. Those
 who are curious can consult the [`pytest-regression` docs](https://pytest-regressions.readthedocs.io/en/latest/overview.html#using-data-regression).
+
+### Documentation
+You can generate the documentation locally by running:
+
+```bash
+pixi run build-docs
+```
+
+After running this command, the documentation will be generated in the `site/` directory. You can view it by opening `site/index.html` in your browser. You can also serve the documentation locally using a simple HTTP server, using the following command:
+
+```bash
+pixi run serve-docs
+```
+
+After running this command, the documentation will be served locally at [http://localhost:8000/](http://localhost:8000/).
 
 ## Development & Code Style
 

@@ -10,12 +10,15 @@ from .mlir import (
     MLIRLibrary,
     MLIRNAryOperator,
     MLIROperator,
+    construct_from_mlir,
+    deserialize_from_mlir,
     mlir_binary_function_call,
     mlir_ctype,
     mlir_function_call,
     mlir_function_name,
     mlir_nary_function_call,
     mlir_type,
+    serialize_to_mlir,
 )
 from .stages import MLIRCode, MLIRLowerer
 
@@ -33,10 +36,13 @@ __all__ = [
     "MLIRLowerer",
     "MLIRNAryOperator",
     "MLIROperator",
+    "construct_from_mlir",
+    "deserialize_from_mlir",
     "mlir_binary_function_call",
     "mlir_ctype",
     "mlir_function_call",
     "mlir_function_name",
     "mlir_nary_function_call",
     "mlir_type",
+    "serialize_to_mlir",
 ]
