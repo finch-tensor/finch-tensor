@@ -201,12 +201,14 @@ class FinchJLGenerator:
                 return f"{tns_str}[{idx_str}]"
 
             case ntn.Call(op, args):
-                arg_str = ",".join(
-                    [self.generate_julia(arg, nestingLvl) for arg in args]
-                )
+                arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
                 if op.val in ops_to_ignore:
-                    return f"{arg_str}"
-                return f"{ops_map[op.val]}({arg_str})"
+                    return ",".join(arg_strs)
+
+                julia_op = ops_map[op.val]
+                if julia_op == "&":
+                    return "(" + " & ".join(arg_strs) + ")"
+                return f"{julia_op}(" + ",".join(arg_strs) + ")"
 
             case ntn.If(cond, body):
                 tab_str = "    " * nestingLvl
