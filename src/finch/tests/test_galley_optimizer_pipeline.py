@@ -2,6 +2,8 @@
 Galley optimizer pipeline tests.
 """
 
+import pytest
+
 import numpy as np
 
 import finch.interface as fl_interface
@@ -14,7 +16,7 @@ def test_elementwise_mul():
     a = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     b = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.lazy(a) * fl_interface.lazy(b),
+        fl_interface.defer(a) * fl_interface.defer(b),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array([[1.0, 2.0], [3.0, 4.0]]) * np.array([[1.0, 1.0], [1.0, 1.0]])
@@ -29,8 +31,8 @@ def test_add_of_elementwise():
     c = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     d = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.lazy(a) * fl_interface.lazy(b)
-        + fl_interface.lazy(c) * fl_interface.lazy(d),
+        fl_interface.defer(a) * fl_interface.defer(b)
+        + fl_interface.defer(c) * fl_interface.defer(d),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.array(a) * np.array(b) + np.array(c) * np.array(d)
@@ -45,7 +47,7 @@ def test_matmul_sum_axis0():
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B), axis=0),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     expected = np.sum(np.array(A) @ np.array(B), axis=0)
@@ -63,8 +65,8 @@ def test_sum_axis0_plus_sum_axis1():
     D = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B), axis=0)
-        + fl_interface.sum(fl_interface.lazy(C) @ fl_interface.lazy(D), axis=1),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B), axis=0)
+        + fl_interface.sum(fl_interface.defer(C) @ fl_interface.defer(D), axis=1),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -84,7 +86,7 @@ def test_nested_aggregates_full_sum():
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) @ fl_interface.lazy(B)),
+        fl_interface.sum(fl_interface.defer(A) @ fl_interface.defer(B)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -102,7 +104,7 @@ def test_deeper_nesting():
 
     out = fl_interface.compute(
         fl_interface.sum(
-            (fl_interface.lazy(A) @ fl_interface.lazy(B)) @ fl_interface.lazy(C)
+            (fl_interface.defer(A) @ fl_interface.defer(B)) @ fl_interface.defer(C)
         ),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
@@ -118,7 +120,7 @@ def test_expand_dims_sum_singleton():
     """
     A = fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
 
-    expanded = fl_interface.expand_dims(fl_interface.lazy(A), axis=2)
+    expanded = fl_interface.expand_dims(fl_interface.defer(A), axis=2)
     out = fl_interface.compute(
         fl_interface.sum(expanded, axis=2),
         ctx=INTERPRET_NOTATION_GALLEY,
@@ -134,7 +136,7 @@ def test_alias_matmul():
     Exercises alias-based query merging and reordering.
     """
     A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
-    A = fl_interface.lazy(fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]])))
+    A = fl_interface.defer(fl_interface.asarray(np.array([[1.0, 2.0], [3.0, 4.0]])))
     B = A @ A
     C = B @ B @ B
     out = fl_interface.compute(
@@ -163,7 +165,7 @@ def test_galley_performance_optimization_chain_matmul():
     C = fl_interface.asarray(np.arange(3 * 4, dtype=float).reshape(3, 4))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -183,7 +185,7 @@ def test_galley_chain_matmul_10_2_2_10_10_2():
     C = fl_interface.asarray(np.arange(1000 * 2, dtype=float).reshape(1000, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -199,8 +201,8 @@ def test_alias_matmul_two_bases():
     """
     A1_np = np.array([[1.0, 2.0], [3.0, 4.0]])
     A2_np = np.array([[1.0, 0.0], [0.0, 1.0]])
-    A1 = fl_interface.lazy(fl_interface.asarray(A1_np))
-    A2 = fl_interface.lazy(fl_interface.asarray(A2_np))
+    A1 = fl_interface.defer(fl_interface.asarray(A1_np))
+    A2 = fl_interface.defer(fl_interface.asarray(A2_np))
     B = A1 @ A2
     C = B @ B
     out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
@@ -221,7 +223,7 @@ def test_galley_chain_matmul_5_4_4_6_6_3():
     C = fl_interface.asarray(np.arange(6 * 3, dtype=float).reshape(6, 3))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -241,7 +243,7 @@ def test_galley_chain_matmul_3_5_5_2_2_2():
     C = fl_interface.asarray(np.arange(2 * 2, dtype=float).reshape(2, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A) @ fl_interface.lazy(B) @ fl_interface.lazy(C),
+        fl_interface.defer(A) @ fl_interface.defer(B) @ fl_interface.defer(C),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -261,10 +263,10 @@ def test_galley_chain_matmul_four_matrices():
     D = fl_interface.asarray(np.arange(3 * 2, dtype=float).reshape(3, 2))
 
     out = fl_interface.compute(
-        fl_interface.lazy(A)
-        @ fl_interface.lazy(B)
-        @ fl_interface.lazy(C)
-        @ fl_interface.lazy(D),
+        fl_interface.defer(A)
+        @ fl_interface.defer(B)
+        @ fl_interface.defer(C)
+        @ fl_interface.defer(D),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -279,7 +281,7 @@ def test_alias_matmul_longer_chain():
     Exercises alias merging with more inlined copies (8 uses of A).
     """
     A_np = np.array([[1.0, 2.0], [3.0, 4.0]])
-    A = fl_interface.lazy(fl_interface.asarray(A_np))
+    A = fl_interface.defer(fl_interface.asarray(A_np))
     B = A @ A
     C = B @ B @ B @ B
     out = fl_interface.compute(C, ctx=INTERPRET_NOTATION_GALLEY)
@@ -298,7 +300,7 @@ def test_sum_elementwise_mul():
     B = fl_interface.asarray(np.array([[1.0, 1.0], [1.0, 1.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B)),
+        fl_interface.sum(fl_interface.defer(A) * fl_interface.defer(B)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -315,7 +317,7 @@ def test_sum_elementwise_mul_axis1():
     B = fl_interface.asarray(np.array([[1.0, 2.0], [1.0, 2.0]]))
 
     out = fl_interface.compute(
-        fl_interface.sum(fl_interface.lazy(A) * fl_interface.lazy(B), axis=1),
+        fl_interface.sum(fl_interface.defer(A) * fl_interface.defer(B), axis=1),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -335,8 +337,8 @@ def test_matmul_plus_matmul():
     D = fl_interface.asarray(np.array([[1.0, 0.0], [0.0, 1.0]]))
 
     out = fl_interface.compute(
-        (fl_interface.lazy(A) @ fl_interface.lazy(B))
-        + (fl_interface.lazy(C) @ fl_interface.lazy(D)),
+        (fl_interface.defer(A) @ fl_interface.defer(B))
+        + (fl_interface.defer(C) @ fl_interface.defer(D)),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
 
@@ -357,8 +359,8 @@ def test_multiple_compute():
 
     out = fl_interface.compute(
         (
-            fl_interface.lazy(A) @ fl_interface.lazy(B),
-            fl_interface.lazy(C) @ fl_interface.lazy(D),
+            fl_interface.defer(A) @ fl_interface.defer(B),
+            fl_interface.defer(C) @ fl_interface.defer(D),
         ),
         ctx=INTERPRET_NOTATION_GALLEY,
     )
@@ -366,3 +368,122 @@ def test_multiple_compute():
     expected = ((np.array(A) @ np.array(B)), (np.array(C) @ np.array(D)))
     assert np.allclose(np.array(out[0]), np.array(expected[0]))
     assert np.allclose(np.array(out[1]), np.array(expected[1]))
+
+
+# --- Scalar constants reduced via a repeat operator ---
+@pytest.mark.parametrize("scalar", [2, 2.0, 3, 3.0, 6.0])
+@pytest.mark.parametrize("axis", [None, 0, 1])
+def test_repeat_operator_scalar_literal(scalar, axis):
+    """
+    Reducing an expression whose scalar operand is a bare `Literal` sends galley
+    down the repeat-operator path (sum_i c = c*|Dom(i)|, prod_i c = c**|Dom(i)|).
+
+    The domain size is itself a Literal, and literals compare by value, so the
+    rewrite has to be applied in one pass with one combined factor. Rewriting
+    one reduction index at a time let the next index match inside the subtree
+    just inserted and square the result: prod(x*2) over a 2x3 tensor gave 2**24
+    instead of 2**6. `scalar=6.0` is the case where the constant equals the
+    combined factor exactly.
+    """
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.asarray(arr)
+
+    for reduce_fn, np_fn in (
+        (fl_interface.sum, np.sum),
+        (fl_interface.prod, np.prod),
+    ):
+        for expr, np_expr in (
+            (fl_interface.defer(x) * scalar, arr * scalar),
+            (fl_interface.defer(x) + scalar, arr + scalar),
+        ):
+            out = fl_interface.compute(
+                reduce_fn(expr, axis=axis), ctx=INTERPRET_NOTATION_GALLEY
+            )
+            assert np.allclose(np.array(out), np_fn(np_expr, axis=axis))
+
+
+def test_repeat_operator_repeated_scalar_literal():
+    """The same constant twice under one reduction: each occurrence is reduced
+    over, so each takes the combined factor."""
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.defer(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 2.0 * 2.0), ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 2.0 * 2.0).prod())
+
+    out = fl_interface.compute(
+        fl_interface.sum(x + 2.0 + 2.0), ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr + 2.0 + 2.0).sum())
+
+
+def test_repeat_operator_scalar_outside_reduction():
+    """
+    A constant appearing both inside and outside the reduction: the two
+    occurrences are structurally equal, but only the inner one is reduced
+    over. Galley's rewrites address occurrences by path, so the repeat factor
+    applies to the inner occurrence only.
+    """
+    arr = np.arange(6.0).reshape(2, 3) + 1
+    x = fl_interface.defer(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 2.0) * 2.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 2.0).prod() * 2.0)
+
+    out = fl_interface.compute(
+        fl_interface.sum(x + 2.0) + 2.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr + 2.0).sum() + 2.0)
+
+    out = fl_interface.compute(
+        fl_interface.prod(x * 6.0) * 6.0, ctx=INTERPRET_NOTATION_GALLEY
+    )
+    assert np.allclose(np.array(out), (arr * 6.0).prod() * 6.0)
+
+
+@pytest.mark.parametrize("scalar", [2.0, 3.0, 6.0])
+def test_repeat_operator_under_nested_reduction(scalar):
+    """
+    A constant under two reductions with different operators. The repeat
+    compensation for the outer sum must not reach the constant that the inner
+    prod also reads: applying it up front scaled the constant by |Dom(i)|,
+    giving sum(prod(x + 2*scalar)) instead of sum(prod(x + scalar)).
+    """
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    x = fl_interface.defer(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.prod(x + scalar, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + scalar).prod(axis=1).sum())
+
+
+def test_repeat_operator_nested_reduction_no_constant():
+    """The same nesting without a constant, as a control."""
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    other = np.arange(7.0, 13.0).reshape(2, 3)
+    x = fl_interface.defer(fl_interface.asarray(arr))
+    y = fl_interface.defer(fl_interface.asarray(other))
+
+    out = fl_interface.compute(
+        fl_interface.sum(fl_interface.prod(x + y, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + other).prod(axis=1).sum())
+
+
+def test_repeat_operator_nested_reduction_swapped_ops():
+    """Outer prod over an inner sum, the mirror of the failing case."""
+    arr = np.arange(1.0, 7.0).reshape(2, 3)
+    x = fl_interface.defer(fl_interface.asarray(arr))
+
+    out = fl_interface.compute(
+        fl_interface.prod(fl_interface.sum(x + 2.0, axis=1)),
+        ctx=INTERPRET_NOTATION_GALLEY,
+    )
+    assert np.allclose(np.array(out), (arr + 2.0).sum(axis=1).prod())

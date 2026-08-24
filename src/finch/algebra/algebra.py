@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .fill import AbstractFill, is_dynamic
 from .ftypes import FDTypeOrdered, FType, ftype
 
 
@@ -10,6 +11,7 @@ class FinchOperator(ABC):
     is_associative: bool = False
     is_commutative: bool = False
     is_idempotent: bool = False
+    arity: int | float = 2
 
     @abstractmethod
     def __call__(self, *args: Any) -> Any:
@@ -42,6 +44,10 @@ class FinchOperator(ABC):
         return repr(self)
 
 
+def arity(op: FinchOperator) -> int | float:
+    return op.arity
+
+
 def is_associative(op: FinchOperator) -> bool:
     return op.is_associative
 
@@ -54,12 +60,20 @@ def is_idempotent(op: FinchOperator) -> bool:
     return op.is_idempotent
 
 
+def _specializable(val: Any) -> tuple[bool, Any]:
+    if isinstance(val, AbstractFill):
+        return not is_dynamic(val), val.value
+    return True, val
+
+
 def is_identity(op: FinchOperator, val: Any) -> bool:
-    return op.is_identity(val)
+    ok, value = _specializable(val)
+    return ok and op.is_identity(value)
 
 
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
-    return op.is_annihilator(val)
+    ok, value = _specializable(val)
+    return ok and op.is_annihilator(value)
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:

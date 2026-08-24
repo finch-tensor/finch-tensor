@@ -7,7 +7,15 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import FType, TensorFType, ffuncs, ftype
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    StaticFill,
+    TensorFType,
+    as_fill,
+    ffuncs,
+    ftype,
+)
 
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
@@ -39,8 +47,8 @@ class IndexTensorFType(TensorFType):
         )
 
     @property
-    def fill_value(self):
-        return self._element_type(0)
+    def fill_value(self) -> AbstractFill:
+        return StaticFill(self._element_type(0))
 
     @property
     def element_type(self) -> FType:
@@ -90,12 +98,12 @@ class IndexTensorFType(TensorFType):
 
 @dataclass(frozen=True, eq=False)
 class FillTensorFType(TensorFType):
-    _fill_value: Any
+    _fill_value: AbstractFill
     _element_type: FType
     _shape_type: tuple
 
     @property
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         return self._fill_value
 
     @property
@@ -155,15 +163,15 @@ class FillTensor(OverrideTensor):
 
     def __init__(self, shape, fill_value):
         self._shape = shape
-        self._fill_value = fill_value
+        self._fill = as_fill(fill_value)
 
     def __getitem__(self, idxs):
-        return Scalar(self._fill_value, fill_value=self._fill_value)
+        return Scalar(self._fill.value, fill_value=self._fill)
 
     def item(self):
         if self.ndim != 0:
             raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
-        return self._fill_value
+        return self._fill.value
 
     def to_numpy(self):
         raise NotImplementedError(f"{type(self).__name__} does not support to_numpy.")
@@ -178,7 +186,7 @@ class FillTensor(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default fill value."""
-        return self.ftype.fill_value
+        return self._fill.value
 
     @property
     def element_type(self) -> FType:
@@ -193,8 +201,8 @@ class FillTensor(OverrideTensor):
     @property
     def ftype(self):
         return FillTensorFType(
-            self._fill_value,
-            ftype(self._fill_value),
+            self._fill,
+            self._fill.ftype,
             tuple(ftype(dim) for dim in self.shape),
         )
 
@@ -241,7 +249,7 @@ class IndexTensor(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default fill value."""
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:
@@ -270,8 +278,11 @@ class PatternTensorFType(TensorFType):
     _tensor_type: type[PatternTensor]
     _constructor_kwargs: tuple[tuple[str, Any], ...]
 
+    def __post_init__(self):
+        object.__setattr__(self, "_fill_value", as_fill(self._fill_value))
+
     @property
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         return self._fill_value
 
     @property
@@ -389,7 +400,7 @@ class PatternTensor(OverrideTensor):
 
     @property
     def fill_value(self) -> Any:
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:

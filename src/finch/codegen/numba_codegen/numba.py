@@ -10,6 +10,7 @@ import numba
 from finch import algebra
 from finch import finch_assembly as asm
 from finch.algebra import (
+    DynamicFillError,
     FType,
     ImmutableStructFType,
     MutableStructFType,
@@ -17,6 +18,7 @@ from finch.algebra import (
     TupleFType,
     ffuncs,
     fisinstance,
+    is_dynamic,
 )
 from finch.finch_assembly import BufferFType
 from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
@@ -666,6 +668,11 @@ class NumbaContext(Context):
         feed = self.feed
         match prgm:
             case asm.Literal(value):
+                if is_dynamic(value):
+                    # str() would silently emit broken source.
+                    raise DynamicFillError(
+                        "cannot emit a dynamic fill as a numba literal"
+                    )
                 return str(value)
             case asm.Variable(name, _) | asm.Slot(name, _):
                 return name.replace("#", "_")

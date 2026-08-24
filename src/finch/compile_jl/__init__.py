@@ -1,4 +1,4 @@
 from .compiler import FinchJLCompiler
-from .dtypes import JuliaElementFType
+from .types import JuliaElementFType
 
 __all__ = ["FinchJLCompiler", "JuliaElementFType"]

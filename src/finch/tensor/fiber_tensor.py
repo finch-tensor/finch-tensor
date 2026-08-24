@@ -7,10 +7,12 @@ import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
+    DynamicFillError,
     ImmutableStructFType,
     TupleFType,
     bool_,
     ftype,
+    is_dynamic,
     normalize_device,
 )
 from finch.codegen import NumpyBuffer
@@ -300,14 +302,32 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", bool_),
         ]
 
-    def construct(self, shape: tuple[int, ...]) -> FiberTensor:
+    def with_fill(self, fill_value: Any) -> FiberTensorFType:
+        """Rebuild this ftype with the leaf fill value replaced."""
+        return FiberTensorFType(self.lvl_t.with_fill(fill_value), self._device)
+
+    def fisinstance(self, other):
+        other_t = ftype(other)
+        if is_dynamic(self.fill_value) and isinstance(other_t, FiberTensorFType):
+            # A dynamic-fill ftype accepts any fill value of matching dtype.
+            other_t = other_t.with_fill(self.fill_value)
+        return other_t == self
+
+    def construct(self, shape: tuple[int, ...], fill_value: Any = None) -> FiberTensor:
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
+        fmt = self
+        if fill_value is not None:
+            fmt = self.with_fill(self.element_type(fill_value))
+        elif is_dynamic(self.fill_value):
+            raise DynamicFillError(
+                f"cannot construct {self!r} without a resolved fill value"
+            )
         return FiberTensor(
-            self.lvl_t.construct(shape=shape, pos=1),
-            self.position_type(0),
-            _device=self.device,
+            fmt.lvl_t.construct(shape=shape, pos=1),
+            fmt.position_type(0),
+            _device=fmt.device,
         )
 
     def __call__(self, val: Any) -> FiberTensor:
