@@ -42,10 +42,6 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             fields.append(("fill", self.element_type))
         return fields
 
-    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl):
-        # no iteration here
-        return 0
-
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         # no inner level
         # cost = num_pos * bytes per value

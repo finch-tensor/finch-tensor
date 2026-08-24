@@ -34,15 +34,6 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             ("stride", self.dimension_type),
         ]
 
-    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl):
-        """
-        For all the parent num_pos passed we go through all the positions given dense
-        """
-        n = stats.get_dim_size(fields[lvl])
-        return num_pos * n + self.lvl_t.level_iter_cost(
-            fields, stats, stats_factory, num_pos * n, lvl + 1
-        )
-
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         n = stats.get_dim_size(fields[lvl])
         return self.lvl_t.level_cost(fields, stats, stats_factory, num_pos * n, lvl + 1)

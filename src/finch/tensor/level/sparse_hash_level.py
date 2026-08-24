@@ -99,22 +99,6 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def lvl_t(self) -> LevelFType:
         return self._lvl_t
 
-    def level_iter_cost(self, fields, stats, stats_factory, num_pos, lvl):
-
-        reduce_fields = fields[lvl + 1 :]
-        if reduce_fields:
-            reduced_stats = stats_factory.aggregate(
-                ffuncs.or_, False, reduce_fields, stats
-            )
-        else:
-            reduced_stats = stats
-        nnz_prefix = reduced_stats.estimate_non_fill_values()
-
-        cost_sparse_hash = num_pos + nnz_prefix
-        return cost_sparse_hash + self.lvl_t.level_iter_cost(
-            fields, stats, stats_factory, nnz_prefix, lvl + 1
-        )
-
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         pos_type = getattr(self.position_type, "dtype", np.intp)
         pos_size = np.dtype(pos_type).itemsize
