@@ -6,16 +6,30 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra.algebra import FinchOperator, is_annihilator, is_identity
-from finch.finch_logic import Field, StatsFactory
+import finch as fl
+from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    StatsFactory,
+    Table,
+)
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
 def build_grid_uniform(
-    d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: np.ndarray
+    d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: Any
 ) -> tuple[np.ndarray, dict[Field, np.ndarray]]:
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
     index_order = d.index_order
     base_block_size = {
         idx: d.dim_sizes[idx] / blocks_per_dim[idx] for idx in index_order
@@ -30,14 +44,30 @@ def build_grid_uniform(
         starts = [*block_starts[idx], int(d.dim_sizes[idx])]
         block_sizes[idx] = np.diff(np.array(starts, dtype=float))
 
-    arr = np.asarray(data)
-    nnz_grid = (arr != d.fill_value).astype(np.int64)
+    data_table = Table(Literal(data), index_order)
+    non_fill = MapJoin(Literal(ffuncs.ne), (data_table, Literal(data.fill_value)))
 
-    for axis in reversed(range(len(index_order))):
-        idx = index_order[axis]
-        nnz_grid = np.add.reduceat(nnz_grid, block_starts[idx], axis=axis)
+    select_tbls = []
+    for idx in index_order:
+        n_blocks = blocks_per_dim[idx]
+        dim_size = int(d.dim_sizes[idx])
+        starts = [*block_starts[idx], dim_size]
+        out_f = Field(f"out_{idx.name}")
 
-    return nnz_grid.astype(float), block_sizes
+        select = np.zeros((n_blocks, dim_size), dtype=np.float64)
+        for b in range(n_blocks):
+            select[b, starts[b] : starts[b + 1]] = 1
+        select_tbls.append(Table(Literal(fl.asarray(select)), (out_f, idx)))
+
+    joined = MapJoin(Literal(ffuncs.mul), (non_fill, *select_tbls))
+    nnz_grid_expr = Aggregate(
+        Literal(ffuncs.add), Literal(np.float64(0.0)), joined, index_order
+    )
+    out = Alias("blocked_uniform_nnz_grid")
+    prgm = Plan((Query(out, nnz_grid_expr), Produces((out,))))
+    (nnz_grid,) = NON_RECURSIVE_SCHEDULER(prgm)
+
+    return np.asarray(nnz_grid, dtype=float), block_sizes
 
 
 def _block_volume_grid(
