@@ -1,6 +1,7 @@
 from finch.finch_logic import TensorStats
 
 from .blocked_stats import BlockedStats, BlockedStatsFactory
+from .blocked_uniform import BlockedUniformStats, BlockedUniformStatsFactory
 from .bound_stats import (
     DC,
     BoundStats,
@@ -25,6 +26,8 @@ __all__ = [
     "BaseTensorStatsFactory",
     "BlockedStats",
     "BlockedStatsFactory",
+    "BlockedUniformStats",
+    "BlockedUniformStatsFactory",
     "BoundStats",
     "BoundStatsFactory",
     "DCStats",

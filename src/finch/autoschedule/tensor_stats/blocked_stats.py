@@ -229,6 +229,7 @@ class BlockedStats(NumericStats):
         stats_factory: StatsFactory[NumericStats],
         data: Any,
     ) -> np.ndarray:
+
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
         blocks_grid = np.empty(grid_dim, dtype=object)
 
