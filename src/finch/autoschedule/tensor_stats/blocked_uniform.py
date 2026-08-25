@@ -15,7 +15,7 @@ from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 def build_grid_uniform(
     d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: np.ndarray
-) -> np.ndarray:
+) -> tuple[np.ndarray, dict[Field, np.ndarray]]:
     index_order = d.index_order
     base_block_size = {
         idx: d.dim_sizes[idx] / blocks_per_dim[idx] for idx in index_order
@@ -280,12 +280,8 @@ class BlockedUniformStats(NumericStats):
             density, perm
         )  # making sure we have the index in correct order
 
-        shape = []
         it = iter(density.shape)
-        shape = [
-            shape.append(next(it) if idx in self.index_order else 1)
-            for idx in base_index_order
-        ]
+        shape = [next(it) if idx in self.index_order else 1 for idx in base_index_order]
         return density.reshape(shape)
 
     def estimate_non_fill_values(self) -> float:
