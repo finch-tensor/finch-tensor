@@ -126,17 +126,6 @@ class Scalar(OverrideTensor):
         )
 
     @property
-    def argument_ftype(self):
-        # A scalar's fill is not part of its kernel identity, so it never enters
-        # the cache key: `struct_fields` carries only `val`, and `lower_unwrap`
-        # reads only `val`, so no kernel body can observe the fill. It is used
-        # solely at bind time -- `infer_fill_value` reads it off the actual
-        # instance -- which is why one kernel serves every fill of a dtype.
-        # `ConstantScalar` overrides this to opt into value specialization.
-        elem_t = ftype(self.val)
-        return ScalarFType(elem_t, DynamicFill(elem_t), self._device)
-
-    @property
     def shape(self):
         return ()
 

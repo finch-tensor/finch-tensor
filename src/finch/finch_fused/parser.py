@@ -13,12 +13,6 @@ from finch.tensor.scalar import ConstantScalar
 
 from . import nodes as fzd
 
-# Numeric literals written inside a jit function are compile-time constants, so
-# they are parsed as ConstantScalars: `elementwise` inlines one into the logic
-# program as a bare literal instead of binding it as a runtime tensor, which
-# lets the simplifier fold it and lets a backend specialize on the value.
-# `bool` is excluded, being a control-flow value more often than an operand,
-# and `type` is exact so that a NumPy scalar is not caught as a `float`.
 _CONSTANT_TYPES = (int, float, complex)
 
 _BIN_OPS = {

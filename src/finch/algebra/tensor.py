@@ -118,13 +118,6 @@ class Tensor(FTyped, ABC):
         ...
 
     @property
-    def argument_ftype(self) -> TensorFType:
-        """FType to compile kernels against when this tensor is bound as an
-        argument. May generalize `ftype` (e.g. with a dynamic fill) so one
-        kernel serves many instances."""
-        return self.ftype
-
-    @property
     def fill_value(self) -> Any:
         """The fill value for the tensor.  The fill value is the
         default value for a tensor when it is created with a given shape and dtype,
