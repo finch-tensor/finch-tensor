@@ -10,9 +10,11 @@ from typing import Any, Generic, Self, TypeVar
 import numpy as np
 
 from finch.algebra import (
+    AbstractFill,
     FinchOperator,
     NAryFinchOperator,
     apply_fill,
+    as_fill,
     is_annihilator,
     is_dynamic,
     is_idempotent,
@@ -63,7 +65,9 @@ class BaseTensorStats(TensorStats):
     ):
         self._index_order = tuple(index_order)
         self._dim_sizes: OrderedDict[Field, float] = OrderedDict(dim_sizes)
-        self._fill_value = fill_value
+        # Stats always carry an AbstractFill: propagation must be able to say
+        # "this fill exists but must not be specialized on".
+        self._fill_value: AbstractFill = as_fill(fill_value)
 
     @classmethod
     def from_fields(
@@ -103,12 +107,13 @@ class BaseTensorStats(TensorStats):
         return self.index_order
 
     @property
-    def fill_value(self) -> Any:
+    def fill_value(self) -> AbstractFill:
+        """The fill, and whether kernels may specialize on it."""
         return self._fill_value
 
     @fill_value.setter
     def fill_value(self, value: Any):
-        self._fill_value = value
+        self._fill_value = as_fill(value)
 
     def get_dim_space_size(self, idx: Iterable[Field]) -> float:
         prod = 1
@@ -207,15 +212,18 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
 
+        old_fill = d.fill_value.value
+        new_fill = init
         if init is None:
             if is_dynamic(d.fill_value):
-                # The reduced background of an unknown fill is value-dependent.
-                init = apply_fill(op, d.fill_value, d.fill_value)
-            elif is_identity(op, d.fill_value) or is_idempotent(op):
-                init = op(d.fill_value, d.fill_value)
+                # A dynamic background must stay dynamic through the reduction.
+                # NOTE: the computed d.fill_value.value is not necessarily correct.
+                new_fill = apply_fill(op, d.fill_value, d.fill_value)
+            elif is_identity(op, old_fill) or is_idempotent(op):
+                new_fill = as_fill(op(old_fill, old_fill))
             else:
                 try:
-                    init = repeat_operator(op)(d.fill_value, n)
+                    new_fill = as_fill(repeat_operator(op)(old_fill, n))
                 except AttributeError:
                     # This is going to be VERY SLOW. Should raise a warning about
                     #  reductions over non-identity fill values. Depending on the
@@ -225,16 +233,16 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                         "value is not the reduction operator's identity. This can"
                         "result in a large slowdown as the new fill is calculated."
                     )
-                    acc = d.fill_value
+                    acc = old_fill
                     for _ in range(max(n - 1, 0)):
-                        acc = op(acc, d.fill_value)
-                    init = acc
+                        acc = op(acc, old_fill)
+                    new_fill = as_fill(acc)
 
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
         )
         new_index_order = tuple(new_dim_sizes)
-        return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, init)
+        return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, new_fill)
 
     @staticmethod
     def relabel_def(

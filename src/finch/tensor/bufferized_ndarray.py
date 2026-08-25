@@ -6,11 +6,14 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
-    DynamicFillError,
+    AbstractFill,
+    DynamicFill,
     FType,
     ImmutableStructFType,
+    StaticFill,
     Tensor,
     TupleFType,
+    as_fill,
     ffuncs,
     ftype,
     is_dynamic,
@@ -41,12 +44,15 @@ class BufferizedNDArray(OverrideTensor):
     ):
         self.val = val
         self._shape = shape
-        self.strides = strides
-        if is_dynamic(fill_value):
-            raise DynamicFillError(
-                "BufferizedNDArray instances require a concrete fill value"
-            )
-        self._fill_value = val.ftype.element_type(fill_value)
+        pos_t = val.ftype.length_type
+        self.strides = tuple(pos_t(stride) for stride in strides)
+        elem_t = val.ftype.element_type
+        self._fill_value = (
+            fill_value
+            if isinstance(fill_value, AbstractFill)
+            else as_fill(elem_t(fill_value))
+        )
+
         self._device = normalize_device(device)
 
     def to_numpy(self):
@@ -69,11 +75,25 @@ class BufferizedNDArray(OverrideTensor):
         strides = tuple(np.intp(stride // itemsize) for stride in arr.strides)
         shape = tuple(np.intp(s) for s in arr.shape)
         val = NumpyBuffer(arr.reshape(-1, copy=False))
-        fill_value = np.asarray(fill_value, dtype=arr.dtype).flat[0]
-        return BufferizedNDArray(val, shape, strides, fill_value, device=device)
+        fill = as_fill(fill_value)
+        coerced = np.asarray(fill.value, dtype=arr.dtype).flat[0]
+        return BufferizedNDArray(
+            val,
+            shape,
+            strides,
+            DynamicFill(coerced) if is_dynamic(fill) else StaticFill(coerced),
+            device=device,
+        )
 
-    def __array__(self):
-        return self.to_numpy()
+    def __array__(self, dtype=None, copy=None):
+        out = self.to_numpy()
+        if dtype is not None and out.dtype != dtype:
+            if copy is not None and not copy:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            out = out.astype(dtype)
+        return out
 
     @property
     def ftype(self):
@@ -83,7 +103,7 @@ class BufferizedNDArray(OverrideTensor):
         return BufferizedNDArrayFType(
             buffer_type=ftype(self.val),
             ndim=self.ndim,
-            dimension_type=ftype(self.strides),
+            dimension_type=ftype(self._shape),
             fill_value=self._fill_value,
             device=self._device,
         )
@@ -99,13 +119,13 @@ class BufferizedNDArray(OverrideTensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self._fill_value
+        return self._fill_value.value
 
     @property
     def fill(self) -> Any:
         """The fill value as a struct field, for marshaling to kernels
         compiled against a dynamic fill."""
-        return self._fill_value
+        return self._fill_value.value
 
     @property
     def device(self):
@@ -142,7 +162,7 @@ class BufferizedNDArray(OverrideTensor):
         """
         if is_dynamic(init):
             # The value arrives at bind time: use this instance's fill.
-            init = self._fill_value
+            init = self._fill_value.value
         for i in range(self.val.length()):
             self.val.store(i, init)
         return self
@@ -294,11 +314,14 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self.buf_t = buffer_type
         self._ndim = ndim
         self.shape_t = dimension_type
-        self.strides_t = dimension_type  # assuming strides is the same type as shape
-        if is_dynamic(fill_value):
-            self._fill_value = fill_value
-        else:
-            self._fill_value = self.buf_t.element_type(fill_value)
+        self.strides_t = TupleFType.from_tuple((self.buf_t.length_type,) * ndim)
+        fill = as_fill(fill_value)
+        elem_t = self.buf_t.element_type
+        self._fill_value = (
+            DynamicFill(elem_t(fill.value), elem_t)
+            if is_dynamic(fill)
+            else StaticFill(elem_t(fill.value))
+        )
         self._device = normalize_device(device)
 
     def construct(
@@ -306,15 +329,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         shape: tuple[int, ...],
         fill_value: Any = None,
     ) -> BufferizedNDArray:
-        if fill_value is None:
-            fill_value = self.fill_value
-            if is_dynamic(fill_value):
-                raise DynamicFillError(
-                    f"cannot construct {self!r} without a resolved fill value"
-                )
+        fill = self.fill_value if fill_value is None else as_fill(fill_value)
         arr = np.empty(shape, dtype=to_numpy_type(self.element_type))
-        arr[...] = fill_value
-        return self.from_numpy(arr, fill_value=fill_value)
+        arr[...] = fill.value
+        return self.from_numpy(arr, fill_value=fill)
 
     def __call__(
         self,
@@ -379,7 +397,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         self._ndim = val
 
     @property
-    def fill_value(self) -> Any:
+    def fill_value(self) -> AbstractFill:
         return self._fill_value
 
     @property
@@ -504,7 +522,7 @@ class BufferizedNDArrayAccessor(Tensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:

@@ -36,9 +36,12 @@ from .devices import (
 )
 from .ffuncs import NAryFinchOperator
 from .fill import (
+    AbstractFill,
     DynamicFill,
     DynamicFillError,
+    StaticFill,
     apply_fill,
+    as_fill,
     is_dynamic,
 )
 from .ftypes import (
@@ -93,6 +96,7 @@ from .tensor import (
 __all__ = [
     "CPU",
     "AbstractDevice",
+    "AbstractFill",
     "AbstractTask",
     "CPUFType",
     "CPUThread",
@@ -115,14 +119,15 @@ __all__ = [
     "SerialFType",
     "SerialTask",
     "SerialTaskFType",
+    "StaticFill",
     "StructFType",
     "TaskFType",
     "Tensor",
     "TensorFType",
     "TupleFType",
-    "TupleFType",
     "apply_fill",
     "arity",
+    "as_fill",
     "bool",
     "bool_",
     "can_cast",

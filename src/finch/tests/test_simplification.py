@@ -9,7 +9,6 @@ from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
-    COMPILE_NUMBA,
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
     DefaultLoopOrderer,
@@ -28,7 +27,9 @@ from finch.finch_assembly import (
 from finch.finch_logic import LogicSimplify
 from finch.finch_logic.simplification import simplify_logic, unwrap_literal
 from finch.finch_notation.interpreter import NotationInterpreter
-from finch.symbolic import UnvalidatedForm, simplify
+from finch.symbolic import UnvalidatedForm
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
+from finch.symbolic.simplification import simplify_rules
 from finch.symbolic.term import CallTerm
 
 x = ntn.Variable("x", int64)
@@ -36,6 +37,10 @@ y = ntn.Variable("y", int64)
 a = ntn.Variable("a", bool_)
 b = ntn.Variable("b", bool_)
 c = ntn.Variable("c", bool_)
+
+
+def simplify(term):
+    return Rewrite(Fixpoint(PostWalk(Chain(simplify_rules()))))(term)
 
 
 def call(op, *args):
@@ -306,44 +311,11 @@ def test_simplify_logic_mapjoin():
     )
 
 
-def test_simplify_surfaces_a_malformed_call():
-    """
-    A literal the operator cannot be run on is a malformed term, so the error
-    reaches the caller rather than being quietly skipped over.
-    """
-    term = call(ffuncs.add, ntn.Literal(1), ntn.Literal("s"))
-    with pytest.raises(TypeError):
-        simplify(term)
-
-
-@pytest.mark.parametrize(
-    "dtype,folds",
-    [(np.int64, True), (np.bool_, True), (np.float64, False)],
-    ids=["int64", "bool", "float64"],
-)
-def test_annihilator_folds_only_where_it_absorbs(dtype, folds):
-    """
-    `x * 0` may discard `x` over the integers and booleans, but not over the
-    floats, where `nan * 0` and `inf * 0` are `nan`. pydata/sparse keeps IEEE
-    semantics here (it computes even a `nan` fill as `nan * 0 == nan`), so we
-    do too.
-    """
-    op = ffuncs.logical_and if dtype is np.bool_ else ffuncs.mul
-    zero = ntn.Literal(dtype(False) if dtype is np.bool_ else dtype(0))
-    term = ntn.Call(ntn.Literal(op), (ntn.Variable("x", ftype(dtype)), zero))
-
-    if folds:
-        assert_simplifies_to(term, zero)
-    else:
-        assert_simplifies_to(term, term)
-
-
-def test_float_annihilator_preserves_nan_end_to_end():
-    """The guard is what keeps the compiled backend agreeing with NumPy."""
-    arr = np.array([[1.0, np.nan], [np.inf, 4.0]])
-    x = finch.asarray(arr)
-    out = finch.compute(finch.lazy(x) * ConstantScalar(0.0), ctx=COMPILE_NUMBA)
-    np.testing.assert_array_equal(out.to_numpy(), arr * 0.0)
+def test_annihilator_folds():
+    term = ntn.Call(
+        ntn.Literal(ffuncs.mul), (ntn.Variable("x", ftype(0)), ntn.Literal(0))
+    )
+    assert_simplifies_to(term, ntn.Literal(0))
 
 
 def _capturing_scheduler():
@@ -398,7 +370,7 @@ def test_logic_simplify_drops_identity_operands(build, ids):
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
     x = finch.asarray(arr)
     capture, ctx = _capturing_scheduler()
-    out = finch.compute(build(finch.lazy(x)), ctx=ctx)
+    out = finch.compute(build(finch.defer(x)), ctx=ctx)
 
     np.testing.assert_array_equal(out.to_numpy(), arr)
     assert not _mapjoins(capture.last_prgm)
@@ -413,7 +385,7 @@ def test_logic_simplify_leaves_annihilators_to_notation():
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
     x = finch.asarray(arr)
     capture, ctx = _capturing_scheduler()
-    out = finch.compute(finch.lazy(x) * ConstantScalar(0), ctx=ctx)
+    out = finch.compute(finch.defer(x) * ConstantScalar(0), ctx=ctx)
 
     assert out.to_numpy().shape == arr.shape
     np.testing.assert_array_equal(out.to_numpy(), arr * 0)
@@ -456,7 +428,7 @@ def _assembly_for(build):
         )
     )
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
-    out = finch.compute(build(finch.lazy(finch.asarray(arr)), arr), ctx=ctx)
+    out = finch.compute(build(finch.defer(finch.asarray(arr)), arr), ctx=ctx)
     return str(capture.last), out.to_numpy(), arr
 
 

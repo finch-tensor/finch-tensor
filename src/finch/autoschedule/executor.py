@@ -2,7 +2,7 @@ from collections import OrderedDict
 from typing import Any
 
 from finch import finch_logic as lgc
-from finch.algebra import is_dynamic
+from finch.algebra import AbstractFill, as_fill, is_dynamic
 from finch.algebra.tensor import Tensor, TensorFType
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
@@ -82,12 +82,12 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
 
         stmt, bindings = extract_tensors(stmt, bindings)
 
-        # Compile against the argument ftypes, which may generalize the value
-        # ftypes (e.g. dynamic scalar fills) so one kernel serves many values.
-        # A backend that cannot express a runtime fill must raise
-        # DynamicFillError, and is responsible for its own recovery.
+        # A tensor's ftype says whether its fill may be specialized on, so a
+        # dynamic fill already keeps the value out of the cache key and one
+        # kernel serves many values. A backend that cannot express a runtime
+        # fill must raise DynamicFillError and handle its own recovery.
         arg_ftypes: dict[lgc.Alias, TensorFType] = {
-            var: val.argument_ftype for var, val in bindings.items()
+            var: val.ftype for var, val in bindings.items()
         }
         mod, binding_ftypes, binding_idxs, final_prgm = self._load_cached(
             stmt, arg_ftypes, bindings
@@ -106,14 +106,14 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
 
         # Dynamic output fills resolve at bind time against the actual
         # argument fills, mirroring the shape resolution above.
-        fill_map: dict[lgc.Alias, Any] | None = None
+        fill_map: dict[lgc.Alias, AbstractFill] | None = None
         if any(
             is_dynamic(tns_ftype.fill_value)
             for var, tns_ftype in binding_ftypes.items()
             if var not in bindings
         ):
             fill_map = final_prgm.infer_fill_value(
-                {var: tns.fill_value for var, tns in input_bindings.items()}
+                {var: tns.ftype.fill_value for var, tns in input_bindings.items()}
             )
 
         for var, tns_ftype in binding_ftypes.items():
@@ -121,7 +121,11 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
                 if is_dynamic(tns_ftype.fill_value):
                     assert fill_map is not None
-                    bindings[var] = tns_ftype.construct(shape, fill_value=fill_map[var])
+                    # We preserve the dynamic fill value in the ftype so that
+                    # later kernels won't compile against it.
+                    bindings[var] = tns_ftype.construct(
+                        shape, fill_value=as_fill(fill_map[var]).as_dynamic()
+                    )
                 else:
                     bindings[var] = tns_ftype.construct(shape)
 

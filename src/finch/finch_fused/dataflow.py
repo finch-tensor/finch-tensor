@@ -1,6 +1,6 @@
 from typing import cast
 
-from finch.interface import compute, lazy
+from finch.interface import compute, defer
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
 from finch.tensor.scalar import ConstantScalar
@@ -102,7 +102,7 @@ def _insert_compute(
                 lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
-                    Assign(lazy_vars_tuple, Call(Literal(lazy), (lazy_vars_tuple,))),
+                    Assign(lazy_vars_tuple, Call(Literal(defer), (lazy_vars_tuple,))),
                 )
                 exprs_to_compute = ()
                 return_vars = ()
@@ -143,12 +143,12 @@ def _insert_compute(
     return Rewrite(PostWalk(_visitor))(prgm)
 
 
-def maybelazy(arrs):
-    # A ConstantScalar is skipped even though it is 0-dimensional: `lazy` would
+def maybedefer(arrs):
+    # A ConstantScalar is skipped even though it is 0-dimensional: `defer` would
     # bind it as a table, and `elementwise` only inlines a constant it receives
-    # directly, so lazifying one silently downgrades it to a runtime operand.
+    # directly, so deferring one silently downgrades it to a runtime operand.
     return tuple(
-        lazy(arr)
+        defer(arr)
         if hasattr(arr, "ndim") and not isinstance(arr, ConstantScalar)
         else arr
         for arr in arrs
@@ -165,7 +165,7 @@ def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNo
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
                     Assign(
-                        lazy_vars_tuple, Call(Literal(maybelazy), (lazy_vars_tuple,))
+                        lazy_vars_tuple, Call(Literal(maybedefer), (lazy_vars_tuple,))
                     ),
                 )
                 return Block(lazies + (node,))

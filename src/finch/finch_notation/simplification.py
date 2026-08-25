@@ -1,7 +1,7 @@
 from finch import finch_notation as ntn
 from finch.algebra import is_annihilator
-from finch.symbolic import simplify as simplify_terms
 from finch.symbolic import simplify_rules
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 from finch.symbolic.stage import UnvalidatedForm
 
 from .stages import NotationTransform
@@ -9,7 +9,8 @@ from .stages import NotationTransform
 
 class LoopletSimplify(UnvalidatedForm, NotationTransform):
     def lower(self, term: ntn.Module) -> ntn.Module:
-        return simplify_terms(term, [*simplify_rules(), self.simplify])
+        rules = [*simplify_rules(), self.simplify]
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
 
     @staticmethod
     def simplify(term: ntn.NotationNode):

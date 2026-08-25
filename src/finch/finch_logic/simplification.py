@@ -1,6 +1,7 @@
 from finch.algebra.tensor import TensorFType
 from finch.symbolic import UnvalidatedForm
-from finch.symbolic.simplification import annihilate, simplify, simplify_rules
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
+from finch.symbolic.simplification import annihilate, simplify_rules
 
 from . import nodes as lgc
 from .stages import LogicLoader
@@ -29,10 +30,13 @@ def simplify_logic(prgm: lgc.LogicStatement) -> lgc.LogicStatement:
 
     `annihilate` is deliberately left out. An operand of a MapJoin carries the
     fields that give the result its extent, so discarding one discards a
-    dimension: annihilating `A * 0` here returns a tensor of shape `(1, 1)`.
+    dimension.
     """
     rules = [rule for rule in simplify_rules() if rule is not annihilate]
-    return simplify(prgm, [*rules, unwrap_literal])
+    # `unwrap_literal` belongs in the chain, not before it: `PostWalk` visits
+    # children first, so an operand is unwrapped in time for the algebraic
+    # rules to see a `LiteralTerm` when the parent call is examined.
+    return Rewrite(Fixpoint(PostWalk(Chain([*rules, unwrap_literal]))))(prgm)
 
 
 class LogicSimplify(UnvalidatedForm, LogicLoader):

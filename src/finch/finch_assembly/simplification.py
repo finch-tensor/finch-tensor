@@ -1,14 +1,15 @@
 from finch import finch_assembly as asm
 from finch.algebra import ffuncs, is_annihilator, is_identity
 from finch.symbolic import UnvalidatedForm, simplify_rules
-from finch.symbolic import simplify as simplify_terms
+from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 
 from .stages import AssemblyTransform
 
 
 class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
     def lower(self, term: asm.Module) -> asm.Module:
-        return simplify_terms(term, [*simplify_rules(), self.simplify])
+        rules = [*simplify_rules(), self.simplify]
+        return Rewrite(Fixpoint(PostWalk(Chain(rules))))(term)
 
     @classmethod
     def simplify(cls, term: asm.AssemblyNode):

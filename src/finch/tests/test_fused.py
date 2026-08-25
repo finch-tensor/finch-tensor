@@ -26,7 +26,7 @@ from finch.finch_fused.cfg_builder import (
 from finch.finch_fused.dataflow import (
     LivenessAnalysis,
     insert_lazy_and_compute,
-    maybelazy,
+    maybedefer,
 )
 from finch.finch_fused.parser import (
     fused_function_to_python_ast,
@@ -442,17 +442,17 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
-def test_maybelazy_preserves_constant_scalars():
+def test_maybedefer_preserves_constant_scalars():
     """A ConstantScalar must stay one, so `elementwise` can still inline it."""
     A = asarray(np.arange(3.0))
-    (lazy_A, constant, plain) = maybelazy((A, ConstantScalar(2.0), 2.0))
+    (lazy_A, constant, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
     assert isinstance(lazy_A, LazyTensor)
     assert constant == ConstantScalar(2.0)
     assert plain == 2.0
 
-    # Lazifying the constant would bind it as a table, adding a third query and
+    # Deferring the constant would bind it as a table, adding a third query and
     # dropping the bare Literal that lets the kernel specialize on the value.
-    y = finch.lazy(A) * constant
+    y = finch.defer(A) * constant
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     assert len(queries) == 2
     assert Literal(2.0) in queries[-1].rhs.arg.args
