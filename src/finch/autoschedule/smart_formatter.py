@@ -92,7 +92,7 @@ def optimize_format(
     return fmt
 
 
-def total_iter_cost(
+def total_tree_cost(
     lvl, fields, stats, stats_factory, num_pos, level, candidates, cost_of, leaf_cost_fn
 ):
     val_size = np.dtype(ftype(lvl.fill_value).dtype).itemsize
@@ -106,7 +106,7 @@ def total_iter_cost(
     nnz_l = nnz_after(fields, stats, stats_factory, level)
     local_cost = cost_of(option)(num_pos, n_l, nnz_l, val_size, pos_size)
     child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
-    return local_cost + total_iter_cost(
+    return local_cost + total_tree_cost(
         lvl.lvl_t,
         fields,
         stats,
