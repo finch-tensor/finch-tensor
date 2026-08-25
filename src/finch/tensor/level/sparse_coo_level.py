@@ -4,7 +4,8 @@ from typing import Any, cast
 import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
-from finch.tensor.fiber_tensor import Level, LevelFType
+
+from .level import Level, LevelFType
 
 
 class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
@@ -35,6 +36,15 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
             raise ValueError("SparseCOOLevelFType requires at least one COO dimension")
         if self.coo_ndim != len(self.tbl_type.struct_fieldtypes):
             raise ValueError("SparseCOOLevelFType tbl arity must match COO dimensions")
+
+    def with_fill(self, fill_value: Any) -> "SparseCOOLevelFType":
+        return SparseCOOLevelFType(
+            self.lvl_type.with_fill(fill_value),
+            self.coo_shape_type,
+            self.ptr_type,
+            self.idx_type,
+            self.tbl_type,
+        )
 
     @property
     def struct_name(self) -> str:

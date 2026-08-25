@@ -5,153 +5,116 @@ Shared functionality across TensorStats implementations.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 import numpy as np
 
-from finch import finch_notation as ntn
-from finch.algebra import ffuncs, ftype, int64
-from finch.compile import make_extent
-from finch.finch_logic import Field
-from finch.tensor import BufferizedNDArray
+from finch.algebra import Tensor, ffuncs
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 
-_INT64_VECTOR_FTYPE = BufferizedNDArray.from_numpy(np.zeros(1, dtype=np.int64)).ftype
 
+def get_lp_norms(
+    arr: Tensor, fields: Iterable[Field], norms: Iterable[float]
+) -> dict[Field, list[float]]:
+    """Scan ``arr`` and return the Lp norms of each axis' degree sequence.
 
-def _int_tuple_ftype(size: int):
-    return ftype(tuple(np.int64(0) for _ in range(size)))
+    The degree sequence of axis ``i`` counts, for each index of that axis, how
+    many non-fill entries carry it. Its norms are what :class:`DC` degree
+    constraints are built from:
 
-
-def degree_count_scan(
-    arr: Any, fields: Iterable[Field], fill_value: Any
-) -> tuple[list[np.ndarray], int]:
-    """Scan ``arr`` and return per-dimension degree sequences and ``nnz``.
+    * ``p == 0`` -- the number of indices with at least one non-fill entry,
+      i.e. the size of the projection onto that axis.
+    * ``p == inf`` -- the largest degree.
+    * otherwise -- ``(sum(degree ** p)) ** (1 / p)``.
 
     Args:
         arr: The tensor to scan.
         fields: The axis names of ``arr`` (one per dimension), in order.
-        fill_value: The value treated as "empty"; entries not equal to it are
-            counted.
+        norms: The Lp norms to compute.
 
     Returns:
-        A pair ``(counts, nnz)`` where ``counts[i]`` is a 1-D ``int64`` numpy
-        array of length ``arr.shape[i]`` giving, for each index of dimension
-        ``i``, the number of non-fill entries with that index, and ``nnz`` is
-        the total number of non-fill entries.
+        A dictionary mapping each field to its norms, ordered as ``norms``.
     """
-    fields = list(fields)
-    ndims = len(fields)
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
 
-    dim_loop_variables = [ntn.Variable(f"{fields[i]}", int64) for i in range(ndims)]
-    dim_array_variables = [
-        ntn.Variable(f"x_{fields[i]}", _INT64_VECTOR_FTYPE) for i in range(ndims)
-    ]
-    dim_size_variables = [ntn.Variable(f"n_{fields[i]}", int64) for i in range(ndims)]
-    dim_array_slots = [
-        ntn.Slot(f"x_{fields[i]}_", _INT64_VECTOR_FTYPE) for i in range(ndims)
-    ]
+    fields = tuple(fields)
+    norms = tuple(norms)
+    if not fields or not norms:
+        return {field: [] for field in fields}
 
-    A = ntn.Variable("A", arr.ftype)
-    A_ = ntn.Slot("A_", arr.ftype)
-    A_access = ntn.Unwrap(ntn.Access(A_, ntn.Read(), tuple(dim_loop_variables)))
-    A_nnz_variable = ntn.Variable("nnz", int64)
+    int_zero = Literal(np.int64(0))
+    float_zero = Literal(np.float64(0.0))
+    # Indicator of the non-fill structure. Left inlined in each reduction below
+    # rather than bound to its own alias, so no full-size temporary is built.
+    non_fill = MapJoin(
+        Literal(ffuncs.ne),
+        (Table(Literal(arr), fields), Literal(arr.fill_value)),
+    )
 
-    dim_size_assignments = []
-    dim_array_unpacks = []
-    dim_array_declares = []
-    dim_array_increments = []
-    for i in range(ndims):
-        dim_size_assignments.append(
-            ntn.Assign(dim_size_variables[i], ntn.Dimension(A_, ntn.Literal(i)))
-        )
-        dim_array_unpacks.append(ntn.Unpack(dim_array_slots[i], dim_array_variables[i]))
-        dim_array_declares.append(
-            ntn.Declare(
-                dim_array_slots[i],
-                ntn.Literal(int64(0)),
-                ntn.Literal(ffuncs.add),
-                (dim_size_variables[i],),
-            )
-        )
-        dim_array_increments.append(
-            ntn.Increment(
-                ntn.Access(
-                    dim_array_slots[i],
-                    ntn.Update(ntn.Literal(ffuncs.add)),
-                    (dim_loop_variables[i],),
+    bodies: list[Query] = []
+    outputs: list[Alias] = []
+    for dim, field in enumerate(fields):
+        degrees = Alias(f"degrees_{dim}")
+        bodies.append(
+            Query(
+                degrees,
+                Aggregate(
+                    Literal(ffuncs.add),
+                    int_zero,
+                    non_fill,
+                    tuple(f for f in fields if f != field),
                 ),
-                ntn.Call(ntn.Literal(ffuncs.ne), (A_access, ntn.Literal(fill_value))),
             )
         )
+        degree_table = Table(degrees, (field,))
 
-    array_build_loop: ntn.NotationStatement = ntn.Block(
-        (
-            *dim_array_increments,
-            ntn.Assign(
-                A_nnz_variable,
-                ntn.Call(
-                    ntn.Literal(ffuncs.add),
-                    (
-                        A_nnz_variable,
-                        ntn.Call(
-                            ntn.Literal(ffuncs.ne),
-                            (A_access, ntn.Literal(fill_value)),
-                        ),
+        for k, norm in enumerate(norms):
+            out = Alias(f"norm_{dim}_{k}")
+            rhs: Aggregate
+            if norm == 0:
+                rhs = Aggregate(
+                    Literal(ffuncs.add),
+                    int_zero,
+                    MapJoin(Literal(ffuncs.ne), (degree_table, Literal(np.int64(0)))),
+                    (field,),
+                )
+            elif np.isinf(norm):
+                # Degrees are non-negative, so 0 is a safe identity for max.
+                rhs = Aggregate(Literal(ffuncs.max), int_zero, degree_table, (field,))
+            else:
+                # The outer ** (1 / norm) is applied to the scalar result below.
+                rhs = Aggregate(
+                    Literal(ffuncs.add),
+                    float_zero,
+                    MapJoin(
+                        Literal(ffuncs.pow), (degree_table, Literal(np.float64(norm)))
                     ),
-                ),
-            ),
-        )
-    )
-    for i in range(ndims):
-        array_build_loop = ntn.Loop(
-            dim_loop_variables[i],
-            ntn.Call(
-                ntn.Literal(make_extent),
-                (ntn.Literal(int64(0)), dim_size_variables[i]),
-            ),
-            array_build_loop,
-        )
+                    (field,),
+                )
+            bodies.append(Query(out, rhs))
+            outputs.append(out)
 
-    dim_array_freezes = [
-        ntn.Freeze(dim_array_slots[i], ntn.Literal(ffuncs.add)) for i in range(ndims)
-    ]
-    dim_array_repacks = [
-        ntn.Repack(dim_array_slots[i], dim_array_variables[i]) for i in range(ndims)
-    ]
+    prgm = Plan((*bodies, Produces(tuple(outputs))))
+    results = NON_RECURSIVE_SCHEDULER(prgm)
 
-    def to_tuple(*args):
-        return (*args,)
+    flat: list[float] = []
+    all_norms = [norm for _ in fields for norm in norms]
+    for result, norm in zip(results, all_norms, strict=True):
+        value = float(np.asarray(result)[()])
+        if norm != 0 and not np.isinf(norm):
+            value = value ** (1.0 / norm)
+        flat.append(value)
 
-    return_expr = ntn.Return(ntn.Call(ntn.Literal(to_tuple), (A_nnz_variable,)))
-
-    prgm = ntn.Module(
-        (
-            ntn.Function(
-                ntn.Variable("degree_count_scan", _int_tuple_ftype(1)),
-                (A, *dim_array_variables),
-                ntn.Block(
-                    (
-                        ntn.Unpack(A_, A),
-                        *dim_size_assignments,
-                        ntn.Assign(A_nnz_variable, ntn.Literal(int64(0))),
-                        *dim_array_unpacks,
-                        *dim_array_declares,
-                        array_build_loop,
-                        *dim_array_freezes,
-                        *dim_array_repacks,
-                        ntn.Repack(A_, A),
-                        return_expr,
-                    )
-                ),
-            ),
-        )
-    )
-    mod = ntn.NotationInterpreter()(prgm)
-
-    dim_array_instances = [
-        BufferizedNDArray.from_numpy(np.zeros(arr.shape[i], dtype=np.int64))
-        for i in range(ndims)
-    ]
-    out = mod.degree_count_scan(arr, *dim_array_instances)
-    counts = [inst.to_numpy().copy() for inst in dim_array_instances]
-    return counts, int(out[0])
+    return {
+        field: flat[i * len(norms) : (i + 1) * len(norms)]
+        for i, field in enumerate(fields)
+    }

@@ -17,7 +17,7 @@ from finch.finch_logic import Field, StatsFactory
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
-from .util import degree_count_scan
+from .util import get_lp_norms
 
 __all__ = [
     "DC",
@@ -31,7 +31,7 @@ __all__ = [
 ]
 
 # Default ell_p norm orders kept by LPStats.
-DEFAULT_PS: tuple[float, ...] = (1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
+DEFAULT_PS: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0, 5.0, math.inf)
 
 
 @dataclass(frozen=True)
@@ -47,16 +47,6 @@ class DC:
     to_indices: frozenset[Field]
     value: float
     p: float = math.inf
-
-
-def _lp_norm(counts: np.ndarray, p: float) -> float:
-    """``ell_p``-norm of the nonzero degrees in ``counts``."""
-    nz = counts[counts != 0].astype(np.float64)
-    if nz.size == 0:
-        return 0.0
-    if math.isinf(p):
-        return float(nz.max())
-    return float(np.power(np.power(nz, p).sum(), 1.0 / p))
 
 
 # ─────────────────────────────── base classes ────────────────────────────────
@@ -122,33 +112,37 @@ class BoundStatsFactory(BaseTensorStatsFactory[TS], StatsFactory[TS], Generic[TS
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> TS:
         base = super().__call__(tensor, fields)
-        dcs = self.structure_to_dcs(tensor, fields, base.fill_value, self.ps)
+        dcs = self.compute_dcs(tensor, fields, self.ps)
         return self.stats_cls(base, dcs, self.ps)
 
     # Per field: the distinct-value count DC(∅, {i}) and, for each p, the ell_p
     # norm DC({i}, {*fields}, p); plus the full-tensor nnz DC(∅, {*fields}). The
     # ∅-conditioned records are length-1 sequences (p-independent), so kept once.
     @staticmethod
-    def structure_to_dcs(
+    def compute_dcs(
         tensor: Tensor,
         fields: Iterable[Field],
-        fill_value: Any,
         ps: Iterable[float],
     ) -> set[DC]:
         fields = list(fields)
         if tensor.ndim == 0:
             return {DC(frozenset(), frozenset(), 1.0)}
-
-        ps = tuple(ps)
-        counts, nnz = degree_count_scan(tensor, fields, fill_value)
         dcs: set[DC] = set()
-        all_fields = frozenset(fields)
-        for i, field in enumerate(fields):
-            proj = float(np.count_nonzero(counts[i]))
-            dcs.add(DC(frozenset(), frozenset({field}), proj))
-            for p in ps:
-                dcs.add(DC(frozenset({field}), all_fields, _lp_norm(counts[i], p), p))
-        dcs.add(DC(frozenset(), all_fields, float(nnz)))
+        norms = get_lp_norms(tensor, fields, ps)
+        for field in fields:
+            for i, p in enumerate(ps):
+                if p == 0:
+                    dcs.add(
+                        DC(frozenset(), frozenset({field}), norms[field][i], math.inf)
+                    )
+                elif p == 1:
+                    dcs.add(
+                        DC(frozenset(), frozenset(fields), norms[field][i], math.inf)
+                    )
+                else:
+                    dcs.add(
+                        DC(frozenset({field}), frozenset(fields), norms[field][i], p)
+                    )
         return dcs
 
     def _rebuild(self, base: BaseTensorStats, dcs: Iterable[DC]) -> TS:
@@ -304,16 +298,7 @@ class DCStatsFactory(BoundStatsFactory["DCStats"]):
     """Factory for :class:`DCStats` -- keeps only max-degree (``p = inf``)."""
 
     def __init__(self):
-        super().__init__(DCStats)
-
-    @staticmethod
-    def structure_to_dcs(
-        tensor: Tensor,
-        fields: Iterable[Field],
-        fill_value: Any,
-        ps: Iterable[float] = DCStats.default_ps,
-    ) -> set[DC]:
-        return BoundStatsFactory.structure_to_dcs(tensor, fields, fill_value, ps)
+        super().__init__(DCStats, ps=(0, 1, math.inf))
 
 
 # ────────────────────────────────── LPStats ──────────────────────────────────

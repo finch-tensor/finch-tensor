@@ -24,6 +24,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
 )
+from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
@@ -122,8 +123,11 @@ class StatsMachine:
                 reduce_indices = node.idxs
                 return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
 
+            case Literal(val):
+                return self.stats_factory(Scalar(val), ())
+
             case Reorder():
-                return self(node.arg)
+                return self.stats_factory.reorder(self(node.arg), node.idxs)
 
             case Relabel():
                 base = self(node.arg)

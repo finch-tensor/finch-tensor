@@ -8,9 +8,9 @@ import numpy as np
 from finch.algebra.algebra import FinchOperator, is_annihilator, is_identity
 from finch.finch_logic import Field, StatsFactory
 
-from .bound_stats import DCStatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import get_lp_norms
 
 
 class UniformStatsFactory(
@@ -23,16 +23,10 @@ class UniformStatsFactory(
         base = super().__call__(tensor, fields)
 
         if tensor.ndim == 0:
-            nnz = float(tensor.item() != base.fill_value)
+            nnz = float(tensor.item() != base.fill_value.value)
         else:
-            dcs = DCStatsFactory.structure_to_dcs(tensor, fields, base.fill_value)
-            nnz = 0.0
-            for dc in dcs:
-                if dc.from_indices == frozenset() and dc.to_indices == frozenset(
-                    fields
-                ):
-                    nnz = dc.value
-                    break
+            lps = get_lp_norms(tensor, fields, norms=(1.0,))
+            nnz = lps[fields[0]][0]
 
         return UniformStats(base, nnz=nnz)
 

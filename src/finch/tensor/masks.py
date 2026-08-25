@@ -7,7 +7,8 @@ from finch import finch_notation as ntn
 from finch.algebra import ImmutableStructFType, ffuncs
 from finch.compile import looplets as lplt
 
-from .fiber_tensor import FiberTensor, FiberTensorFType, Level, LevelFType
+from .fiber_tensor import FiberTensor, FiberTensorFType
+from .level import Level, LevelFType
 from .scalar import Scalar
 
 
@@ -124,7 +125,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             )
             return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
-        scalar = Scalar(self.fill_value, self.fill_value)
+        scalar = Scalar(self.fill_value.value, self.fill_value)
         visited_idxs = tns.idxs
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),

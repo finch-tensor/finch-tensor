@@ -10,7 +10,7 @@ operation at once.
 
 Key Functions:
 --------------
-- `lazy`: Marks an array as an input to a fused operation.
+- `defer`: Marks an array as an input to a fused operation.
 - `compute`: Executes the fused operation efficiently.
 - `fuse`: Combines multiple operations into a single kernel.
 - `fused`: A decorator for marking functions as fused.
@@ -18,10 +18,14 @@ Key Functions:
 Examples:
 ---------
 1. Basic Usage:
-    >>> C = lazy(A)
-    >>> D = lazy(B)
+    >>> rng = np.random.default_rng(42)
+    >>> A = rng.integers(0, 10, (10, 10))
+    >>> B = rng.integers(0, 10, (10, 10))
+    >>> C = defer(A)
+    >>> D = defer(B)
     >>> E = (C + D) / 2
     >>> compute(E)
+    BufferizedNDArray(shape=(10, 10))
 
     In this example, `E` represents a fused operation that adds `C` and `D` together and
     divides the result by 2. The `compute` function optimizes and executes the operation
@@ -35,20 +39,23 @@ Examples:
 
 3. Using the `fused` decorator:
     >>> @fused
-    >>> def add_and_divide(x, y):
-    >>>     return (x + y) / 2
+    ... def add_and_divide(x, y):
+    ...     return (x + y) / 2
     >>> result = add_and_divide(A, B)
 
     The `fused` decorator enables automatic fusion of operations within the function.
 
 Performance:
 ------------
-- Using `lazy` and `compute` results in faster execution due to operation fusion.
+- Using `defer` and `compute` results in faster execution due to operation fusion.
 - Different optimizers can be used with `compute`, such as the Galley optimizer, which
   adapts to the sparsity patterns of the inputs.
 - The optimizer can be set using the `ctx` argument in `compute`, or via `set_scheduler`
   or `with_scheduler`.
 """
+
+from collections.abc import Callable
+from typing import Any
 
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
@@ -61,7 +68,7 @@ from finch.finch_logic import (
 )
 from finch.symbolic import gensym
 
-from .lazy import LazyTensor, asarray, lazy
+from .lazy import LazyTensor, asarray, defer
 
 
 def compute(arg, ctx=None):
@@ -123,25 +130,25 @@ def compute(arg, ctx=None):
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
 
-def fuse(f, *args, ctx=None):
+def fuse(f: Callable, *args: Any, ctx: Any = None) -> Any:
     """
     Fuses multiple array operations into a single kernel. This function allows for
     composing operations and executing them efficiently.
 
-    Parameters:
-        - f: The function representing the operation to be fused, returning a tensor or
-        tuple of tensor results.
-        - *args: The input arrays or LazyTensors to be fused.
-        - ctx: The scheduler to use for computation. Defaults to the result of
-        `get_default_scheduler()`.
+    Args:
+        f: The function representing the operation to be fused, returning a tensor or
+            tuple of tensor results.
+        *args: The input arrays or LazyTensors to be fused.
+        ctx: The scheduler to use for computation. Defaults to the result of
+            `get_default_scheduler()`.
 
     Returns:
-        - The result of the fused operation, a tensor or tuple of tensors.
+        The result of the fused operation, a tensor or tuple of tensors.
     """
     if ctx is None:
         ctx = get_default_scheduler()
 
-    args = [lazy(arg) for arg in args]
+    args = tuple(defer(arg) for arg in args)
     if len(args) == 1:
         return f(args[0])
     return compute(f(*args), ctx=ctx)

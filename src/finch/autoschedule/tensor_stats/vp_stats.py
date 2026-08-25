@@ -8,9 +8,9 @@ import numpy as np
 from finch.algebra.algebra import FinchOperator
 from finch.finch_logic import Field, StatsFactory
 
-from .bound_stats import DCStatsFactory
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import get_lp_norms
 
 
 class VPStatsFactory(BaseTensorStatsFactory["VPStats"], StatsFactory["VPStats"]):
@@ -19,19 +19,19 @@ class VPStatsFactory(BaseTensorStatsFactory["VPStats"], StatsFactory["VPStats"])
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> VPStats:
         base = super().__call__(tensor, fields)
-        dcs = DCStatsFactory.structure_to_dcs(tensor, fields, base.fill_value)
-
-        nnz = 0.0
-        for dc in dcs:
-            if dc.from_indices == frozenset() and dc.to_indices == frozenset(fields):
-                nnz = dc.value
-                break
+        lps = get_lp_norms(
+            tensor,
+            fields,
+            norms=(
+                0.0,
+                1.0,
+            ),
+        )
+        nnz = lps[fields[0]][1]
 
         V = dict.fromkeys(fields, 0.0)
         for idx in fields:
-            for dc in dcs:
-                if dc.from_indices == frozenset() and dc.to_indices == frozenset({idx}):
-                    V[idx] = dc.value
+            V[idx] = lps[idx][0]
 
         return VPStats(base, nnz=nnz, V=V)
 

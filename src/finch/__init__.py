@@ -61,6 +61,7 @@ from .algebra import (
 )
 from .array_namespace_info import __array_namespace_info__
 from .autoschedule import (
+    COMPILE_MLIR,
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
     INTERPRET_LOGIC,
@@ -133,6 +134,7 @@ from .interface import (
     count_nonzero,
     cumulative_prod,
     cumulative_sum,
+    defer,
     diag,
     diff,
     divide,
@@ -161,7 +163,6 @@ from .interface import (
     isfinite,
     isinf,
     isnan,
-    lazy,
     less,
     less_equal,
     linalg,
@@ -241,6 +242,7 @@ from .interface import (
 from .tensor import (
     BufferizedNDArray,
     BufferizedNDArrayFType,
+    ConstantScalar,
     EyeTensor,
     FiberTensor,
     FiberTensorFType,
@@ -292,6 +294,7 @@ newaxis = None
 __array_api_version__ = "2024.12"
 
 __all__ = [
+    "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "CPU",
     "DC",
@@ -309,6 +312,7 @@ __all__ = [
     "CPUFType",
     "CPUThread",
     "CPUThreadFType",
+    "ConstantScalar",
     "DCStats",
     "DenseLevel",
     "DenseLevelFType",
@@ -421,6 +425,7 @@ __all__ = [
     "cpu",
     "cumulative_prod",
     "cumulative_sum",
+    "defer",
     "dense",
     "diag",
     "diff",
@@ -481,7 +486,6 @@ __all__ = [
     "isinf",
     "isnan",
     "jit",
-    "lazy",
     "less",
     "less_equal",
     "linalg",

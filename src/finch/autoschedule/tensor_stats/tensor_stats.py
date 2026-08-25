@@ -10,7 +10,13 @@ from typing import Any, Generic, Self, TypeVar
 import numpy as np
 
 from finch.algebra import (
+    AbstractFill,
     FinchOperator,
+    NAryFinchOperator,
+    apply_fill,
+    as_fill,
+    is_annihilator,
+    is_dynamic,
     is_idempotent,
     is_identity,
     repeat_operator,
@@ -59,7 +65,9 @@ class BaseTensorStats(TensorStats):
     ):
         self._index_order = tuple(index_order)
         self._dim_sizes: OrderedDict[Field, float] = OrderedDict(dim_sizes)
-        self._fill_value = fill_value
+        # Stats always carry an AbstractFill: propagation must be able to say
+        # "this fill exists but must not be specialized on".
+        self._fill_value: AbstractFill = as_fill(fill_value)
 
     @classmethod
     def from_fields(
@@ -99,12 +107,13 @@ class BaseTensorStats(TensorStats):
         return self.index_order
 
     @property
-    def fill_value(self) -> Any:
+    def fill_value(self) -> AbstractFill:
+        """The fill, and whether kernels may specialize on it."""
         return self._fill_value
 
     @fill_value.setter
     def fill_value(self, value: Any):
-        self._fill_value = value
+        self._fill_value = as_fill(value)
 
     def get_dim_space_size(self, idx: Iterable[Field]) -> float:
         prod = 1
@@ -135,16 +144,22 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
-            if op.is_annihilator(s.fill_value):
+            if is_annihilator(op, s.fill_value):
                 join_args.append(s)
             else:
                 union_args.append(s)
+        if (
+            op.is_associative
+            and op.is_commutative
+            and isinstance(op, NAryFinchOperator)
+        ):
+            if union_args:
+                join_args.append(self._mapjoin_union(op, *union_args))
 
-        if union_args:
-            join_args.append(self._mapjoin_union(op, *union_args))
-            # Add test cases - To test both join and union
-
-        return self._mapjoin_join(op, *join_args)
+            return self._mapjoin_join(op, *join_args)
+        if len(union_args) > 1:
+            return self._mapjoin_union(op, *args)
+        return self._mapjoin_join(op, *args)
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: TS) -> TS:
         raise NotImplementedError
@@ -169,7 +184,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
 
     @staticmethod
     def _mapjoin_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
-        new_fill_value = op(*(s.fill_value for s in args))
+        new_fill_value = apply_fill(op, *(s.fill_value for s in args))
         new_index_order = MapJoin(
             Literal(op),
             tuple(
@@ -197,12 +212,18 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
 
+        old_fill = d.fill_value.value
+        new_fill = init
         if init is None:
-            if is_identity(op, d.fill_value) or is_idempotent(op):
-                init = op(d.fill_value, d.fill_value)
+            if is_dynamic(d.fill_value):
+                # A dynamic background must stay dynamic through the reduction.
+                # NOTE: the computed d.fill_value.value is not necessarily correct.
+                new_fill = apply_fill(op, d.fill_value, d.fill_value)
+            elif is_identity(op, old_fill) or is_idempotent(op):
+                new_fill = as_fill(op(old_fill, old_fill))
             else:
                 try:
-                    init = repeat_operator(op)(d.fill_value, n)
+                    new_fill = as_fill(repeat_operator(op)(old_fill, n))
                 except AttributeError:
                     # This is going to be VERY SLOW. Should raise a warning about
                     #  reductions over non-identity fill values. Depending on the
@@ -212,16 +233,16 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                         "value is not the reduction operator's identity. This can"
                         "result in a large slowdown as the new fill is calculated."
                     )
-                    acc = d.fill_value
+                    acc = old_fill
                     for _ in range(max(n - 1, 0)):
-                        acc = op(acc, d.fill_value)
-                    init = acc
+                        acc = op(acc, old_fill)
+                    new_fill = as_fill(acc)
 
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
         )
         new_index_order = tuple(new_dim_sizes)
-        return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, init)
+        return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, new_fill)
 
     @staticmethod
     def relabel_def(

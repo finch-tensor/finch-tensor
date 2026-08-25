@@ -1,10 +1,12 @@
 [project]
 name = "finch-tensor"
 description = ""
-version = "0.6.0"
+version = "0.7.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<4'
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "numpy>=2.0,<3",
     "numba>=0.61,<2",
@@ -17,6 +19,7 @@ dependencies = [
 julia = [
     "juliapkg>=0.1.16,<0.2.0",
     "juliacall>=0.9.24,<0.10.0",
+    "ssgetpy>=1.0rc2",
 ]
 
 [dependency-groups]
@@ -27,10 +30,9 @@ test = [
     "ndindex>=1.8,<2",
     "pre-commit>=3.6.0,<5",
     "pytest-cov>=4.1.0",
+    "pytest-xdist>=3.8.0,<4",
     "sparse>=0.17.0",
-    "scipy>=1.7,<2",
     "mypy>=1.15,<2",
-    "pytest-mypy>=1,<2",
     "pytest-regressions>=2.8.1,<3",
 ]
 benchmark = [
@@ -41,6 +43,7 @@ docs = [
     "mkdocs-material>=9.7.7,<10",
     "mkdocstrings[python]>=1.0.6",
     "mkdocs-autoapi>=0.4.1",
+    "ruff>=0.6.0",
 ]
 
 
@@ -86,6 +89,7 @@ c-gcc = { features = ["c-gcc"], solve-group = "default" }
 c-clang = { features = ["c-clang"], solve-group = "default" }
 julia = { features = ["julia"], solve-group = "julia" }
 test-julia = { features = ["test", "julia"], solve-group = "julia" }
+benchmark-julia = { features = ["test", "julia", "benchmark"], solve-group = "julia" }
 docs = { features = ["docs"], solve-group = "default" }
 pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
@@ -94,6 +98,9 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 [tool.pixi.dependencies]
 finch-tensor.path = "."
 
+[tool.pixi.target.macos-arm64.dependencies]
+libblas = { version = "*", build = "*newaccelerate" }
+
 [tool.pixi.dev]
 finch-tensor.path = "."
 
@@ -101,22 +108,46 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend and not mlir_backend'"
-depends-on = [{task = "compile", environment = "test"}]
+args = [
+    { arg = "pre_commit_skip", default = "" },
+    { arg = "njobs", default = "logical" },
+]
+depends-on = [
+    { task = "compile", environment = "test" },
+    { task = "pre-commit", environment = "pre-commit", args = ["{{ pre_commit_skip }}"] },
+    { task = "type-check", environment = "test", args = [] },
+    { task = "test-array-api", args = ["{{ njobs }}"] },
+    { task = "test-only", args = ["{{ njobs }}"] },
+]
+
+[tool.pixi.feature.test.tasks.test-only]
+cmd = "pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "logical" },
+]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "python -m pytest -m c_backend"
+cmd = "pytest -m c_backend -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "0" },
+]
 depends-on = [{task = "compile", environment = "test-c"}]
 default-environment = "test-c"
 
 [tool.pixi.feature.test.tasks.test-mlir]
-cmd = "python -m pytest -m mlir_backend"
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "pytest -m mlir_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
 [tool.pixi.feature.julia.tasks.test-julia]
-cmd = "python -m pytest tests/test_julia_backend.py"
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -125,16 +156,28 @@ cmd = "pytest --codspeed benchmarks/"
 depends-on = [{task = "compile", environment = "benchmark"}]
 default-environment = "benchmark"
 
+[tool.pixi.feature.julia.tasks.benchmark-julia]
+cmd = "pytest --codspeed benchmarks/test_julia_boeing.py"
+depends-on = [{task = "compile", environment = "benchmark-julia"}]
+default-environment = "benchmark-julia"
+
 [tool.pixi.feature.test.tasks.type-check]
 cmd = "python -m mypy"
 default-environment = "test"
 
+[tool.pixi.feature.test.tasks.test-array-api]
+args = [
+    { arg = "njobs", default = "logical" },
+]
+cmd = "python scripts/run_array_api_tests.py -n {{ njobs }}"
+default-environment = "test"
+
 [tool.pixi.feature.docs.tasks.serve-docs]
-cmd = "mkdocs serve"
+cmd = "mkdocs serve --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.docs.tasks.build-docs]
-cmd = "mkdocs build"
+cmd = "mkdocs build --strict"
 default-environment = "docs"
 
 [tool.pixi.feature.mindeps.dependencies]
@@ -183,12 +226,18 @@ pre-commit = "*"
 
 [tool.pixi.feature.pre-commit.tasks]
 pre-commit-install = "pre-commit install"
-pre-commit = "pre-commit run -a"
+
+[tool.pixi.feature.pre-commit.tasks.pre-commit]
+args = [
+    { arg = "skip", default = "" },
+]
+env = { "SKIP" = "{{ skip }}" }
+cmd = "pre-commit run -a"
 
 
 [tool.ruff]
 extend-exclude = [
-    "tests/reference",
+    "src/finch/tests/reference",
 ]
 line-length = 88
 
@@ -218,9 +267,28 @@ section-order = [
 [tool.mypy]
 ignore_missing_imports = true
 exclude = [
-    "tests/reference",
+    "src/finch/tests/reference",
 ]
-files = [
-    "src",
-    "tests",
+files = ["src"]
+
+[tool.pytest]
+addopts = [
+    "--doctest-modules",
+    "--doctest-ignore-import-errors",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-report=term",
+    "--cov=finch",
+    "--cov-config=.coveragerc",
+    "--junitxml=junit/test-results.xml",
+    "--ignore-glob=src/finch/tests/reference/*",
 ]
+markers = [
+    "c_backend: tests that exercise the C backend (require a native C compiler)",
+    "mlir_backend: tests that exercise the MLIR backend (require MLIR Python bindings)",
+    "slow: tests that are slow (not recommended for CI)",
+]
+testpaths = ["src"]
+junit_family = "xunit2"
+strict = true

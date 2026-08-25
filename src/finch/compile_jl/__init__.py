@@ -1,4 +1,4 @@
-from .dtypes import JuliaElementFType
-from .scheduler import COMPILE_JULIA
+from .compiler import FinchJLCompiler
+from .types import JuliaElementFType
 
-__all__ = ["COMPILE_JULIA", "JuliaElementFType"]
+__all__ = ["FinchJLCompiler", "JuliaElementFType"]

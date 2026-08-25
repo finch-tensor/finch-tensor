@@ -4,16 +4,17 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
-import scipy.sparse as scipy_sparse
+import scipy.sparse as sps
 
 from .devices import normalize_device, serial
+from .fill import AbstractFill
 from .ftypes import FType, FTyped
 
 
 def to_numpy(x):
     if hasattr(x, "to_numpy"):
         x = x.to_numpy()
-    if scipy_sparse.issparse(x):
+    if sps.issparse(x):
         return x.toarray()
     return np.asarray(x)
 
@@ -21,7 +22,7 @@ def to_numpy(x):
 def to_scipy(x):
     if hasattr(x, "to_scipy"):
         return x.to_scipy()
-    if scipy_sparse.issparse(x):
+    if sps.issparse(x):
         return x
     raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
 
@@ -41,8 +42,8 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> Any:
-        """Default value to fill the tensor."""
+    def fill_value(self) -> AbstractFill:
+        """AbstractFill value of the tensor, either static or dynamic."""
         ...
 
     @property
@@ -121,8 +122,9 @@ class Tensor(FTyped, ABC):
         """The fill value for the tensor.  The fill value is the
         default value for a tensor when it is created with a given shape and dtype,
         as well as the background value for sparse tensors.
+        Note: this is the raw value NOT the AbstractFill.
         """
-        return self.ftype.fill_value
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self) -> FType:
