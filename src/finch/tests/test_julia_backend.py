@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 
 import finch as ft
+import finch.finch_notation as ntn
 from finch import (
     DenseLevel,
     ElementLevel,
@@ -13,6 +14,7 @@ from finch import (
     SparseCOOLevel,
     SparseListLevel,
     element,
+    ffuncs,
     ftype,
 )
 from finch.autoschedule import (
@@ -300,3 +302,39 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
 
     csr_result = _to_csr(result)
     np.testing.assert_allclose(csr_result.to_scipy().toarray(), expected)
+
+
+@pytest.mark.parametrize("op, julia_op", [(ffuncs.and_, "&"), (ffuncs.or_, "|")])
+def test_julia_codegen_chains_variadic_infix_ops(op, julia_op):
+    from finch.compile_jl.compiler import FinchJLGenerator
+
+    call = ntn.Call(
+        ntn.Literal(op),
+        (
+            ntn.Variable("v0", ft.bool),
+            ntn.Variable("v1", ft.bool),
+            ntn.Variable("v2", ft.bool),
+        ),
+    )
+
+    generated = FinchJLGenerator().generate_julia(call)
+
+    assert generated == f"(v0 {julia_op} v1 {julia_op} v2)"
+
+
+def test_compile_julia_evaluates_variadic_and_call():
+    """End-to-end check that a >2-arg `and_` call actually runs in Julia
+    without raising a MethodError."""
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLGenerator, ops_map
+
+    call = ntn.Call(
+        ntn.Literal(ffuncs.and_),
+        (ntn.Literal(True), ntn.Literal(True), ntn.Literal(False)),
+    )
+    generated = FinchJLGenerator().generate_julia(call)
+    assert ops_map[ffuncs.and_] not in generated.split("(", 1)[0]
+
+    from finch.compile_jl.julia import jl
+
+    assert bool(jl.seval(generated)) is False

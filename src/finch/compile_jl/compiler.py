@@ -103,6 +103,10 @@ ops_map = _ops_for()
 red_ops_map = _ops_for(_REDUCTION_OPS)
 ops_to_ignore = [make_tuple]
 
+# Julia operators with no variadic (>2-arg) method in Base -- e.g. `&(a, b, c)`
+# is a MethodError, unlike `+(a, b, c)`.
+infix_only_ops = {"&", "|"}
+
 
 class CompiledJLKernel:
     """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
@@ -253,8 +257,8 @@ class FinchJLGenerator:
                     return ",".join(arg_strs)
 
                 julia_op = ops_map[op.val]
-                if julia_op == "&":
-                    return "(" + " & ".join(arg_strs) + ")"
+                if julia_op in infix_only_ops:
+                    return "(" + f" {julia_op} ".join(arg_strs) + ")"
                 return f"{julia_op}(" + ",".join(arg_strs) + ")"
 
             case ntn.If(cond, body):
