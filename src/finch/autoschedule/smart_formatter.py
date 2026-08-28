@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import logging
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -38,7 +36,6 @@ def optimize_format(
     stats_factory,
     fill_value,
     candidates,
-    cost_of,
     leaf_cost_fn,
 ):
     n = len(fields)
@@ -75,7 +72,7 @@ def optimize_format(
         best_cost = None
         best_format = None
         for option in candidates:
-            local = cost_of(option)(num_pos, n_l, nnz_l, val_size, pos_size)
+            local = option.cost_fn(num_pos, n_l, nnz_l, val_size, pos_size)
             child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
@@ -93,7 +90,7 @@ def optimize_format(
 
 
 def total_tree_cost(
-    lvl, fields, stats, stats_factory, num_pos, level, candidates, cost_of, leaf_cost_fn
+    lvl, fields, stats, stats_factory, num_pos, level, candidates, leaf_cost_fn
 ):
     val_size = np.dtype(ftype(lvl.fill_value).dtype).itemsize
     pos_size = np.dtype(ftype(lvl.position_type).dtype).itemsize
@@ -104,7 +101,7 @@ def total_tree_cost(
     option = next(o for o in candidates if o.level_type is type(lvl))
     n_l = stats.get_dim_size(fields[level])
     nnz_l = nnz_after(fields, stats, stats_factory, level)
-    local_cost = cost_of(option)(num_pos, n_l, nnz_l, val_size, pos_size)
+    local_cost = option.cost_fn(num_pos, n_l, nnz_l, val_size, pos_size)
     child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
     return local_cost + total_tree_cost(
         lvl.lvl_t,
@@ -114,7 +111,6 @@ def total_tree_cost(
         child_num_pos,
         level + 1,
         candidates,
-        cost_of,
         leaf_cost_fn,
     )
 
@@ -221,51 +217,60 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
-@dataclass(frozen=True)
-class LevelOption:
+class LevelOption(ABC):
     level_type: type
-    build: Callable
-    next_num_pos: Callable
-    storage_cost_fn: Callable
-    iter_cost_fn: Callable
+
+    @abstractmethod
+    def build(self, lvl, dim_type): ...
+
+    @abstractmethod
+    def next_num_pos(self, num_pos, n_l, nnz_l): ...
+    @abstractmethod
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size): ...
 
 
-def dense_next_num_pos(num_pos, n_l, nnz_l):
-    return num_pos * n_l
+class DenseLevelOption(LevelOption):
+    level_type = DenseLevelFType
+
+    def build(self, lvl, dim_type):
+        return dense(lvl, dim_type)
+
+    def next_num_pos(self, num_pos, n_l, nnz_l):
+        return num_pos * n_l
 
 
-def sparse_hash_next_num_pos(num_pos, n_l, nnz_l):
-    return nnz_l
+class SparseHashLevelOption(LevelOption):
+    level_type = SparseHashLevelFType
+
+    def build(self, lvl, dim_type):
+        return sparse_hash(lvl, dim_type, single_writer=False)
+
+    def next_num_pos(self, num_pos, n_l, nnz_l):
+        return nnz_l
 
 
-def build_dense(lvl, dim_type):
-    return dense(lvl, dim_type)
+class IterCostDenseLevelOption(DenseLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return num_pos * n_l
 
 
-def build_sparse_hash(lvl, dim_type):
-    return sparse_hash(lvl, dim_type, single_writer=False)
+class StorageCostDenseLevelOption(DenseLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return 0.0
 
 
-CANDIDATES = (
-    LevelOption(
-        level_type=DenseLevelFType,
-        build=build_dense,
-        next_num_pos=dense_next_num_pos,
-        storage_cost_fn=lambda num_pos, n_l, nnz_l, val_size, pos_size: 0.0,
-        iter_cost_fn=lambda num_pos, n_l, nnz_l, val_size, pos_size: num_pos * n_l,
-    ),
-    LevelOption(
-        level_type=SparseHashLevelFType,
-        build=build_sparse_hash,
-        next_num_pos=sparse_hash_next_num_pos,
-        storage_cost_fn=(
-            lambda num_pos, n_l, nnz_l, val_size, pos_size: (
-                (num_pos + 1) * pos_size + nnz_l * pos_size
-            )
-        ),
-        iter_cost_fn=lambda num_pos, n_l, nnz_l, val_size, pos_size: num_pos + nnz_l,
-    ),
-)
+class IterCostSparseHashLevelOption(SparseHashLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return num_pos + nnz_l
+
+
+class StorageCostSparseHashLevelOption(SparseHashLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return (num_pos + 1) * pos_size + nnz_l * pos_size
+
+
+ITER_CANDIDATES = (IterCostDenseLevelOption(), IterCostSparseHashLevelOption())
+STORAGE_CANDIDATES = (StorageCostDenseLevelOption(), StorageCostSparseHashLevelOption())
 
 
 class CostFormatter(SmartFormatter):
@@ -293,24 +298,21 @@ class CostFormatter(SmartFormatter):
             stats,
             self._stats_factory,
             fill_value,
-            CANDIDATES,
-            self.cost_of,
+            self.candidates,
             self.leaf_cost_fn,
         )
         return fiber_tensor(lvl)
 
 
 class StorageCostFormatter(CostFormatter):
-    def cost_of(self, option: LevelOption):
-        return option.storage_cost_fn
+    candidates = STORAGE_CANDIDATES
 
     def leaf_cost_fn(self, num_pos, val_size, pos_size):
         return num_pos * val_size
 
 
 class IterCostFormatter(CostFormatter):
-    def cost_of(self, option: LevelOption):
-        return option.iter_cost_fn
+    candidates = ITER_CANDIDATES
 
     def leaf_cost_fn(self, num_pos, val_size, pos_size):
         return 0.0

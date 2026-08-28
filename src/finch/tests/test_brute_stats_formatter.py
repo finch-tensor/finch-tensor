@@ -8,7 +8,6 @@ import numpy as np
 import finch as fl
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
 from finch.autoschedule.smart_formatter import (
-    CANDIDATES,
     IterCostFormatter,
     StorageCostFormatter,
     total_tree_cost,
@@ -32,20 +31,20 @@ def get_stats(matrix, fields):
 
 
 def brute_force_best(
-    fields, shape_type, stats, factory, fill_value, cost_of, leaf_cost_fn
+    fields, shape_type, stats, factory, fill_value, candidates, leaf_cost_fn
 ):
     fill_ftype = fl.ftype(fill_value)
     leaf_lvl = fl.element(fill_value, fill_ftype)
     best_cost = None
     best_fmt = None
-    for combination in itertools.product(CANDIDATES, repeat=len(fields)):
+    for combination in itertools.product(candidates, repeat=len(fields)):
         lvl = leaf_lvl
         for option, dim_type in zip(
             reversed(combination), reversed(shape_type), strict=True
         ):
             lvl = option.build(lvl, dim_type)
         cost = total_tree_cost(
-            lvl, fields, stats, factory, 1.0, 0, CANDIDATES, cost_of, leaf_cost_fn
+            lvl, fields, stats, factory, 1.0, 0, candidates, leaf_cost_fn
         )
         if best_cost is None or cost < best_cost:
             best_cost, best_fmt = cost, lvl
@@ -89,7 +88,7 @@ def test_storage_dp_and_brute(matrix, fields_2d):
         stats,
         factory,
         stats.fill_value,
-        formatter.cost_of,
+        formatter.candidates,
         formatter.leaf_cost_fn,
     )
 
@@ -101,8 +100,7 @@ def test_storage_dp_and_brute(matrix, fields_2d):
         factory,
         1,
         0,
-        CANDIDATES,
-        formatter.cost_of,
+        formatter.candidates,
         formatter.leaf_cost_fn,
     )
     # print(f"Matrix : {matrix}, \nFormat by brute : {
@@ -123,7 +121,7 @@ def test_iter_dp_and_brute(matrix, fields_2d):
         stats,
         factory,
         stats.fill_value,
-        formatter.cost_of,
+        formatter.candidates,
         formatter.leaf_cost_fn,
     )
 
@@ -135,8 +133,7 @@ def test_iter_dp_and_brute(matrix, fields_2d):
         factory,
         1,
         0,
-        CANDIDATES,
-        formatter.cost_of,
+        formatter.candidates,
         formatter.leaf_cost_fn,
     )
 
