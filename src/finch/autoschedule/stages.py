@@ -9,6 +9,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     Literal,
     LogicStatement,
     MapJoin,
@@ -44,11 +45,13 @@ class AliasedForm(Form):
             match node:
                 case Query(Alias() as lhs, _):
                     defined_aliases.add(lhs)
+                case Query(FusedAlias() as lhs, _):
+                    defined_aliases.add(lhs)
                 case Alias(name):
                     if node not in defined_aliases:
                         raise ValueError(f"Alias {name} is not defined in bindings.")
                 case Table(tns, _):
-                    if not isinstance(tns, Alias):
+                    if not isinstance(tns, Alias | FusedAlias):
                         raise ValueError("Table nodes must wrap an Alias.")
             return node
 
@@ -91,14 +94,14 @@ class SingleAggregateForm(AliasedForm):
                         )
                     for body in bodies[:-1]:
                         validate(body, True)
-                case Query(Alias(), Reorder(Table(), _)):
+                case Query(Alias() | FusedAlias(), Reorder(Table(), _)):
                     return None
-                case Query(Alias(), Reorder(Aggregate(_, _, arg, _), _)):
+                case Query(Alias() | FusedAlias(), Reorder(Aggregate(_, _, arg, _), _)):
                     return validate(arg, False)
-                case Query(Alias(), Aggregate(_, _, arg, _)):
+                case Query(Alias() | FusedAlias(), Aggregate(_, _, arg, _)):
                     return validate(arg, False)
                 case Query(
-                    Alias() as lhs1,
+                    Alias() | FusedAlias() as lhs1,
                     Reorder(
                         MapJoin(
                             op1, (Table(lhs2, output_order1), Aggregate(op2, _, arg, _))
@@ -178,19 +181,24 @@ class LoopOrderedForm(SingleAggregateForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body, loop_order)
-                case Query(Alias(), Reorder(Table(_, idxs), _)):
+                case Query(Alias() | FusedAlias(), Reorder(Table(_, idxs), _)):
                     return None
-                case Query(Alias(), Aggregate(_, _, Reorder(arg, idxs), _)):
+                case Query(
+                    Alias() | FusedAlias(), Aggregate(_, _, Reorder(arg, idxs), _)
+                ):
                     return validate(arg, idxs)
-                case Query(Alias(), Reorder(Aggregate(_, _, Reorder(arg, idxs)), _)):
+                case Query(
+                    Alias() | FusedAlias(),
+                    Reorder(Aggregate(_, _, Reorder(arg, idxs)), _),
+                ):
                     return validate(arg, idxs)
-                case Query(Alias(), Aggregate(_, _, arg, _)):
+                case Query(Alias() | FusedAlias(), Aggregate(_, _, arg, _)):
                     raise ValueError(
                         "All aggregates must wrap a Reorder node specifying\
                              the loop order."
                     )
                 case Query(
-                    Alias(),
+                    Alias() | FusedAlias(),
                     Reorder(
                         MapJoin(
                             _,
@@ -206,7 +214,8 @@ class LoopOrderedForm(SingleAggregateForm):
                         raise ValueError("Table index order does not match loop order.")
                     return validate(agg_arg, idxs_1)
                 case Query(
-                    Alias(), Reorder(MapJoin(_, (Table(), Aggregate(_, _, arg, _))), _)
+                    Alias() | FusedAlias(),
+                    Reorder(MapJoin(_, (Table(), Aggregate(_, _, arg, _))), _),
                 ):
                     raise ValueError(
                         "In-place queries must have an interior loop order!"
@@ -259,12 +268,12 @@ class FormattedForm(LoopOrderedForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body)
-                case Query(Alias(), Reorder(Table(tns, _), _)):
+                case Query(Alias() | FusedAlias(), Reorder(Table(tns, _), _)):
                     return None
-                case Query(Alias(), Reorder(Aggregate(_, _, arg, _), _)):
+                case Query(Alias() | FusedAlias(), Reorder(Aggregate(_, _, arg, _), _)):
                     return validate(arg)
                 case Query(
-                    Alias(),
+                    Alias() | FusedAlias(),
                     Reorder(
                         MapJoin(
                             _,
@@ -277,7 +286,7 @@ class FormattedForm(LoopOrderedForm):
                     ),
                 ):
                     return validate(agg_arg)
-                case Query(Alias(), Aggregate(_, _, arg, _)):
+                case Query(Alias() | FusedAlias(), Aggregate(_, _, arg, _)):
                     raise ValueError(
                         "All aggregates must be wrapped in a Reorder node specifying\
                               the output order."
@@ -286,9 +295,10 @@ class FormattedForm(LoopOrderedForm):
                     for arg in args:
                         validate(arg)
                 case Table(tns, _):
+                    key = tns.alias if isinstance(tns, FusedAlias) else tns
                     if tns not in bindings:
                         raise ValueError(
-                            f"Alias {tns.name} is not defined in bindings. All aliase\
+                            f"Alias {key.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
                         )
                 case Literal():

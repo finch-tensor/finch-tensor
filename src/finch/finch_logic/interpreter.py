@@ -17,6 +17,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     Literal,
     MapJoin,
     Plan,
@@ -81,8 +82,18 @@ class LogicMachine:
                 return TableValue(val, idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
+            case Table(FusedAlias(alias, _), idxs):
+                val = self.bindings.get(alias, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return TableValue(val, idxs)
             case Alias() as var:
                 val = self.bindings.get(var, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return val
+            case FusedAlias(alias, _):
+                val = self.bindings.get(alias, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return val
@@ -157,13 +168,14 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
-                if lhs not in self.bindings:
+                key = lhs.alias if isinstance(lhs, FusedAlias) else lhs
+                if key not in self.bindings:
                     tns = self.make_tensor(
                         rhs.tns.shape,
                         rhs.tns.fill_value,
                         dtype=rhs.tns.element_type,
                     )
-                    self.bindings[lhs] = tns
+                    self.bindings[key] = tns
                 lhs = self(lhs)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
                     lhs[*crds] = rhs.tns[*crds].item()

@@ -420,6 +420,33 @@ class Alias(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
+class FusedAlias(LogicNode):
+    alias: Alias
+    n: int
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        raise NotImplementedError(
+            "FusedAliases do not have fields until assigned to  loop order"
+        )
+
+    def dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> tuple[T | None, ...]:
+        return self.alias.dimmap(op, dim_bindings)
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        return self.alias.valmap(f, g, bindings)
+
+
+@dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
@@ -430,7 +457,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value | Alias
+    tns: Literal | Value | Alias | FusedAlias
     idxs: tuple[Field, ...]
 
     @property
@@ -445,12 +472,11 @@ class Table(LogicTree, LogicExpression):
     def dimmap(
         self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
-        if isinstance(self.tns, Alias):
-            if self.tns not in dim_bindings:
-                raise NotImplementedError(
-                    f"Cannot resolve dims of Alias {self.tns.name}"
-                )
-            return dim_bindings[self.tns]
+        tns = self.tns.alias if isinstance(self.tns, FusedAlias) else self.tns
+        if isinstance(tns, Alias):
+            if tns not in dim_bindings:
+                raise NotImplementedError(f"Cannot resolve dims of Alias {tns.name}")
+            return dim_bindings[tns]
         raise NotImplementedError("Cannot resolve dims of Tables")
 
     def valmap(
@@ -459,12 +485,11 @@ class Table(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        if isinstance(self.tns, Alias):
-            if self.tns not in bindings:
-                raise NotImplementedError(
-                    f"Cannot resolve value of Alias {self.tns.name}"
-                )
-            return bindings[self.tns]
+        tns = self.tns.alias if isinstance(self.tns, FusedAlias) else self.tns
+        if isinstance(tns, Alias):
+            if tns not in bindings:
+                raise NotImplementedError(f"Cannot resolve value of Alias {tns.name}")
+            return bindings[tns]
         raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
@@ -679,7 +704,7 @@ class Query(LogicTree, LogicStatement):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Alias
+    lhs: Alias | FusedAlias
     rhs: LogicExpression
 
     @property
@@ -845,6 +870,8 @@ class LogicPrinterContext(Context):
                 return str(name)
             case Alias(name):
                 return str(name)
+            case FusedAlias(alias, n):
+                return f"FusedAlias({self(alias)},{n})"
             case Table(tns, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Table({self(tns)}, {idxs_e})"
