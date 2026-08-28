@@ -304,37 +304,39 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     np.testing.assert_allclose(csr_result.to_scipy().toarray(), expected)
 
 
-@pytest.mark.parametrize("op, julia_op", [(ffuncs.and_, "&"), (ffuncs.or_, "|")])
-def test_julia_codegen_chains_variadic_infix_ops(op, julia_op):
+@pytest.mark.parametrize(
+    "op, args, expected_code, expected",
+    [
+        (ffuncs.add, (1, 2, 3), "(1 + 2 + 3)", 6),
+        (ffuncs.and_, (7, 3, 1), "(7 & 3 & 1)", 1),
+        (ffuncs.or_, (4, 2, 1), "(4 | 2 | 1)", 7),
+        (
+            ffuncs.logical_and,
+            (True, True, False),
+            "Finch.and(true,true,false)",
+            False,
+        ),
+        (
+            ffuncs.logical_or,
+            (False, False, True),
+            "Finch.or(false,false,true)",
+            True,
+        ),
+    ],
+)
+def test_compile_julia_evaluates_variadic_and_or_call(
+    op, args, expected_code, expected
+):
+    _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLGenerator
 
     call = ntn.Call(
         ntn.Literal(op),
-        (
-            ntn.Variable("v0", ft.bool),
-            ntn.Variable("v1", ft.bool),
-            ntn.Variable("v2", ft.bool),
-        ),
-    )
-
-    generated = FinchJLGenerator().generate_julia(call)
-
-    assert generated == f"(v0 {julia_op} v1 {julia_op} v2)"
-
-
-def test_compile_julia_evaluates_variadic_and_call():
-    """End-to-end check that a >2-arg `and_` call actually runs in Julia
-    without raising a MethodError."""
-    _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLGenerator, ops_map
-
-    call = ntn.Call(
-        ntn.Literal(ffuncs.and_),
-        (ntn.Literal(True), ntn.Literal(True), ntn.Literal(False)),
+        tuple(ntn.Literal(arg) for arg in args),
     )
     generated = FinchJLGenerator().generate_julia(call)
-    assert ops_map[ffuncs.and_] not in generated.split("(", 1)[0]
+    assert generated == expected_code
 
     from finch.compile_jl.julia import jl
 
-    assert bool(jl.seval(generated)) is False
+    assert jl.seval(generated) == expected
