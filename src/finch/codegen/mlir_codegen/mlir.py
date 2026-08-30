@@ -3,7 +3,8 @@ from __future__ import annotations
 import ctypes
 import logging
 from abc import ABC, abstractmethod
-from functools import lru_cache
+from collections.abc import Sequence
+from functools import lru_cache, reduce
 from typing import Any
 
 import numpy as np
@@ -16,6 +17,7 @@ from finch.algebra import (
     TupleFType,
     ffuncs,
     fisinstance,
+    promote_type,
 )
 from finch.finch_assembly import BufferFType
 from finch.symbolic import Context, Form, ScopedDict
@@ -391,8 +393,16 @@ def mlir_function_name(op, arg: FType) -> str:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
 
+def _promote_type_helper(args: Sequence[Any]) -> Any:
+    """
+    Determine an ftype that all operands can promote to.
+    """
+    types = [getattr(arg.result_type, "element_type", arg.result_type) for arg in args]
+    return reduce(promote_type, types)
+
+
 def mlir_nary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
-    t = mlir_type(args[0].result_type)
+    t = mlir_type(_promote_type_helper(args))
     acc = ctx(args[0])
     for a in args[1:]:
         rhs = ctx(a)
@@ -406,7 +416,8 @@ def mlir_binary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> s
     a, b = args
     av, bv = ctx(a), ctx(b)
     res = ctx.new_ssa()
-    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {mlir_type(a.result_type)}")
+    t = mlir_type(_promote_type_helper(args))
+    ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {t}")
     return res
 
 
@@ -462,7 +473,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             return acc
         case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
             return mlir_nary_function_call(
-                mlir_function_name(op, args[0].result_type), ctx, *args
+                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
             )
         case (
             ffuncs.sub
@@ -481,15 +492,15 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
             | ffuncs.le
         ):
             return mlir_binary_function_call(
-                mlir_function_name(op, args[0].result_type), ctx, *args
+                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
             )
         case ffuncs.not_ | ffuncs.invert:
             return mlir_new_function_call(
-                mlir_function_name(op, args[0].result_type), ctx, *args
+                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
             )
         case ffuncs.scansearch:
             return mlir_call_function_call(
-                mlir_function_name(op, args[0].result_type),
+                mlir_function_name(op, _promote_type_helper(args)),
                 op.return_type(*(arg.result_type for arg in args)),
                 ctx,
                 *args,
@@ -569,10 +580,12 @@ def mlir_type(t: FType):
             return t.mlir_type()
         case algebra.bool_:
             return "i1"
-        case algebra.intp:
+        case algebra.intp | algebra.int_:
+            # A Python `int` is a 64-bit integer, which this backend represents
+            # as `index` like every other one. Mapping it to `i64` instead made
+            # the emitted type depend on whether a literal or a variable came
+            # first in a commutative call.
             return "index"
-        case algebra.int_:
-            return "i64"
         case algebra.float_:
             return "f64"
         case algebra.ftypes.FDTypeNumpy():
@@ -880,12 +893,13 @@ class MLIRContext(Context):
         feed = self.feed
         match prgm:
             case asm.Literal(value):
-                t = mlir_type(prgm.result_type)
-                new = (
-                    float(value)
-                    if MLIROperator.is_float(prgm.result_type)
-                    else int(value)
-                )
+                # A Scalar-wrapped literal (a sparse gap read) carries its dtype
+                # in element_type; the Scalar's own ftype is a struct, which is
+                # not a type `arith.constant` can be given.
+                value_type = _promote_type_helper([prgm])
+                value = getattr(value, "val", value)
+                t = mlir_type(value_type)
+                new = float(value) if MLIROperator.is_float(value_type) else int(value)
                 return self.constant(new, t)
 
             case asm.Variable(name, _):

@@ -9,6 +9,7 @@ from finch.algebra.tensor import TensorFType
 from finch.codegen.numba_codegen import to_numpy_type
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
+from finch.tensor.scalar import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from . import nodes as lgc
@@ -62,7 +63,10 @@ class LogicMachine:
         logger.debug("Evaluating: %s", node)
         match node:
             case Literal(val):
-                return val
+                # A literal is a zero-dimensional tensor, so it evaluates to a
+                # rank-0 TableValue and every consumer below can treat it
+                # uniformly rather than special-casing raw scalars.
+                return TableValue(Scalar(val), ())
             case Value(_):
                 raise ValueError(
                     "The interpreter cannot evaluate a lazy node. Instead, you can "
@@ -223,6 +227,7 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        lgc.LogicStatement,
     ]:
         shape_vars = compute_shape_vars(prgm, bindings)
-        return MockLogicLibrary(prgm, bindings), bindings, shape_vars
+        return MockLogicLibrary(prgm, bindings), bindings, shape_vars, prgm

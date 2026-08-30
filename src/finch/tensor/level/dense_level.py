@@ -34,6 +34,10 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             ("stride", self.dimension_type),
         ]
 
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        n = stats.get_dim_size(fields[lvl])
+        return self.lvl_t.level_cost(fields, stats, stats_factory, num_pos * n, lvl + 1)
+
     def __post_init__(self):
         self.dimension_type = ftype(self.dimension_type)
 
@@ -238,9 +242,10 @@ class DenseLevel(Level):
 
     @property
     def stride(self) -> np.integer:
+        dim_t = ftype(self.dimension)
         if self.lvl.ndim == 0 or self.lvl.stride == 0:
-            return np.intp(1)
-        return self.lvl.shape[0] * self.lvl.stride
+            return dim_t(1)
+        return dim_t(self.lvl.shape[0] * self.lvl.stride)
 
     @property
     def ftype(self) -> DenseLevelFType:

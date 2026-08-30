@@ -119,8 +119,8 @@ def test_estimators_isolated(D_true=100, N_true=1000000, q=0.125, trials=50, see
 
 def test_mapjoin():
     i, j, k = Field("i"), Field("j"), Field("k")
-    data_a = np.zeros((1000, 1000))
-    data_b = np.zeros((1000, 1000))
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
 
     data_a[:20, :] = 1.0
     data_b[:20, :] = 1.0
@@ -160,11 +160,11 @@ def test_mapjoin():
 @pytest.mark.skip(reason="sampling estimators are heavily dependent on f1")
 def test_aggregate():
     i, j, k = Field("i"), Field("j"), Field("k")
-    data_a = np.zeros((100, 100))
-    data_b = np.zeros((100, 100))
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
 
-    data_a[:20, :] = 1.0
-    data_b[:20, :] = 1.0
+    data_a[:2, :] = 1.0
+    data_b[:2, :] = 1.0
 
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))

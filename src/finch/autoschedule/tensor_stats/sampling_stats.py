@@ -24,14 +24,13 @@ from finch.tensor import BufferizedNDArray
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
-from .util import _scalar
 
 
 def mask_table(field: Field, mask: np.ndarray) -> Table:
     return Table(Literal(BufferizedNDArray.from_numpy(mask)), (field,))
 
 
-def _dgood1(d_n: float, frequencies: dict, n: float, N: float) -> float:
+def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
 
     if d_n == 0:
         return 0.0
@@ -120,7 +119,7 @@ def _dsj1(d_n: float, q: float, N: float) -> float:
     return (lo + hi) / 2
 
 
-def _gamma2(d_n: float, frequencies: dict, n: float, N: float) -> float:
+def _gamma2(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
     """
     gamma^2 = max(0,D/n^2*sum_i[i*(i-1)*f_i]+ D/N - 1)
 
@@ -146,7 +145,7 @@ def _gamma2(d_n: float, frequencies: dict, n: float, N: float) -> float:
 
 
 def _duj2(
-    d_n: float, f_1: float, frequencies: dict, q: float, n: float, N: float
+    d_n: float, f_1: float, frequencies: dict | None, q: float, n: float, N: float
 ) -> float:
     """
     Unsmoothened second-order jackknife
@@ -177,7 +176,7 @@ def _duj2(
     return max(float(estimate), d_n)
 
 
-def _dsh(d_n: float, f_1: float, frequencies: dict, q: float, n: float) -> float:
+def _dsh(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float) -> float:
     """
     Schlosser estimator - uses all frequency counts
 
@@ -210,7 +209,7 @@ def _dsh(d_n: float, f_1: float, frequencies: dict, q: float, n: float) -> float
 
 
 def _dsh2(
-    d_n: float, f_1: float, frequencies: dict, q: float, n: float, N: float
+    d_n: float, f_1: float, frequencies: dict | None, q: float, n: float, N: float
 ) -> float:
     """
     Modified Schlosser - corrects the bias in K_Sh
@@ -248,7 +247,7 @@ def _dsh2(
     return d_n + K_star * f_1 / max(n, 1.0)
 
 
-def _dsh3(d_n: float, f_1: float, frequencies: dict, q: float, n: float):
+def _dsh3(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float):
     """
     Further modified Schlosser
     num1 = sum(i * q^2 * (1-q^2)^(i-1) * f_i)
@@ -301,14 +300,14 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> SamplingStats:
         base = super().__call__(tensor, fields)
-        fill = base.fill_value
+        fill = base.fill_value.value
 
         # defining one Bernoulli mask per dimension, an entry will survive
         # only if all its indices are kept
         # masks has the 0's 1's combination for each entry in a dimension
         masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
         non_fill = MapJoin(
-            Literal(ffuncs.ne), (Table(Literal(tensor), fields), _scalar(fill))
+            Literal(ffuncs.ne), (Table(Literal(tensor), fields), Literal(fill))
         )
         mask_tables = [
             mask_table(field, mask) for field, mask in zip(fields, masks, strict=True)
@@ -379,7 +378,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
                 for f in other.remainder_dims:
                     other_free_size *= other.dim_sizes.get(f, 1.0)
             terms.append(
-                MapJoin(Literal(ffuncs.mul), (arg.sketch, _scalar(other_free_size)))
+                MapJoin(Literal(ffuncs.mul), (arg.sketch, Literal(other_free_size)))
             )
             new_remainder |= arg.remainder_dims
 
@@ -435,21 +434,23 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             )
 
         elif is_annihilator(op, stats.fill_value):
-            exists = MapJoin(Literal(ffuncs.gt), (stats.sketch, _scalar(0.0)))
+            exists: LogicExpression = MapJoin(
+                Literal(ffuncs.gt), (stats.sketch, Literal(0.0))
+            )
             if reduce_fields:
                 exists = Aggregate(
                     Literal(ffuncs.min), Literal(np.float64(1.0)), exists, reduce_fields
                 )
             prod_n = math.prod(int(stats.dim_sizes[f]) for f in reduce_set)
-            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, _scalar(prod_n)))
+            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, Literal(prod_n)))
         else:
             prod_n = math.prod(int(stats.dim_sizes[f]) for f in reduce_set)
-            exists = MapJoin(Literal(ffuncs.gt), (stats.sketch, _scalar(0.0)))
+            exists = MapJoin(Literal(ffuncs.gt), (stats.sketch, Literal(0.0)))
             if reduce_fields:
                 exists = Aggregate(
                     Literal(ffuncs.max), Literal(np.float64(0.0)), exists, reduce_fields
                 )
-            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, _scalar(prod_n)))
+            new_sketch = MapJoin(Literal(ffuncs.mul), (exists, Literal(prod_n)))
 
         new_remainder = stats.remainder_dims | reduce_set
         new_remainder_sizes = dict(stats.remainder_dim_sizes)
@@ -502,7 +503,7 @@ class SamplingStats(NumericStats):
     sample_prob : Bernoulli sample prob
     """
 
-    sketch: np.ndarray
+    sketch: LogicExpression
     remainder_dims: set
     sample_prob: float
 
@@ -526,10 +527,12 @@ class SamplingStats(NumericStats):
             dict(remainder_dim_sizes) if remainder_dim_sizes else {}
         )
         self.masks_ref = masks_ref if masks_ref is not None else {}
-        self.scan_cache: tuple[float, float, float, np.ndarray | None] | None = None
+        self.scan_cache: tuple[float, float, float, dict | None] | None = None
 
-    def scan(self, needs_freq: bool) -> tuple[float, float, float, dict]:
+    def scan(self, needs_freq: bool) -> tuple[float, float, float, dict | None]:
         from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
+        frequencies: dict | None
 
         if self.scan_cache is not None and (
             not needs_freq or self.scan_cache[3] is not None
@@ -548,7 +551,7 @@ class SamplingStats(NumericStats):
                     Aggregate(
                         Literal(ffuncs.add),
                         Literal(0.0),
-                        MapJoin(Literal(ffuncs.gt), (self.sketch, _scalar(0.0))),
+                        MapJoin(Literal(ffuncs.gt), (self.sketch, Literal(0.0))),
                         fields,
                     ),
                 ),
@@ -557,7 +560,7 @@ class SamplingStats(NumericStats):
                     Aggregate(
                         Literal(ffuncs.add),
                         Literal(0.0),
-                        MapJoin(Literal(ffuncs.eq), (self.sketch, _scalar(1.0))),
+                        MapJoin(Literal(ffuncs.eq), (self.sketch, Literal(1.0))),
                         fields,
                     ),
                 ),
@@ -566,7 +569,6 @@ class SamplingStats(NumericStats):
             outputs = [n_a, dn_a, f1_a]
             max_a = None
             if needs_freq:
-                frequencies = {}
                 max_a = Alias("max_val")
                 bodies.append(
                     Query(
@@ -584,7 +586,7 @@ class SamplingStats(NumericStats):
             d_n = float(np.asarray(results[1])[()])
             f_1 = float(np.asarray(results[2])[()])
 
-            frequencies: dict | None = None
+            frequencies = None
             if needs_freq:
                 max_val = int(round(float(np.asarray(results[3])[()])))
                 if max_val >= 1:
@@ -596,7 +598,7 @@ class SamplingStats(NumericStats):
                                 Literal(ffuncs.add),
                                 Literal(0.0),
                                 MapJoin(
-                                    Literal(ffuncs.eq), (self.sketch, _scalar(float(i)))
+                                    Literal(ffuncs.eq), (self.sketch, Literal(float(i)))
                                 ),
                                 fields,
                             ),

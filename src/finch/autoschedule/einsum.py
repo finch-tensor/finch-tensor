@@ -114,6 +114,7 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        lgc.LogicStatement,
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
         mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
@@ -124,4 +125,4 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
             )
             for var, idxs in ein_shape_vars.items()
         }
-        return mod, lgc_bindings, lgc_shape_vars
+        return mod, lgc_bindings, lgc_shape_vars, prgm

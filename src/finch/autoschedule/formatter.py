@@ -1,11 +1,11 @@
 import logging
+import random
 from abc import ABC, abstractmethod
-from typing import Any
 
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import FType, TensorFType, TupleFType, ftype
+from finch.algebra import AbstractFill, FType, TensorFType, TupleFType, ftype
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.codegen import NumpyBufferFType
 from finch.finch_logic import (
@@ -15,6 +15,8 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.tensor import BufferizedNDArrayFType
+from finch.tensor.fiber_tensor import FiberTensorFType
+from finch.tensor.level import DenseLevelFType, ElementLevelFType, SparseListLevelFType
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
@@ -33,7 +35,9 @@ class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
 
 class MonoLogicFormatter(LogicFormatter):
     @abstractmethod
-    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]): ...
+    def get_tensor_ftype(
+        self, fill_value: AbstractFill, shape_type: tuple[FType, ...]
+    ) -> TensorFType: ...
 
     def lower(
         self,
@@ -85,7 +89,7 @@ class MonoLogicFormatter(LogicFormatter):
 
 
 class BufferizedNDArrayFormatter(MonoLogicFormatter):
-    def get_tensor_ftype(self, fill_value: Any, shape_type: tuple[FType, ...]):
+    def get_tensor_ftype(self, fill_value: AbstractFill, shape_type: tuple[FType, ...]):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.
@@ -99,6 +103,26 @@ class BufferizedNDArrayFormatter(MonoLogicFormatter):
             dimension_type=TupleFType.from_tuple(shape_type),
             fill_value=fill_value,
         )
+
+
+class RandomLogicFormatter(LogicFormatter):
+    def get_output_tns_ftype(self, fill_value, shape_type):
+        fill_ftype = ftype(
+            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        )
+        elem = ElementLevelFType(
+            fill_value=fill_value,
+            element_type=fill_ftype,
+            buffer_type=NumpyBufferFType(fill_ftype),
+        )
+        fmt = elem
+        for _ in reversed(shape_type):
+            if random.random() < 0.5:
+                fmt = DenseLevelFType(_lvl_t=fmt)
+            else:
+                fmt = SparseListLevelFType(_lvl_t=fmt)
+
+        return FiberTensorFType(fmt)
 
 
 class DefaultLogicFormatter(BufferizedNDArrayFormatter):

@@ -48,6 +48,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def lvl_t(self):
         return self.body.lvl_t
 
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl): ...
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "LoTriMask":
         return LoTriMask(self.lvl_t.construct(shape=shape, pos=pos))
 
@@ -125,7 +127,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             )
             return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
-        scalar = Scalar(self.fill_value, self.fill_value)
+        scalar = Scalar(self.fill_value.value, self.fill_value)
         visited_idxs = tns.idxs
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
