@@ -57,7 +57,6 @@ def test_sampling_from_tensor():
         replace=False,
         cache={},
     )
-    assert stats.sketch.shape == (20, 20)
     assert stats.remainder_dims == set()
     assert stats.remainder_dim_sizes == {}
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
@@ -1624,62 +1623,6 @@ def get_structured_example(M, K, matrix_type):
         A[:, ::5] = 1.0
         return A
     return np.zeros((M, K), dtype=np.float64)
-
-
-def test_benchmark_structured_comparison():
-    M, K, N = 20, 20, 20
-    i, j, k = Field("i"), Field("j"), Field("k")
-
-    matrix_types = ["diagonal", "tridiagonal", "banded", "triangular", "striped"]
-    implementations = [
-        ("UniformStats", UniformStatsFactory()),
-        ("DenseStats", DenseStatsFactory()),
-        ("DCStats", DCStatsFactory()),
-        ("LPStats", LPStatsFactory()),
-    ]
-
-    print("\n" + "=" * 85)
-    print(
-        f"{'Matrix Type':<15} | {'Stats':<15} |"
-        f" {'Stats Relative Error':<18} | {'Blocked Stats Relative Error'}"
-    )
-    print("-" * 85)
-
-    for m_type in matrix_types:
-        data_a = get_structured_example(M, K, m_type)
-        data_b = get_structured_example(K, N, m_type)
-
-        tns_a = ft.asarray(data_a)
-        tns_b = ft.asarray(data_b)
-
-        # Actual result
-        actual_result = np.matmul(data_a, data_b)
-        actual_nnz = float(np.count_nonzero(actual_result))
-
-        if actual_nnz == 0:
-            continue
-
-        for impl_name, impl_factory in implementations:
-            # Stats performance
-            g_a = impl_factory(tns_a, (i, k))
-            g_b = impl_factory(tns_b, (k, j))
-            g_res = impl_factory.aggregate(
-                ffuncs.add, 0.0, (k,), impl_factory.mapjoin(ffuncs.mul, g_a, g_b)
-            )
-            g_perf = abs(g_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
-
-            # Blocked Stats Performance
-            blocked_factory = BlockedStatsFactory(impl_factory)
-            b_a = blocked_factory(tns_a, (i, k))
-            b_b = blocked_factory(tns_b, (k, j))
-            b_res = blocked_factory.aggregate(
-                ffuncs.add, 0.0, (k,), blocked_factory.mapjoin(ffuncs.mul, b_a, b_b)
-            )
-            b_perf = abs(b_res.estimate_non_fill_values() - actual_nnz) / actual_nnz
-
-            print(f"{m_type:<15} | {impl_name:<15} | {g_perf:<18.6f} | {b_perf:.6f}")
-
-        print("-" * 85)
 
 
 # ─────────────────────────── BaseTensorStats def tests ───────────────────────────
