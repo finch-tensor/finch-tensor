@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Self, cast
 
 from finch.algebra import ffuncs
-from finch.symbolic import Context, Term, TermTree
+from finch.symbolic import Context, Term, TermTree, hash_key_value
 from finch.util.print import qual_str
 
 
@@ -57,7 +57,7 @@ class EinsumStatement(EinsumNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Literal(EinsumExpression):
     """
     Literal
@@ -65,17 +65,14 @@ class Literal(EinsumExpression):
 
     val: Any
 
-    def __hash__(self):
-        return hash(self.val)
-
-    def __eq__(self, other):
-        return isinstance(other, Literal) and self.val == other.val
+    def __hash_key__(self) -> Any:
+        return hash_key_value(self.val)
 
     def get_idxs(self) -> set["Index"]:
         return set()
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Index(EinsumExpression):
     """
     Represents a  AST expression for an index named `name`.
@@ -86,11 +83,14 @@ class Index(EinsumExpression):
 
     name: str
 
+    def __hash_key__(self) -> Any:
+        return self.name
+
     def get_idxs(self) -> set["Index"]:
         return {self}
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Alias(EinsumExpression):
     """
     Represents a  AST expression for an index named `name`.
@@ -101,11 +101,14 @@ class Alias(EinsumExpression):
 
     name: str
 
+    def __hash_key__(self) -> Any:
+        return self.name
+
     def get_idxs(self) -> set["Index"]:
         return set()
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Access(EinsumExpression, EinsumTree):
     """
     Access
@@ -141,7 +144,7 @@ class Access(EinsumExpression, EinsumTree):
         return idxs
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Call(EinsumExpression, EinsumTree):
     """
     Call
@@ -181,7 +184,7 @@ class Call(EinsumExpression, EinsumTree):
         return idxs
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Einsum(EinsumTree, EinsumStatement):
     """
     Einsum
@@ -220,7 +223,7 @@ class Einsum(EinsumTree, EinsumStatement):
         return [self.op, self.tns, self.idxs, self.arg]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Plan(EinsumTree, EinsumStatement):
     """
     Plan
@@ -247,7 +250,7 @@ class Plan(EinsumTree, EinsumStatement):
         return [*self.bodies]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Produces(EinsumTree, EinsumStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.

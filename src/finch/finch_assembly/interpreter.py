@@ -22,7 +22,7 @@ class AssemblyInterpreterKernel(AssemblyKernel):
         self.func = asm.Variable(func_n, ret_t)
 
     def __call__(self, *args):
-        args_i = (asm.Literal(arg) for arg in args)
+        args_i = tuple(asm.Literal(arg) for arg in args)
         return self.ctx(asm.Call(self.func, args_i))
 
 

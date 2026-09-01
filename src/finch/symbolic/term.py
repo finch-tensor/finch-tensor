@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+import weakref
+from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass, fields
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 """
 This module contains definitions for common functions that are useful for symbolic
@@ -45,7 +46,62 @@ Notes:
 """
 
 
-class Term:
+def hash_key_value(val: Any) -> Any:
+    if isinstance(val, HashCons):
+        return id(val)
+    if isinstance(val, tuple | list):
+        return tuple(hash_key_value(v) for v in val)
+    try:
+        hash(val)
+    except TypeError:
+        return (type(val), id(val))
+    return (type(val), val)
+
+
+class HashConsMeta(ABCMeta):
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        obj = super().__call__(*args, **kwargs)
+        return obj._intern_table.setdefault(obj.__hash_key__(), obj)
+
+
+class HashCons(metaclass=HashConsMeta):
+    """
+    A base class for interned ("hash consed") objects. Construction returns a
+    canonical instance for each distinct `__hash_key__`, so structurally equal
+    objects are the same object and equality is identity.
+    """
+
+    _intern_table: ClassVar[weakref.WeakValueDictionary]
+
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        cls._intern_table = weakref.WeakValueDictionary()
+
+    @abstractmethod
+    def __hash_key__(self) -> Any:
+        """Return a hashable key of the fields which identify this object."""
+        ...
+
+    def __eq__(self, other: object) -> bool:
+        return self is other
+
+    def __hash__(self) -> int:
+        return id(self)
+
+    def __copy__(self) -> Self:
+        return self
+
+    def __deepcopy__(self, memo: dict) -> Self:
+        return self
+
+    def __reduce__(self):
+        return (
+            type(self),
+            tuple(getattr(self, f.name) for f in fields(self)),  # type: ignore[arg-type]
+        )
+
+
+class Term(HashCons):
     @abstractmethod
     def head(self) -> Any:
         """Return the head type of the S-expression."""
@@ -62,13 +118,16 @@ class Term:
         ...
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=False)
 class TermTree(Term, ABC):
     @property
     @abstractmethod
     def children(self) -> list[Term]:
         """Return the children (AKA tail) of the S-expression."""
         ...
+
+    def __hash_key__(self) -> Any:
+        return tuple(hash_key_value(c) for c in self.children)
 
 
 class LiteralTerm(Term, ABC):
@@ -77,6 +136,9 @@ class LiteralTerm(Term, ABC):
     """
 
     val: Any
+
+    def __hash_key__(self) -> Any:
+        return hash_key_value(self.val)
 
 
 class CallTerm(TermTree, ABC):

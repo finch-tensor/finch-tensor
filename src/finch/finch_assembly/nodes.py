@@ -11,6 +11,7 @@ from finch.symbolic import (
     NamedTerm,
     Term,
     TermTree,
+    hash_key_value,
     literal_repr,
 )
 from finch.util import qual_str
@@ -83,7 +84,7 @@ class AssemblyStatement(AssemblyNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Literal(AssemblyExpression, LiteralTerm):
     """
     Represents the literal value `val`.
@@ -106,7 +107,7 @@ class Literal(AssemblyExpression, LiteralTerm):
 L = Literal
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Variable(AssemblyExpression, NamedTerm):
     """
     Represents a logical AST expression for a variable named `name`, which
@@ -119,6 +120,9 @@ class Variable(AssemblyExpression, NamedTerm):
 
     name: str
     type: FType
+
+    def __hash_key__(self) -> Any:
+        return (self.name, hash_key_value(self.type))
 
     @property
     def result_type(self) -> FType:
@@ -133,7 +137,7 @@ class Variable(AssemblyExpression, NamedTerm):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Slot(AssemblyExpression):
     """
     Represents a register to a symbolic object. Using a register in an
@@ -146,6 +150,9 @@ class Slot(AssemblyExpression):
 
     name: str
     type: Any
+
+    def __hash_key__(self) -> Any:
+        return (self.name, hash_key_value(self.type))
 
     @property
     def result_type(self):
@@ -160,7 +167,7 @@ class Slot(AssemblyExpression):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Unpack(AssemblyTree, AssemblyStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
@@ -181,7 +188,7 @@ class Unpack(AssemblyTree, AssemblyStatement):
         return [self.lhs, self.rhs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Repack(AssemblyTree, AssemblyStatement):
     """
     Registers updates from a symbolic object `val` with the original
@@ -199,7 +206,7 @@ class Repack(AssemblyTree, AssemblyStatement):
         return [self.val]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Assign(AssemblyTree, AssemblyStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result
@@ -219,7 +226,7 @@ class Assign(AssemblyTree, AssemblyStatement):
         return [self.lhs, self.rhs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class GetAttr(AssemblyExpression, AssemblyTree):
     """
     Represents a getter for an attribute `attr` of an object `obj`.
@@ -242,7 +249,7 @@ class GetAttr(AssemblyExpression, AssemblyTree):
         return dict(self.obj.result_type.struct_fields)[self.attr.val]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class SetAttr(AssemblyTree, AssemblyStatement):
     """
     Represents a setter for an attribute `attr` of an object `obj`.
@@ -262,7 +269,7 @@ class SetAttr(AssemblyTree, AssemblyStatement):
         return [self.obj, self.attr, self.value]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Call(AssemblyExpression, AssemblyTree, CallTerm):
     """
     Represents an expression for calling the function `op` on `args...`.
@@ -291,7 +298,7 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
         return return_type(self.op.val, *arg_types)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Load(AssemblyExpression, AssemblyTree):
     """
     Represents loading a value from a buffer at a given index.
@@ -314,7 +321,7 @@ class Load(AssemblyExpression, AssemblyTree):
         return self.buffer.result_type.element_type
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Store(AssemblyTree, AssemblyStatement):
     """
     Represents storing a value into a buffer at a given index.
@@ -334,7 +341,7 @@ class Store(AssemblyTree, AssemblyStatement):
         return [self.buffer, self.index, self.value]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Resize(AssemblyTree, AssemblyStatement):
     """
     Represents resizing a buffer to a new size.
@@ -352,7 +359,7 @@ class Resize(AssemblyTree, AssemblyStatement):
         return [self.buffer, self.new_size]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Length(AssemblyExpression, AssemblyTree):
     """
     Represents getting the length of a buffer.
@@ -373,7 +380,7 @@ class Length(AssemblyExpression, AssemblyTree):
         return length_type(self.buffer.result_type)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class ForLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a for loop that iterates over a range of values.
@@ -396,7 +403,7 @@ class ForLoop(AssemblyTree, AssemblyStatement):
         return [self.var, self.start, self.end, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class BufferLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a loop that iterates over the elements of a buffer.
@@ -417,7 +424,7 @@ class BufferLoop(AssemblyTree, AssemblyStatement):
         return [self.buffer, self.var, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class WhileLoop(AssemblyTree, AssemblyStatement):
     """
     Represents a while loop that executes as long as the condition is true.
@@ -436,7 +443,7 @@ class WhileLoop(AssemblyTree, AssemblyStatement):
         return [self.condition, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class If(AssemblyTree, AssemblyStatement):
     """
     Represents an if statement that executes the body if the condition is true.
@@ -455,7 +462,7 @@ class If(AssemblyTree, AssemblyStatement):
         return [self.condition, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Assert(AssemblyTree, AssemblyStatement):
     """
     Represents an assert node which asserts that expression is true.
@@ -473,7 +480,7 @@ class Assert(AssemblyTree, AssemblyStatement):
         return [self.exp]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class IfElse(AssemblyTree, AssemblyStatement):
     """
     Represents an if-else statement that executes the body if the condition
@@ -495,7 +502,7 @@ class IfElse(AssemblyTree, AssemblyStatement):
         return [self.condition, self.body, self.else_body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Function(AssemblyTree):
     """
     Represents a logical AST statement that defines a function `fun` on the
@@ -525,7 +532,7 @@ class Function(AssemblyTree):
         return cls(name, tuple(arg_nodes), body)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Return(AssemblyTree, AssemblyStatement):
     """
     Represents a return statement that returns `arg` from the current function.
@@ -543,7 +550,7 @@ class Return(AssemblyTree, AssemblyStatement):
         return [self.arg]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Break(AssemblyTree, AssemblyStatement):
     """
     Represents a break statement that exits the current loop.
@@ -555,7 +562,7 @@ class Break(AssemblyTree, AssemblyStatement):
         return []
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Block(AssemblyTree, AssemblyStatement):
     """
     Represents a statement that executes a sequence of statements `bodies...`.
@@ -576,7 +583,7 @@ class Block(AssemblyTree, AssemblyStatement):
         return cls(bodies)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Module(AssemblyTree):
     """
     Represents a group of functions. This is the toplevel translation unit for

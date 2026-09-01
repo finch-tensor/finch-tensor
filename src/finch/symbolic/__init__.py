@@ -13,9 +13,11 @@ from .simplification import simplify_rules
 from .stage import Form, Stage, UnvalidatedForm
 from .term import (
     CallTerm,
+    HashCons,
     LiteralTerm,
     Term,
     TermTree,
+    hash_key_value,
     literal_repr,
 )
 from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
@@ -29,6 +31,7 @@ __all__ = [
     "DataFlowAnalysis",
     "Fixpoint",
     "Form",
+    "HashCons",
     "LiteralTerm",
     "Memo",
     "NamedTerm",
@@ -45,6 +48,7 @@ __all__ = [
     "TermTree",
     "UnvalidatedForm",
     "gensym",
+    "hash_key_value",
     "intree",
     "isdescendant",
     "literal_repr",
