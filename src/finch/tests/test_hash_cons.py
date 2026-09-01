@@ -60,10 +60,10 @@ def test_interning_is_weak():
     t = Table(Alias("garbage_collected_alias"), (Field("i"),))
     table = type(t)._intern_table
     key = t.__hash_key__()
-    assert table.get(key) is t
+    assert table[key]() is t
     del t
     gc.collect()
-    assert table.get(key) is None
+    assert key not in table
 
 
 def test_interned_across_hierarchies():

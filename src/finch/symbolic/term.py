@@ -4,7 +4,7 @@ import weakref
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass, fields
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, ClassVar, Self
+from typing import Any, Self
 
 """
 This module contains definitions for common functions that are useful for symbolic
@@ -46,47 +46,73 @@ Notes:
 """
 
 
+_ATOMIC_KEY_TYPES = frozenset({int, float, complex, bool, str, bytes, type(None)})
+
+_hash_cons_types: set[type] = set()
+
+
 def hash_key_value(val: Any) -> Any:
-    if isinstance(val, HashCons):
+    t = type(val)
+    if t in _hash_cons_types:
         return id(val)
-    if isinstance(val, tuple | list):
-        return tuple(hash_key_value(v) for v in val)
+    if t in _ATOMIC_KEY_TYPES:
+        return (t, val)
+    if t is tuple or t is list:
+        return tuple([hash_key_value(v) for v in val])
     try:
         hash(val)
     except TypeError:
-        return (type(val), id(val))
-    return (type(val), val)
+        return (t, id(val))
+    return (t, val)
 
 
 class HashConsMeta(ABCMeta):
+    _intern_table: dict[Any, weakref.ref]
+
     def __call__(cls, *args: Any, **kwargs: Any) -> Any:
         obj = super().__call__(*args, **kwargs)
-        return obj._intern_table.setdefault(obj.__hash_key__(), obj)
+        key = obj.__hash_key__()
+        table = cls._intern_table
+        wr = table.get(key)
+        if wr is not None:
+            cached = wr()
+            if cached is not None:
+                return cached
+
+        def remove(r: Any, table: dict = table, key: Any = key) -> None:
+            if table.get(key) is r:
+                del table[key]
+
+        new_ref = weakref.ref(obj, remove)
+        existing = table.setdefault(key, new_ref)
+        if existing is not new_ref:
+            cached = existing()
+            if cached is not None:
+                return cached
+            table[key] = new_ref
+        return obj
 
 
 class HashCons(metaclass=HashConsMeta):
     """
     A base class for interned ("hash consed") objects. Construction returns a
     canonical instance for each distinct `__hash_key__`, so structurally equal
-    objects are the same object and equality is identity.
+    objects are the same object and equality is identity (object's default
+    id-based __eq__ and __hash__).
     """
-
-    _intern_table: ClassVar[weakref.WeakValueDictionary]
 
     def __init_subclass__(cls, **kwargs: Any):
         super().__init_subclass__(**kwargs)
-        cls._intern_table = weakref.WeakValueDictionary()
+        cls._intern_table = {}
+        _hash_cons_types.add(cls)
 
     @abstractmethod
     def __hash_key__(self) -> Any:
         """Return a hashable key of the fields which identify this object."""
         ...
 
-    def __eq__(self, other: object) -> bool:
-        return self is other
-
-    def __hash__(self) -> int:
-        return id(self)
+    __eq__ = object.__eq__
+    __hash__ = object.__hash__
 
     def __copy__(self) -> Self:
         return self
@@ -127,7 +153,12 @@ class TermTree(Term, ABC):
         ...
 
     def __hash_key__(self) -> Any:
-        return tuple(hash_key_value(c) for c in self.children)
+        return tuple(
+            [
+                id(c) if type(c) in _hash_cons_types else hash_key_value(c)
+                for c in self.children
+            ]
+        )
 
 
 class LiteralTerm(Term, ABC):
