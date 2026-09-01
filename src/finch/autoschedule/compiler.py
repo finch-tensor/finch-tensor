@@ -54,18 +54,18 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
-            case lgc.Table(lgc.Alias() as var, idxs):
-                return ntn.Unwrap(
-                    ntn.Access(
-                        self.ctx.slots[var],
-                        ntn.Read(),
-                        tuple(loops[idx] for idx in idxs),
-                    )
-                )
             case lgc.Table(lgc.FusedAlias(alias, _), idxs):
                 return ntn.Unwrap(
                     ntn.Access(
                         self.ctx.slots[alias],
+                        ntn.Read(),
+                        tuple(loops[idx] for idx in idxs),
+                    )
+                )
+            case lgc.Table(lgc.Alias() as var, idxs):
+                return ntn.Unwrap(
+                    ntn.Access(
+                        self.ctx.slots[var],
                         ntn.Read(),
                         tuple(loops[idx] for idx in idxs),
                     )

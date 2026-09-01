@@ -6,9 +6,9 @@ import finch as fl
 from finch.algebra import ffuncs, ftype
 from finch.autoschedule.compiler import NotationGenerator
 from finch.finch_logic import (
-    Alias,
     Field,
     FusedAlias,
+    HardAlias,
     Literal,
     LogicInterpreter,
     MapJoin,
@@ -27,12 +27,12 @@ from .conftest import reset_name_counts
 
 # 1. Introduced node to finch_logic
 def test_fused_alias_node():
-    w = Alias("w")
+    w = HardAlias("w")
     fa = FusedAlias(w, 1)
     assert fa.alias == w
     assert fa.n == 1
-    assert FusedAlias(Alias("w"), 1) == FusedAlias(Alias("w"), 1)
-    assert FusedAlias(Alias("w"), 1) != FusedAlias(Alias("w"), 2)
+    assert FusedAlias(HardAlias("w"), 1) == FusedAlias(HardAlias("w"), 1)
+    assert FusedAlias(HardAlias("w"), 1) != FusedAlias(HardAlias("w"), 2)
     with pytest.raises(NotImplementedError):
         fa.fields()
 
@@ -41,14 +41,15 @@ def test_fused_alias_node():
 def test_use_fused_alias():
     i, j = Field("i"), Field("j")
     a = fl.asarray(np.array([[1, 2], [3, 4]]))
-    w = FusedAlias(Alias("w"), 1)
+    w = FusedAlias(HardAlias("w"), 1)
     p = Plan(
         (
             Query(w, Table(Literal(a), (i, j))),
             Query(
-                Alias("C"), MapJoin(Literal(ffuncs.mul), (Table(w, (i, j)), Literal(2)))
+                HardAlias("C"),
+                MapJoin(Literal(ffuncs.mul), (Table(w, (i, j)), Literal(2))),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
     result = LogicInterpreter()(p)[0]
@@ -59,19 +60,19 @@ def test_use_fused_alias():
 # 3. Adding FusedAlias to compiler.py in places it can occur
 def test_fused_alias_compiles(file_regression):
     i, j = Field("i"), Field("j")
-    w = FusedAlias(Alias("w"), 1)
+    w = FusedAlias(HardAlias("w"), 1)
     plan = Plan(
         bodies=(
-            Query(w, Reorder(Table(Alias("A0"), (i, j)), (i, j))),
-            Query(Alias("A1"), Reorder(Table(w, (i, j)), (i, j))),
-            Produces(args=(Alias("A1"),)),
+            Query(w, Reorder(Table(HardAlias("A0"), (i, j)), (i, j))),
+            Query(HardAlias("A1"), Reorder(Table(w, (i, j)), (i, j))),
+            Produces(args=(HardAlias("A1"),)),
         )
     )
 
     bindings = {
-        Alias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
-        Alias(name="w"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
-        Alias(name="A1"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
+        HardAlias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
+        HardAlias(name="w"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
+        HardAlias(name="A1"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
     }
 
     program = NotationGenerator()(

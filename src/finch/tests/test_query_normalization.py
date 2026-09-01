@@ -5,8 +5,8 @@ from finch.autoschedule.galley.logical_optimizer.query_normalization import (
 )
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -43,9 +43,9 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
     j = Field("j")
 
     A_lit = Literal("A")
-    q1 = Query(Alias("A1"), Table(A_lit, (i, j)))
-    q2 = Query(Alias("A2"), Table(Alias("A1"), (j, i)))
-    plan = Plan((q1, q2, Produces((Alias("A2"),))))
+    q1 = Query(HardAlias("A1"), Table(A_lit, (i, j)))
+    q2 = Query(HardAlias("A2"), Table(HardAlias("A1"), (j, i)))
+    plan = Plan((q1, q2, Produces((HardAlias("A2"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     assert isinstance(preprocessed, Plan)
@@ -53,14 +53,14 @@ def test_merge_queries_inlines_alias_tables_and_keeps_produced_aliases():
     out_query, out_produces = preprocessed.bodies
 
     assert isinstance(out_query, Query)
-    assert out_query.lhs == Alias("A2")
+    assert out_query.lhs == HardAlias("A2")
     assert isinstance(out_query.rhs, Reorder)
     assert isinstance(out_query.rhs.arg, Table)
     assert out_query.rhs.arg.tns == A_lit
     assert out_query.rhs.arg.idxs == (j, i)
 
     assert isinstance(out_produces, Produces)
-    assert out_produces.args == (Alias("A2"),)
+    assert out_produces.args == (HardAlias("A2"),)
 
 
 def test_normalize_reorders_produces_single_outer_reorder():
@@ -79,8 +79,8 @@ def test_normalize_reorders_produces_single_outer_reorder():
     inner = Reorder(Table(A_lit, (i, j)), (j, i))
     agg = Aggregate(Literal(ffuncs.add), Literal(0), inner, (i,))
     original_rhs = Reorder(agg, (j,))
-    q = Query(Alias("out"), original_rhs)
-    plan = Plan((q, Produces((Alias("out"),))))
+    q = Query(HardAlias("out"), original_rhs)
+    plan = Plan((q, Produces((HardAlias("out"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, norm_produces = preprocessed.bodies
@@ -92,7 +92,7 @@ def test_normalize_reorders_produces_single_outer_reorder():
     assert rhs.idxs == (j,)
 
     assert isinstance(norm_produces, Produces)
-    assert norm_produces.args == (Alias("out"),)
+    assert norm_produces.args == (HardAlias("out"),)
 
 
 def test_preprocess_plan_for_galley_produces_canonical_queries():
@@ -123,9 +123,9 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
         ),
     )
     agg = Aggregate(Literal(ffuncs.add), Literal(0), mj, (j,))
-    q1 = Query(Alias("A1"), agg)
-    q2 = Query(Alias("A2"), Reorder(Table(Alias("A1"), (i, k)), (i, k)))
-    plan = Plan((q1, q2, Produces((Alias("A2"),))))
+    q1 = Query(HardAlias("A1"), agg)
+    q2 = Query(HardAlias("A2"), Reorder(Table(HardAlias("A1"), (i, k)), (i, k)))
+    plan = Plan((q1, q2, Produces((HardAlias("A2"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
 
@@ -134,13 +134,13 @@ def test_preprocess_plan_for_galley_produces_canonical_queries():
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
     assert isinstance(out_query, Query)
-    assert out_query.lhs == Alias("A2")
+    assert out_query.lhs == HardAlias("A2")
 
     rhs = out_query.rhs
     assert rhs.fields() == q2.rhs.fields()
 
     assert isinstance(out_produces, Produces)
-    assert out_produces.args == (Alias("A2"),)
+    assert out_produces.args == (HardAlias("A2"),)
 
 
 def test_merge_queries_chain_of_three_aliases():
@@ -159,16 +159,16 @@ def test_merge_queries_chain_of_three_aliases():
     j = Field("j")
     A_lit = Literal("A")
 
-    q1 = Query(Alias("A1"), Table(A_lit, (i, j)))
-    q2 = Query(Alias("A2"), Table(Alias("A1"), (j, i)))
-    q3 = Query(Alias("A3"), Table(Alias("A2"), (i, j)))
-    plan = Plan((q1, q2, q3, Produces((Alias("A3"),))))
+    q1 = Query(HardAlias("A1"), Table(A_lit, (i, j)))
+    q2 = Query(HardAlias("A2"), Table(HardAlias("A1"), (j, i)))
+    q3 = Query(HardAlias("A3"), Table(HardAlias("A2"), (i, j)))
+    plan = Plan((q1, q2, q3, Produces((HardAlias("A3"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
 
-    assert out_query.lhs == Alias("A3")
+    assert out_query.lhs == HardAlias("A3")
     assert isinstance(out_query.rhs, Reorder)
     assert isinstance(out_query.rhs.arg, Table)
     assert out_query.rhs.arg.tns == A_lit
@@ -192,24 +192,24 @@ def test_merge_queries_produces_multiple_aliases():
     j = Field("j")
     A_lit = Literal("A")
 
-    q1 = Query(Alias("A1"), Table(A_lit, (i, j)))
-    q2 = Query(Alias("A2"), Table(Alias("A1"), (j, i)))
-    plan = Plan((q1, q2, Produces((Alias("A1"), Alias("A2")))))
+    q1 = Query(HardAlias("A1"), Table(A_lit, (i, j)))
+    q2 = Query(HardAlias("A2"), Table(HardAlias("A1"), (j, i)))
+    plan = Plan((q1, q2, Produces((HardAlias("A1"), HardAlias("A2")))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     assert len(preprocessed.bodies) == 3
     out_q1, out_q2, out_produces = preprocessed.bodies
 
-    assert out_q1.lhs == Alias("A1")
+    assert out_q1.lhs == HardAlias("A1")
     assert isinstance(out_q1.rhs, Reorder)
     assert out_q1.rhs.idxs == (i, j)
     assert out_q1.rhs.arg == Table(A_lit, (i, j))
 
-    assert out_q2.lhs == Alias("A2")
+    assert out_q2.lhs == HardAlias("A2")
     assert isinstance(out_q2.rhs, Reorder)
     assert out_q2.rhs.idxs == (j, i)
     assert isinstance(out_q2.rhs.arg, Table)
-    assert out_q2.rhs.arg.tns == Alias("A1")
+    assert out_q2.rhs.arg.tns == HardAlias("A1")
     assert out_q2.rhs.arg.idxs == (j, i)
 
 
@@ -227,8 +227,8 @@ def test_normalize_reorders_strips_identity_reorder():
     A_lit = Literal("A")
 
     original_rhs = Reorder(Table(A_lit, (i, j)), (j, i))
-    q = Query(Alias("out"), original_rhs)
-    plan = Plan((q, Produces((Alias("out"),))))
+    q = Query(HardAlias("out"), original_rhs)
+    plan = Plan((q, Produces((HardAlias("out"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
@@ -251,8 +251,8 @@ def test_normalize_reorders_nested_reorders_collapse():
 
     inner = Reorder(Table(A_lit, (i, j)), (j, i))
     outer = Reorder(inner, (i, j))
-    q = Query(Alias("out"), outer)
-    plan = Plan((q, Produces((Alias("out"),))))
+    q = Query(HardAlias("out"), outer)
+    plan = Plan((q, Produces((HardAlias("out"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
@@ -277,8 +277,8 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
 
     agg = Aggregate(Literal(ffuncs.add), Literal(0), Table(A_lit, (i, j)), (j,))
     original_rhs = Reorder(agg, (i,))
-    q = Query(Alias("out"), original_rhs)
-    plan = Plan((q, Produces((Alias("out"),))))
+    q = Query(HardAlias("out"), original_rhs)
+    plan = Plan((q, Produces((HardAlias("out"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
@@ -309,15 +309,15 @@ def test_preprocess_plan_chain_with_reorder_and_aggregate():
         (Table(A_lit, (i, j)), Table(B_lit, (j, k))),
     )
     agg = Aggregate(Literal(ffuncs.add), Literal(0), mj, (j,))
-    q1 = Query(Alias("A1"), agg)
-    q2 = Query(Alias("A2"), Reorder(Table(Alias("A1"), (i, k)), (k, i)))
-    plan = Plan((q1, q2, Produces((Alias("A2"),))))
+    q1 = Query(HardAlias("A1"), agg)
+    q2 = Query(HardAlias("A2"), Reorder(Table(HardAlias("A1"), (i, k)), (k, i)))
+    plan = Plan((q1, q2, Produces((HardAlias("A2"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
 
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
-    assert out_query.lhs == Alias("A2")
+    assert out_query.lhs == HardAlias("A2")
     assert out_query.rhs.fields() == (k, i)
     # At most one outer Reorder, no interior Reorders
     if isinstance(out_query.rhs, Reorder):
@@ -339,8 +339,8 @@ def test_preprocess_plan_single_table_no_change():
     j = Field("j")
     A_lit = Literal("A")
 
-    q = Query(Alias("out"), Table(A_lit, (i, j)))
-    plan = Plan((q, Produces((Alias("out"),))))
+    q = Query(HardAlias("out"), Table(A_lit, (i, j)))
+    plan = Plan((q, Produces((HardAlias("out"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
 
@@ -379,21 +379,21 @@ def test_preprocess_plan_A_at_B_at_C():
         Literal(ffuncs.mul),
         (Table(A_lit, (i, j)), Table(B_lit, (j, k))),
     )
-    q1 = Query(Alias("A1"), Aggregate(Literal(ffuncs.add), Literal(0), ab, (j,)))
+    q1 = Query(HardAlias("A1"), Aggregate(Literal(ffuncs.add), Literal(0), ab, (j,)))
 
     # (A @ B) @ C: (i, k) @ (k, l) -> (i, l)
     abc = MapJoin(
         Literal(ffuncs.mul),
-        (Table(Alias("A1"), (i, k)), Table(C_lit, (k, l_))),
+        (Table(HardAlias("A1"), (i, k)), Table(C_lit, (k, l_))),
     )
-    q2 = Query(Alias("A2"), Aggregate(Literal(ffuncs.add), Literal(0), abc, (k,)))
-    plan = Plan((q1, q2, Produces((Alias("A2"),))))
+    q2 = Query(HardAlias("A2"), Aggregate(Literal(ffuncs.add), Literal(0), abc, (k,)))
+    plan = Plan((q1, q2, Produces((HardAlias("A2"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
 
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
-    assert out_query.lhs == Alias("A2")
+    assert out_query.lhs == HardAlias("A2")
     assert out_query.rhs.fields() == (i, l_)
 
     # Single Aggregate with both reduction indices after push_aggregates_up.
@@ -432,26 +432,26 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     X_lit = Literal("X")
     Y_lit = Literal("Y")
 
-    q1 = Query(Alias("A"), Table(X_lit, (i, i_2)))
-    q2 = Query(Alias("A_2"), Table(Y_lit, (i_3, i_4)))
+    q1 = Query(HardAlias("A"), Table(X_lit, (i, i_2)))
+    q2 = Query(HardAlias("A_2"), Table(Y_lit, (i_3, i_4)))
     a3_rhs = MapJoin(
         Literal(ffuncs.mul),
         (
-            Table(Alias("A"), (i_11, i_12)),
-            Table(Alias("A_2"), (i_12, i_13)),
+            Table(HardAlias("A"), (i_11, i_12)),
+            Table(HardAlias("A_2"), (i_12, i_13)),
         ),
     )
-    q3 = Query(Alias("A_3"), a3_rhs)
+    q3 = Query(HardAlias("A_3"), a3_rhs)
     q4 = Query(
-        Alias("A_4"),
+        HardAlias("A_4"),
         Aggregate(
             Literal(ffuncs.add),
             Literal(0),
-            Table(Alias("A_3"), (i_16, i_17, i_18)),
+            Table(HardAlias("A_3"), (i_16, i_17, i_18)),
             (i_17,),
         ),
     )
-    plan = Plan((q1, q2, q3, q4, Produces((Alias("A_4"),))))
+    plan = Plan((q1, q2, q3, q4, Produces((HardAlias("A_4"),))))
 
     preprocessed = preprocess_plan_for_galley(plan)
 
@@ -460,9 +460,9 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     out_query, out_produces = preprocessed.bodies
 
     assert isinstance(out_query, Query)
-    assert out_query.lhs == Alias("A_4")
+    assert out_query.lhs == HardAlias("A_4")
     assert isinstance(out_produces, Produces)
-    assert out_produces.args == (Alias("A_4"),)
+    assert out_produces.args == (HardAlias("A_4"),)
 
     rhs = out_query.rhs
     assert isinstance(rhs, Reorder)
@@ -516,35 +516,35 @@ def test_merge_queries_same_alias_inlined_twice_unique_internal_fields():
 
     # B = A @ A: (i,k) @ (k,j) -> (i,j), contracts over k
     a_rhs = Table(X_lit, (i, j))
-    q_a = Query(Alias("A"), a_rhs)
+    q_a = Query(HardAlias("A"), a_rhs)
     b_rhs = Aggregate(
         Literal(ffuncs.add),
         Literal(0),
         MapJoin(
             Literal(ffuncs.mul),
-            (Table(Alias("A"), (i, k)), Table(Alias("A"), (k, j))),
+            (Table(HardAlias("A"), (i, k)), Table(HardAlias("A"), (k, j))),
         ),
         (k,),
     )
-    q_b = Query(Alias("B"), b_rhs)
+    q_b = Query(HardAlias("B"), b_rhs)
     # C = B @ B: (i,m) @ (m,j) -> (i,j), contracts over m
     c_rhs = Aggregate(
         Literal(ffuncs.add),
         Literal(0),
         MapJoin(
             Literal(ffuncs.mul),
-            (Table(Alias("B"), (i, m)), Table(Alias("B"), (m, j))),
+            (Table(HardAlias("B"), (i, m)), Table(HardAlias("B"), (m, j))),
         ),
         (m,),
     )
-    q_c = Query(Alias("C"), c_rhs)
-    plan = Plan((q_a, q_b, q_c, Produces((Alias("C"),))))
+    q_c = Query(HardAlias("C"), c_rhs)
+    plan = Plan((q_a, q_b, q_c, Produces((HardAlias("C"),))))
 
     merged = merge_queries(plan)
     assert len(merged.bodies) == 2
     out_query = merged.bodies[0]
     assert isinstance(out_query, Query)
-    assert out_query.lhs == Alias("C")
+    assert out_query.lhs == HardAlias("C")
 
     reduce_idxs = _collect_reduce_idxs(out_query.rhs)
     names = [f.name for f in reduce_idxs]

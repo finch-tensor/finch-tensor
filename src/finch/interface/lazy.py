@@ -41,6 +41,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicStatement,
@@ -210,7 +211,7 @@ class EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
 
     def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
-        var = Alias(gensym("A"))
+        var = HardAlias(gensym("A"))
         return var, self.exec(Query(var, ex))
 
     def join(self, *blobs: EffectBlob) -> EffectBlob:
@@ -493,7 +494,7 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
     if isinstance(arr, LazyTensor):
         return arr
     arr = Scalar(arr) if _is_numeric_constant(arr) else asarray(arr)
-    tns = Alias(gensym("A"))
+    tns = HardAlias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))

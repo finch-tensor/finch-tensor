@@ -377,20 +377,12 @@ class Field(LogicNode, NamedTerm):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
-    """
-    Represents a logical AST expression for an alias named `name`. Aliases are used to
-    refer to tables in the program.
-
-    Attributes:
-        name: The name of the alias.
-    """
-
+    __match_args__ = ("name",)
     name: str
 
     @property
-    def symbol(self) -> str:
+    def symbol(self):
         return self.name
 
     def fields(self) -> tuple[Field, ...]:
@@ -420,30 +412,33 @@ class Alias(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class FusedAlias(LogicNode):
-    alias: Alias
+class HardAlias(Alias):
+    """
+    Represents a logical AST expression for an alias named `name`. Aliases are used to
+    refer to tables in the program.
+
+    Attributes:
+        name: The name of the alias.
+    """
+
+    name: str
+
+    @property
+    def symbol(self):
+        return self.name
+
+
+@dataclass(eq=True, frozen=True)
+class FusedAlias(Alias):
+    alias: HardAlias
     n: int
 
-    def fields(self) -> tuple[Field, ...]:
-        """Returns fields of the node."""
-        raise NotImplementedError(
-            "FusedAliases do not have fields until assigned to  loop order"
-        )
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", self.alias.name)
 
-    def dimmap(
-        self,
-        op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-    ) -> tuple[T | None, ...]:
-        return self.alias.dimmap(op, dim_bindings)
-
-    def valmap(
-        self,
-        f: Callable,
-        g: Callable,
-        bindings: dict[Alias, T],
-    ) -> T:
-        return self.alias.valmap(f, g, bindings)
+    @property
+    def symbol(self):
+        return self.name
 
 
 @dataclass(eq=True, frozen=True)
@@ -717,13 +712,14 @@ class Query(LogicTree, LogicStatement):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
-        if self.lhs in dim_bindings:
+        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if key in dim_bindings:
             for dim1, dim2 in zip(
                 self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
             ):
                 op(dim1, dim2)
         else:
-            dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
+            dim_bindings[key] = self.rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return dim_bindings
@@ -736,16 +732,17 @@ class Query(LogicTree, LogicStatement):
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        if self.lhs in bindings:
+        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if key in bindings:
             val = self.rhs.valmap(f, g, bindings)
-            prev = bindings[self.lhs]
+            prev = bindings[key]
             # A dynamic value is compatible with any value of its dtype.
             if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(
                     f"Cannot rebind alias {self.lhs} to a different values"
                 )
         else:
-            bindings[self.lhs] = self.rhs.valmap(f, g, bindings)
+            bindings[key] = self.rhs.valmap(f, g, bindings)
         return bindings
 
 
@@ -868,10 +865,10 @@ class LogicPrinterContext(Context):
                 return self(ex)
             case Field(name):
                 return str(name)
-            case Alias(name):
-                return str(name)
             case FusedAlias(alias, n):
                 return f"FusedAlias({self(alias)},{n})"
+            case HardAlias(name):
+                return str(name)
             case Table(tns, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 return f"Table({self(tns)}, {idxs_e})"

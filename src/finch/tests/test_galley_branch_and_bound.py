@@ -17,8 +17,8 @@ from finch.autoschedule.galley.logical_optimizer.branch_and_bound import (
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Query,
@@ -39,7 +39,7 @@ def _make_aq_four_index_chain():
     B = ft.asarray(np.ones((10, 5)))
     C = ft.asarray(np.ones((5, 2)))
     q = Query(
-        Alias("out"),
+        HardAlias("out"),
         Aggregate(
             Literal(ffuncs.add),
             Literal(0),
@@ -62,7 +62,7 @@ def _make_aq_three_index_chain():
     A = ft.asarray(np.ones((4, 8)))
     B = ft.asarray(np.ones((8, 6)))
     q = Query(
-        Alias("out"),
+        HardAlias("out"),
         Aggregate(
             Literal(ffuncs.add),
             Literal(0),
@@ -90,7 +90,7 @@ def test_layered_bnb_exact_matches_dfs_bnb_exact_on_matmul_chain():
         ft.asarray(rng.standard_normal((r, c)).astype(np.float64)) for r, c in shapes
     ]
     q = Query(
-        Alias("out"),
+        HardAlias("out"),
         Aggregate(
             Literal(ffuncs.add),
             Literal(0),
@@ -169,11 +169,11 @@ def _make_aq_passthrough_alias():
     list because ``get_remaining_query`` short-circuited on ``Table(Alias, _)``.
     """
     A = ft.asarray(np.ones((3, 4)))
-    a_alias = Alias("A_in")
+    a_alias = HardAlias("A_in")
     bindings = OrderedDict()
     bindings[a_alias] = _DENSE_STATS_FACTORY(A, (Field("a_in_i_0"), Field("a_in_i_1")))
     q = Query(
-        Alias("out"),
+        HardAlias("out"),
         Reorder(Table(a_alias, (Field("i"), Field("j"))), (Field("i"), Field("j"))),
     )
     return AnnotatedQuery(_DENSE_STATS_FACTORY, q, bindings=bindings)
@@ -192,7 +192,7 @@ def test_pruned_query_to_plan_passthrough_lhs_matches_output_name():
     """The single query returned for a passthrough binds the correct output alias."""
     aq = _make_aq_passthrough_alias()
     queries, _ = pruned_query_to_plan(aq)
-    assert queries[-1].lhs == Alias("out")
+    assert queries[-1].lhs == HardAlias("out")
 
 
 def test_pruned_query_to_plan_passthrough_body_references_input_alias():
@@ -200,7 +200,7 @@ def test_pruned_query_to_plan_passthrough_body_references_input_alias():
     aq = _make_aq_passthrough_alias()
     queries, _ = pruned_query_to_plan(aq)
     last_rhs = queries[-1].rhs
-    # Body should be Reorder(Table(Alias("A_in"), ...), ...) — the input alias
+    # Body should be Reorder(Table(HardAlias("A_in"), ...), ...) — the input alias
     assert isinstance(last_rhs, Reorder)
     assert isinstance(last_rhs.arg, Table)
-    assert last_rhs.arg.tns == Alias("A_in")
+    assert last_rhs.arg.tns == HardAlias("A_in")

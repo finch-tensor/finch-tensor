@@ -2,7 +2,13 @@ import logging
 from typing import TypeVar, overload
 
 from finch.algebra.tensor import Tensor
-from finch.finch_logic import Alias, Field, LogicEvaluator, LogicNode
+from finch.finch_logic import (
+    Alias,
+    Field,
+    HardAlias,
+    LogicEvaluator,
+    LogicNode,
+)
 from finch.finch_logic.nodes import LogicExpression, LogicStatement
 from finch.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 from finch.util.logging import LOG_LOGIC_PRE_OPT
@@ -39,10 +45,10 @@ def normalize_names(
         match node:
             case Alias(name):
                 if name in renames:
-                    return Alias(renames[name])
+                    return HardAlias(renames[name])
                 new_name = spc.freshen("A")
                 renames[name] = new_name
-                return Alias(new_name)
+                return HardAlias(new_name)
             case Field(name):
                 if name in renames:
                     return Field(renames[name])

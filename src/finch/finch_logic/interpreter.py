@@ -75,11 +75,6 @@ class LogicMachine:
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Table(Alias() as var, idxs):
-                val = self.bindings.get(var, None)
-                if val is None:
-                    raise ValueError(f"undefined tensor alias {node}")
-                return TableValue(val, idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
             case Table(FusedAlias(alias, _), idxs):
@@ -87,13 +82,20 @@ class LogicMachine:
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return TableValue(val, idxs)
-            case Alias() as var:
-                val = self.bindings.get(var, None)
+            case Table(Alias() as var, idxs):
+                key = var.alias if isinstance(var, FusedAlias) else var
+                val = self.bindings.get(key, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return TableValue(val, idxs)
+            case FusedAlias(alias, _):
+                val = self.bindings.get(alias, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return val
-            case FusedAlias(alias, _):
-                val = self.bindings.get(alias, None)
+            case Alias() as var:
+                key = var.alias if isinstance(var, FusedAlias) else var
+                val = self.bindings.get(key, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return val

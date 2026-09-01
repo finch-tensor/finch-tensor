@@ -19,6 +19,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicNode,
@@ -723,7 +724,7 @@ class AnnotatedQuery:
             stats_cache[query_expr.arg],
         )
 
-        query = Query(Alias(gensym("A")), query_expr)
+        query = Query(HardAlias(gensym("A")), query_expr)
         return query, replace_path, removal_paths, reduced_idxs
 
     def reduce_idx(self, reduce_idx: Field, do_condense: bool = False) -> Query:
@@ -759,7 +760,7 @@ class AnnotatedQuery:
             reduce_idx
         )
 
-        alias_expr = Alias(query.lhs.name)
+        alias_expr = HardAlias(query.lhs.name)
         stats_cache = self.cache_point
         insert_statistics(
             self.stats_factory,
