@@ -97,6 +97,25 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def idx_type(self):
         return self.buffer_factory(self.dimension_type)
 
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        pos_size = np.dtype(self.position_type.dtype).itemsize
+        size_ptr = (num_pos + 1) * pos_size
+        reduce_fields = fields[lvl + 1 :]
+        if reduce_fields:
+            reduced_stats = stats_factory.aggregate(
+                ffuncs.or_, False, reduce_fields, stats
+            )
+        else:
+            reduced_stats = stats
+        nnz_prefix = reduced_stats.estimate_non_fill_values()
+        size_idx = nnz_prefix * pos_size
+
+        return (
+            size_ptr
+            + size_idx
+            + self.lvl_t.level_cost(fields, stats, stats_factory, nnz_prefix, lvl + 1)
+        )
+
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "SparseListLevel":
         """
         Creates an instance of SparseListLevel.

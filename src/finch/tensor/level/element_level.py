@@ -42,6 +42,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
             fields.append(("fill", self.element_type))
         return fields
 
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
+        # no inner level
+        # cost = num_pos * bytes per value
+        elem_type = getattr(self.element_type, "dtype", np.float64)
+        val_size = np.dtype(elem_type).itemsize
+        return num_pos * val_size
+
     def __post_init__(self):
         # Ensure element_type is an FType
         if self.element_type is None:

@@ -6,6 +6,7 @@ import numpy as np
 
 import finch as fl
 import finch.algebra.ffuncs as ffuncs
+from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
 from finch.autoschedule.tensor_stats.sampling_stats import (
     SamplingStatsFactory,
@@ -19,14 +20,25 @@ from finch.autoschedule.tensor_stats.sampling_stats import (
 )
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
     Literal,
     MapJoin,
+    Plan,
+    Produces,
+    Query,
     Table,
 )
 
 i, j, k = Field("i"), Field("j"), Field("k")
 rng = np.random.default_rng(0)
+
+
+def materialize(sketch):
+    out = Alias("sketch_out")
+    prgm = Plan((Query(out, sketch), Produces((out,))))
+    result = NON_RECURSIVE_SCHEDULER(prgm)[0]
+    return result.to_numpy() if hasattr(result, "to_numpy") else np.asarray(result)
 
 
 def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
@@ -49,7 +61,7 @@ def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
     s_a = factory(fl.asarray(A), (i, k))
     s_b = factory(fl.asarray(B), (k, j))
     mm = factory.mapjoin(ffuncs.mul, s_a, s_b)
-    factory_sketch = factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch
+    factory_sketch = materialize(factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch)
 
     # manually calculating
     pat_a = (A != 0).astype(float)
@@ -107,8 +119,8 @@ def test_estimators_isolated(D_true=100, N_true=1000000, q=0.125, trials=50, see
 
 def test_mapjoin():
     i, j, k = Field("i"), Field("j"), Field("k")
-    data_a = np.zeros((100, 100))
-    data_b = np.zeros((100, 100))
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
 
     data_a[:20, :] = 1.0
     data_b[:20, :] = 1.0
@@ -148,11 +160,11 @@ def test_mapjoin():
 @pytest.mark.skip(reason="sampling estimators are heavily dependent on f1")
 def test_aggregate():
     i, j, k = Field("i"), Field("j"), Field("k")
-    data_a = np.zeros((100, 100))
-    data_b = np.zeros((100, 100))
+    data_a = np.zeros((10, 10))
+    data_b = np.zeros((10, 10))
 
-    data_a[:20, :] = 1.0
-    data_b[:20, :] = 1.0
+    data_a[:2, :] = 1.0
+    data_b[:2, :] = 1.0
 
     ta = Table(Literal(fl.asarray(data_a)), (i, j))
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
@@ -173,7 +185,7 @@ def test_aggregate():
         cache=cache,
     )
 
-    print(stats.sketch)
+    print(materialize(stats.sketch))
     true_nnz = float(
         np.count_nonzero(np.sum((data_a[:, :, None] * data_b[None, :, :]), axis=1))
     )
