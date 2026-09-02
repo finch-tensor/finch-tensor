@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, cast, overload
+from typing import Any, overload
 
 import numpy as np
 
@@ -13,10 +13,10 @@ from ..algebra import (
     ImmutableStructFType,
     TensorFType,
     ffuncs,
+    ftype,
     register_property,
 )
 from ..algebra.algebra import FinchOperator
-from ..algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from ..finch_assembly import (
     AssemblyInterpreter,
     AssemblyLibrary,
@@ -25,7 +25,6 @@ from ..finch_assembly import (
 )
 from ..finch_notation import NotationLoader
 from ..symbolic import Context, PostOrderDFS, PostWalk, Rewrite, ScopedDict
-from ..util import qual_str
 from ..util.logging import LOG_ASSEMBLY
 from .stages import NotationLowerer
 
@@ -81,8 +80,11 @@ class FinchTensorFType(TensorFType, ABC):
 @dataclass(frozen=True)
 class Extent(FTyped):
     """
-    A class to represent the extent of a loop variable.
-    This is used to define the start and end values of a loop.
+    A class to represent the extent of a loop variable. This is used to define
+    the start and end values of a loop.
+
+    The extent is start-inclusive and end-exclusive, meaning that the loop variable
+    will take on values from start to end-1.
     """
 
     start: Any
@@ -99,9 +101,7 @@ class Extent(FTyped):
 
     @property
     def ftype(self):
-        return ExtentFType(
-            np.asarray(self.start).dtype.type, np.asarray(self.end).dtype.type
-        )
+        return ExtentFType(ftype(self.start), ftype(self.end))
 
 
 class _MakeExtent(FinchOperator):
@@ -112,15 +112,7 @@ class _MakeExtent(FinchOperator):
         return Extent(start, end)
 
     def return_type(self, start: FType, end: FType) -> FType:  # type: ignore[override]
-        if isinstance(start, FDTypeNumpy):
-            start = start.dtype
-        elif isinstance(start, FDTypeBuiltin):
-            start = start.type
-        if isinstance(end, FDTypeNumpy):
-            end = end.dtype
-        elif isinstance(end, FDTypeBuiltin):
-            end = end.type
-        return ExtentFType(cast(type, start), cast(type, end))  # type: ignore[abstract]
+        return ExtentFType(start, end)  # type: ignore[abstract]
 
 
 make_extent = _MakeExtent()
@@ -128,7 +120,7 @@ make_extent = _MakeExtent()
 
 def dimension(tns, mode: int) -> Extent:
     end = tns.shape[mode]
-    return Extent(type(end)(0), end)
+    return Extent(ftype(end)(0), end)
 
 
 def numba_lower_dimension(ctx, tns, mode: int) -> str:
@@ -139,7 +131,7 @@ register_property(
     dimension,
     "__call__",
     "return_type",
-    lambda op, x, y: ExtentFType(np.intp, np.intp),  # type: ignore[abstract]
+    lambda op, x, y: ExtentFType(ftype(np.intp), ftype(np.intp)),  # type: ignore[abstract]
 )
 
 
@@ -232,13 +224,11 @@ class SymbolicExtent(FTyped):
 
 @dataclass(eq=True, frozen=True)
 class ExtentFType(ImmutableStructFType):
-    start_t: type
-    end_t: type
+    start_t: FType
+    end_t: FType
 
     def __repr__(self):
-        return (
-            f"ExtentFType(start={qual_str(self.start_t)}, end={qual_str(self.end_t)})"
-        )
+        return f"ExtentFType(start={self.start_t}, end={self.end_t})"
 
     @classmethod
     def stack(cls, ext: Extent):
@@ -253,12 +243,6 @@ class ExtentFType(ImmutableStructFType):
         return [("start", self.start_t), ("end", self.end_t)]
 
     def from_fields(self, start, end) -> "Extent":
-        if not (isinstance(start, self.start_t) and isinstance(end, self.end_t)):
-            raise Exception(
-                "Incorrect types for Extent fields: "
-                f"start={type(start)} vs {self.start_t}, "
-                f"end={type(end)} vs {self.end_t}"
-            )
         return Extent(start, end)
 
     def __call__(self, *args):

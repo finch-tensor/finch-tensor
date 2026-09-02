@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from dataclasses import dataclass
 
 import numpy as np
@@ -55,7 +54,11 @@ class NumberedStatement(AssemblyStatement):
     sid: int
 
     def __str__(self) -> str:
-        return str(self.stmt)
+        return f"[{self.sid}] {str(self.stmt)}"
+
+    @property
+    def children(self):
+        return (self.stmt, self.sid)
 
 
 def assembly_build_cfg(

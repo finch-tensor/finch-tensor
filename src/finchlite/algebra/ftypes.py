@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import builtins
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -16,14 +15,28 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 
 
 class FType(ABC):
+    @abstractmethod
+    def __eq__(self, other): ...
 
     @abstractmethod
-    def __eq__(self, other):
-        ...
-    
+    def __hash__(self): ...
+
     @abstractmethod
-    def __hash__(self):
+    def __call__(self, val):
+        """
+        Perform type conversion or construction with the given value.
+
+        For numeric/scalar types, this converts the value to this type.
+        For composite types, this may construct an instance of this type.
+
+        Args:
+            val: The value to convert or use for construction
+
+        Returns:
+            The converted/constructed value
+        """
         ...
+
     def fisinstance(self, other):
         """
         Check if `other` is an instance of this ftype.
@@ -31,18 +44,10 @@ class FType(ABC):
         return ftype(other) == self
 
 
-
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
 
 
 class FDType(FType):
-    @abstractmethod
-    def __call__(self, other):
-        """
-        Create an instance of this ftype with the given value, attempt to cast
-        if necessary.
-        """
-
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -134,7 +139,7 @@ class FDTypeBuiltin(FDType):
 
     def __eq__(self, other):
         return isinstance(other, FDTypeBuiltin) and self.type == other.type
-    
+
     def __hash__(self):
         return hash(self.type)
 
@@ -158,7 +163,6 @@ str_ = _FDTypeBuiltinStr()
 
 
 class _FDTypeBuiltinNone(FDTypeBuiltin):
-
     @property
     def type(self):
         return type(None)
@@ -296,10 +300,9 @@ class FDTypeNumpy(FDType):
         """
         ...
 
-
     def __eq__(self, other):
         return isinstance(other, FDTypeNumpy) and self.dtype == other.dtype
-    
+
     def __hash__(self):
         return hash(self.dtype)
 
@@ -420,7 +423,6 @@ class _FDTypeInt32(FDTypeNumpyInteger, FDTypeReal):
 
 
 int32 = _FDTypeInt32()
-
 
 
 class _FDTypeInt64(FDTypeNumpyInteger, FDTypeReal):
@@ -585,6 +587,23 @@ class StructFType(FType, ABC):
     def __repr__(self):
         fields_str = ", ".join(f"{name}: {type_}" for name, type_ in self.struct_fields)
         return f"{self.struct_name}({fields_str})"
+
+    def __call__(self, *args, **kwargs):
+        """
+        Construct a struct instance from the given fields.
+
+        Can be called with positional arguments matching struct_fields order,
+        or keyword arguments matching field names.
+        """
+        if args and kwargs:
+            raise TypeError("Cannot use both positional and keyword arguments")
+        if args:
+            return self.from_fields(*args)
+        if kwargs:
+            # Convert kwargs to positional args in field order
+            field_values = [kwargs[name] for name, _ in self.struct_fields]
+            return self.from_fields(*field_values)
+        raise TypeError("__call__ requires at least one argument")
 
     @property
     @abstractmethod
@@ -782,6 +801,8 @@ def ftype(x) -> FType:
         return x
     if isinstance(x, FTyped):
         return x.ftype
+    if isinstance(x, np.dtype):
+        x = x.type
     if type(x) is builtins.bool or x is builtins.bool:
         return bool_
     if type(x) is builtins.int or x is builtins.int:

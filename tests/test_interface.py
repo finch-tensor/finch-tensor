@@ -6,6 +6,7 @@ import numpy as np
 
 import finchlite
 from finchlite import ffuncs
+from finchlite.algebra import ftype
 
 from .conftest import finch_assert_allclose, finch_assert_equal
 
@@ -77,9 +78,22 @@ class TestEagerTensorFType(finchlite.TensorFType):
     def __hash__(self):
         return hash(self.fmt)
 
-    def __call__(self, shape: tuple):
+    def construct(self, shape: tuple):
         return TestEagerTensor(
             np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
+        )
+
+    def __call__(self, val):
+        """
+        Convert a tensor to this test eager tensor type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            A TestEagerTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
 
     def from_numpy(self, arr):
@@ -1440,7 +1454,10 @@ def test_flatten(array_shape, expected_shape, wrapper):
 def test_tril(arr1: np.ndarray, arr2: np.ndarray, wrapper, op):
     # construct dense format
     fmt = finchlite.element(
-        arr1.dtype.type(0), arr1.dtype, np.intp, finchlite.NumpyBufferFType
+        arr1.dtype.type(0),
+        ftype(arr1.dtype),
+        ftype(np.intp),
+        finchlite.NumpyBufferFType,
     )
     for _ in range(arr1.ndim):
         fmt = finchlite.dense(fmt)

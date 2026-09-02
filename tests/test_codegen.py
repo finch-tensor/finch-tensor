@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 import ctypes
 import re
 import subprocess
@@ -311,23 +310,23 @@ def test_dot_product(compiler, buffer):
                 ),
                 asm.Block(
                     (
-                        asm.Assign(c, asm.Literal(np.float64(0.0))),
+                        asm.Assign(c, asm.L(np.float64(0.0))),
                         asm.Unpack(ab_slt, ab_v),
                         asm.Unpack(bb_slt, bb_v),
                         asm.ForLoop(
                             i,
-                            asm.Literal(np.int64(0)),
+                            asm.L(np.int64(0)),
                             asm.Length(ab_slt),
                             asm.Block(
                                 (
                                     asm.Assign(
                                         c,
                                         asm.Call(
-                                            asm.Literal(ffuncs.add),
+                                            asm.L(ffuncs.add),
                                             (
                                                 c,
                                                 asm.Call(
-                                                    asm.Literal(ffuncs.mul),
+                                                    asm.L(ffuncs.mul),
                                                     (
                                                         asm.Load(ab_slt, i),
                                                         asm.Load(bb_slt, i),
@@ -930,7 +929,9 @@ def test_np_numba_serialization(value, np_type):
             dimension_type=(ftypes.intp, ftypes.intp),
         ),
         lambda dtype: fiber_tensor(
-            dense(dense(element(dtype(0), dtype, np.intp, NumpyBufferFType)))
+            dense(
+                dense(element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType))
+            )
         ),
     ],
 )

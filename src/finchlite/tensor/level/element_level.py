@@ -18,8 +18,8 @@ class ElementLevelFields(NamedTuple):
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, ImmutableStructFType):
     fill_value: Any = None
-    element_type: type | FType | None = None
-    position_type: type | FType | None = None
+    element_type: FType | None = None
+    position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None
 
@@ -36,10 +36,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def __post_init__(self):
         # Ensure element_type is an FType
         if self.element_type is None:
-            assert self.fill_value is not None, "Must provide either element_type or fill_value."
+            assert self.fill_value is not None, (
+                "Must provide either element_type or fill_value."
+            )
             self.element_type = ftype(self.fill_value)
-        assert isinstance(self.element_type, FType), "element_type must be an instance of FType"
-        
+        assert isinstance(self.element_type, FType), (
+            "element_type must be an instance of FType"
+        )
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
@@ -48,7 +51,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         self.element_type = self.buffer_type.element_type
         self.fill_value = self.element_type(self.fill_value)
 
-    def __call__(self, shape, *, val=None):
+    def construct(self, shape, *, val=None):
         """
         Creates an instance of ElementLevel with the given ftype.
 
@@ -66,6 +69,19 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         return ElementLevel(self, val)
+
+    def __call__(self, val: Any) -> "ElementLevel":
+        """
+        Convert a level to this element level type.
+
+        Args:
+            val: A value to convert to this type.
+        Returns:
+            An ElementLevel instance of this type.
+        """
+        raise NotImplementedError(
+            f"Level conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"ElementLevelFType(fv={self.fill_value})"
@@ -103,9 +119,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         ctx.exec(asm.Unpack(buf_s, buf))
         return ElementLevelFields(buf_s)
 
-    def level_asm_repack(self, ctx, lvl_fields):
-        buf_s = self._get_buf_s(lvl_fields)
-        ctx.exec(asm.Repack(buf_s))
+    def level_asm_repack(self, ctx, lvl_fields: ElementLevelFields):
+        ctx.exec(asm.Repack(lvl_fields.buf_s))
 
     def level_lower_declare(self, ctx, lvl_fields, init, op, shape, pos):
         buf_s = self._get_buf_s(lvl_fields)
@@ -148,7 +163,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
-        return self(shape=shape, val=val)
+        return self.construct(shape, val=val)
 
 
 def element(

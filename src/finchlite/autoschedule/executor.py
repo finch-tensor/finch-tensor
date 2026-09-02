@@ -1,4 +1,3 @@
-# AI modified: 2026-04-08T22:22:21Z 84b3c0ad
 from collections import OrderedDict
 
 from finchlite.algebra.tensor import Tensor, TensorFType
@@ -110,7 +109,7 @@ class LogicExecutor(LogicEvaluator):
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
                 shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
-                bindings[var] = tns_ftype(shape)
+                bindings[var] = tns_ftype.construct(shape)
 
         args = list(bindings.values())
 

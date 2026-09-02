@@ -23,9 +23,22 @@ class NumPyFType(TensorFType):
     def shape_type(self) -> tuple[FType, ...]:
         return (intp,) * self._ndim
 
-    def __call__(self, shape: tuple) -> "NumPyWrapper":
+    def construct(self, shape: tuple) -> "NumPyWrapper":
         # creates a zero-filled tensor
         return NumPyWrapper(np.zeros(shape, dtype=self._dtype))
+
+    def __call__(self, val: "NumPyWrapper") -> "NumPyWrapper":
+        """
+        Convert a tensor to this numpy tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A NumPyWrapper instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __eq__(self, other):
         if not isinstance(other, NumPyFType):

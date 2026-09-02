@@ -75,7 +75,7 @@ class LazyTensorFType(TensorFType):
     def __hash__(self):
         return hash((self._fill_value, self._element_type, self._shape_type))
 
-    def __call__(self, shape: tuple) -> LazyTensor:
+    def construct(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
         ctx = EffectBlob()
         expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
@@ -86,6 +86,19 @@ class LazyTensorFType(TensorFType):
             shape=shape,
             fill_value=self._fill_value,
             element_type=self._element_type,
+        )
+
+    def __call__(self, val: Any) -> LazyTensor:
+        """
+        Convert a tensor to this tensor type.
+
+        Args:
+            val: A tensor to convert to this tensor type.
+        Returns:
+            A LazyTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
 
     @property
@@ -191,7 +204,7 @@ class LazyTensor(OverrideTensor):
         return LazyTensorFType(
             _fill_value=self._fill_value,
             _element_type=self._element_type,
-            _shape_type=tuple(type(dim) for dim in self._shape),
+            _shape_type=tuple(ftype(dim) for dim in self._shape),
         )
 
     @property
@@ -1298,8 +1311,21 @@ class WrapperTensorFType(TensorFType):
 
 @dataclass(frozen=True)
 class FillTensorFType(DefaultTensorFType):
-    def __call__(self, shape: tuple) -> FillTensor:
+    def construct(self, shape: tuple) -> FillTensor:
         return FillTensor(shape, self.fill_value)
+
+    def __call__(self, val: Any) -> FillTensor:
+        """
+        Convert a tensor to this fill tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FillTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
 
 class FillTensor(Tensor):
@@ -1340,7 +1366,7 @@ class FillTensor(Tensor):
         return FillTensorFType(
             self._fill_value,
             ftype(self._fill_value),
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
         )
 
 
@@ -1388,13 +1414,26 @@ class ConcatTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
-    def __call__(self, shape: tuple) -> ConcatTensor:
-        tns = self._child_formats[0](shape)
+    def __call__(self, val: Any) -> Any:
+        """
+        Convert a tensor to this concatenated tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A concatenated tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+    def construct(self, shape: tuple) -> ConcatTensor:
+        tns = self._child_formats[0].construct(shape)
         shape2 = tuple(
             dim if i != self.concat_axis else self._shape_type[i](0)
             for i, dim in enumerate(shape)
         )
-        tnss = (tns,) + tuple(fmt(shape2) for fmt in self._child_formats[1:])
+        tnss = (tns,) + tuple(fmt.construct(shape2) for fmt in self._child_formats[1:])
         return ConcatTensor(*tnss, axis=self.concat_axis)
 
 
@@ -1465,7 +1504,7 @@ class ConcatTensor(Tensor):
                 )
         return ConcatTensorFType(
             tuple(formats),
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
             self.concat_axis,
         )
 
@@ -1527,13 +1566,26 @@ class SplitDimsTensorFType(WrapperTensorFType):
         parent_shape_type = self._child_formats[0].shape_type
         shape_type_list = list(parent_shape_type)
         shape_type_list[self.split_axis : self.split_axis + 1] = [
-            type(dim) for dim in self.split_shape
+            ftype(dim) for dim in self.split_shape
         ]
         return tuple(shape_type_list)
 
-    def __call__(self, shape: tuple) -> SplitDimsTensor:
+    def construct(self, shape: tuple) -> SplitDimsTensor:
         raise NotImplementedError(
             "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
+
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this split dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A split dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
 
 
@@ -1633,9 +1685,22 @@ class CombineDimsTensorFType(WrapperTensorFType):
     def shape_type(self):
         return self._shape_type
 
-    def __call__(self, shape: tuple) -> SplitDimsTensor:
+    def construct(self, shape: tuple) -> SplitDimsTensor:
         raise NotImplementedError(
             "Cannot directly instantiate SplitDimsTensor from ftype"
+        )
+
+    def __call__(self, val: Any) -> SplitDimsTensor:
+        """
+        Convert a tensor to this combined dimensions tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A combined dimensions tensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
 
 
@@ -1720,7 +1785,7 @@ class CombineDimsTensor(Tensor):
         return CombineDimsTensorFType(
             (child_format,),
             self.axes,
-            tuple(type(dim) for dim in self.shape),
+            tuple(ftype(dim) for dim in self.shape),
         )
 
     @property

@@ -141,9 +141,9 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def __call__(self, shape):
+    def construct(self, shape, **kwargs):
         """
-        Construct level
+        Construct a level instance with the given shape.
         """
         ...
 
@@ -304,11 +304,24 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", np.bool_),
         ]
 
-    def __call__(self, shape: tuple[int, ...]):
+    def construct(self, shape: tuple[int, ...]):
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        return FiberTensor(self.lvl_t(shape=shape), self.position_type(0))
+        return FiberTensor(self.lvl_t.construct(shape=shape), self.position_type(0))
+
+    def __call__(self, val: Any) -> FiberTensor:
+        """
+        Convert a tensor to this fiber tensor type.
+
+        Args:
+            val: A tensor to convert to this type.
+        Returns:
+            A FiberTensor instance of this type.
+        """
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
 
     def __str__(self):
         return f"FiberTensorFType({self.lvl_t})"
