@@ -73,8 +73,24 @@ _JULIA_REDUCTION_OPS = {
     ffuncs.logical_or: "|",
 }
 _INFIX_OPS = {
-    "+", "*", "-", "/", "^", "==", "!=", "<", "<=", ">", ">=", "&", "|", "<<", ">>"
+    "+",
+    "*",
+    "-",
+    "/",
+    "^",
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "&",
+    "|",
+    "<<",
+    ">>",
 }
+
+
 class CompiledJLKernel:
     """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
     source text, with no Python-side values left to inject."""
