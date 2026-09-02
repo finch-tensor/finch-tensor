@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+import weakref
+from abc import ABC, ABCMeta, abstractmethod
+from dataclasses import dataclass, fields
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Self
 
@@ -45,7 +46,88 @@ Notes:
 """
 
 
-class Term:
+_ATOMIC_KEY_TYPES = frozenset({int, float, complex, bool, str, bytes, type(None)})
+
+_hash_cons_types: set[type] = set()
+
+
+def hash_key_value(val: Any) -> Any:
+    t = type(val)
+    if t in _hash_cons_types:
+        return id(val)
+    if t in _ATOMIC_KEY_TYPES:
+        return (t, val)
+    if t is tuple or t is list:
+        return tuple([hash_key_value(v) for v in val])
+    try:
+        hash(val)
+    except TypeError:
+        return (t, id(val))
+    return (t, val)
+
+
+class HashConsMeta(ABCMeta):
+    _intern_table: dict[Any, weakref.ref]
+
+    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+        obj = super().__call__(*args, **kwargs)
+        key = obj.__hash_key__()
+        table = cls._intern_table
+        wr = table.get(key)
+        if wr is not None:
+            cached = wr()
+            if cached is not None:
+                return cached
+
+        def remove(r: Any, table: dict = table, key: Any = key) -> None:
+            if table.get(key) is r:
+                del table[key]
+
+        new_ref = weakref.ref(obj, remove)
+        existing = table.setdefault(key, new_ref)
+        if existing is not new_ref:
+            cached = existing()
+            if cached is not None:
+                return cached
+            table[key] = new_ref
+        return obj
+
+
+class HashCons(metaclass=HashConsMeta):
+    """
+    A base class for interned ("hash consed") objects. Construction returns a
+    canonical instance for each distinct `__hash_key__`, so structurally equal
+    objects are the same object and equality is identity (object's default
+    id-based __eq__ and __hash__).
+    """
+
+    def __init_subclass__(cls, **kwargs: Any):
+        super().__init_subclass__(**kwargs)
+        cls._intern_table = {}
+        _hash_cons_types.add(cls)
+
+    @abstractmethod
+    def __hash_key__(self) -> Any:
+        """Return a hashable key of the fields which identify this object."""
+        ...
+
+    __eq__ = object.__eq__
+    __hash__ = object.__hash__
+
+    def __copy__(self) -> Self:
+        return self
+
+    def __deepcopy__(self, memo: dict) -> Self:
+        return self
+
+    def __reduce__(self):
+        return (
+            type(self),
+            tuple(getattr(self, f.name) for f in fields(self)),  # type: ignore[arg-type]
+        )
+
+
+class Term(HashCons):
     @abstractmethod
     def head(self) -> Any:
         """Return the head type of the S-expression."""
@@ -62,13 +144,21 @@ class Term:
         ...
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=False)
 class TermTree(Term, ABC):
     @property
     @abstractmethod
     def children(self) -> list[Term]:
         """Return the children (AKA tail) of the S-expression."""
         ...
+
+    def __hash_key__(self) -> Any:
+        return tuple(
+            [
+                id(c) if type(c) in _hash_cons_types else hash_key_value(c)
+                for c in self.children
+            ]
+        )
 
 
 class LiteralTerm(Term, ABC):
@@ -77,6 +167,9 @@ class LiteralTerm(Term, ABC):
     """
 
     val: Any
+
+    def __hash_key__(self) -> Any:
+        return hash_key_value(self.val)
 
 
 class CallTerm(TermTree, ABC):

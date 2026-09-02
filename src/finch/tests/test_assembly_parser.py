@@ -42,13 +42,16 @@ def test_for_loop():
                     Variable(name="lvl_ptr", type=np.ndarray),
                     Call(
                         op=Literal(val=ffuncs.add),
-                        args=(Variable(name="pos_stop", type=int), Literal(val=1)),
+                        args=(
+                            Variable(name="pos_stop", type=int),
+                            Literal(val=np.intp(1)),
+                        ),
                     ),
                 ),
             ),
             ForLoop(
                 var=Variable(name="p", type=int),
-                start=Literal(val=0),
+                start=Literal(val=np.intp(0)),
                 end=Variable(name="pos_stop", type=int),
                 body=Block(
                     bodies=(
@@ -56,7 +59,10 @@ def test_for_loop():
                             buffer=Variable(name="lvl_ptr", type=np.ndarray),
                             index=Call(
                                 op=Literal(val=ffuncs.add),
-                                args=(Variable(name="p", type=int), Literal(val=1)),
+                                args=(
+                                    Variable(name="p", type=int),
+                                    Literal(val=np.intp(1)),
+                                ),
                             ),
                             value=Call(
                                 op=Literal(val=ffuncs.add),
@@ -69,7 +75,7 @@ def test_for_loop():
                                             op=Literal(val=ffuncs.add),
                                             args=(
                                                 Variable(name="p", type=int),
-                                                Literal(val=1),
+                                                Literal(val=np.intp(1)),
                                             ),
                                         ),
                                     ),
@@ -94,7 +100,7 @@ def test_for_loop():
                             buffer=Variable(name="lvl_ptr", type=np.ndarray),
                             index=Variable(name="pos_stop", type=int),
                         ),
-                        Literal(val=1),
+                        Literal(val=np.intp(1)),
                     ),
                 ),
             ),
