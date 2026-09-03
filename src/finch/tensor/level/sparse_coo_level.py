@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 
@@ -97,11 +97,11 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
 
     @property
     def coo_shape_tuple_type(self) -> TupleFType:
-        return cast(TupleFType, self.coo_shape_type)
+        return self.coo_shape_type
 
     @property
     def tbl_tuple_type(self) -> TupleFType:
-        return cast(TupleFType, self.tbl_type)
+        return self.tbl_type
 
     @property
     def buffer_type(self) -> FType:
@@ -167,10 +167,10 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -179,7 +179,7 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
 

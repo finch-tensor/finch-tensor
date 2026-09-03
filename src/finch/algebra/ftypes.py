@@ -3,9 +3,12 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from finch.algebra.tensor import Tensor, TensorFType
 
 """
 This module defines the FType class and related classes for representing data
@@ -17,10 +20,10 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 
 class FType(ABC):
     @abstractmethod
-    def __eq__(self, other): ...
+    def __eq__(self, other) -> builtins.bool: ...
 
     @abstractmethod
-    def __hash__(self): ...
+    def __hash__(self) -> builtins.int: ...
 
     @abstractmethod
     def __call__(self, val: Any) -> Any:
@@ -38,7 +41,7 @@ class FType(ABC):
         """
         ...
 
-    def fisinstance(self, other):
+    def fisinstance(self, other) -> builtins.bool:
         """
         Check if `other` is an instance of this ftype.
         """
@@ -306,7 +309,7 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         The finfo object for this float type.
         """
-        return _finfo(self, np.float64.finfo)
+        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
 
     @property
     def type_min(self):
@@ -330,15 +333,15 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
 
     @property
     def finfo(self):
-        return _finfo(self, np.float64.finfo)
+        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
 
     @property
     def type_min(self):
-        return self.type(complex(-np.inf, -np.inf))
+        return self.type(builtins.complex(-np.inf, -np.inf))
 
     @property
     def type_max(self):
-        return self.type(complex(np.inf, np.inf))
+        return self.type(builtins.complex(np.inf, np.inf))
 
 
 complex_ = _FDTypeBuiltinComplex()
@@ -961,7 +964,26 @@ def isdtype(dtype, kind):
     return builtins.bool(dtype == ftype(kind))
 
 
-def ftype(x) -> FType:
+FT = TypeVar("FT", bound=FType)
+
+
+@overload
+def ftype(x: Tensor) -> TensorFType: ...
+
+
+@overload
+def ftype(x: tuple) -> TupleFType: ...
+
+
+@overload
+def ftype(x: FT) -> FT: ...
+
+
+@overload
+def ftype(x: Any) -> FType: ...
+
+
+def ftype(x: Any) -> FType:
     """Return the corresponding FType for a given object.  Recognizes numpy,
     Python builtins, and Python tuples.  Sometimes recognizes types.
     Override .ftype to customize the ftype of an object.

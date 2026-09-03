@@ -93,7 +93,8 @@ def add_output_orders(prgm: LogicStatement) -> LogicStatement:
     for stmt in PostOrderDFS(prgm):
         match stmt:
             case Produces(vars):
-                produced_aliases.update(vars)
+                assert all(isinstance(v, Alias) for v in vars)
+                produced_aliases.update(vars)  # ty: ignore[invalid-argument-type]
 
     def rule_1(node: LogicNode) -> LogicNode | None:
         match node:

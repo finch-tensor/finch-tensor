@@ -1,3 +1,7 @@
+import itertools
+from collections.abc import Sequence
+from typing import TypeVar
+
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -23,9 +27,9 @@ from .loop_ordering import AbstractLoopOrderer
 
 def connected_loop_candidates(
     prefix: tuple[Field, ...],
-    remaining: list[Field],
-    conjunct_stats: list[TensorStats],
-    disjunct_stats: list[TensorStats],
+    remaining: Sequence[Field],
+    conjunct_stats: Sequence[TensorStats],
+    disjunct_stats: Sequence[TensorStats],
 ) -> list[Field]:
     """Fields in ``remaining`` that share a tensor with ``prefix``.
 
@@ -34,6 +38,10 @@ def connected_loop_candidates(
     set here would make the chosen loop order depend on ``Field`` hash values,
     which vary between processes.
     """
+    if not isinstance(conjunct_stats, list):
+        conjunct_stats = list(conjunct_stats)
+    if not isinstance(disjunct_stats, list):
+        disjunct_stats = list(disjunct_stats)
     if not prefix:
         return list(remaining)
 
@@ -49,7 +57,7 @@ def connected_loop_candidates(
 
 
 def transpose_penalty(
-    input_stats: list[TensorStats],
+    input_stats: Sequence[TensorStats],
     prefix: tuple[Field, ...],
     charged: frozenset[int],
 ) -> float:
@@ -67,10 +75,13 @@ def transpose_penalty(
     )
 
 
+TS = TypeVar("TS", bound=TensorStats)
+
+
 def greedy_loop_order(
     expr: LogicExpression,
     stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_bindings: dict[Alias, TS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
     """Build a loop order one index at a time, appending the cheapest candidate.
@@ -85,14 +96,14 @@ def greedy_loop_order(
         return ()
 
     stats_bindings_2 = stats_bindings.copy()
-    cache: dict[object, TensorStats] = {}
+    cache: dict[object, TS] = {}
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
         expr, stats_factory, stats_bindings_2, cache
     )
 
     # Deduplicated by identity, matching how loop_order_cost charges reformats.
-    input_stats: list[TensorStats] = []
-    for stat in conjunct_stats + disjunct_stats:
+    input_stats: list[TS] = []
+    for stat in itertools.chain(conjunct_stats, disjunct_stats):
         if not any(stat is seen for seen in input_stats):
             input_stats.append(stat)
 

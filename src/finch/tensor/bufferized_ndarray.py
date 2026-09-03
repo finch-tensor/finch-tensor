@@ -1,3 +1,5 @@
+import functools
+import operator
 from dataclasses import replace
 from typing import Any, cast
 
@@ -29,16 +31,16 @@ from .scalar import Scalar
 from .traits import Dense, FormatProperty
 
 
-def _get_default_strides(size: tuple[int, ...]) -> tuple[int, ...]:
-    return tuple(np.cumprod((1,) + size[::-1]).astype(int))[-2::-1]
+def _get_default_strides(size: tuple[np.intp, ...]) -> tuple[np.intp, ...]:
+    return tuple(np.cumprod((1,) + size[::-1]).astype(np.intp))[-2::-1]
 
 
 class BufferizedNDArray(OverrideTensor):
     def __init__(
         self,
         val: NumpyBuffer,
-        shape: tuple[np.integer, ...],
-        strides: tuple[np.integer, ...],
+        shape: tuple[np.intp, ...],
+        strides: tuple[np.intp, ...],
         fill_value: Any = 0,
         device=None,
     ):
@@ -416,10 +418,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return [Dense(tuple(range(n + 1))) for n in range(self.ndim)]
 
-    def lower_dim(self, ctx, obj, r):
+    def lower_dim(self, ctx, obj, i):
         return asm.GetAttr(
             asm.GetAttr(obj.root, asm.Literal("shape")),
-            asm.Literal(f"element_{r}"),
+            asm.Literal(f"element_{i}"),
         )
 
     def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
@@ -463,16 +465,15 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         )
         return acc_t.unfurl(ctx, view, ext, mode, proto)
 
-    def reshape(self, arr, new_shape: tuple):
-        new_shape = tuple(np.intp(s) for s in new_shape)
-        old_size = int(np.prod(arr.shape, dtype=np.intp)) if arr.shape else 1
-        new_size = int(np.prod(new_shape, dtype=np.intp)) if new_shape else 1
+    def reshape(self, arr: Tensor, new_shape: tuple[np.intp, ...]):
+        old_size = functools.reduce(operator.mul, arr.shape, np.intp(1))
+        new_size = functools.reduce(operator.mul, new_shape, np.intp(1))
         if old_size != new_size:
             raise ValueError(
                 f"Cannot reshape array of size {old_size} into shape {new_shape}"
             )
-        new_strides = tuple(np.intp(s) for s in _get_default_strides(new_shape))
-        default_strides = tuple(np.intp(s) for s in _get_default_strides(arr.shape))
+        new_strides = _get_default_strides(new_shape)
+        default_strides = _get_default_strides(arr.shape)
         if arr.strides == default_strides:
             return BufferizedNDArray(
                 arr.val,
@@ -647,10 +648,10 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
     def level_format_properties(self) -> list[FormatProperty]:
         return [Dense(tuple(range(n + 1))) for n in range(self.ndim)]
 
-    def lower_dim(self, ctx, obj, r):
+    def lower_dim(self, ctx, obj, i):
         return asm.GetAttr(
             asm.GetAttr(obj.root, asm.Literal("shape")),
-            asm.Literal(f"element_{self.nind + r}"),
+            asm.Literal(f"element_{self.nind + i}"),
         )
 
     def lower_declare(self, ctx, tns, init, op, shape):
@@ -668,33 +669,33 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             "BufferizedNDArrayAccessorFType does not support lower_thaw."
         )
 
-    def lower_unwrap(self, ctx, tns):
+    def lower_unwrap(self, ctx, obj):
         return asm.Load(
-            asm.GetAttr(tns.root, asm.Literal("val")),
-            tns.pos,
+            asm.GetAttr(obj.root, asm.Literal("val")),
+            obj.pos,
         )
 
     def lower_increment(
         self,
         ctx: AssemblyContext,
-        tns: ntn.Fiber,
+        obj: ntn.Fiber,
         op: ntn.Literal,
         val: ntn.NotationExpression,
     ):
-        buf = asm.GetAttr(tns.root, asm.Literal("val"))
-        op_e, pos_e, val_e = ctx(op), tns.pos, ctx(val)
+        buf = asm.GetAttr(obj.root, asm.Literal("val"))
+        op_e, pos_e, val_e = ctx(op), obj.pos, ctx(val)
         increment_call = asm.Call(
             op_e,
             (asm.Load(buf, pos_e), val_e),
         )
         if (
-            tns.dirty
+            obj.dirty
             and op.val is ffuncs.overwrite
             # init_write only helps the simplifier elide stores of a Known fill
-            and not is_dynamic(tns.type.fill_value)
+            and not is_dynamic(obj.type.fill_value)
         ):
             increment_call = asm.Call(
-                asm.Literal(ffuncs.init_write(tns.type.fill_value)),
+                asm.Literal(ffuncs.init_write(obj.type.fill_value)),
                 (asm.Load(buf, pos_e), increment_call),
             )
 

@@ -97,21 +97,21 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         """
         Emit code to freeze `pos` previously assembled positions in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         """
         Emit code to thaw `pos` previously assembled positions in the level.
         """

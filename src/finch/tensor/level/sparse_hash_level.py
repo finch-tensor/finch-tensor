@@ -155,10 +155,10 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -167,7 +167,7 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def from_fields(

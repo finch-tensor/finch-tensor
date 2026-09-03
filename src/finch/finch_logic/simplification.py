@@ -24,7 +24,7 @@ def unwrap_literal(node: lgc.LogicNode) -> lgc.LogicNode | None:
     return None
 
 
-def simplify_logic(prgm: lgc.LogicStatement) -> lgc.LogicStatement:
+def simplify_logic(prgm: lgc.LogicNode) -> lgc.LogicNode:
     """
     Algebraically simplify a logic program.
 

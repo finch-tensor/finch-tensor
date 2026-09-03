@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from typing import TypeVar
 
 import numpy as np
 
@@ -115,6 +116,9 @@ def total_tree_cost(
     )
 
 
+TS = TypeVar("TS", bound=TensorStats)
+
+
 class SmartFormatter(LogicFormatter):
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__(loader)
@@ -131,11 +135,11 @@ class SmartFormatter(LogicFormatter):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
+        stats: dict[lgc.Alias, TS],
         stats_factory: StatsFactory,
     ):
         bindings = bindings.copy()
-        stats_bindings: OrderedDict[lgc.Alias, TensorStats] = OrderedDict(stats)
+        stats_bindings: OrderedDict[lgc.Alias, TS] = OrderedDict(stats)
         stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}

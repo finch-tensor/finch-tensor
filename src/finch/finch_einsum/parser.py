@@ -286,7 +286,8 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             "start",
             [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])],
         ):
-            arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
+            assert isinstance(expr_node, Tree)
+            arg = _parse_einop_expr(expr_node)
             idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
             op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
             return ein.Einsum(
@@ -297,7 +298,8 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             )
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
-            arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
+            assert isinstance(expr_node, Tree)
+            arg = _parse_einop_expr(expr_node)
             op = ein.Literal(ffuncs.overwrite)
             return ein.Einsum(
                 op,

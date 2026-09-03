@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from finch.algebra import (
     AbstractFill,
@@ -165,7 +165,7 @@ class LogicTree(LogicNode, TermTree, ABC):
         ...
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=LogicNode)
 
 
 class LogicExpression(LogicNode):
@@ -378,7 +378,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicNode, NamedTerm, Generic[T]):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -485,7 +485,7 @@ class MapJoin(LogicTree, LogicExpression, CallTerm):
         args: The arguments to map the function across.
     """
 
-    op: Literal
+    op: Literal | Field
     args: tuple[LogicExpression, ...]
 
     @property
@@ -734,7 +734,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[Alias, ...]
+    args: tuple[Alias | MapJoin, ...]
 
     @property
     def children(self):
