@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 
 import finch as ft
+import finch.finch_notation as ntn
 from finch import (
     DenseLevel,
     ElementLevel,
@@ -13,6 +14,7 @@ from finch import (
     SparseCOOLevel,
     SparseListLevel,
     element,
+    ffuncs,
     ftype,
 )
 from finch.autoschedule import (
@@ -300,3 +302,41 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
 
     csr_result = _to_csr(result)
     np.testing.assert_allclose(csr_result.to_scipy().toarray(), expected)
+
+
+@pytest.mark.parametrize(
+    "op, args, expected_code, expected",
+    [
+        (ffuncs.add, (1, 2, 3), "(1 + 2 + 3)", 6),
+        (ffuncs.and_, (7, 3, 1), "(7 & 3 & 1)", 1),
+        (ffuncs.or_, (4, 2, 1), "(4 | 2 | 1)", 7),
+        (
+            ffuncs.logical_and,
+            (True, True, False),
+            "Finch.and(true,true,false)",
+            False,
+        ),
+        (
+            ffuncs.logical_or,
+            (False, False, True),
+            "Finch.or(false,false,true)",
+            True,
+        ),
+    ],
+)
+def test_compile_julia_evaluates_variadic_and_or_call(
+    op, args, expected_code, expected
+):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLGenerator
+
+    call = ntn.Call(
+        ntn.Literal(op),
+        tuple(ntn.Literal(arg) for arg in args),
+    )
+    generated = FinchJLGenerator().generate_julia(call)
+    assert generated == expected_code
+
+    from finch.compile_jl.julia import jl
+
+    assert jl.seval(generated) == expected
