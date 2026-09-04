@@ -146,10 +146,11 @@ class _FusedFunctionParser:
                 return fzd.Literal(value)
             case ast.Name(id=name):
                 return self._parse_name(name)
-            case ast.Call(func=func, args=args, keywords=[]):
+            case ast.Call(func=func, args=args, keywords=keywords):
                 return fzd.Call(
                     self._parse_expr(func),
                     tuple(self._parse_expr(arg) for arg in args),
+                    tuple(self._parse_keyword(kw) for kw in keywords),
                 )
             case ast.BinOp(left=left, op=op, right=right):
                 return fzd.BinaryOp(
@@ -239,6 +240,13 @@ class _FusedFunctionParser:
         for value in values[1:]:
             expr = fzd.BinaryOp(expr, op_lit, self._parse_expr(value))
         return expr
+
+    def _parse_keyword(self, kw: ast.keyword) -> fzd.Keyword:
+        match kw.arg:
+            case None:
+                raise self._unsupported(kw, "Unsupported **kwargs unpacking in call")
+            case str(name):
+                return fzd.Keyword(name, self._parse_expr(kw.value))
 
     def _unsupported(self, node: ast.AST, message: str) -> ValueError:
         lineno = getattr(node, "lineno", "?")
@@ -382,7 +390,7 @@ class _FusedToPythonAST:
                 return ast.Name(id=name, ctx=ast.Load())
             case fzd.Literal(val=value):
                 return self._literal_to_expr(value)
-            case fzd.Call(fn=fn, args=args):
+            case fzd.Call(fn=fn, args=args, kwargs=kwargs):
                 if isinstance(fn, fzd.Literal) and fn.val is tuple:
                     return ast.Tuple(
                         elts=[self._expr_to_ast(arg) for arg in args],
@@ -391,7 +399,10 @@ class _FusedToPythonAST:
                 return ast.Call(
                     func=self._expr_to_ast(fn),
                     args=[self._expr_to_ast(arg) for arg in args],
-                    keywords=[],
+                    keywords=[
+                        ast.keyword(arg=kw.arg, value=self._expr_to_ast(kw.value))
+                        for kw in kwargs
+                    ],
                 )
             case fzd.Compare(left=left, op=fzd.Literal(val=op_fn), right=right):
                 cmp_op = _REV_CMP_OPS.get(op_fn)

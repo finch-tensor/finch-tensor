@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
@@ -178,6 +179,11 @@ def _julia_literal(value: Any) -> str:
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
         return "true" if value else "false"
+    if isinstance(value, (float, np.floating)):
+        if math.isinf(value):
+            return "-Inf" if value < 0 else "Inf"
+        if math.isnan(value):
+            return "NaN"
     return str(value)
 
 
