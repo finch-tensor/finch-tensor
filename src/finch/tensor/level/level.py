@@ -1,9 +1,12 @@
 from abc import ABC, abstractmethod
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
 
+from finch import finch_assembly as asm
 from finch.algebra import (
+    AbstractFill,
     FType,
     FTyped,
 )
@@ -13,6 +16,17 @@ class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
+
+    def with_fill(self, fill_value: Any) -> "LevelFType":
+        """Rebuild this level ftype with the leaf fill value replaced."""
+        # Level ftypes are dataclasses with a `_lvl_t` child field; non-
+        # dataclass levels must override.
+        return replace(self, _lvl_t=self.lvl_t.with_fill(fill_value))  # type: ignore[type-var]
+
+    def lower_fill(self, lvl_expr):
+        """Assembly expression reading the runtime fill from the leaf level's
+        fill field, descending from this level's struct expression."""
+        return self.lvl_t.lower_fill(asm.GetAttr(lvl_expr, asm.Literal("lvl")))
 
     @property
     @abstractmethod
@@ -24,9 +38,10 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self):
+    def fill_value(self) -> AbstractFill:
         """
-        Fill value of the fibers, or `None` if dynamic.
+        Fill value of the fibers, and whether kernels may specialize on it.
+        Use `.value` for the value itself.
         """
         ...
 
@@ -71,6 +86,13 @@ class LevelFType(FType, ABC):
     def lvl_t(self):
         """
         Get the nested level.
+        """
+        ...
+
+    @abstractmethod
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        """
+        Defines cost for a level
         """
         ...
 
@@ -179,7 +201,9 @@ class Level(FTyped, ABC):
 
     @property
     def fill_value(self):
-        return self.ftype.fill_value
+        """The fill value itself; see `self.ftype.fill_value` for
+        dynamic vs static."""
+        return self.ftype.fill_value.value
 
     @property
     def element_type(self):

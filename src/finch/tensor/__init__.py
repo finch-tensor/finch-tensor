@@ -45,11 +45,12 @@ from .patterns import (
     RollTensor,
     UpperTriangleTensor,
 )
-from .scalar import Scalar, ScalarFType
+from .scalar import ConstantScalar, Scalar, ScalarFType
 
 __all__ = [
     "BufferizedNDArray",
     "BufferizedNDArrayFType",
+    "ConstantScalar",
     "DenseLevel",
     "DenseLevelFType",
     "ElementLevel",

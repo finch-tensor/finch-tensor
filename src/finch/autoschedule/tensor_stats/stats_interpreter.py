@@ -127,7 +127,7 @@ class StatsMachine:
                 return self.stats_factory(Scalar(val), ())
 
             case Reorder():
-                return self(node.arg)
+                return self.stats_factory.reorder(self(node.arg), node.idxs)
 
             case Relabel():
                 base = self(node.arg)

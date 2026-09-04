@@ -17,7 +17,7 @@ def jit(f, /, ctx=None):
         `get_default_scheduler()`.
 
     Returns:
-    - A transformed function that inserts lazy and compute statements to do tracing
+    - A transformed function that inserts defer and compute statements to do tracing
        and optimization.
 
 
@@ -29,14 +29,14 @@ def jit(f, /, ctx=None):
             D = D + C
         return D
 
-    In this example, `my_function` will be transformed to include lazy and compute
+    In this example, `my_function` will be transformed to include defer and compute
     statements, allowing it to be optimized and executed efficiently when called.
     def opt_my_function(A, B, C):
-        A, B = lazy(A), lazy(B)
+        A, B = defer(A), defer(B)
         D = A @ B
         D = compute(D)
         while some_condition(D):
-            C = lazy(C)
+            C = defer(C)
             D = D + C
             D = compute(D)
         D = compute(D)

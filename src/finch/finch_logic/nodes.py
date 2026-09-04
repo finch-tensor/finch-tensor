@@ -6,15 +6,27 @@ from dataclasses import dataclass
 from typing import Any, Self, TypeVar
 
 from finch.algebra import (
+    AbstractFill,
     FType,
     FTyped,
+    apply_fill,
+    as_fill,
     ffuncs,
     fixpoint_type,
     ftype,
+    is_dynamic,
     promote_type,
     return_type,
 )
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.symbolic import (
+    CallTerm,
+    Context,
+    LiteralTerm,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_repr,
+)
 from finch.util import qual_str
 
 
@@ -42,11 +54,18 @@ def reduce_element_type(op, z: Any, t: FType) -> FType:
     return fixpoint_type(op, z, t)
 
 
-def merge_fill_value(op, *args):
-    return op(*args)
+def merge_fill_value(op, *args) -> AbstractFill:
+    return apply_fill(op, *args)
 
 
-def reduce_fill_value(op, z, t):
+def reduce_fill_value(op, z, t) -> AbstractFill:
+    # `z` arrives from the IR, so it is a raw value or a Dynamic sentinel;
+    # normalize it, or fills would be compared against raw values downstream.
+    z = as_fill(z)
+    # An overwrite reduction's background is the argument's background when
+    # the init is not compile-time data.
+    if is_dynamic(z) and op is ffuncs.overwrite:
+        return t
     return z
 
 
@@ -203,7 +222,7 @@ class LogicExpression(LogicNode):
         """Returns element type of the node."""
         return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
-    def fill_value(self, bindings: dict[Alias, Any]) -> Any:
+    def fill_value(self, bindings: dict[Alias, AbstractFill]) -> AbstractFill:
         """Returns fill value of the node."""
         return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
@@ -260,14 +279,16 @@ class LogicStatement(LogicNode):
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
 
-    def infer_fill_value(self, bindings: dict[Alias, Any]) -> dict[Alias, Any]:
+    def infer_fill_value(
+        self, bindings: dict[Alias, AbstractFill]
+    ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicExpression):
+class Literal(LogicExpression, LiteralTerm):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -282,12 +303,14 @@ class Literal(LogicExpression):
 
     def __hash__(self):
         try:
-            return hash(self.val)
+            return hash((type(self.val), self.val))
         except TypeError:
             return hash(id(self.val))
 
     def __eq__(self, value):
         if not isinstance(value, Literal):
+            return False
+        if type(self.val) is not type(value.val):
             return False
         # For consistency with __hash__, we fall back to pointer equality
         # when the value is unhashable
@@ -450,7 +473,7 @@ class Table(LogicTree, LogicExpression):
 
 
 @dataclass(eq=True, frozen=True)
-class MapJoin(LogicTree, LogicExpression):
+class MapJoin(LogicTree, LogicExpression, CallTerm):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
     Dimensions which are not present are broadcasted. Dimensions which are
@@ -689,7 +712,10 @@ class Query(LogicTree, LogicStatement):
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         if self.lhs in bindings:
-            if self.rhs.valmap(f, g, bindings) != bindings[self.lhs]:
+            val = self.rhs.valmap(f, g, bindings)
+            prev = bindings[self.lhs]
+            # A dynamic value is compatible with any value of its dtype.
+            if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(
                     f"Cannot rebind alias {self.lhs} to a different values"
                 )

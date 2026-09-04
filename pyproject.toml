@@ -1,7 +1,7 @@
 [project]
 name = "finch-tensor"
 description = ""
-version = "0.6.0"
+version = "0.7.0"
 readme = "README.md"
 authors = [{name = "Willow Ahrens", email = "willow.marie.ahrens@gmail.com"}]
 requires-python = '>=3.11,<4'
@@ -108,19 +108,27 @@ finch-tensor.path = "."
 compile = "python -c 'import finch'"
 
 [tool.pixi.feature.test.tasks.test]
-cmd = "python -m pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
 args = [
+    { arg = "pre_commit_skip", default = "" },
     { arg = "njobs", default = "logical" },
 ]
 depends-on = [
     { task = "compile", environment = "test" },
-    "type-check",
+    { task = "pre-commit", environment = "pre-commit", args = ["{{ pre_commit_skip }}"] },
+    { task = "type-check", environment = "test", args = [] },
     { task = "test-array-api", args = ["{{ njobs }}"] },
+    { task = "test-only", args = ["{{ njobs }}"] },
+]
+
+[tool.pixi.feature.test.tasks.test-only]
+cmd = "pytest -m 'not c_backend and not mlir_backend' -n {{ njobs }}"
+args = [
+    { arg = "njobs", default = "logical" },
 ]
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-c]
-cmd = "python -m pytest -m c_backend -n {{ njobs }}"
+cmd = "pytest -m c_backend -n {{ njobs }}"
 args = [
     { arg = "njobs", default = "0" },
 ]
@@ -131,7 +139,7 @@ default-environment = "test-c"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "python -m pytest -m mlir_backend -n {{ njobs }}"
+cmd = "pytest -m mlir_backend -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-mlir"}]
 default-environment = "test-mlir"
 
@@ -139,7 +147,7 @@ default-environment = "test-mlir"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "python -m pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
+cmd = "pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -218,7 +226,13 @@ pre-commit = "*"
 
 [tool.pixi.feature.pre-commit.tasks]
 pre-commit-install = "pre-commit install"
-pre-commit = "pre-commit run -a"
+
+[tool.pixi.feature.pre-commit.tasks.pre-commit]
+args = [
+    { arg = "skip", default = "" },
+]
+env = { "SKIP" = "{{ skip }}" }
+cmd = "pre-commit run -a"
 
 
 [tool.ruff]
@@ -256,3 +270,25 @@ exclude = [
     "src/finch/tests/reference",
 ]
 files = ["src"]
+
+[tool.pytest]
+addopts = [
+    "--doctest-modules",
+    "--doctest-ignore-import-errors",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-report=term",
+    "--cov=finch",
+    "--cov-config=.coveragerc",
+    "--junitxml=junit/test-results.xml",
+    "--ignore-glob=src/finch/tests/reference/*",
+]
+markers = [
+    "c_backend: tests that exercise the C backend (require a native C compiler)",
+    "mlir_backend: tests that exercise the MLIR backend (require MLIR Python bindings)",
+    "slow: tests that are slow (not recommended for CI)",
+]
+testpaths = ["src"]
+junit_family = "xunit2"
+strict = true

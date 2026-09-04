@@ -102,7 +102,9 @@ def test_greedy_orderer_multi_query_plan():
     fa, fb, fc = (fl.asarray(x) for x in (a, b, c))
 
     with fl.with_default_scheduler(greedy_scheduler()):
-        result = fl.compute(fl.matmul(fl.matmul(fl.lazy(fa), fl.lazy(fb)), fl.lazy(fc)))
+        result = fl.compute(
+            fl.matmul(fl.matmul(fl.defer(fa), fl.defer(fb)), fl.defer(fc))
+        )
 
     assert np.allclose(np.asarray(result), a @ b @ c)
 
@@ -115,11 +117,11 @@ def test_greedy_orderer_matches_reference_results():
     scheduler = greedy_scheduler()
 
     cases = [
-        (lambda: fl.matmul(fl.lazy(fa), fl.lazy(fb)), a @ b),
-        (lambda: fl.sum(fl.multiply(fl.lazy(fa), fl.lazy(fa))), (a * a).sum()),
-        (lambda: fl.sum(fl.matmul(fl.lazy(fa), fl.lazy(fb)), axis=0), (a @ b).sum(0)),
+        (lambda: fl.matmul(fl.defer(fa), fl.defer(fb)), a @ b),
+        (lambda: fl.sum(fl.multiply(fl.defer(fa), fl.defer(fa))), (a * a).sum()),
+        (lambda: fl.sum(fl.matmul(fl.defer(fa), fl.defer(fb)), axis=0), (a @ b).sum(0)),
         (
-            lambda: fl.multiply(fl.permute_dims(fl.lazy(fa), (1, 0)), fl.lazy(fd)),
+            lambda: fl.multiply(fl.permute_dims(fl.defer(fa), (1, 0)), fl.defer(fd)),
             a.T * d,
         ),
     ]
