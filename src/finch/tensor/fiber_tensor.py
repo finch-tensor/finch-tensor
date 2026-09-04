@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
+    AbstractFill,
     DynamicFillError,
     ImmutableStructFType,
     TupleFType,
@@ -51,6 +52,9 @@ class FiberTensor(OverrideTensor):
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
         return FiberTensorFType(self.lvl.ftype, self._device)
+
+    def with_fill(self, fill_value: AbstractFill) -> FiberTensor:
+        return replace(self, lvl=self.lvl.with_fill(fill_value))
 
     @property
     def shape(self):

@@ -198,6 +198,13 @@ class Level(FTyped, ABC):
         dynamic vs static."""
         return self.ftype.fill_value.value
 
+    def with_fill(self, fill_value: AbstractFill) -> "Level":
+        """Rebuild this level with the leaf fill value replaced."""
+        # Mirrors `LevelFType.with_fill` on the value side: every level but
+        # the leaf is a dataclass wrapping a child in `lvl`, and the leaf --
+        # where the fill actually lives -- overrides this.
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
     @property
     def element_type(self):
         return self.ftype.element_type

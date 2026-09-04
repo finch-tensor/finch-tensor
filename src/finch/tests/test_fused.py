@@ -8,7 +8,14 @@ import pytest
 import numpy as np
 
 import finch
-from finch.algebra import is_dynamic, is_specializable_value
+from finch.algebra import (
+    DynamicFill,
+    StaticFill,
+    ftype,
+    is_dynamic,
+    is_specializable_value,
+)
+from finch.algebra.tensor import Tensor
 from finch.autoschedule import (
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
@@ -444,15 +451,12 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
-def test_maybedefer_demotes_constant_scalars():
-    """A constant crossing a block boundary becomes a runtime Scalar."""
+def test_maybedefer_defers_every_tensor():
+    """`maybedefer` makes no judgement about fills -- it only defers tensors."""
     A = asarray(np.arange(3.0))
-    (lazy_A, demoted, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
+    (lazy_A, lazy_c, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
     assert isinstance(lazy_A, LazyTensor)
-    # Demoted, not deferred: `defer` would bind a 0-d value as a table, and
-    # `elementwise` only inlines a scalar it receives directly.
-    assert type(demoted) is Scalar
-    assert demoted.val == 2.0
+    assert isinstance(lazy_c, LazyTensor)
     assert plain == 2.0
 
 
@@ -467,6 +471,71 @@ def test_constant_scalar_still_inlines_at_a_use_site():
     assert Literal(2.0) in queries[-1].rhs.arg.args
 
 
+@pytest.mark.parametrize("fill", [0.0, 1.0, math.inf, 2.0, 1.5])
+def test_compute_passes_a_non_lazy_argument_through_untouched(fill):
+    """`compute` only re-marks what it computes; an argument is not its business."""
+    out = finch.compute(ConstantScalar(fill))
+    assert out is not None
+    assert out.val == fill
+    assert not is_dynamic(out.ftype.fill_value)
+
+
+@pytest.mark.parametrize(
+    ("addend", "stays_static"), [(0.0, True), (math.inf, True), (2.0, False)]
+)
+def test_compute_keeps_only_specializable_tensor_fills(addend, stays_static):
+    """The same rule governs tensors, whose fills also key the kernel cache."""
+    x = asarray(np.arange(3.0))
+    out = finch.compute(finch.defer(x) + ConstantScalar(addend))
+    assert is_dynamic(out.ftype.fill_value) is not stays_static
+
+
+def test_with_fill_re_marks_without_touching_the_data():
+    """`with_fill` installs the given fill and leaves the data alone."""
+    x = asarray(np.arange(3.0))
+    assert not is_dynamic(x.ftype.fill_value)
+
+    demoted = x.with_fill(x.ftype.fill_value.as_dynamic())
+    assert is_dynamic(demoted.ftype.fill_value)
+    assert demoted.ftype.fill_value.value == x.ftype.fill_value.value
+    np.testing.assert_array_equal(np.asarray(demoted), np.asarray(x))
+
+    # The argument carries the marking, so the same call installs a static fill
+    # -- and a different value -- when that is what a caller wants.
+    restated = demoted.with_fill(StaticFill(np.float64(7.0)))
+    assert not is_dynamic(restated.ftype.fill_value)
+    assert restated.ftype.fill_value.value == 7.0
+    np.testing.assert_array_equal(np.asarray(restated), np.asarray(x))
+
+
+def test_with_fill_mirrors_the_ftype_side():
+    """The tensor and its ftype expose the same operation under the same name."""
+    x = asarray(np.arange(3.0))
+    dynamic = x.ftype.fill_value.as_dynamic()
+    # Value side and type side agree on the ftype they produce.
+    assert x.with_fill(dynamic).ftype == x.ftype.with_fill(dynamic)
+
+
+def test_with_fill_reports_a_fill_a_format_cannot_express():
+    """A ConstantScalar's fill is its value, so a mismatched static fill fails."""
+    s = Scalar(5.0)
+    assert isinstance(s.with_fill(StaticFill(5.0)), ConstantScalar)
+    with pytest.raises(NotImplementedError, match="cannot take the static fill"):
+        s.with_fill(StaticFill(3.0))
+
+
+def test_with_fill_is_unimplemented_by_default():
+    """A format that cannot re-express its fill says so rather than lying."""
+
+    class _Unreplaceable(Scalar):
+        @property
+        def ftype(self):
+            return ScalarFType(ftype(self.val), StaticFill(self._fill_value))
+
+    with pytest.raises(NotImplementedError):
+        Tensor.with_fill(_Unreplaceable(2.0), DynamicFill(2.0))
+
+
 class _CollectBindings(LogicCapture):
     """A LogicCapture that keeps the bindings of every lowering, not just the last."""
 
@@ -479,12 +548,13 @@ class _CollectBindings(LogicCapture):
         return super().lower(prgm, bindings, stats, stats_factory)
 
 
-def test_jit_constant_scalar_argument_is_demoted():
-    """A ConstantScalar argument is computed correctly, but as a runtime value.
+def test_jit_constant_scalar_argument_is_demoted_after_the_first_compute():
+    """A ConstantScalar argument specializes once, then becomes a runtime value.
 
-    `maybedefer` cannot tell a constant the caller passed in from the seed of a
-    loop-carried counter, so it demotes both. The value is bound as a scalar
-    tensor with a dynamic fill, which every value of that dtype shares.
+    The constant the caller passed in reaches the entry lowering intact, so that
+    kernel compiles against the value. Crossing `compute` ends its compile-time
+    life -- 2.0 is not a value any operator's identity or annihilator law can
+    fire against -- so the loop body compiles against a dynamic fill instead.
     """
 
     @jit
@@ -504,13 +574,18 @@ def test_jit_constant_scalar_argument_is_demoted():
         result = opt_fn(asarray(arr), ConstantScalar(2.0), 2)
     finch_assert_allclose(result, arr + 4.0)
     scalars = [
-        t
+        [t for t in bindings.values() if isinstance(t, ScalarFType)]
         for bindings in capture.all_bindings
-        for t in bindings.values()
-        if isinstance(t, ScalarFType)
     ]
-    assert scalars
-    assert all(is_dynamic(t.fill_value) for t in scalars)
+    first, rest = scalars[0], scalars[1:]
+    # The caller asked for specialization by constructing a ConstantScalar, and
+    # gets it: the entry lowering compiles against the value itself.
+    assert [t.fill_value.value for t in first] == [2.0]
+    assert not any(is_dynamic(t.fill_value) for t in first)
+    # Past the first compute the value is a runtime one, so the loop body
+    # compiles once however many trips it runs.
+    assert any(rest)
+    assert all(is_dynamic(t.fill_value) for lowering in rest for t in lowering)
 
 
 def _literal_values(node):
@@ -620,9 +695,9 @@ def test_jit_constant_folded_in_a_loop_does_not_grow_the_kernel_cache(trip_count
         finch_assert_allclose(result, want)
         counts.append(len(executor.cached_kernels))
 
-    # Flat, not linear: the largest trip count must compile no more than the
-    # smallest, once the loop body has been seen once.
-    assert counts[-1] == counts[1], counts
+    # Flat, not linear: once the loop body has been compiled the cache stops
+    # growing, however many more trips are added.
+    assert counts[-1] == counts[-2] == counts[len(counts) // 2], counts
 
 
 def test_jit_scalar_loop():
