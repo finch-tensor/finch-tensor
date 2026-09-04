@@ -27,25 +27,8 @@ def connected_loop_candidates(
     conjunct_stats: list[TensorStats],
     disjunct_stats: list[TensorStats],
 ) -> list[Field]:
-    """Fields in ``remaining`` that share a tensor with ``prefix``.
-
-    ``remaining`` is kept ordered, and the result preserves that order, so that
-    ties in the greedy cost comparison always break the same way. Iterating a
-    set here would make the chosen loop order depend on ``Field`` hash values,
-    which vary between processes.
-    """
-    if not prefix:
-        return list(remaining)
-
-    prefix_set = set(prefix)
-    connected: set[Field] = set()
-    for stat in conjunct_stats + disjunct_stats:
-        index_set = set(stat.index_order)
-        if index_set & prefix_set:
-            connected |= index_set
-
-    candidates = [field for field in remaining if field in connected]
-    return candidates if candidates else list(remaining)
+    """All fields still available for the next loop index."""
+    return list(remaining)
 
 
 def transpose_penalty(
