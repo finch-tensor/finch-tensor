@@ -3,7 +3,6 @@ from typing import cast
 from finch.interface import compute, defer
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
-from finch.tensor.scalar import ConstantScalar, Scalar
 
 from .cfg_builder import (
     NumberedStatement,
