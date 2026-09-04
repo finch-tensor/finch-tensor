@@ -1,6 +1,5 @@
 """
-Julia backend CodSpeed benchmark: Bellman-Ford shortest paths kernel with
-auto active-set semiring relaxation.
+Julia backend CodSpeed benchmark: Bellman-Ford shortest paths kernel.
 
 Run: ``pixi run --environment=benchmark-julia pytest --codspeed
 benchmarks/test_julia_bellman_ford.py``
