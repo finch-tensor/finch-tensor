@@ -210,7 +210,9 @@ class BFSLoopOrderer(AbstractLoopOrderer):
                         output_idxs,
                     )
                     new_queries.append(Query(lhs, aggregate_2))
-                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
                     idxs_2 = loop_order_bfs(
                         arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
                     )
@@ -259,7 +261,9 @@ class DFSLoopOrderer(AbstractLoopOrderer):
                         output_idxs,
                     )
                     new_queries.append(Query(lhs, aggregate_2))
-                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
                     idxs_2 = loop_order_dfs(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )
@@ -308,7 +312,9 @@ class BruteForceLoopOrderer(AbstractLoopOrderer):
                         output_idxs,
                     )
                     new_queries.append(Query(lhs, aggregate_2))
-                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                case Query(
+                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
+                ):
                     idxs_2 = loop_order_brute_force(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )
