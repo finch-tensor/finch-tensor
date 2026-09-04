@@ -1,3 +1,5 @@
+import itertools
+
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -146,99 +148,30 @@ def loop_order_dfs(
     return best_order
 
 
-def set_bfs_loop_order(
-    plan: Plan,
+def loop_order_brute_force(
+    expr: LogicExpression,
     stats_factory: StatsFactory,
-    stats: dict[Alias, TensorStats],
-    *,
-    k: int | None = None,
-    output_fields: dict[Alias, tuple[Field, ...]] | None = None,
-) -> Plan:
-    if output_fields is None:
-        output_fields = {}
-    stats_bindings = dict(stats)
-    cache: dict[object, TensorStats] = {}
+    stats_bindings: dict[Alias, TensorStats],
+    output_vars: tuple[Field, ...] | None = None,
+) -> tuple[Field, ...]:
+    """Pick the loop order with the lowest ``loop_order_cost`` over all permutations.
 
-    new_queries = []
-    for query in plan.bodies[:-1]:
-        match query:
-            case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-                idxs_2 = loop_order_bfs(
-                    arg, stats_factory, stats_bindings, rhs.fields(), k=k
-                )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                aggregate_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, aggregate_2))
-            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
-                idxs_2 = loop_order_bfs(
-                    arg, stats_factory, stats_bindings, rhs.fields(), k=k
-                )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                reorder_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, reorder_2))
-            case Query(_, Reorder(Table(Alias(), _), _)) as q:
-                new_queries.append(q)
-            case _:
-                raise Exception(f"Invalid node: {query} in set_bfs_loop_order")
+    Ties keep the first permutation in ``expr.fields()`` order. Exponential in the
+    number of indices; intended as an oracle for small nests and benchmarks.
+    """
+    all_vars = tuple(dict.fromkeys(expr.fields()))
+    if not all_vars:
+        return ()
 
-        insert_statistics(
-            stats_factory, query, stats_bindings, replace=False, cache=cache
-        )
-
-    return Plan(tuple(new_queries + [plan.bodies[-1]]))
-
-
-def set_dfs_loop_order(
-    plan: Plan,
-    stats_factory: StatsFactory,
-    stats: dict[Alias, TensorStats],
-    *,
-    output_fields: dict[Alias, tuple[Field, ...]] | None = None,
-) -> Plan:
-    if output_fields is None:
-        output_fields = {}
-    stats_bindings = dict(stats)
-    cache: dict[object, TensorStats] = {}
-
-    new_queries = []
-    for query in plan.bodies[:-1]:
-        match query:
-            case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-                idxs_2 = loop_order_dfs(
-                    arg, stats_factory, stats_bindings, rhs.fields()
-                )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                aggregate_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, aggregate_2))
-            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
-                idxs_2 = loop_order_dfs(
-                    arg, stats_factory, stats_bindings, rhs.fields()
-                )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                reorder_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, reorder_2))
-            case Query(_, Reorder(Table(Alias(), _), _)) as q:
-                new_queries.append(q)
-            case _:
-                raise Exception(f"Invalid node: {query} in set_dfs_loop_order")
-
-        insert_statistics(
-            stats_factory, query, stats_bindings, replace=False, cache=cache
-        )
-
-    return Plan(tuple(new_queries + [plan.bodies[-1]]))
+    best_order = all_vars
+    best_cost = loop_order_cost(
+        expr, best_order, stats_factory, stats_bindings, output_vars
+    )
+    for order in itertools.permutations(all_vars):
+        cost = loop_order_cost(expr, order, stats_factory, stats_bindings, output_vars)
+        if cost < best_cost:
+            best_order, best_cost = order, cost
+    return best_order
 
 
 class BFSLoopOrderer(AbstractLoopOrderer):
@@ -259,13 +192,44 @@ class BFSLoopOrderer(AbstractLoopOrderer):
         *,
         output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        return set_bfs_loop_order(
-            prgm,
-            stats_factory,
-            stats,
-            k=self.k,
-            output_fields=output_fields,
-        )
+        if output_fields is None:
+            output_fields = {}
+        stats_bindings = dict(stats)
+        cache: dict[object, TensorStats] = {}
+
+        new_queries = []
+        for query in prgm.bodies[:-1]:
+            match query:
+                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                    idxs_2 = loop_order_bfs(
+                        arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    aggregate_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, aggregate_2))
+                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                    idxs_2 = loop_order_bfs(
+                        arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    reorder_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, reorder_2))
+                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                    new_queries.append(q)
+                case _:
+                    raise Exception(f"Invalid node: {query} in BFSLoopOrderer")
+
+            insert_statistics(
+                stats_factory, query, stats_bindings, replace=False, cache=cache
+            )
+
+        return Plan(tuple(new_queries + [prgm.bodies[-1]]))
 
 
 class DFSLoopOrderer(AbstractLoopOrderer):
@@ -277,6 +241,90 @@ class DFSLoopOrderer(AbstractLoopOrderer):
         *,
         output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        return set_dfs_loop_order(
-            prgm, stats_factory, stats, output_fields=output_fields
-        )
+        if output_fields is None:
+            output_fields = {}
+        stats_bindings = dict(stats)
+        cache: dict[object, TensorStats] = {}
+
+        new_queries = []
+        for query in prgm.bodies[:-1]:
+            match query:
+                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                    idxs_2 = loop_order_dfs(
+                        arg, stats_factory, stats_bindings, rhs.fields()
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    aggregate_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, aggregate_2))
+                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                    idxs_2 = loop_order_dfs(
+                        arg, stats_factory, stats_bindings, rhs.fields()
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    reorder_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, reorder_2))
+                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                    new_queries.append(q)
+                case _:
+                    raise Exception(f"Invalid node: {query} in DFSLoopOrderer")
+
+            insert_statistics(
+                stats_factory, query, stats_bindings, replace=False, cache=cache
+            )
+
+        return Plan(tuple(new_queries + [prgm.bodies[-1]]))
+
+
+class BruteForceLoopOrderer(AbstractLoopOrderer):
+    def set_loop_orders(
+        self,
+        prgm: Plan,
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+        *,
+        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+    ) -> Plan:
+        if output_fields is None:
+            output_fields = {}
+        stats_bindings = dict(stats)
+        cache: dict[object, TensorStats] = {}
+
+        new_queries = []
+        for query in prgm.bodies[:-1]:
+            match query:
+                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                    idxs_2 = loop_order_brute_force(
+                        arg, stats_factory, stats_bindings, rhs.fields()
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    aggregate_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, aggregate_2))
+                case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                    idxs_2 = loop_order_brute_force(
+                        arg, stats_factory, stats_bindings, rhs.fields()
+                    )
+                    output_idxs = output_fields.get(lhs, rhs.fields())
+                    reorder_2 = Reorder(
+                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
+                        output_idxs,
+                    )
+                    new_queries.append(Query(lhs, reorder_2))
+                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                    new_queries.append(q)
+                case _:
+                    raise Exception(f"Invalid node: {query} in BruteForceLoopOrderer")
+
+            insert_statistics(
+                stats_factory, query, stats_bindings, replace=False, cache=cache
+            )
+
+        return Plan(tuple(new_queries + [prgm.bodies[-1]]))
