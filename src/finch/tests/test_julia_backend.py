@@ -45,6 +45,8 @@ def _requires_julia_backend():
 
 def test_julia_element_ftype_can_customize_vector_lowering():
     _requires_julia_backend()
+    import juliacall as jc
+
     from finch.compile_jl import JuliaElementFType
     from finch.compile_jl import types as jl_dtypes
     from finch.compile_jl.julia import jl
@@ -66,6 +68,12 @@ def test_julia_element_ftype_can_customize_vector_lowering():
         def julia_value(self, value, *, offset: int = 0):
             left, right = value
             return int(left) + offset, int(right) + offset
+
+        def julia_vector(self, values, *, offset: int = 0):
+            return jc.convert(
+                jl.Vector[self.julia_type()],
+                [self.julia_value(value, offset=offset) for value in values],
+            )
 
     vec = jl_dtypes.to_jl_vector(PairFType(), [(0, 3), (4, 5)], offset=1)
 
