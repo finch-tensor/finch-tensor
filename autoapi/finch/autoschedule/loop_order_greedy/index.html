@@ -1164,6 +1164,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../loop_order_bnb/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    loop_order_bnb
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../loop_order_cost/" class="md-nav__link">
         
   
@@ -1455,10 +1483,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_17" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_18" >
         
           
-          <label class="md-nav__link" for="__nav_3_2_3_17" id="__nav_3_2_3_17_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_2_3_18" id="__nav_3_2_3_18_label" tabindex="0">
             
   
   
@@ -1476,8 +1504,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_17_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_3_17">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_18_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_3_18">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -5325,11 +5353,7 @@
 
     <div class="doc doc-contents ">
 
-        <p>Fields in <code>remaining</code> that share a tensor with <code>prefix</code>.</p>
-<p><code>remaining</code> is kept ordered, and the result preserves that order, so that
-ties in the greedy cost comparison always break the same way. Iterating a
-set here would make the chosen loop order depend on <code>Field</code> hash values,
-which vary between processes.</p>
+        <p>All fields still available for the next loop index.</p>
 
 
             <details class="mkdocstrings-source">
@@ -5341,48 +5365,14 @@ which vary between processes.</p>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">connected_loop_candidates</span><span class="p">(</span>
+<span class="normal">31</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">connected_loop_candidates</span><span class="p">(</span>
     <span class="n">prefix</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">remaining</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
     <span class="n">conjunct_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">disjunct_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fields in ``remaining`` that share a tensor with ``prefix``.</span>
-
-<span class="sd">    ``remaining`` is kept ordered, and the result preserves that order, so that</span>
-<span class="sd">    ties in the greedy cost comparison always break the same way. Iterating a</span>
-<span class="sd">    set here would make the chosen loop order depend on ``Field`` hash values,</span>
-<span class="sd">    which vary between processes.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
-        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">remaining</span><span class="p">)</span>
-
-    <span class="n">prefix_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
-    <span class="n">connected</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="k">for</span> <span class="n">stat</span> <span class="ow">in</span> <span class="n">conjunct_stats</span> <span class="o">+</span> <span class="n">disjunct_stats</span><span class="p">:</span>
-        <span class="n">index_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">stat</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">index_set</span> <span class="o">&amp;</span> <span class="n">prefix_set</span><span class="p">:</span>
-            <span class="n">connected</span> <span class="o">|=</span> <span class="n">index_set</span>
-
-    <span class="n">candidates</span> <span class="o">=</span> <span class="p">[</span><span class="n">field</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">remaining</span> <span class="k">if</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">connected</span><span class="p">]</span>
-    <span class="k">return</span> <span class="n">candidates</span> <span class="k">if</span> <span class="n">candidates</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">remaining</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;All fields still available for the next loop index.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">remaining</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5409,7 +5399,24 @@ the new index forces -- so the summed score of the returned order equals its
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/loop_order_greedy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
 <span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
@@ -5441,24 +5448,7 @@ the new index forces -- so the summed score of the returned order equals its
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">greedy_loop_order</span><span class="p">(</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">greedy_loop_order</span><span class="p">(</span>
     <span class="n">expr</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="n">stats_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
@@ -5535,23 +5525,23 @@ and the total over a full order matches <code>loop_order_cost</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/loop_order_greedy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transpose_penalty</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transpose_penalty</span><span class="p">(</span>
     <span class="n">input_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">prefix</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">charged</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
