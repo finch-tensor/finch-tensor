@@ -92,21 +92,55 @@ class Variable(FusedExpression, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Call(FusedTree, FusedExpression):
-    fn: FusedExpression
-    args: tuple[FusedExpression, ...]
+class Keyword(FusedTree, FusedNode):
+    arg: str
+    value: FusedExpression
 
     @property
     def children(self):
-        return [self.fn, *self.args]
+        return [Literal(self.arg), self.value]
 
     @classmethod
-    def from_children(cls, fn, *args):
-        return cls(fn, tuple(args))
+    def from_children(cls, arg, value):
+        match arg:
+            case Literal(val=name):
+                return cls(name, value)
+            case str(name):
+                return cls(name, value)
+            case _:
+                return cls(str(arg), value)
+
+    @property
+    def result_type(self):
+        return self.value.result_type
+
+
+@dataclass(eq=True, frozen=True)
+class Call(FusedTree, FusedExpression):
+    fn: FusedExpression
+    args: tuple[FusedExpression, ...] = ()
+    kwargs: tuple[Keyword, ...] = ()
+
+    @property
+    def children(self):
+        return [self.fn, *self.args, *self.kwargs]
+
+    @classmethod
+    def from_children(cls, fn, *args_and_kwargs):
+        args: list[FusedExpression] = []
+        kwargs: list[Keyword] = []
+        for child in args_and_kwargs:
+            match child:
+                case Keyword():
+                    kwargs.append(child)
+                case _:
+                    args.append(child)
+        return cls(fn, tuple(args), tuple(kwargs))
 
     @property
     def result_type(self):
         arg_types = [arg.result_type for arg in self.args]
+        arg_types.extend(kw.value.result_type for kw in self.kwargs)
         if isinstance(self.fn, Literal):
             return return_type(self.fn.val, *arg_types)
         return None
@@ -298,12 +332,15 @@ class FusedPrinterContext(Context):
                 return qual_str(value).replace("\n", "")
             case Variable(name, _):
                 return name
-            case Call(fn, args):
+            case Call(fn, args, kwargs):
                 if isinstance(fn, Literal) and fn.val is tuple:
                     if len(args) == 1:
                         return f"({self(args[0])},)"
                     return f"({', '.join(self(arg) for arg in args)})"
-                return f"{self(fn)}({', '.join(self(arg) for arg in args)})"
+                all_args = [self(arg) for arg in args] + [self(kw) for kw in kwargs]
+                return f"{self(fn)}({', '.join(all_args)})"
+            case Keyword(arg, value):
+                return f"{arg}={self(value)}"
             case Compare(left, op, right):
                 return f"({self(left)} {self(op)} {self(right)})"
             case BinaryOp(left, op, right):

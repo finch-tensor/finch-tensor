@@ -157,7 +157,7 @@ depends-on = [{task = "compile", environment = "benchmark"}]
 default-environment = "benchmark"
 
 [tool.pixi.feature.julia.tasks.benchmark-julia]
-cmd = "pytest --codspeed benchmarks/test_julia_boeing.py"
+cmd = "pytest --codspeed benchmarks/test_julia_boeing.py benchmarks/test_julia_bellman_ford.py"
 depends-on = [{task = "compile", environment = "benchmark-julia"}]
 default-environment = "benchmark-julia"
 
