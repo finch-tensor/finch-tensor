@@ -59,6 +59,12 @@ class JuliaElementFType(ABC):
 
     def julia_vector(self, values, *, offset: int = 0):
         jl = get_jl()
+        if isinstance(values, np.ndarray):
+            if offset != 0:
+                values = values + offset
+            if not values.flags["C_CONTIGUOUS"]:
+                values = np.ascontiguousarray(values)
+            return jl.wrap_numpy_ptr(values.ctypes.data, values.size, self.julia_type())
         return jc.convert(
             jl.Vector[self.julia_type()],
             [self.julia_value(value, offset=offset) for value in values],
@@ -160,7 +166,20 @@ def to_jl_vector(T, values, *, offset: int = 0):
     T = to_fl_dtype(T)
     if isinstance(T, JuliaElementFType):
         return T.julia_vector(values, offset=offset)
-    if isinstance(T, TupleFType) or offset:
+    if isinstance(T, TupleFType):
+        jl = get_jl()
+        return jc.convert(
+            jl.Vector[to_jl_type(T)],
+            [to_jl_value(T, value, offset=offset) for value in values],
+        )
+    if isinstance(values, np.ndarray):
+        if offset != 0:
+            values = values + offset
+        if not values.flags["C_CONTIGUOUS"]:
+            values = np.ascontiguousarray(values)
+        jl_type = _fl_dtype_to_jl()[T]
+        return get_jl().wrap_numpy_ptr(values.ctypes.data, values.size, jl_type)
+    if offset:
         jl = get_jl()
         return jc.convert(
             jl.Vector[to_jl_type(T)],
