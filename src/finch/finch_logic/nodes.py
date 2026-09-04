@@ -715,7 +715,7 @@ class Query(LogicTree, LogicStatement):
         key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
         if key in dim_bindings:
             for dim1, dim2 in zip(
-                self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
+                self.rhs.dimmap(op, dim_bindings), dim_bindings[key], strict=True
             ):
                 op(dim1, dim2)
         else:
