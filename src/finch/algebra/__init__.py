@@ -1,6 +1,5 @@
 from . import ffuncs
 from .algebra import (
-    SPECIALIZABLE_VALUES,
     FinchOperator,
     arity,
     cansplitpush,
@@ -97,7 +96,6 @@ from .tensor import (
 
 __all__ = [
     "CPU",
-    "SPECIALIZABLE_VALUES",
     "AbstractDevice",
     "AbstractFill",
     "AbstractTask",
