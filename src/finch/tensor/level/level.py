@@ -90,6 +90,13 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        """
+        Defines cost for a level
+        """
+        ...
+
+    @abstractmethod
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.

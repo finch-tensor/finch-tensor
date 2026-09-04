@@ -5,7 +5,6 @@ import numpy as np
 
 import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
-from finch.algebra.algebra import FinchOperator
 from finch.algebra.ffuncs import make_tuple, overwrite
 from finch.algebra.fill import (
     AbstractFill,
@@ -23,85 +22,73 @@ from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
-# Single source of truth for Python ffunc name → Julia operator/function name.
-# max/min use Finch's <<op>> semiring syntax; they appear only as Aggregate
-# (reduction) nodes, never as plain element-wise Calls, so this is safe.
-_JULIA_NAMES = {
+_JULIA_OPS = {
     # arithmetic
-    "add": "+",
-    "mul": "*",
-    "sub": "-",
-    "truediv": "/",
-    "divide": "/",
-    "floordiv": "div",
-    "mod": "mod",
-    "remainder": "mod",
-    "pow": "^",
-    "neg": "-",
-    "pos": "+",
+    ffuncs.add: "+",
+    ffuncs.mul: "*",
+    ffuncs.sub: "-",
+    ffuncs.truediv: "/",
+    ffuncs.floordiv: "div",
+    ffuncs.mod: "mod",
+    ffuncs.pow: "^",
+    ffuncs.neg: "-",
+    ffuncs.pos: "+",
     # comparisons
-    "eq": "==",
-    "equal": "==",
-    "ne": "!=",
-    "not_equal": "!=",
-    "lt": "<",
-    "less": "<",
-    "le": "<=",
-    "less_equal": "<=",
-    "gt": ">",
-    "greater": ">",
-    "ge": ">=",
-    "greater_equal": ">=",
+    ffuncs.eq: "==",
+    ffuncs.ne: "!=",
+    ffuncs.lt: "<",
+    ffuncs.le: "<=",
+    ffuncs.gt: ">",
+    ffuncs.ge: ">=",
     # bitwise / logical
-    "and_": "&",
-    "or_": "|",
-    "not_": "!",
-    "invert": "~",
-    "lshift": "<<",
-    "rshift": ">>",
-    "logical_and": "&",
-    "logical_or": "|",
-    "logical_not": "!",
-    "logical_xor": "xor",
-    # reductions (Finch <<op>>= semiring syntax)
-    "max": "<<max>>",
-    "min": "<<min>>",
+    ffuncs.and_: "&",
+    ffuncs.or_: "|",
+    ffuncs.not_: "!",
+    ffuncs.invert: "~",
+    ffuncs.lshift: "<<",
+    ffuncs.rshift: ">>",
+    ffuncs.logical_and: "Finch.and",
+    ffuncs.logical_or: "Finch.or",
+    ffuncs.logical_not: "!",
+    ffuncs.logical_xor: "xor",
     # misc
-    "divmod": "divrem",
-    "square": "abs2",
-    "reciprocal": "inv",
-    "atan2": "atan",
-    "conjugate": "conj",
-    "where": "ifelse",
-    "clip": "clamp",
-    "truth": "Bool",
+    ffuncs.divmod: "divrem",
+    ffuncs.square: "abs2",
+    ffuncs.reciprocal: "inv",
+    ffuncs.atan2: "atan",
+    ffuncs.conjugate: "conj",
+    ffuncs.where: "ifelse",
+    ffuncs.clip: "clamp",
+    ffuncs.truth: "Bool",
 }
 
-# Names of ffuncs that are valid as reduction operators.
-_REDUCTION_OPS = {
-    "add",
-    "mul",
-    "max",
-    "min",
-    "and_",
-    "or_",
-    "logical_and",
-    "logical_or",
+_JULIA_REDUCTION_OPS = {
+    ffuncs.add: "+",
+    ffuncs.mul: "*",
+    ffuncs.max: "<<max>>",
+    ffuncs.min: "<<min>>",
+    ffuncs.and_: "&",
+    ffuncs.or_: "|",
+    ffuncs.logical_and: "&",
+    ffuncs.logical_or: "|",
 }
-
-
-def _ops_for(names=None) -> dict:
-    """Build a FinchOperator → Julia-name map from _JULIA_NAMES."""
-    return {
-        obj: _JULIA_NAMES.get(n, n)
-        for n in (names if names is not None else dir(ffuncs))
-        if isinstance(obj := getattr(ffuncs, n, None), FinchOperator)
-    }
-
-
-ops_map = _ops_for()
-red_ops_map = _ops_for(_REDUCTION_OPS)
-ops_to_ignore = [make_tuple]
+_INFIX_OPS = {
+    "+",
+    "*",
+    "-",
+    "/",
+    "^",
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+    "&",
+    "|",
+    "<<",
+    ">>",
+}
 
 
 class CompiledJLKernel:
@@ -248,12 +235,13 @@ class FinchJLGenerator:
                 return f"{tns_str}[{idx_str}]"
 
             case ntn.Call(op, args):
-                arg_str = ",".join(
-                    [self.generate_julia(arg, nestingLvl) for arg in args]
-                )
-                if op.val in ops_to_ignore:
-                    return f"{arg_str}"
-                return f"{ops_map[op.val]}({arg_str})"
+                arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
+                if op.val == make_tuple:
+                    return ",".join(arg_strs)
+                julia_op = _JULIA_OPS.get(op.val, repr(op.val))
+                if len(arg_strs) > 1 and julia_op in _INFIX_OPS:
+                    return "(" + f" {julia_op} ".join(arg_strs) + ")"
+                return f"{julia_op}(" + ",".join(arg_strs) + ")"
 
             case ntn.If(cond, body):
                 tab_str = "    " * nestingLvl
@@ -278,7 +266,8 @@ class FinchJLGenerator:
                 if lhs.mode.op.val == overwrite:
                     stmt = f"{lhs_str} = {rhs_str}"
                 else:
-                    stmt = f"{lhs_str} {red_ops_map[lhs.mode.op.val]}= {rhs_str}"
+                    op = _JULIA_REDUCTION_OPS[lhs.mode.op.val]
+                    stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):

@@ -7,12 +7,83 @@ from typing import Any
 import numpy as np
 
 import finch as ft
-from finch.algebra import FinchOperator
-from finch.finch_logic import Field
-from finch.finch_logic.tensor_stats import StatsFactory
+from finch.algebra import FinchOperator, ffuncs
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    StatsFactory,
+    Table,
+)
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+
+
+def build_block_expr(
+    arr: Any,
+    fields: tuple[Field, ...],
+    starts: Mapping[Field, int],
+    ends: Mapping[Field, int],
+    coord: tuple[int, ...],
+):
+
+    data_table = Table(Literal(arr), fields)
+
+    select_tbls = []
+    for d, f in enumerate(fields):
+        start, end = starts[f], ends[f]
+        block_size = end - start
+        dim_size = arr.shape[d]
+        out_f = Field(f"out_{f.name}")
+        select = np.zeros((block_size, dim_size), dtype=np.float64)
+        select[np.arange(block_size), np.arange(start, end)] = 1
+        select_tbls.append(Table(Literal(ft.asarray(select)), (out_f, f)))
+
+    joined = MapJoin(Literal(ffuncs.mul), (data_table, *select_tbls))
+
+    return Aggregate(Literal(ffuncs.add), Literal(np.float64(0.0)), joined, fields)
+
+
+def get_blocks_subtensor(
+    arr: Any,
+    fields: tuple[Field, ...],
+    blocks_per_dim: Mapping[Field, int],
+) -> dict[tuple[int, ...], Any]:
+
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
+    fields = tuple(fields)
+    grid_dim = [blocks_per_dim[f] for f in fields]
+    base_block_sizes = {
+        f: arr.shape[d] / blocks_per_dim[f] for d, f in enumerate(fields)
+    }
+
+    blocks: dict[tuple[int, ...], Any] = {}
+
+    for coord in np.ndindex(*grid_dim):
+        starts, ends = {}, {}
+        for d, f in enumerate(fields):
+            start = math.floor(coord[d] * base_block_sizes[f])
+            end = int(
+                arr.shape[d]
+                if coord[d] == blocks_per_dim[f] - 1
+                else math.floor((coord[d] + 1) * base_block_sizes[f])
+            )
+            starts[f], ends[f] = start, end
+
+        expr = build_block_expr(arr, fields, starts, ends, coord)
+        out = Alias(f"block_{'_'.join(str(c) for c in coord)}")
+        prgm = Plan((Query(out, expr), Produces((out,))))
+        (result,) = NON_RECURSIVE_SCHEDULER(prgm)
+        blocks[coord] = result
+
+    return blocks
 
 
 class BlockedStatsFactory(
@@ -229,29 +300,14 @@ class BlockedStats(NumericStats):
         stats_factory: StatsFactory[NumericStats],
         data: Any,
     ) -> np.ndarray:
+
         grid_dim = [blocks_per_dim[idx] for idx in d.index_order]
         blocks_grid = np.empty(grid_dim, dtype=object)
 
-        base_block_sizes = {
-            idx: d.dim_sizes[idx] / blocks_per_dim[idx] for idx in d.index_order
-        }
+        blocks = get_blocks_subtensor(data, d.index_order, blocks_per_dim)
 
-        for coord in np.ndindex(*grid_dim):
-            block_dim_sizes = {}
-            slices = []
-            for i, idx in enumerate(d.index_order):
-                start = math.floor(coord[i] * base_block_sizes[idx])
-                end = int(
-                    d.dim_sizes[idx]
-                    if coord[i] == (blocks_per_dim[idx] - 1)
-                    else math.floor((coord[i] + 1) * base_block_sizes[idx])
-                )
-                block_dim_sizes[idx] = float(end - start)
-                slices.append(slice(start, end))
-
-            wrapped_arr = ft.asarray(data[tuple(slices)])
-            local_stats = stats_factory(wrapped_arr, d.index_order)
-            blocks_grid[coord] = local_stats
+        for coord, block in blocks.items():
+            blocks_grid[coord] = stats_factory(block, d.index_order)
 
         return blocks_grid
 
