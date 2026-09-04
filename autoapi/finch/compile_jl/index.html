@@ -5258,8 +5258,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
-<span class="normal">45</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
@@ -5278,7 +5277,8 @@
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -5335,12 +5335,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
-<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the Julia type used for elements with this ftype.</span>
@@ -5372,12 +5372,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
-<span class="normal">53</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert a Python value with this ftype into a Julia element value.</span>

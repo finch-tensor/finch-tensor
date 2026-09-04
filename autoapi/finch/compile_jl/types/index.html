@@ -5417,8 +5417,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
-<span class="normal">45</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
@@ -5437,7 +5436,8 @@
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -5494,12 +5494,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
-<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the Julia type used for elements with this ftype.</span>
@@ -5531,12 +5531,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
-<span class="normal">53</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Convert a Python value with this ftype into a Julia element value.</span>
@@ -5574,13 +5574,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">264</span>
 <span class="normal">265</span>
 <span class="normal">266</span>
 <span class="normal">267</span>
@@ -5595,7 +5589,13 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">276</span>
 <span class="normal">277</span>
 <span class="normal">278</span>
-<span class="normal">279</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Julia source text constructing a minimal instance of `ftype`, for</span>
 <span class="sd">    embedding directly in generated kernel source (see compiler.py).&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
@@ -5639,16 +5639,16 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
 <span class="normal">292</span>
 <span class="normal">293</span>
-<span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Julia type as source text (e.g. for a cache key). Cached per ftype.&quot;&quot;&quot;</span>
     <span class="n">cached</span> <span class="o">=</span> <span class="n">_TYPE_STR_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -5681,8 +5681,7 @@ type, or finch FType into the corresponding finch FType.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
-<span class="normal">101</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
@@ -5693,7 +5692,8 @@ type, or finch FType into the corresponding finch FType.</p>
 <span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
-<span class="normal">112</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_fl_dtype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="normal">112</span>
+<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_fl_dtype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a Julia DataType, numpy dtype/scalar type, Python builtin</span>
 <span class="sd">    type, or finch FType into the corresponding finch FType.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">FType</span><span class="p">):</span>
