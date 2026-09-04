@@ -49,9 +49,6 @@ class TensorFType(FType, ABC):
     def with_fill(self, fill_value: AbstractFill) -> TensorFType:
         """
         This ftype carrying `fill_value` as its fill.
-
-        The type-side mirror of `Tensor.with_fill`. Formats that cannot
-        re-express their fill raise `NotImplementedError`.
         """
         raise NotImplementedError(
             f"{type(self).__name__} cannot replace its fill value"

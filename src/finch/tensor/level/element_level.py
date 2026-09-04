@@ -243,7 +243,6 @@ class ElementLevel(Level):
         return self._format
 
     def with_fill(self, fill_value: AbstractFill) -> "ElementLevel":
-        # The leaf is where a fiber's fill lives, so the recursion stops here.
         return replace(self, _format=self._format.with_fill(fill_value))
 
     @property

@@ -146,9 +146,7 @@ class _FusedFunctionParser:
     def _parse_expr(self, expr: ast.expr) -> fzd.FusedExpression:
         match expr:
             case ast.Constant(value=value):
-                if is_specializable_value(value):
-                    return fzd.Literal(ConstantScalar(value))
-                return fzd.Literal(value)
+                return fzd.Literal(ConstantScalar(value))
             case ast.Name(id=name):
                 return self._parse_name(name)
             case ast.Call(func=func, args=args, keywords=[]):
