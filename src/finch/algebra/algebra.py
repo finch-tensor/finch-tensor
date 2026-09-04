@@ -1,5 +1,6 @@
 """Algebraic interfaces and helpers used by Finch operators."""
 
+import math
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -74,6 +75,27 @@ def is_identity(op: FinchOperator, val: Any) -> bool:
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
     ok, value = _specializable(val)
     return ok and op.is_annihilator(value)
+
+
+# The only scalar values any operator in `ffuncs` can specialize on: every
+# `is_identity`/`is_annihilator` there tests `== 0`, `== 1`, `== +-inf`, or
+# truthiness -- and `True`/`False` compare equal to `1`/`0`, so this tuple
+# covers those too. A constant outside this set tells the optimizer nothing
+# it can act on, while still costing a kernel-cache key of its own.
+SPECIALIZABLE_VALUES = (0, 1, math.inf, -math.inf)
+
+
+def is_specializable_value(val: Any) -> bool:
+    """
+    Whether treating `val` as a compile-time constant can pay for itself.
+
+    A constant is only worth specializing on if some operator's identity or
+    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.
+    """
+    try:
+        return any(bool(val == candidate) for candidate in SPECIALIZABLE_VALUES)
+    except (TypeError, ValueError):
+        return False
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:

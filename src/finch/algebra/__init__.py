@@ -1,5 +1,6 @@
 from . import ffuncs
 from .algebra import (
+    SPECIALIZABLE_VALUES,
     FinchOperator,
     arity,
     cansplitpush,
@@ -11,6 +12,7 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
+    is_specializable_value,
     repeat_operator,
     return_type,
 )
@@ -95,6 +97,7 @@ from .tensor import (
 
 __all__ = [
     "CPU",
+    "SPECIALIZABLE_VALUES",
     "AbstractDevice",
     "AbstractFill",
     "AbstractTask",
@@ -166,6 +169,7 @@ __all__ = [
     "is_identity",
     "is_on_device",
     "is_parent_device",
+    "is_specializable_value",
     "isdtype",
     "none_",
     "normalize_device",

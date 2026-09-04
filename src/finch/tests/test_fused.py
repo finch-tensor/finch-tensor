@@ -1,4 +1,5 @@
 import ast
+import math
 import operator
 import textwrap
 
@@ -7,6 +8,7 @@ import pytest
 import numpy as np
 
 import finch
+from finch.algebra import is_dynamic, is_specializable_value
 from finch.autoschedule import (
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
@@ -36,7 +38,7 @@ from finch.finch_logic import Literal, Query
 from finch.finch_notation.interpreter import NotationInterpreter
 from finch.interface import add, asarray, matmul, sum
 from finch.interface.lazy import LazyTensor
-from finch.tensor.scalar import ConstantScalar, ScalarFType
+from finch.tensor.scalar import ConstantScalar, Scalar, ScalarFType
 
 from .conftest import finch_assert_allclose
 
@@ -442,17 +444,24 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
-def test_maybedefer_preserves_constant_scalars():
-    """A ConstantScalar must stay one, so `elementwise` can still inline it."""
+def test_maybedefer_demotes_constant_scalars():
+    """A constant crossing a block boundary becomes a runtime Scalar."""
     A = asarray(np.arange(3.0))
-    (lazy_A, constant, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
+    (lazy_A, demoted, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
     assert isinstance(lazy_A, LazyTensor)
-    assert constant == ConstantScalar(2.0)
+    # Demoted, not deferred: `defer` would bind a 0-d value as a table, and
+    # `elementwise` only inlines a scalar it receives directly.
+    assert type(demoted) is Scalar
+    assert demoted.val == 2.0
     assert plain == 2.0
 
+
+def test_constant_scalar_still_inlines_at_a_use_site():
+    """A constant reaching `elementwise` directly is inlined, not bound."""
+    A = asarray(np.arange(3.0))
     # Deferring the constant would bind it as a table, adding a third query and
     # dropping the bare Literal that lets the kernel specialize on the value.
-    y = finch.defer(A) * constant
+    y = finch.defer(A) * ConstantScalar(2.0)
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     assert len(queries) == 2
     assert Literal(2.0) in queries[-1].rhs.arg.args
@@ -470,8 +479,13 @@ class _CollectBindings(LogicCapture):
         return super().lower(prgm, bindings, stats, stats_factory)
 
 
-def test_jit_constant_scalar_argument():
-    """A ConstantScalar argument is inlined, never bound as a runtime tensor."""
+def test_jit_constant_scalar_argument_is_demoted():
+    """A ConstantScalar argument is computed correctly, but as a runtime value.
+
+    `maybedefer` cannot tell a constant the caller passed in from the seed of a
+    loop-carried counter, so it demotes both. The value is bound as a scalar
+    tensor with a dynamic fill, which every value of that dtype shares.
+    """
 
     @jit
     def opt_fn(A, s, n):
@@ -495,7 +509,8 @@ def test_jit_constant_scalar_argument():
         for t in bindings.values()
         if isinstance(t, ScalarFType)
     ]
-    assert not scalars
+    assert scalars
+    assert all(is_dynamic(t.fill_value) for t in scalars)
 
 
 def _literal_values(node):
@@ -507,26 +522,45 @@ def _literal_values(node):
     return []
 
 
-def test_parse_wraps_numeric_literals_only():
+def test_parse_wraps_specializable_literals_only():
     def fn(A, n):
-        B = finch.interface.add(A, 2)
-        return B * 1.5 - n
+        B = finch.interface.add(A, 0)
+        C = B * 1 - n
+        D = finch.interface.multiply(C, 2)
+        return D / 1.5
 
     values = _literal_values(parse_fused_function(fn))
     numeric = [v for v in values if isinstance(v, ConstantScalar)]
-    assert [v.val for v in numeric] == [2, 1.5]
+    # 0 and 1 are an identity or annihilator for some operator, so wrapping them
+    # can pay for the kernel-cache key it costs. 2 and 1.5 are not, so they stay
+    # plain and reach the kernel as ordinary runtime values.
+    assert [v.val for v in numeric] == [0, 1]
+    assert 2 in values
+    assert 1.5 in values
     # Attribute access encodes its names as string literals, which must be
     # left alone -- `getattr(finch, "interface")` is not arithmetic.
     assert "interface" in values
     assert "add" in values
 
 
+@pytest.mark.parametrize(
+    "value", [0, 1, 0.0, 1.0, -0.0, math.inf, -math.inf, complex(0), complex(1)]
+)
+def test_specializable_values_are_wrapped(value):
+    assert is_specializable_value(value)
+
+
+@pytest.mark.parametrize("value", [2, -1, 0.5, 1.5, math.nan, complex(0, 1), "x", None])
+def test_unspecializable_values_are_not_wrapped(value):
+    assert not is_specializable_value(value)
+
+
 def test_jit_inlines_literal_operands():
-    """A literal written in a jit function reaches the kernel as a constant."""
+    """A specializable literal in a jit body reaches the kernel as a constant."""
 
     @jit
     def opt_fn(A):
-        return add(A, 2.0)
+        return add(A, 1.0)
 
     capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
     executor = LogicExecutor(
@@ -536,7 +570,7 @@ def test_jit_inlines_literal_operands():
     arr = np.arange(3.0)
     with finch.with_default_scheduler(LogicNormalizer(executor)):
         result = opt_fn(asarray(arr))
-    finch_assert_allclose(result, arr + 2.0)
+    finch_assert_allclose(result, arr + 1.0)
     scalars = [
         t
         for bindings in capture.all_bindings
@@ -544,6 +578,51 @@ def test_jit_inlines_literal_operands():
         if isinstance(t, ScalarFType)
     ]
     assert not scalars
+
+
+@pytest.mark.parametrize("trip_counts", [(1, 2, 4, 8, 16)])
+def test_jit_constant_folded_in_a_loop_does_not_grow_the_kernel_cache(trip_counts):
+    """A constant incremented in a loop must not cost a kernel per iteration.
+
+    `n` folds to a fresh value on every trip. Without the demotion in
+    `maybedefer` each fresh value is a fresh literal, so the program -- and the
+    kernel compiled from it -- differs per iteration and the cache grows without
+    bound in the trip count.
+    """
+
+    @jit
+    def const_loop(A, k):
+        n = 1
+        B = A
+        for _i in range(k):
+            n = n + 1
+            B = add(B, n)
+        return B
+
+    arr = np.arange(3.0)
+    counts = []
+    for k in trip_counts:
+        executor = LogicExecutor(
+            DefaultLogicOptimizer(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                )
+            ),
+            cache=True,
+        )
+        with finch.with_default_scheduler(LogicNormalizer(executor)):
+            result = const_loop(asarray(arr), k)
+        want = arr.copy()
+        n = 1
+        for _ in range(k):
+            n += 1
+            want = want + n
+        finch_assert_allclose(result, want)
+        counts.append(len(executor.cached_kernels))
+
+    # Flat, not linear: the largest trip count must compile no more than the
+    # smallest, once the loop body has been seen once.
+    assert counts[-1] == counts[1], counts
 
 
 def test_jit_scalar_loop():

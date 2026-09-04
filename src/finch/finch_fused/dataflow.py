@@ -3,7 +3,7 @@ from typing import cast
 from finch.interface import compute, defer
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
-from finch.tensor.scalar import ConstantScalar
+from finch.tensor.scalar import ConstantScalar, Scalar
 
 from .cfg_builder import (
     NumberedStatement,
@@ -144,15 +144,25 @@ def _insert_compute(
 
 
 def maybedefer(arrs):
-    # A ConstantScalar is skipped even though it is 0-dimensional: `defer` would
-    # bind it as a table, and `elementwise` only inlines a constant it receives
-    # directly, so deferring one silently downgrades it to a runtime operand.
-    return tuple(
-        defer(arr)
-        if hasattr(arr, "ndim") and not isinstance(arr, ConstantScalar)
-        else arr
-        for arr in arrs
-    )
+    # These are the values live across a block boundary, so any one of them may
+    # be loop-carried. A ConstantScalar here is demoted to a runtime Scalar: a
+    # loop-carried constant folds to a fresh value every iteration, and each
+    # fresh value mints a fresh literal, a fresh program, and a fresh kernel, so
+    # specializing on it costs a compilation per trip. Literals written at a use
+    # site never reach this function -- they are inlined into the expression
+    # rather than bound to a variable -- so this does not undo what the parser
+    # wraps.
+    output = []
+    for arr in arrs:
+        if isinstance(arr, ConstantScalar):
+            output.append(Scalar(arr.val))
+        elif hasattr(arr, "ndim"):
+            # `defer` would bind a 0-d constant as a table, and `elementwise`
+            # only inlines a constant it receives directly.
+            output.append(defer(arr))
+        else:
+            output.append(arr)
+    return tuple(output)
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
