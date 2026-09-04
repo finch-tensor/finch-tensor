@@ -146,6 +146,7 @@ COMPILE_JULIA = LogicNormalizer(
             )
         ),
         stats_factory=FDStatsFactory(),
+        cache=True,
     )
 )
 
