@@ -45,7 +45,6 @@ def _requires_julia_backend():
 
 def test_julia_element_ftype_can_customize_vector_lowering():
     _requires_julia_backend()
-
     from finch.compile_jl import JuliaElementFType
     from finch.compile_jl import types as jl_dtypes
     from finch.compile_jl.julia import jl
@@ -68,8 +67,11 @@ def test_julia_element_ftype_can_customize_vector_lowering():
             left, right = value
             return int(left) + offset, int(right) + offset
 
-    with pytest.raises(TypeError, match="Expected np.ndarray"):
-        jl_dtypes.to_jl_vector(PairFType(), [(0, 3), (4, 5)], offset=1)
+    arr = np.array([(0, 3), (4, 5)], dtype=[("f0", np.int64), ("f1", np.int64)])
+    vec = jl_dtypes.to_jl_vector(PairFType(), arr)
+
+    assert str(jl.typeof(vec)) == "Vector{Tuple{Int64, Int64}}"
+    assert [tuple(entry) for entry in vec] == [(0, 3), (4, 5)]
 
 
 def _element_level(data) -> ElementLevel:
