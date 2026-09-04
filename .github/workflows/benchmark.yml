@@ -38,7 +38,7 @@ jobs:
       - name: Run Julia benchmarks
         uses: CodSpeedHQ/action@v4
         with:
-          mode: simulation,memory
+          mode: walltime
           run: |
             pixi run benchmark-julia -vvv -m "not slow"
 
