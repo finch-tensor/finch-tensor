@@ -14,10 +14,6 @@ from finch.tensor.scalar import ConstantScalar
 
 from . import nodes as fzd
 
-# `bool` is deliberately absent: a boolean literal in a traced body is a
-# control-flow value far more often than an operand.
-_CONSTANT_TYPES = (int, float, complex)
-
 _BIN_OPS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -150,10 +146,7 @@ class _FusedFunctionParser:
     def _parse_expr(self, expr: ast.expr) -> fzd.FusedExpression:
         match expr:
             case ast.Constant(value=value):
-                # Wrap only the literals the optimizer can actually act on.
-                # Every other value would be a kernel-cache key that buys no
-                # simplification -- see `finch.algebra.is_specializable_value`.
-                if type(value) in _CONSTANT_TYPES and is_specializable_value(value):
+                if is_specializable_value(value):
                     return fzd.Literal(ConstantScalar(value))
                 return fzd.Literal(value)
             case ast.Name(id=name):
