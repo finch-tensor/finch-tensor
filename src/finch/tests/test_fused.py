@@ -8,7 +8,6 @@ import pytest
 import numpy as np
 
 import finch
-from finch.algebra import ffuncs
 from finch.finch_fused import jit
 from finch.finch_fused import nodes as fzd
 from finch.finch_fused.cfg_builder import (
