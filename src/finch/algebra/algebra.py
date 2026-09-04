@@ -1,5 +1,6 @@
 """Algebraic interfaces and helpers used by Finch operators."""
 
+import math
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -74,6 +75,20 @@ def is_identity(op: FinchOperator, val: Any) -> bool:
 def is_annihilator(op: FinchOperator, val: Any) -> bool:
     ok, value = _specializable(val)
     return ok and op.is_annihilator(value)
+
+
+SPECIALIZABLE_VALUES = (0, 1, math.inf, -math.inf)
+
+
+def is_specializable_value(val: Any) -> bool:
+    """
+    A constant is only worth specializing on if some operator's identity or
+    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.
+    """
+    try:
+        return any(bool(val == candidate) for candidate in SPECIALIZABLE_VALUES)
+    except (TypeError, ValueError):
+        return False
 
 
 def is_distributive(op: FinchOperator, other_op: FinchOperator) -> bool:

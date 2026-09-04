@@ -57,6 +57,8 @@ Performance:
 from collections.abc import Callable
 from typing import Any
 
+from finch.algebra import is_dynamic, is_specializable_value
+from finch.algebra.tensor import Tensor
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
     Alias,
@@ -69,6 +71,16 @@ from finch.finch_logic import (
 from finch.symbolic import gensym
 
 from .lazy import LazyTensor, asarray, defer
+
+
+def unspecialize_fill(tns: Tensor) -> Tensor:
+    """
+    `tns` with a static fill demoted to dynamic.
+    """
+    fill = tns.ftype.fill_value
+    if is_dynamic(fill):
+        return tns
+    return tns.with_fill(fill.as_dynamic())
 
 
 def compute(arg, ctx=None):
@@ -123,9 +135,12 @@ def compute(arg, ctx=None):
                 len(res[lazy_idx].shape) == 0
             ):  # if the result is a scalar, extract the value and turn it into a
                 # finch `Scalar`
-                outputs[out_idx] = asarray(res[lazy_idx][()], device=device)
+                out = asarray(res[lazy_idx][()], device=device)
             else:
-                outputs[out_idx] = asarray(res[lazy_idx], device=device)
+                out = asarray(res[lazy_idx], device=device)
+            if not is_specializable_value(out.fill_value):
+                out = unspecialize_fill(out)
+            outputs[out_idx] = out
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 

@@ -9,6 +9,8 @@ import types
 from collections.abc import Callable
 from typing import Any
 
+from finch.tensor.scalar import ConstantScalar
+
 from . import nodes as fzd
 
 _BIN_OPS = {
@@ -143,7 +145,7 @@ class _FusedFunctionParser:
     def _parse_expr(self, expr: ast.expr) -> fzd.FusedExpression:
         match expr:
             case ast.Constant(value=value):
-                return fzd.Literal(value)
+                return fzd.Literal(ConstantScalar(value))
             case ast.Name(id=name):
                 return self._parse_name(name)
             case ast.Call(func=func, args=args, keywords=[]):
@@ -427,6 +429,14 @@ class _FusedToPythonAST:
             value, str | bytes | int | float | complex | bool
         ):
             return ast.Constant(value=value)
+
+        if isinstance(value, ConstantScalar):
+            self._extra_globals["ConstantScalar"] = ConstantScalar
+            return ast.Call(
+                func=ast.Name(id="ConstantScalar", ctx=ast.Load()),
+                args=[ast.Constant(value=value.val)],
+                keywords=[],
+            )
 
         if callable(value):
             if getattr(builtins, getattr(value, "__name__", ""), None) is value:

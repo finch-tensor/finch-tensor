@@ -469,6 +469,32 @@ def test_executor_output_keeps_a_dynamic_fill():
     assert out.ftype.fill_value.value == 5.0
 
 
+@pytest.mark.parametrize(
+    ("fill_value", "stays_dynamic"),
+    [
+        pytest.param(DynamicFill(np.float64(0.0)), True, id="dynamic_fill"),
+        pytest.param(StaticFill(np.float64(0.0)), False, id="static_fill"),
+        pytest.param(np.float64(0.0), False, id="numpy_scalar"),
+        pytest.param(0.0, False, id="python_float"),
+    ],
+)
+def test_fiber_construct_accepts_a_marked_fill(fill_value, stays_dynamic):
+    """`construct` must take an `AbstractFill`, not just a raw number.
+
+    The executor resolves a dynamic output fill and hands it back through
+    `construct` as a `DynamicFill`; coercing that as a bare number raised
+    `TypeError`, so a fiber output with a dynamic fill could not be built.
+    """
+    a, _ = _sparse_fiber(0.0)
+    out = a.ftype.construct((2, 2), fill_value=fill_value)
+    fill = out.ftype.fill_value
+    assert is_dynamic(fill) is stays_dynamic
+    assert fill.value == 0.0
+    # A DynamicFill compares by dtype alone, so an uncoerced one would miss its
+    # own kernel in the cache.
+    assert fill.ftype == a.ftype.element_type
+
+
 def test_dynamic_output_feeds_a_reusable_kernel():
     """Chaining off a dynamically filled output reuses one kernel across fills,
     which is the whole point of not collapsing the output to a static fill."""
