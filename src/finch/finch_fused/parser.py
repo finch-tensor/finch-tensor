@@ -9,7 +9,6 @@ import types
 from collections.abc import Callable
 from typing import Any
 
-from finch.algebra import is_specializable_value
 from finch.tensor.scalar import ConstantScalar
 
 from . import nodes as fzd

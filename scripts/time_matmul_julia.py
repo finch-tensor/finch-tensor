@@ -128,9 +128,7 @@ def run_case(case: str, n: int, density: float, reps: int, seed: int) -> dict:
         want = a.T.toarray() if sps.issparse(a) else np.asarray(a).T
     else:
         reference = a @ b
-        want = (
-            reference.toarray() if sps.issparse(reference) else np.asarray(reference)
-        )
+        want = reference.toarray() if sps.issparse(reference) else np.asarray(reference)
 
     # Everything stays inside the scheduler context, the conversion of the
     # result included: converting a tensor can itself run a kernel, and outside
@@ -202,10 +200,20 @@ def main() -> int:
     for case in CASES:
         proc = subprocess.run(
             [
-                sys.executable, __file__, "--case", case,
-                "--n", str(args.n), "--sparse-n", str(args.sparse_n),
-                "--density", str(args.density), "--reps", str(args.reps),
-                "--seed", str(args.seed),
+                sys.executable,
+                __file__,
+                "--case",
+                case,
+                "--n",
+                str(args.n),
+                "--sparse-n",
+                str(args.sparse_n),
+                "--density",
+                str(args.density),
+                "--reps",
+                str(args.reps),
+                "--seed",
+                str(args.seed),
             ],
             capture_output=True,
             text=True,
@@ -221,9 +229,7 @@ def main() -> int:
     print("-" * 74)
     for r in results:
         orders = "; ".join(",".join(o) for o in r["loop_orders"]) or "-"
-        print(
-            f"{r['case']:14} {r['cold_s']:10.3f} {r['warm_min_s']:13.4f} {orders}"
-        )
+        print(f"{r['case']:14} {r['cold_s']:10.3f} {r['warm_min_s']:13.4f} {orders}")
     for r in results:
         print(f"\n{r['case']}: {r['desc']}")
 

@@ -9,13 +9,8 @@ import numpy as np
 
 import finch
 from finch.algebra import (
-    DynamicFill,
-    StaticFill,
-    ftype,
     is_dynamic,
-    is_specializable_value,
 )
-from finch.algebra.tensor import Tensor
 from finch.autoschedule import (
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
@@ -45,7 +40,7 @@ from finch.finch_logic import Literal, Query
 from finch.finch_notation.interpreter import NotationInterpreter
 from finch.interface import add, asarray, matmul, sum
 from finch.interface.lazy import LazyTensor
-from finch.tensor.scalar import ConstantScalar, Scalar, ScalarFType
+from finch.tensor.scalar import ConstantScalar, ScalarFType
 
 from .conftest import finch_assert_allclose
 
@@ -469,6 +464,7 @@ def test_constant_scalar_still_inlines_at_a_use_site():
     queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
     assert len(queries) == 2
     assert Literal(2.0) in queries[-1].rhs.arg.args
+
 
 @pytest.mark.parametrize(
     ("addend", "stays_static"), [(0.0, True), (math.inf, True), (2.0, False)]
