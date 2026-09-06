@@ -112,21 +112,6 @@ class FiberTensor(OverrideTensor):
             return np.reshape(buf, self.shape)
         return self.to_scipy().toarray()
 
-    def __getitem__(self, idx):
-        arr = self.to_numpy()
-        return arr[idx]
-
-    def __setitem__(self, idx, val):
-        curr = self.lvl
-        while hasattr(curr, "lvl"):
-            curr = curr.lvl
-        if hasattr(curr, "val"):
-            buf = curr.val.arr if hasattr(curr.val, "arr") else curr.val
-            arr = np.reshape(buf, self.shape)
-            arr[idx] = val
-            return
-        raise NotImplementedError("Item assignment not supported for sparse FiberTensor.")
-
     def to_scipy(self):
         from .level import (
             DenseLevel,

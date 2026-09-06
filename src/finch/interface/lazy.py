@@ -607,6 +607,13 @@ def arange(
     return defer(asarray(arr, device=device))
 
 
+def setitem(tensor, index, value) -> LazyTensor:
+    tensor = defer(tensor)
+    if tensor.ndim != 1:
+        raise NotImplementedError("setitem currently supports one-dimensional tensors.")
+    return where(equal(arange(tensor.shape[0]), index), value, tensor)
+
+
 def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
     """
     Permutes the axes (dimensions) of an array ``x``.
