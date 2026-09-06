@@ -7,11 +7,8 @@ import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
-    AbstractFill,
-    DynamicFill,
     DynamicFillError,
     ImmutableStructFType,
-    StaticFill,
     TupleFType,
     bool_,
     ftype,
@@ -322,16 +319,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         """
         fmt = self
         if fill_value is not None:
-            if isinstance(fill_value, AbstractFill):
-                typed_val = self.element_type(fill_value.value)
-                new_fill = (
-                    DynamicFill(typed_val, fill_value.ftype)
-                    if is_dynamic(fill_value)
-                    else StaticFill(typed_val)
-                )
-                fmt = self.with_fill(new_fill)
-            else:
-                fmt = self.with_fill(self.element_type(fill_value))
+            fmt = self.with_fill(self.element_type(fill_value))
         elif is_dynamic(self.fill_value):
             raise DynamicFillError(
                 f"cannot construct {self!r} without a resolved fill value"
