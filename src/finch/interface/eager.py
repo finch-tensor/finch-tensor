@@ -194,12 +194,6 @@ def arange(
     return compute(lazy.arange(start, stop, step, dtype=dtype, device=device))
 
 
-def setitem(x, index, value):
-    if isinstance(x, lazy.LazyTensor):
-        return lazy.setitem(x, index, value)
-    return compute(lazy.setitem(x, index, value))
-
-
 def linspace(
     start: float,
     stop: float,
