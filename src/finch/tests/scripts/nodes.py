@@ -116,26 +116,30 @@ def create_log_simple_node():
 
     return log.Plan(
         (
-            log.Query(log.Alias("S"), log.Table(log.Literal(s), (i, j))),
-            log.Query(log.Alias("A"), log.Table(log.Literal(a), (i, k))),
-            log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
+            log.Query(log.HardAlias("S"), log.Table(log.Literal(s), (i, j))),
+            log.Query(log.HardAlias("A"), log.Table(log.Literal(a), (i, k))),
+            log.Query(log.HardAlias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
-                log.Alias("AB"),
-                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("A"), log.Alias("B"))),
+                log.HardAlias("AB"),
+                log.MapJoin(
+                    log.Literal(ffuncs.mul), (log.HardAlias("A"), log.HardAlias("B"))
+                ),
             ),
             # matmul
             log.Query(
-                log.Alias("C"),
+                log.HardAlias("C"),
                 log.Aggregate(
-                    log.Literal(ffuncs.add), log.Literal(0), log.Alias("AB"), (k,)
+                    log.Literal(ffuncs.add), log.Literal(0), log.HardAlias("AB"), (k,)
                 ),
             ),
             # elemwise
             log.Query(
-                log.Alias("RES"),
-                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("C"), log.Alias("S"))),
+                log.HardAlias("RES"),
+                log.MapJoin(
+                    log.Literal(ffuncs.mul), (log.HardAlias("C"), log.HardAlias("S"))
+                ),
             ),
-            log.Produces((log.Alias("RES"),)),
+            log.Produces((log.HardAlias("RES"),)),
         )
     )
 

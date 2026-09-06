@@ -7,6 +7,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     LogicNode,
     LogicStatement,
@@ -41,7 +42,7 @@ def isolate_aggregates(root: LogicStatement) -> LogicStatement:
         def rule_1(ex):
             match ex:
                 case Aggregate(_, _, _, _) as agg:
-                    var = Alias(gensym("A"))
+                    var = HardAlias(gensym("A"))
                     stack.append(Query(var, agg))
                     return Table(var, agg.fields())
                 case _:
@@ -82,7 +83,7 @@ def with_unique_lhs(
         match node:
             case Query(lhs, rhs):
                 if lhs in bound:
-                    var = Alias(spc.freshen(lhs.name))
+                    var = HardAlias(spc.freshen(lhs.name))
                     renames[lhs] = var
                     if lhs in bindings:
                         writes[lhs] = var

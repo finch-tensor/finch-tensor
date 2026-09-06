@@ -118,9 +118,11 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
         mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
-        lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
+        lgc_bindings: dict[lgc.Alias, TensorFType] = {
+            lgc.HardAlias(var.name): val for var, val in ein_bindings.items()
+        }
         lgc_shape_vars: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {
-            lgc.Alias(var.name): tuple(
+            lgc.HardAlias(var.name): tuple(
                 lgc.Field(idx.name) if idx is not None else None for idx in idxs
             )
             for var, idxs in ein_shape_vars.items()

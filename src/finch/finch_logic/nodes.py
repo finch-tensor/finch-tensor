@@ -377,20 +377,12 @@ class Field(LogicNode, NamedTerm):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
-    """
-    Represents a logical AST expression for an alias named `name`. Aliases are used to
-    refer to tables in the program.
-
-    Attributes:
-        name: The name of the alias.
-    """
-
+    __match_args__ = ("name",)
     name: str
 
     @property
-    def symbol(self) -> str:
+    def symbol(self):
         return self.name
 
     def fields(self) -> tuple[Field, ...]:
@@ -420,6 +412,36 @@ class Alias(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
+class HardAlias(Alias):
+    """
+    Represents a logical AST expression for an alias named `name`. Aliases are used to
+    refer to tables in the program.
+
+    Attributes:
+        name: The name of the alias.
+    """
+
+    name: str
+
+    @property
+    def symbol(self):
+        return self.name
+
+
+@dataclass(eq=True, frozen=True)
+class FusedAlias(Alias):
+    alias: HardAlias
+    n: int
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", self.alias.name)
+
+    @property
+    def symbol(self):
+        return self.name
+
+
+@dataclass(eq=True, frozen=True)
 class Table(LogicTree, LogicExpression):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
@@ -430,7 +452,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value | Alias
+    tns: Literal | Value | Alias | FusedAlias
     idxs: tuple[Field, ...]
 
     @property
@@ -445,12 +467,11 @@ class Table(LogicTree, LogicExpression):
     def dimmap(
         self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
     ) -> tuple[T | None, ...]:
-        if isinstance(self.tns, Alias):
-            if self.tns not in dim_bindings:
-                raise NotImplementedError(
-                    f"Cannot resolve dims of Alias {self.tns.name}"
-                )
-            return dim_bindings[self.tns]
+        tns = self.tns.alias if isinstance(self.tns, FusedAlias) else self.tns
+        if isinstance(tns, Alias):
+            if tns not in dim_bindings:
+                raise NotImplementedError(f"Cannot resolve dims of Alias {tns.name}")
+            return dim_bindings[tns]
         raise NotImplementedError("Cannot resolve dims of Tables")
 
     def valmap(
@@ -459,12 +480,11 @@ class Table(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        if isinstance(self.tns, Alias):
-            if self.tns not in bindings:
-                raise NotImplementedError(
-                    f"Cannot resolve value of Alias {self.tns.name}"
-                )
-            return bindings[self.tns]
+        tns = self.tns.alias if isinstance(self.tns, FusedAlias) else self.tns
+        if isinstance(tns, Alias):
+            if tns not in bindings:
+                raise NotImplementedError(f"Cannot resolve value of Alias {tns.name}")
+            return bindings[tns]
         raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
@@ -679,7 +699,7 @@ class Query(LogicTree, LogicStatement):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Alias
+    lhs: Alias | FusedAlias
     rhs: LogicExpression
 
     @property
@@ -692,13 +712,14 @@ class Query(LogicTree, LogicStatement):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
-        if self.lhs in dim_bindings:
+        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if key in dim_bindings:
             for dim1, dim2 in zip(
-                self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
+                self.rhs.dimmap(op, dim_bindings), dim_bindings[key], strict=True
             ):
                 op(dim1, dim2)
         else:
-            dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
+            dim_bindings[key] = self.rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return dim_bindings
@@ -711,16 +732,17 @@ class Query(LogicTree, LogicStatement):
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        if self.lhs in bindings:
+        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if key in bindings:
             val = self.rhs.valmap(f, g, bindings)
-            prev = bindings[self.lhs]
+            prev = bindings[key]
             # A dynamic value is compatible with any value of its dtype.
             if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(
                     f"Cannot rebind alias {self.lhs} to a different values"
                 )
         else:
-            bindings[self.lhs] = self.rhs.valmap(f, g, bindings)
+            bindings[key] = self.rhs.valmap(f, g, bindings)
         return bindings
 
 
@@ -843,7 +865,9 @@ class LogicPrinterContext(Context):
                 return self(ex)
             case Field(name):
                 return str(name)
-            case Alias(name):
+            case FusedAlias(alias, n):
+                return f"FusedAlias({self(alias)},{n})"
+            case HardAlias(name):
                 return str(name)
             case Table(tns, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])

@@ -9,8 +9,8 @@ from finch.autoschedule.smart_formatter import (
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -22,7 +22,7 @@ from finch.finch_logic import (
 
 def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
     i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
+    A, B = HardAlias("A"), HardAlias("B")
     matrix = np.ones((2, 3))
     tensor = fl.asarray(matrix)
     stats_factory = DCStatsFactory()

@@ -301,7 +301,7 @@ def test_simplify_assembly():
 
 
 def test_simplify_logic_mapjoin():
-    a = lgc.Alias("A")
+    a = lgc.HardAlias("A")
     term = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (lgc.MapJoin(lgc.Literal(ffuncs.mul), (a, lgc.Literal(2))), lgc.Literal(3)),
@@ -345,7 +345,7 @@ def test_logic_simplify_unwraps_literals():
     assert unwrap_literal(lgc.Relabel(lit, ())) == lit
     # A reorder that does something is left alone.
     idxs = (lgc.Field("i"), lgc.Field("j"))
-    table = lgc.Reorder(lgc.Table(lgc.Alias("A"), idxs), idxs[::-1])
+    table = lgc.Reorder(lgc.Table(lgc.HardAlias("A"), idxs), idxs[::-1])
     assert unwrap_literal(table) is None
 
 
