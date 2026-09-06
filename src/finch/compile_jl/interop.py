@@ -20,8 +20,8 @@ from finch.tensor import (
     SparseListLevel,
     element,
 )
-from finch.tensor.patterns import FillTensor
 from finch.tensor.np_wrapper import NumPyWrapper
+from finch.tensor.patterns import FillTensor
 
 from . import types as jl_dtypes
 from .julia import jc, jl
