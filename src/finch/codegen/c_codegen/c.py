@@ -877,7 +877,7 @@ class CUnpackableFType(ABC):
 def c_getattr(fmt: FType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "c_getattr"):
-            return fmt.c_getattr(ctx, obj, attr)
+            return fmt.c_getattr(ctx, obj, attr)  # ty: ignore[call-non-callable]
         case MutableStructFType():
             return f"{obj}->{attr}"
         case ImmutableStructFType() | TupleFType():

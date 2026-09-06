@@ -564,7 +564,7 @@ class Block(AssemblyTree, AssemblyStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyStatement, ...] = ()
+    bodies: tuple[AssemblyStatement | AssemblyExpression, ...] = ()
 
     @property
     def children(self):

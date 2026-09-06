@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import itertools
+from collections.abc import Mapping, MutableMapping
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from finch.finch_logic import (
     Aggregate,
@@ -11,7 +15,6 @@ from finch.finch_logic import (
     Reorder,
     StatsFactory,
     Table,
-    TensorStats,
 )
 
 from .galley.logical_optimizer import insert_statistics
@@ -25,11 +28,16 @@ from .loop_order_cost import (
 from .loop_order_greedy import connected_loop_candidates, greedy_loop_order
 from .loop_ordering import AbstractLoopOrderer
 
+from .tensor_stats import NumericStats, TensorStats
+
+TS = TypeVar("TS", bound=TensorStats)
+NS = TypeVar("NS", bound=NumericStats)
+
 
 def loop_order_bfs(
     expr: LogicExpression,
-    stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_factory: StatsFactory[NS],
+    stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
     *,
     k: int | None = None,
@@ -39,9 +47,11 @@ def loop_order_bfs(
         return ()
 
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
-        expr, stats_factory, stats_bindings.copy(), {}
+        expr, stats_factory, dict(stats_bindings), {}
     )
-    unique_stats = list({id(s): s for s in conjunct_stats + disjunct_stats}.values())
+    unique_stats = list(
+        {id(s): s for s in itertools.chain(conjunct_stats, disjunct_stats)}.values()
+    )
 
     best_order = greedy_loop_order(expr, stats_factory, stats_bindings, output_vars)
     best_cost = loop_order_cost(
@@ -90,8 +100,8 @@ def loop_order_bfs(
 
 def loop_order_dfs(
     expr: LogicExpression,
-    stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_factory: StatsFactory[NS],
+    stats_bindings: MutableMapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
     all_vars = tuple(expr.fields())
@@ -99,9 +109,11 @@ def loop_order_dfs(
         return ()
 
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
-        expr, stats_factory, stats_bindings.copy(), {}
+        expr, stats_factory, stats_bindings, {}
     )
-    unique_stats = list({id(s): s for s in conjunct_stats + disjunct_stats}.values())
+    unique_stats = list(
+        {id(s): s for s in itertools.chain(conjunct_stats, disjunct_stats)}.values()
+    )
 
     best_order = greedy_loop_order(expr, stats_factory, stats_bindings, output_vars)
     best_cost = loop_order_cost(
@@ -150,8 +162,8 @@ def loop_order_dfs(
 
 def loop_order_brute_force(
     expr: LogicExpression,
-    stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_factory: StatsFactory[NS],
+    stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
     """Pick the loop order with the lowest ``loop_order_cost`` over all permutations.
@@ -159,8 +171,8 @@ def loop_order_brute_force(
     Ties keep the first permutation in ``expr.fields()`` order. Exponential in the
     number of indices; intended as an oracle for small nests and benchmarks.
     """
-    all_vars = tuple(dict.fromkeys(expr.fields()))
-    if not all_vars:
+    all_vars = tuple(expr.fields())
+    if len(all_vars) == 0:
         return ()
 
     best_order = all_vars
@@ -174,7 +186,7 @@ def loop_order_brute_force(
     return best_order
 
 
-class BFSLoopOrderer(AbstractLoopOrderer):
+class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
     def __init__(
         self,
         ctx: LogicLoader | None = None,
@@ -187,15 +199,15 @@ class BFSLoopOrderer(AbstractLoopOrderer):
     def set_loop_orders(
         self,
         prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
+        stats: MutableMapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
         *,
         output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
         if output_fields is None:
             output_fields = {}
         stats_bindings = dict(stats)
-        cache: dict[object, TensorStats] = {}
+        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
@@ -234,19 +246,19 @@ class BFSLoopOrderer(AbstractLoopOrderer):
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
 
 
-class DFSLoopOrderer(AbstractLoopOrderer):
+class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
     def set_loop_orders(
         self,
         prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
+        stats: MutableMapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
         *,
-        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+        output_fields: MutableMapping[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
         if output_fields is None:
             output_fields = {}
         stats_bindings = dict(stats)
-        cache: dict[object, TensorStats] = {}
+        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
@@ -285,19 +297,19 @@ class DFSLoopOrderer(AbstractLoopOrderer):
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
 
 
-class BruteForceLoopOrderer(AbstractLoopOrderer):
+class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
     def set_loop_orders(
         self,
         prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
+        stats: MutableMapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
         *,
-        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
+        output_fields: MutableMapping[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
         if output_fields is None:
             output_fields = {}
         stats_bindings = dict(stats)
-        cache: dict[object, TensorStats] = {}
+        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:

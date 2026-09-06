@@ -4,7 +4,7 @@ import copy
 import math
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, MutableMapping
 from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
@@ -41,7 +41,7 @@ class BaseTensorStats(TensorStats):
     def __init__(
         self,
         index_order: Iterable[Field] | BaseTensorStats,
-        dim_sizes: Mapping[Field, float] | None = None,
+        dim_sizes: MutableMapping[Field, float] | None = None,
         fill_value: Any = None,
     ):
         if isinstance(index_order, BaseTensorStats):
@@ -60,7 +60,7 @@ class BaseTensorStats(TensorStats):
     def _init_from_fields(
         self,
         index_order: Iterable[Field],
-        dim_sizes: Mapping[Field, float],
+        dim_sizes: MutableMapping[Field, float],
         fill_value: Any,
     ):
         self._index_order = tuple(index_order)
@@ -73,7 +73,7 @@ class BaseTensorStats(TensorStats):
     def from_fields(
         cls,
         index_order: Iterable[Field],
-        dim_sizes: Mapping[Field, float],
+        dim_sizes: MutableMapping[Field, float],
         fill_value: Any,
     ) -> Self:
         return cls(index_order, dim_sizes, fill_value)
@@ -84,11 +84,11 @@ class BaseTensorStats(TensorStats):
         return new
 
     @property
-    def dim_sizes(self) -> Mapping[Field, float]:
+    def dim_sizes(self) -> MutableMapping[Field, float]:
         return self._dim_sizes
 
     @dim_sizes.setter
-    def dim_sizes(self, value: Mapping[Field, float]):
+    def dim_sizes(self, value: MutableMapping[Field, float]):
         self._dim_sizes = OrderedDict(value)
 
     def get_dim_size(self, idx: Field) -> float:

@@ -392,19 +392,19 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     def lower_thaw(self, ctx, tns, op):
         return self.lvl_t.level_lower_thaw(ctx, ctx.fiber_level(tns), op, tns.pos)
 
-    def lower_unwrap(self, ctx, tns):
-        return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)
+    def lower_unwrap(self, ctx, obj):
+        return self.lvl_t.level_lower_unwrap(ctx, obj, obj.pos)
 
-    def lower_increment(self, ctx, tns, op, val):
-        return self.lvl_t.level_lower_increment(ctx, tns, op, val, tns.pos)
+    def lower_increment(self, ctx, obj, op, val):
+        return self.lvl_t.level_lower_increment(ctx, obj, op, val, obj.pos)
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
             ctx, ctx.fiber_level(tns), init, op, shape, tns.pos
         )
 
-    def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), r)
+    def lower_dim(self, ctx, obj, i):
+        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), i)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args
@@ -420,7 +420,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         )
 
 
-def fiber_tensor(lvl: LevelFType):
+def fiber_tensor(lvl: LevelFType) -> FiberTensorFType:
     """
     Creates a FiberTensorFType with the given level ftype and position type.
 

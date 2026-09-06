@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Self, TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from finch.algebra import (
     AbstractFill,
@@ -165,7 +165,7 @@ class LogicTree(LogicNode, TermTree, ABC):
         ...
 
 
-T = TypeVar("T")
+T = TypeVar("T", bound=LogicNode)
 
 
 class LogicExpression(LogicNode):
@@ -185,8 +185,8 @@ class LogicExpression(LogicNode):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-    ) -> tuple[T | None, ...]:
+        dim_bindings: dict[Alias, tuple[Tm | None, ...]],
+    ) -> tuple[Tm | None, ...]:
         """Compute per-dimension values, combining using `op`. When dimensions
         are expanded, None is used. When dimensions are contracted, the value
         is combined with None."""
@@ -331,8 +331,8 @@ class Literal(LogicExpression, LiteralTerm):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-    ) -> tuple[T | None, ...]:
+        dim_bindings: dict[Alias, tuple[Tm | None, ...]],
+    ) -> tuple[Tm | None, ...]:
         return ()
 
     def valmap(
@@ -378,7 +378,7 @@ class Field(LogicNode, NamedTerm):
 
 
 @dataclass(eq=True, frozen=True)
-class Alias(LogicNode, NamedTerm):
+class Alias(LogicNode, NamedTerm, Generic[T]):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
     refer to tables in the program.
@@ -402,8 +402,8 @@ class Alias(LogicNode, NamedTerm):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-    ) -> tuple[T | None, ...]:
+        dim_bindings: dict[Alias, tuple[Tm | None, ...]],
+    ) -> tuple[Tm | None, ...]:
         if dim_bindings is None or self not in dim_bindings:
             raise NotImplementedError(f"Cannot resolve dims of Alias {self.name}")
         return dim_bindings[self]
@@ -417,6 +417,9 @@ class Alias(LogicNode, NamedTerm):
         if bindings is None or self not in bindings:
             raise NotImplementedError(f"Cannot resolve value of Alias {self.name}")
         return bindings[self]
+
+
+Tm = TypeVar("Tm", bound=Term)
 
 
 @dataclass(eq=True, frozen=True)
@@ -443,8 +446,8 @@ class Table(LogicTree, LogicExpression):
         return self.idxs
 
     def dimmap(
-        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
-    ) -> tuple[T | None, ...]:
+        self, op: Callable, dim_bindings: dict[Alias, tuple[Tm | None, ...]]
+    ) -> tuple[Tm | None, ...]:
         if isinstance(self.tns, Alias):
             if self.tns not in dim_bindings:
                 raise NotImplementedError(
@@ -485,7 +488,7 @@ class MapJoin(LogicTree, LogicExpression, CallTerm):
         args: The arguments to map the function across.
     """
 
-    op: Literal
+    op: Literal | Field
     args: tuple[LogicExpression, ...]
 
     @property
@@ -501,9 +504,9 @@ class MapJoin(LogicTree, LogicExpression, CallTerm):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
-    ) -> tuple[T | None, ...]:
-        arg_dims: dict[Field, T | None] = {}
+        dim_bindings: dict[Alias, tuple[Tm | None, ...]],
+    ) -> tuple[Tm | None, ...]:
+        arg_dims: dict[Field, Tm | None] = {}
         for arg in self.args:
             dims = arg.dimmap(op, dim_bindings)
             fields = arg.fields()
@@ -603,8 +606,8 @@ class Reorder(LogicTree, LogicExpression):
         return self.idxs
 
     def dimmap(
-        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
-    ) -> tuple[T | None, ...]:
+        self, op: Callable, dim_bindings: dict[Alias, tuple[Tm | None, ...]]
+    ) -> tuple[Tm | None, ...]:
         idxs = self.arg.fields()
         dims = self.arg.dimmap(op, dim_bindings)
         idx_dims = dict(zip(idxs, dims, strict=True))
@@ -734,7 +737,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[Alias, ...]
+    args: tuple[Alias | MapJoin, ...]
 
     @property
     def children(self):

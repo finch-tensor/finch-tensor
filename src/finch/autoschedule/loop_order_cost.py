@@ -1,4 +1,8 @@
-from finch.algebra import ffuncs, is_annihilator
+import itertools
+from collections.abc import Mapping, MutableMapping, Sequence
+from typing import TypeVar
+
+from finch.algebra import StaticFill, ffuncs, is_annihilator
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
@@ -24,22 +28,25 @@ RANDOM_WRITE_COST = 10
 DENSE_ALLOCATE_COST = 0.5
 SPARSE_ALLOCATE_COST = 60
 
+TS = TypeVar("TS", bound=TensorStats)
+NS = TypeVar("NS", bound=NumericStats)
+
 
 def stats_with_false_fill(
-    stats_factory: StatsFactory,
-    stats: TensorStats,
-) -> TensorStats:
+    stats_factory: StatsFactory[TS],
+    stats: TS,
+) -> TS:
     stats_copy = stats_factory.copy(stats)
-    stats_copy.fill_value = False
+    stats_copy.fill_value = StaticFill(False)
     return stats_copy
 
 
 def merge_prefix_stats(
-    stats_factory: StatsFactory,
+    stats_factory: StatsFactory[TS],
     op,
-    args: list[TensorStats],
-) -> TensorStats | None:
-    if not args:
+    args: list[TS],
+) -> TS | None:
+    if len(args) == 0:
         return None
     if len(args) == 1:
         return args[0]
@@ -48,11 +55,11 @@ def merge_prefix_stats(
 
 def get_conjunctive_and_disjunctive_inputs(
     expr: LogicExpression,
-    stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
-    cache: dict[object, TensorStats],
+    stats_factory: StatsFactory[TS],
+    stats_bindings: MutableMapping[Alias, TS],
+    cache: MutableMapping[object, TS],
     disjunct_branch: bool = False,
-) -> tuple[list[TensorStats], list[TensorStats]]:
+) -> tuple[Sequence[TS], Sequence[TS]]:
     match expr:
         case Aggregate(arg=arg):
             return get_conjunctive_and_disjunctive_inputs(
@@ -93,9 +100,9 @@ def get_conjunctive_and_disjunctive_inputs(
 
 def get_loop_lookups(
     prefix: tuple[Field, ...],
-    conjunct_stats: list[TensorStats],
-    disjunct_stats: list[TensorStats],
-    stats_factory: StatsFactory,
+    conjunct_stats: list[NS],
+    disjunct_stats: list[NS],
+    stats_factory: StatsFactory[NS],
 ) -> float:
     prefix_set = set(prefix)
     rel_conjuncts = [
@@ -144,7 +151,7 @@ def cost_of_reformat(stats: TensorStats) -> float:
 
 
 def get_reformat_set(
-    input_stats: list[TensorStats], prefix: tuple[Field, ...]
+    input_stats: Sequence[TS], prefix: tuple[Field, ...]
 ) -> frozenset[int]:
     return frozenset(
         i for i, stats in enumerate(input_stats) if needs_reformat(stats, prefix)
@@ -180,9 +187,9 @@ def _approx_axis_density(stats: TensorStats, rel_vars: set[Field]) -> float:
 
 def get_prefix_cost(
     new_prefix: tuple[Field, ...],
-    conjunct_stats: list[TensorStats],
-    disjunct_stats: list[TensorStats],
-    stats_factory: StatsFactory,
+    conjunct_stats: Sequence[NS],
+    disjunct_stats: Sequence[NS],
+    stats_factory: StatsFactory[NS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> float:
     if not new_prefix:
@@ -201,7 +208,7 @@ def get_prefix_cost(
     lookups = get_loop_lookups(new_prefix, rel_conjuncts, rel_disjuncts, stats_factory)
 
     lookup_factor = 0.0
-    seen: list[TensorStats] = []
+    seen: list[NS] = []
     for stat in rel_conjuncts + rel_disjuncts:
         if any(stat is s for s in seen):
             continue
@@ -233,12 +240,12 @@ def get_prefix_cost(
 def loop_order_cost(
     expr: LogicExpression,
     loop_order: tuple[Field, ...],
-    stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_factory: StatsFactory[NS],
+    stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> float:
-    stats_bindings_2 = stats_bindings.copy()
-    cache: dict[object, TensorStats] = {}
+    stats_bindings_2 = dict(stats_bindings)
+    cache: dict[object, NS] = {}
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
         expr, stats_factory, stats_bindings_2, cache
     )
@@ -252,7 +259,7 @@ def loop_order_cost(
             output_vars,
         )
 
-    for stat in conjunct_stats + disjunct_stats:
+    for stat in itertools.chain(conjunct_stats, disjunct_stats):
         if needs_reformat(stat, loop_order):
             cost += cost_of_reformat(stat)
     return cost

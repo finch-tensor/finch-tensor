@@ -59,7 +59,7 @@ _REV_BOOL_OPS = {fn: op for op, fn in _BOOL_OPS.items()}
 
 
 class _FusedFunctionParser:
-    def __init__(self, fn: Callable[..., Any], fn_def: ast.FunctionDef):
+    def __init__(self, fn: types.FunctionType, fn_def: ast.FunctionDef):
         self.fn = fn
         self.fn_def = fn_def
         self.globals = getattr(fn, "__globals__", {})
@@ -188,7 +188,7 @@ class _FusedFunctionParser:
                 base = self._parse_expr(value)
                 return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
             case ast.Break():
-                return fzd.Break()  # type: ignore[return-value]
+                return fzd.Break()  # ty: ignore[invalid-return-type]
             case _:
                 raise self._unsupported(
                     expr,
@@ -253,7 +253,7 @@ class _FusedFunctionParser:
         return ValueError(f"{message} (line {lineno})")
 
 
-def parse_fused_function(fn: Callable[..., Any]) -> fzd.Function:
+def parse_fused_function(fn: types.FunctionType) -> fzd.Function:
     source = textwrap.dedent(inspect.getsource(fn))
     tree = ast.parse(source)
     fn_name = getattr(fn, "__name__", None)
@@ -303,7 +303,7 @@ class _FusedToPythonAST:
         if len(body) == 0:
             body = [ast.Pass()]
 
-        return ast.FunctionDef(  # type: ignore # noqa: PGH003
+        return ast.FunctionDef(  # noqa: PGH003
             name=function.name.val,
             args=args,
             body=body,
