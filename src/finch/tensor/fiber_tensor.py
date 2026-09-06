@@ -104,18 +104,8 @@ class FiberTensor(OverrideTensor):
         return self.lvl.buffer_factory
 
     def to_numpy(self) -> np.ndarray:
-<<<<<<< HEAD
-        curr = self.lvl
-        while hasattr(curr, "lvl"):
-            curr = curr.lvl
-        if hasattr(curr, "val"):
-            buf = curr.val.arr if hasattr(curr.val, "arr") else curr.val
-            return np.reshape(buf, self.shape)
-        return self.to_scipy().toarray()
-=======
         # TODO: temporary for dense only. TBD in sparse_level PR
         return np.reshape(self.lvl.val.arr, self.shape, copy=False)
->>>>>>> 7a87b59f (feat: lower tensor item updates through lazy ops)
 
     def to_scipy(self):
         from .level import (
