@@ -66,7 +66,7 @@ class JuliaElementFType(ABC):
         if not values.flags["C_CONTIGUOUS"]:
             values = np.ascontiguousarray(values)
         return get_jl().wrap_numpy_ptr(
-            values.ctypes.data, values.size, self.julia_type()
+            values.ctypes.data, len(values), self.julia_type()
         )
 
 

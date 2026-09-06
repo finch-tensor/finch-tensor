@@ -67,11 +67,11 @@ def test_julia_element_ftype_can_customize_vector_lowering():
             left, right = value
             return int(left) + offset, int(right) + offset
 
-    arr = np.array([(0, 3), (4, 5)], dtype=[("f0", np.int64), ("f1", np.int64)])
-    vec = jl_dtypes.to_jl_vector(PairFType(), arr)
+    arr = np.array([(0, 3), (4, 5)], dtype=np.int64)
+    vec = jl_dtypes.to_jl_vector(PairFType(), arr, offset=1)
 
     assert str(jl.typeof(vec)) == "Vector{Tuple{Int64, Int64}}"
-    assert [tuple(entry) for entry in vec] == [(0, 3), (4, 5)]
+    assert [tuple(entry) for entry in vec] == [(1, 4), (5, 6)]
 
 
 def _element_level(data) -> ElementLevel:
