@@ -7,6 +7,8 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch.algebra import (
+    FType,
+    FTyped,
     Tensor,
     TensorFType,
     fisinstance,
@@ -71,7 +73,9 @@ class TensorViewFType(TensorFType):
 
 
 class TensorView(Tensor):
-    def __init__(self, idxs: tuple[Any, ...], tns: ntn.NotationNode, op: Any = None):
+    def __init__(
+        self, idxs: tuple[Any, ...], tns: Tensor, op: Any = None
+    ):
         """
         Initialize the TensorView with the specified indices, tensor, and operation.
 
@@ -89,7 +93,9 @@ class TensorView(Tensor):
         Get the ftype of the tensor view.
         This is the ftype of the tensor at the specified indices.
         """
-        return TensorViewFType(map(ftype, self.idxs), self.tns.ftype, self.op)
+        return TensorViewFType(
+            tuple(ftype(i) for i in self.idxs), self.tns.ftype, self.op
+        )
 
     @property
     def shape(self):
@@ -293,11 +299,11 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
 
     def __init__(
         self,
-        bindings=None,
-        slots=None,
-        types=None,
-        loop_state=None,
-        function_state=None,
+        bindings: ScopedDict | None = None,
+        slots: ScopedDict | None = None,
+        types: ScopedDict[FType] | None = None,
+        loop_state: HaltState | None = None,
+        function_state: HaltState | None = None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -341,8 +347,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
             function_state=function_state,
         )
 
-    def lower(self, prgm: ntn.Module):
-        return self._dispatch(prgm)
+    def lower(self, term: ntn.Module):
+        return self._dispatch(term)
 
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
@@ -529,6 +535,7 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 self.bindings[func_n] = my_func
                 return None
             case ntn.Return(value):
+                assert self.function_state is not None
                 self.function_state.has_returned = True
                 self.function_state.return_value = self(value)
                 return None

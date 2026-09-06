@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -34,11 +35,12 @@ class TensorFType(FType, ABC):
         return len(self.shape_type)
 
     @property
-    def size(self):
-        size = 1
-        for dim in self.shape:
-            size *= int(dim)
-        return size
+    def shape(self) -> tuple[int, ...]:
+        raise TypeError("TensorFType does not have a shape.")
+
+    @property
+    def size(self) -> int:
+        return functools.reduce(lambda x, y: x * int(y), self.shape, 1)
 
     @property
     @abstractmethod
@@ -164,7 +166,7 @@ class Tensor(FTyped, ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> tuple:
+    def shape(self) -> tuple[np.intp, ...]:
         """Shape of the tensor."""
         ...
 

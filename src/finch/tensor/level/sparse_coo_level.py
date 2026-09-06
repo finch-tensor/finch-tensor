@@ -1,26 +1,26 @@
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
 
-from .level import Level, LevelFType
+from .level import Level, MultiDimensionLevelFType, LevelFType
 
 
-class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
+class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
     def __init__(
         self,
         lvl_type: LevelFType,
-        coo_shape_type: FType,
+        dimension_ftype: TupleFType,
         ptr_type: FType,
         idx_type: FType,
         tbl_type: FType,
     ) -> None:
         if not isinstance(lvl_type, LevelFType):
             raise TypeError("SparseCOOLevelFType lvl_type must be a level type")
-        if not isinstance(coo_shape_type, TupleFType):
-            raise TypeError("SparseCOOLevelFType coo_shape_type must be a tuple type")
+        if not isinstance(dimension_ftype, TupleFType):
+            raise TypeError("SparseCOOLevelFType dimension_ftype must be a tuple type")
         if not isinstance(ptr_type, FType):
             raise TypeError("SparseCOOLevelFType ptr_type must be an ftype")
         if not isinstance(idx_type, FType):
@@ -28,7 +28,7 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
         if not isinstance(tbl_type, TupleFType):
             raise TypeError("SparseCOOLevelFType tbl_type must be a tuple type")
         self.lvl_type = lvl_type
-        self.coo_shape_type = coo_shape_type
+        self.coo_shape_type = dimension_ftype
         self.ptr_type = ptr_type
         self.idx_type = idx_type
         self.tbl_type = tbl_type
@@ -97,11 +97,11 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
 
     @property
     def coo_shape_tuple_type(self) -> TupleFType:
-        return cast(TupleFType, self.coo_shape_type)
+        return self.coo_shape_type
 
     @property
     def tbl_tuple_type(self) -> TupleFType:
-        return cast(TupleFType, self.tbl_type)
+        return self.tbl_type
 
     @property
     def buffer_type(self) -> FType:
@@ -167,10 +167,10 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -179,7 +179,7 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError("SparseCOOLevelFType lowering is not implemented.")
 
 
@@ -201,7 +201,7 @@ class SparseCOOLevel(Level):
     lvl: Level
     coo_shape: tuple[Any, ...]
     ptr: Any
-    tbl: tuple[Any, ...]
+    tbl: tuple[Any, ...] | None
 
     def __init__(self, lvl, shape, ptr=None, tbl=None):
         self.lvl = lvl
@@ -226,7 +226,7 @@ class SparseCOOLevel(Level):
             raise ValueError("SparseCOOLevel tbl length must match COO dimensions")
 
     @property
-    def idx(self) -> tuple[Any, ...]:
+    def idx(self) -> tuple[Any, ...] | None:
         return self.tbl
 
     @idx.setter

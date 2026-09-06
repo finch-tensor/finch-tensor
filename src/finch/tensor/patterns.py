@@ -360,9 +360,9 @@ class PatternTensor(OverrideTensor):
         pattern_value=1,
         **constructor_kwargs,
     ):
-        if isinstance(shape, int):
-            shape = (shape,) if ndim == 1 else (shape, shape)
-        self._shape = tuple(shape)
+        if isinstance(shape, int | np.integer):
+            shape = (shape,) * ndim
+        self._shape = tuple(int(d) for d in shape)
         if len(self._shape) != ndim:
             raise ValueError(f"Expected a {ndim}D shape, got {self._shape}")
         self._element_type = ftype(dtype if dtype is not None else default_dtype)

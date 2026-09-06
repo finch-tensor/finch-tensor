@@ -195,7 +195,7 @@ def _dedup_stats(expr, sf, bindings):
         expr, sf, dict(bindings), {}
     )
     input_stats = []
-    for stat in conjuncts + disjuncts:
+    for stat in itertools.chain(conjuncts, disjuncts):
         if not any(stat is seen for seen in input_stats):
             input_stats.append(stat)
     return conjuncts, disjuncts, input_stats

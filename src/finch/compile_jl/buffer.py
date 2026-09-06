@@ -49,7 +49,7 @@ class PlusOneBuffer(Buffer, ABC):
 
     @property
     def length_type(self):
-        return self.data.length_type()
+        return self.data.length_type
 
     def load(self, idx: int):
         return self.data.load(idx) + 1

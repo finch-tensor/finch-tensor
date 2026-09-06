@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from finch.algebra import FType, ftype, return_type
+from finch.algebra import FType, ftype, return_type, TensorFType
 from finch.finch_assembly import AssemblyNode
 from finch.symbolic import (
     CallTerm,
@@ -127,11 +127,10 @@ class Variable(NotationExpression, NamedTerm):
     """
 
     name: str
-    type_: FType | None = None
+    type_: FType
 
     def __post_init__(self):
-        if self.type_ is not None:
-            assert isinstance(self.type_, FType)
+        assert isinstance(self.type_, FType)
 
     @property
     def result_type(self):
@@ -154,12 +153,13 @@ class Call(NotationTree, NotationExpression, CallTerm):
     `args...`.
     """
 
-    op: Literal
+    op: Literal | Variable
     args: tuple[NotationExpression, ...]
 
     @property
-    def result_type(self):
+    def result_type(self) -> FType:
         arg_types = [a.result_type for a in self.args]
+        assert isinstance(self.op, Literal)  # TODO: handle Variable
         return return_type(self.op.val, *arg_types)
 
     @classmethod
@@ -217,7 +217,8 @@ class Dimension(NotationTree, NotationExpression):
 
     @property
     def result_type(self):
-        return self.tns.shape_type[self.r.val]
+        assert(isinstance(self.tns.result_type, TensorFType))
+        return self.tns.result_type.shape_type[self.r.val]
 
     @classmethod
     def from_children(cls, tns, r):
@@ -306,7 +307,7 @@ class Unwrap(NotationTree, NotationExpression):
     tensor `arg`.
     """
 
-    arg: NotationNode
+    arg: NotationExpression
 
     @property
     def children(self):
@@ -317,6 +318,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
+        assert(isinstance(self.arg.result_type, TensorFType))
         return self.arg.result_type.element_type
 
 

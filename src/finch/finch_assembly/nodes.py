@@ -3,7 +3,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from finch.algebra import ftype, return_type
-from finch.algebra.ftypes import FType
+from finch.algebra.ftypes import FType, StructFType
 from finch.symbolic import (
     CallTerm,
     Context,
@@ -239,6 +239,7 @@ class GetAttr(AssemblyExpression, AssemblyTree):
     @property
     def result_type(self):
         """Returns the type of the expression."""
+        assert isinstance(self.obj.result_type, StructFType)
         return dict(self.obj.result_type.struct_fields)[self.attr.val]
 
 
@@ -272,7 +273,7 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
         args: The arguments to call on the function.
     """
 
-    op: Literal
+    op: Literal | Variable
     args: tuple[AssemblyExpression, ...]
 
     @property
@@ -288,6 +289,7 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
     def result_type(self):
         """Returns the type of the expression."""
         arg_types = [arg.result_type for arg in self.args]
+        assert isinstance(self.op, Literal)
         return return_type(self.op.val, *arg_types)
 
 
@@ -309,7 +311,7 @@ class Load(AssemblyExpression, AssemblyTree):
         return [self.buffer, self.index]
 
     @property
-    def result_type(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         return self.buffer.result_type.element_type
 
@@ -564,7 +566,7 @@ class Block(AssemblyTree, AssemblyStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyStatement, ...] = ()
+    bodies: tuple[AssemblyStatement | AssemblyExpression, ...] = ()
 
     @property
     def children(self):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Self
@@ -47,13 +48,13 @@ Notes:
 
 class Term:
     @abstractmethod
-    def head(self) -> Any:
+    def head(self) -> Callable[..., Self]:
         """Return the head type of the S-expression."""
         ...
 
     @classmethod
     @abstractmethod
-    def make_term(cls, head: Any, *children: Term) -> Self:
+    def make_term(cls, head: Callable[..., Self], *children: Term) -> Self:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy

@@ -3,11 +3,20 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, FType, TensorFType, ffuncs, ftype, ftypes
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    TensorFType,
+    ffuncs,
+    ftype,
+    ftypes,
+)
+from finch.algebra.ftypes import np_dtype
 from finch.finch_logic import LogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
 from finch.tensor import dense, element, fiber_tensor, sparse_hash
@@ -16,6 +25,9 @@ from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
 from .tensor_stats import FDStats, StatsInterpreter
+
+if TYPE_CHECKING:
+    from finch.algebra import FiberTensorFType
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -41,8 +53,8 @@ def optimize_format(
     n = len(fields)
     fill_ftype = ftype(fill_value)
     leaf = element(fill_value, fill_ftype)
-    val_size = np.dtype(fill_ftype.dtype).itemsize
-    pos_size = np.dtype(leaf.position_type.dtype).itemsize
+    val_size = np_dtype(fill_ftype.dtype).itemsize
+    pos_size = np_dtype(leaf.position_type).itemsize
 
     # memoizing (l,nnz) : (best_cost,best_fmt)
     memo = {}
@@ -115,6 +127,9 @@ def total_tree_cost(
     )
 
 
+TS = TypeVar("TS", bound=TensorStats)
+
+
 class SmartFormatter(LogicFormatter):
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__(loader)
@@ -131,11 +146,11 @@ class SmartFormatter(LogicFormatter):
         self,
         prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
-        stats: dict[lgc.Alias, TensorStats],
+        stats: dict[lgc.Alias, TS],
         stats_factory: StatsFactory,
     ):
         bindings = bindings.copy()
-        stats_bindings: OrderedDict[lgc.Alias, TensorStats] = OrderedDict(stats)
+        stats_bindings: OrderedDict[lgc.Alias, TS] = OrderedDict(stats)
         stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
@@ -152,7 +167,8 @@ class SmartFormatter(LogicFormatter):
                     rhs_stats = stats_interpreter(rhs, stats_bindings)
                     if not isinstance(rhs_stats, TensorStats):
                         raise TypeError("Expected query RHS to produce TensorStats.")
-                    stats_bindings[lhs] = rhs_stats
+                    assert isinstance(rhs_stats, TensorStats)
+                    stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
                     if lhs not in bindings:
                         shape_type = tuple(
@@ -190,7 +206,7 @@ class FDFormatter(SmartFormatter):
         fill_value: AbstractFill,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
-    ) -> TensorFType:
+    ) -> FiberTensorFType:
         if not isinstance(stats, FDStats):
             raise TypeError("FDFormatter requires FDStats.")
         if len(shape_type) != len(stats.index_order):
