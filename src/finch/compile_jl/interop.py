@@ -279,24 +279,12 @@ def tensor_to_jl(obj, pin_fill: bool = False):
     if isinstance(obj, np.ndarray):
         fill = np.asarray(0, dtype=obj.dtype)[()]
         return _ndarray_to_jl_tensor(obj, fill, copy=False)
-    if isinstance(obj, np.generic):
-        return scalar_to_jl(obj.item(), pin_fill=pin_fill)
     if np.isscalar(obj):
         return scalar_to_jl(obj, pin_fill=pin_fill)
-    if hasattr(obj, "val"):
-        return scalar_to_jl(obj.val, pin_fill=pin_fill)
     raise ValueError(f"Unsupported Julia backend argument type: {type(obj)}")
 
 
 def scalar_to_jl(val, pin_fill: bool = False):
-    if hasattr(val, "to_numpy"):
-        val = val.to_numpy().item()
-    elif hasattr(val, "val"):
-        val = val.val
-        if hasattr(val, "to_numpy"):
-            val = val.to_numpy().item()
-    if isinstance(val, np.generic):
-        val = val.item()
     fill = ftype(val)(0) if pin_fill else val
     buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
