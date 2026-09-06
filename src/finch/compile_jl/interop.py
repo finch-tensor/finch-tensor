@@ -20,6 +20,7 @@ from finch.tensor import (
     SparseListLevel,
     element,
 )
+from finch.tensor.patterns import FillTensor
 from finch.tensor.np_wrapper import NumPyWrapper
 
 from . import types as jl_dtypes
@@ -270,6 +271,11 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
         return scalar_to_jl(obj.val, pin_fill=pin_fill)
+    if isinstance(obj, FillTensor):
+        lvl = jl.PatternLevel()
+        for dim in reversed(obj.shape):
+            lvl = jl.DenseLevel(lvl, int(dim))
+        return jl.Tensor(lvl)
     if isinstance(obj, np.ndarray):
         fill = np.asarray(0, dtype=obj.dtype)[()]
         return _ndarray_to_jl_tensor(obj, fill, copy=False)

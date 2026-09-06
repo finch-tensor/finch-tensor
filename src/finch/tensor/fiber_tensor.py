@@ -7,8 +7,11 @@ import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
+    AbstractFill,
+    DynamicFill,
     DynamicFillError,
     ImmutableStructFType,
+    StaticFill,
     TupleFType,
     bool_,
     ftype,
@@ -112,6 +115,17 @@ class FiberTensor(OverrideTensor):
     def __getitem__(self, idx):
         arr = self.to_numpy()
         return arr[idx]
+
+    def __setitem__(self, idx, val):
+        curr = self.lvl
+        while hasattr(curr, "lvl"):
+            curr = curr.lvl
+        if hasattr(curr, "val"):
+            buf = curr.val.arr if hasattr(curr.val, "arr") else curr.val
+            arr = np.reshape(buf, self.shape)
+            arr[idx] = val
+            return
+        raise NotImplementedError("Item assignment not supported for sparse FiberTensor.")
 
     def to_scipy(self):
         from .level import (
@@ -328,7 +342,16 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         """
         fmt = self
         if fill_value is not None:
-            fmt = self.with_fill(self.element_type(fill_value))
+            if isinstance(fill_value, AbstractFill):
+                typed_val = self.element_type(fill_value.value)
+                new_fill = (
+                    DynamicFill(typed_val, fill_value.ftype)
+                    if is_dynamic(fill_value)
+                    else StaticFill(typed_val)
+                )
+                fmt = self.with_fill(new_fill)
+            else:
+                fmt = self.with_fill(self.element_type(fill_value))
         elif is_dynamic(self.fill_value):
             raise DynamicFillError(
                 f"cannot construct {self!r} without a resolved fill value"

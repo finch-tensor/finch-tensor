@@ -15,6 +15,7 @@ from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
 from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
 from finch.tensor.level.sparse_list_level import SparseListLevelFType
+from finch.tensor.patterns import FillTensorFType
 from finch.tensor.scalar import ScalarFType
 
 from .julia import get_jl, jc
@@ -281,6 +282,11 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         elem_t = _leaf_type_str(ftype.element_type)
         fill = _julia_literal(ftype.fill_value)
         ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
+        for _ in range(ftype.ndim):
+            ctor = f"Finch.DenseLevel({ctor}, 1)"
+        return f"Finch.Tensor({ctor})"
+    if isinstance(ftype, FillTensorFType):
+        ctor = "Finch.PatternLevel()"
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"

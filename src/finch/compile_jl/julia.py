@@ -67,6 +67,7 @@ def _start_julia() -> tuple[Any, Any]:
     function wrap_numpy_ptr(ptr_val::Integer, len::Integer, ::Type{T}) where {T}
         unsafe_wrap(Vector{T}, Ptr{T}(UInt(ptr_val)), (len,); own=false)
     end
+    first_arg(x, y...) = x
     """)
 
     return juliacall, Main

@@ -71,6 +71,7 @@ _JULIA_OPS = {
     ffuncs.where: "ifelse",
     ffuncs.clip: "clamp",
     ffuncs.truth: "Bool",
+    ffuncs.first_arg: "first_arg",
 }
 
 _JULIA_REDUCTION_OPS = {
