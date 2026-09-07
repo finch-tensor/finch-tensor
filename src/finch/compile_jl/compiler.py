@@ -33,13 +33,21 @@ _JULIA_OPS = {
     ffuncs.pow: "^",
     ffuncs.neg: "-",
     ffuncs.pos: "+",
+    ffuncs.divide: "/",
+    ffuncs.remainder: "mod",
     # comparisons
     ffuncs.eq: "==",
+    ffuncs.equal: "==",
     ffuncs.ne: "!=",
+    ffuncs.not_equal: "!=",
     ffuncs.lt: "<",
+    ffuncs.less: "<",
     ffuncs.le: "<=",
+    ffuncs.less_equal: "<=",
     ffuncs.gt: ">",
+    ffuncs.greater: ">",
     ffuncs.ge: ">=",
+    ffuncs.greater_equal: ">=",
     # bitwise / logical
     ffuncs.and_: "&",
     ffuncs.or_: "|",
@@ -51,6 +59,9 @@ _JULIA_OPS = {
     ffuncs.logical_or: "Finch.or",
     ffuncs.logical_not: "!",
     ffuncs.logical_xor: "xor",
+    # math / elementwise
+    ffuncs.max: "max",
+    ffuncs.min: "min",
     # misc
     ffuncs.divmod: "divrem",
     ffuncs.square: "abs2",
@@ -60,6 +71,7 @@ _JULIA_OPS = {
     ffuncs.where: "ifelse",
     ffuncs.clip: "clamp",
     ffuncs.truth: "Bool",
+    ffuncs.first_arg: "first_arg",
 }
 
 _JULIA_REDUCTION_OPS = {
@@ -306,8 +318,11 @@ class FinchJLGenerator:
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"
-                if isinstance(val, float | np.floating) and np.isinf(val):
-                    return "Inf" if val > 0 else "-Inf"
+                if isinstance(val, float | np.floating):
+                    if np.isinf(val):
+                        return "Inf" if val > 0 else "-Inf"
+                    if np.isnan(val):
+                        return "NaN"
                 return str(val)
 
             case ntn.Variable(name, _):

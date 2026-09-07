@@ -21,6 +21,7 @@ from finch.tensor import (
     element,
 )
 from finch.tensor.np_wrapper import NumPyWrapper
+from finch.tensor.patterns import FillTensor
 
 from . import types as jl_dtypes
 from .julia import jc, jl
@@ -247,7 +248,8 @@ def _ndarray_to_jl_tensor(
     elif not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
 
-    buf = jl.Vector(np.reshape(arr, -1))
+    jl_type = jl_dtypes._fl_dtype_to_jl()[ftype(arr.dtype)]
+    buf = jl.wrap_numpy_ptr(arr.ctypes.data, arr.size, jl_type)
     fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
@@ -272,24 +274,24 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
         return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
-        return scalar_to_jl(obj.val)
+        return scalar_to_jl(obj.val, pin_fill=pin_fill)
+    if isinstance(obj, FillTensor):
+        lvl = jl.PatternLevel()
+        for dim in reversed(obj.shape):
+            lvl = jl.DenseLevel(lvl, int(dim))
+        return jl.Tensor(lvl)
     if isinstance(obj, np.ndarray):
         fill = np.asarray(0, dtype=obj.dtype)[()]
         return _ndarray_to_jl_tensor(obj, fill, copy=False)
-    if isinstance(obj, np.generic):
-        return scalar_to_jl(obj.item())
     if np.isscalar(obj):
-        return scalar_to_jl(obj)
-    if hasattr(obj, "val"):
-        return scalar_to_jl(obj.val)
+        return scalar_to_jl(obj, pin_fill=pin_fill)
     raise ValueError(f"Unsupported Julia backend argument type: {type(obj)}")
 
 
-def scalar_to_jl(val):
-    if isinstance(val, np.generic):
-        val = val.item()
+def scalar_to_jl(val, pin_fill: bool = False):
+    fill = ftype(val)(0) if pin_fill else val
     buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(buf.item()), jl.Vector(buf)))
+    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
 
 
 def jl_tensor_to_python(obj):
