@@ -277,10 +277,7 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         # (regardless of the ftype's own dimension_type).
         elem_t = _leaf_type_str(ftype.element_type)
         fill = _julia_literal(ftype.fill_value)
-        ctor = (
-            f"Finch.ElementLevel({fill}, "
-            f"PythonCall.PyArray(PythonCall.pyjl({elem_t}[]), copy=false))"
-        )
+        ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"

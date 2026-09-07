@@ -248,7 +248,8 @@ def _ndarray_to_jl_tensor(
     elif not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
 
-    buf = jl.PythonCall.PyArray(np.reshape(arr, -1), copy=False)
+    jl_type = jl_dtypes._fl_dtype_to_jl()[ftype(arr.dtype)]
+    buf = jl.wrap_numpy_ptr(arr.ctypes.data, arr.size, jl_type)
     fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
