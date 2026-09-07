@@ -123,10 +123,7 @@ def compute(arg, ctx=None):
                 len(res[lazy_idx].shape) == 0
             ):  # if the result is a scalar, extract the value and turn it into a
                 # finch `Scalar`
-                outputs[out_idx] = asarray(
-                    res[lazy_idx].to_numpy()[()],
-                    device=device,
-                )
+                outputs[out_idx] = asarray(res[lazy_idx][()], device=device)
             else:
                 outputs[out_idx] = asarray(res[lazy_idx], device=device)
 
