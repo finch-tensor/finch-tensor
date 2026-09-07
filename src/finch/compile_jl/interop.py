@@ -318,7 +318,7 @@ class JuliaBufferContext:
     def _cache_key(obj):
         # defer() can create a fresh wrapper around the same NumPy
         # allocation, so wrapper identity alone would miss reuse.
-        if isinstance(obj, BufferizedNDArray): 
+        if isinstance(obj, BufferizedNDArray):
             arr = obj.to_numpy()
             pointer = arr.__array_interface__["data"][0]
             return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
