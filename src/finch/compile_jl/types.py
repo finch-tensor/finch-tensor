@@ -59,14 +59,10 @@ class JuliaElementFType(ABC):
         ...
 
     def julia_vector(self, values, *, offset: int = 0):
-        if not isinstance(values, np.ndarray):
-            raise TypeError(f"Expected np.ndarray, got {type(values)}")
-        if offset != 0:
-            values = values + offset
-        if not values.flags["C_CONTIGUOUS"]:
-            values = np.ascontiguousarray(values)
-        return get_jl().wrap_numpy_ptr(
-            values.ctypes.data, len(values), self.julia_type()
+        jl = get_jl()
+        return jc.convert(
+            jl.Vector[self.julia_type()],
+            [self.julia_value(value, offset=offset) for value in values],
         )
 
 

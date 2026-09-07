@@ -135,19 +135,23 @@ def level_to_jl(level: Level, pin_fill: bool = False):
 
 
 def _jl_index_buffer_to_python(v) -> NumpyBuffer:
-    """Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
-    to Python's 0-based indexing, returning an owned copy so Python retains
-    memory ownership across kernel calls."""
+    """
+    Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
+    to Python's 0-based indexing in place on Julia's own memory rather than
+    copying to a new array. Safe because the only caller (jl_tensor_to_python,
+    via FinchJLKernel.__call__) converts a freshly-computed result that's
+    discarded on the Julia side right after this call.
+    """
     if jl.isa(v, jl.Finch.PlusOneVector):
         raw = np.asarray(v.data)
     else:
         raw = np.asarray(v)
         raw -= 1
-    return NumpyBuffer(np.ascontiguousarray(raw).astype(np.intp).copy())
+    return NumpyBuffer(np.ascontiguousarray(raw).astype(np.intp, copy=False))
 
 
 def _jl_buffer_to_python(v) -> NumpyBuffer:
-    return NumpyBuffer(np.ascontiguousarray(np.asarray(v)).copy())
+    return NumpyBuffer(np.ascontiguousarray(np.asarray(v)))
 
 
 def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> NumpyBuffer:
