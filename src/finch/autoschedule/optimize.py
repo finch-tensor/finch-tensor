@@ -194,7 +194,8 @@ def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
         case Plan(bodies):
             return get_productions(bodies[-1])
         case Produces(args):
-            return args
+            assert all(isinstance(arg, Alias) for arg in args)
+            return args  # ty: ignore[invalid-return-type]
         case Query(lhs, _):
             return (lhs,)
         case _:
@@ -258,7 +259,9 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
             case Table(Alias() as a, idxs) if (
                 uses.get(a, 0) == 1 and a not in rets and a in defs
             ):
-                return Relabel(defs[a], idxs)
+                arg = defs[a]
+                assert isinstance(arg, LogicExpression)
+                return Relabel(arg, idxs)
 
     root = Rewrite(PreWalk(rule_1))(root)
     root = push_fields(root)

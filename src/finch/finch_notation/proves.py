@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from collections.abc import Sequence as Seq
 from functools import partial
+from typing import TypeVar
 
 from finch.algebra import ffuncs, is_associative, is_idempotent
 from finch.algebra.utils import all_unique, intersect, is_disjoint, setdiff
@@ -9,7 +10,7 @@ from finch.symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
 from .nodes import Cached, Call, NotationNode
 from .nodes import Literal as L
 
-NN = NotationNode
+NN = TypeVar("NN", bound=NotationNode)
 
 
 def _find_first_call(

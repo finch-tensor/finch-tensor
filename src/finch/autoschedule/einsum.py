@@ -54,7 +54,11 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 arg=einarg,
             )
         case lgc.Produces(args):
-            return ein.Produces(tuple(ein.Alias(ret_arg.name) for ret_arg in args))
+            names = []
+            for arg in args:
+                assert isinstance(arg, lgc.Alias)
+                names.append(ein.Alias(arg.name))
+            return ein.Produces(tuple(names))
         case _:
             raise Exception(f"Unrecognized logic: {node}")
 

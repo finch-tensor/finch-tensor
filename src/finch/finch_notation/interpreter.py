@@ -89,7 +89,9 @@ class TensorView(Tensor):
         Get the ftype of the tensor view.
         This is the ftype of the tensor at the specified indices.
         """
-        return TensorViewFType(map(ftype, self.idxs), self.tns.ftype, self.op)
+        return TensorViewFType(
+            tuple(ftype(i for i in self.idxs)), self.tns.ftype, self.op
+        )
 
     @property
     def shape(self):
@@ -341,8 +343,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
             function_state=function_state,
         )
 
-    def lower(self, prgm: ntn.Module):
-        return self._dispatch(prgm)
+    def lower(self, term: ntn.Module):
+        return self._dispatch(term)
 
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...

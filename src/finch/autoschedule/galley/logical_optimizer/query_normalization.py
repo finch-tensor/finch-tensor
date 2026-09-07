@@ -281,7 +281,8 @@ def merge_queries(plan: Plan) -> Plan:
         if isinstance(body, Query):
             alias_to_query[body.lhs] = body
 
-    produced_aliases: tuple[Alias, ...] = produces_stmt.args
+    assert all(isinstance(arg, Alias) for arg in produces_stmt.args)
+    produced_aliases: tuple[Alias, ...] = produces_stmt.args  # ty: ignore[invalid-assignment]
     produced_alias_set: set[Alias] = set(produced_aliases)
 
     new_queries: list[Query] = []
@@ -362,7 +363,7 @@ def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
         case MapJoin(Literal(op1), args) if is_associative(op1):
             new_args: list[LogicExpression] = []
             for arg in args:
-                if isinstance(arg, MapJoin) and arg.op.val == op1:
+                if isinstance(arg, MapJoin) and arg.op == node.op:
                     new_args.extend(arg.args)
                 else:
                     new_args.append(arg)

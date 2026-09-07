@@ -127,11 +127,10 @@ class Variable(NotationExpression, NamedTerm):
     """
 
     name: str
-    type_: FType | None = None
+    type_: FType
 
     def __post_init__(self):
-        if self.type_ is not None:
-            assert isinstance(self.type_, FType)
+        assert isinstance(self.type_, FType)
 
     @property
     def result_type(self):

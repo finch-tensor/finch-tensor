@@ -574,7 +574,9 @@ def test_asarray_scipy_sparse(csr_type):
     assert isinstance(tensor.lvl.lvl, SparseListLevel)
     assert isinstance(tensor.lvl.lvl.lvl, ElementLevel)
     np.testing.assert_array_equal(tensor.lvl.lvl.lvl.val.arr, csr.data)
+    assert tensor.lvl.lvl.idx is not None
     np.testing.assert_array_equal(tensor.lvl.lvl.idx.arr, csr.indices)
+    assert tensor.lvl.lvl.ptr is not None
     np.testing.assert_array_equal(tensor.lvl.lvl.ptr.arr, csr.indptr)
 
     scipy_tensor = tensor.to_scipy()

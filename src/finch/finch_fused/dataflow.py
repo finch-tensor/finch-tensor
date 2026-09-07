@@ -1,6 +1,5 @@
 from typing import cast
 
-from finch.interface import compute, defer
 from finch.symbolic import Chain, Namespace, PostWalk, Rewrite
 from finch.symbolic.dataflow import DataFlowAnalysis
 
@@ -90,6 +89,8 @@ def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
 def _insert_compute(
     prgm: FusedNode, compute_sid, vars: set[Variable], nspc: Namespace
 ) -> FusedNode:
+    from finch.interface import compute, defer
+
     def _visitor(node):
         match node:
             # In the case of returns, we need to assign the expressions,
@@ -143,6 +144,8 @@ def _insert_compute(
 
 
 def maybedefer(arrs):
+    from finch import defer
+
     return tuple(defer(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
 
 

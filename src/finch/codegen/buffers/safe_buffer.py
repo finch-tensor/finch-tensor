@@ -1,4 +1,5 @@
 import finch.finch_assembly as asm
+from finch import ftype
 from finch.algebra import ftypes
 from finch.codegen.c_codegen import CBufferFType, CUnpackableFType
 from finch.codegen.numba_codegen import NumbaBufferFType, NumbaUnpackableFType
@@ -130,7 +131,7 @@ class SafeBufferFType(
             f"{ctx.feed}if {idx_n} < 0 or {idx_n} >= ({self.numba_length(ctx, buf)}):\n"
             f"{ctx.feed}    raise IndexError()"
         )
-        return asm.Variable(idx_n, int)
+        return asm.Variable(idx_n, ftype(int))
 
     def numba_load(self, ctx, buf, idx):
         """

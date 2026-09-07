@@ -1,5 +1,3 @@
-from finch.finch_logic import TensorStats
-
 from .blocked_stats import BlockedStats, BlockedStatsFactory
 from .blocked_uniform import BlockedUniformStats, BlockedUniformStatsFactory
 from .bound_stats import (
@@ -16,7 +14,8 @@ from .dummy_stats import DummyStats, DummyStatsFactory
 from .fd_stats import FDStats, FDStatsFactory
 from .sampling_stats import SamplingStats, SamplingStatsFactory
 from .stats_interpreter import StatsInterpreter
-from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory, TensorStats
+from .numeric_stats import NumericStats
 from .uniform_stats import UniformStats, UniformStatsFactory
 from .vp_stats import VPStats, VPStatsFactory
 

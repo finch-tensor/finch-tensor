@@ -133,16 +133,16 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return [Dense(tuple(range(n + 1)))] + self.lvl_t.level_format_properties(n + 1)
 
-    def level_lower_dim(self, ctx, lvl, r):
+    def level_lower_dim(self, ctx, obj, r):
         if r == 0:
-            return asm.GetAttr(lvl, asm.Literal("dimension"))
+            return asm.GetAttr(obj, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
@@ -168,15 +168,14 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self,
         ctx: AssemblyContext,
-        fiber: ntn.Fiber,
+        lvl: ntn.Fiber,
         ext: SymbolicExtent,
         mode,
         proto,
         pos: asm.AssemblyExpression,
     ):
-        tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl = ctx.fiber_level(tns)
+        ft_ftype: FiberTensorFType = lvl.type
+        fiber = ctx.fiber_level(lvl)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -194,7 +193,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                             asm.Call(
                                 asm.Literal(ffuncs.mul),
                                 (
-                                    asm.GetAttr(lvl, asm.Literal("stride")),
+                                    asm.GetAttr(fiber, asm.Literal("stride")),
                                     asm.Variable(
                                         idx.name, idx.type_
                                     ),  # TODO: lower with ctx.ctx
@@ -206,11 +205,11 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             )
             child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
             return ntn.Fiber(
-                tns.root,
-                ntn.Child(tns.lvl),
+                lvl.root,
+                ntn.Child(lvl.lvl),
                 pos_2,
                 child_type,
-                (*tns.idxs, idx),
+                (*lvl.idxs, idx),
             )
 
         return lplt.Lookup(
@@ -249,9 +248,7 @@ class DenseLevel(Level):
 
     @property
     def ftype(self) -> DenseLevelFType:
-        # mypy does not understand that dataclasses generate __hash__ and __eq__
-        # https://github.com/python/mypy/issues/19799
-        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
+        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))
 
     @property
     def val(self) -> Any:

@@ -301,7 +301,7 @@ def test_simplify_assembly():
 
 
 def test_simplify_logic_mapjoin():
-    a = lgc.Alias("A")
+    a = lgc.Table(lgc.Alias("A"), ())
     term = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (lgc.MapJoin(lgc.Literal(ffuncs.mul), (a, lgc.Literal(2))), lgc.Literal(3)),
@@ -399,9 +399,9 @@ class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
         self.ctx = ctx
         self.last: asm.Module
 
-    def lower(self, prgm: asm.Module):
-        self.last = prgm
-        return self.ctx(prgm)
+    def lower(self, term: asm.Module):
+        self.last = term
+        return self.ctx(term)
 
 
 def _assembly_for(build):
