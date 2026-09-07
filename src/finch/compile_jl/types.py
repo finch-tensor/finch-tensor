@@ -57,16 +57,18 @@ class JuliaElementFType(ABC):
         """
         ...
 
-    def julia_vector(self, values, *, offset: int = 0):
+    def julia_vector(self, values, *, offset: int = 0, owner_tracker=None):
         if not isinstance(values, np.ndarray):
             raise TypeError(f"Expected np.ndarray, got {type(values)}")
-        if offset != 0:
-            values = values + offset
-        if not values.flags["C_CONTIGUOUS"]:
-            values = np.ascontiguousarray(values)
-        return get_jl().wrap_numpy_ptr(
+        if offset != 0 or not values.flags["C_CONTIGUOUS"] or owner_tracker is None:
+            return jc.convert(
+                get_jl().Vector[self.julia_type()],
+                [self.julia_value(value, offset=offset) for value in values],
+            )
+        vec = get_jl().wrap_numpy_ptr(
             values.ctypes.data, values.size, self.julia_type()
         )
+        return owner_tracker(vec, values, pointers=(values.ctypes.data,))
 
 
 @lru_cache
@@ -160,17 +162,27 @@ def to_jl_value(T, value, *, offset: int = 0):
     return _as_julia_scalar(T(value))
 
 
-def to_jl_vector(T, values, *, offset: int = 0):
+def to_jl_vector(T, values, *, offset: int = 0, owner_tracker=None):
     T = to_fl_dtype(T)
     if isinstance(T, JuliaElementFType):
-        return T.julia_vector(values, offset=offset)
+        return T.julia_vector(values, offset=offset, owner_tracker=owner_tracker)
     if isinstance(T, TupleFType) or offset:
         jl = get_jl()
         return jc.convert(
             jl.Vector[to_jl_type(T)],
             [to_jl_value(T, value, offset=offset) for value in values],
         )
-    return get_jl().Vector(values)
+    expected_dtype = getattr(T, "dtype", None)
+    if expected_dtype is not None and np.dtype(values.dtype) != np.dtype(
+        expected_dtype
+    ):
+        raise ValueError(
+            f"Cannot avoid a copy converting {values.dtype} to Julia {to_jl_type(T)}"
+        )
+    if not values.flags["C_CONTIGUOUS"] or owner_tracker is None:
+        return get_jl().Vector(values)
+    vec = get_jl().wrap_numpy_ptr(values.ctypes.data, values.size, to_jl_type(T))
+    return owner_tracker(vec, values, pointers=(values.ctypes.data,))
 
 
 def _julia_literal(value: Any) -> str:
@@ -181,9 +193,9 @@ def _julia_literal(value: Any) -> str:
             value = fill.value
     # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
-    if isinstance(value, (_py_bool, np.bool_)):
+    if isinstance(value, _py_bool | np.bool_):
         return "true" if value else "false"
-    if isinstance(value, (float, np.floating)):
+    if isinstance(value, float | np.floating):
         if math.isinf(value):
             return "-Inf" if value < 0 else "Inf"
         if math.isnan(value):
