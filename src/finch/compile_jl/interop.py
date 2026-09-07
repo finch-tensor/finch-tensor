@@ -322,13 +322,13 @@ class JuliaBufferContext:
         if isinstance(obj, BufferizedNDArray):
             arr = obj.to_numpy()
             pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
+            return ("numpy", pointer, arr.shape, arr.strides, obj.ftype)
         if isinstance(obj, NumPyWrapper):
             arr = obj._data
             pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
-        # FiberTensors reuse their ids so we restrict cache keys to id.
-        return ("object", id(obj))
+            return ("numpy", pointer, arr.shape, arr.strides, obj.ftype)
+        # FiberTensors can be identified with identity and ftype
+        return ("object", id(obj), obj.ftype)
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         key = self._cache_key(obj)
