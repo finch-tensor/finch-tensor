@@ -212,7 +212,7 @@ class FDFormatter(SmartFormatter):
             if is_dense:
                 lvl = dense(lvl, shape_type[dim])
             else:
-                lvl = sparse_hash(lvl, shape_type[dim], single_writer=False)
+                lvl = sparse_hash(lvl, shape_type[dim], single_writer=True)
 
         return fiber_tensor(lvl)
 
@@ -243,7 +243,7 @@ class SparseHashLevelOption(LevelOption):
     level_type = SparseHashLevelFType
 
     def build(self, lvl, dim_type):
-        return sparse_hash(lvl, dim_type, single_writer=False)
+        return sparse_hash(lvl, dim_type, single_writer=True)
 
     def next_num_pos(self, num_pos, n_l, nnz_l):
         return nnz_l
