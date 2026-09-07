@@ -18,7 +18,7 @@ from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
-from .interop import jl_tensor_to_python, tensor_to_jl
+from .interop import JuliaBufferContext
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
@@ -132,12 +132,13 @@ class FinchJLKernel(AssemblyKernel):
         # arbitrarily set to zero. Other arguments keep their
         # Known fills.
         self.dynamic_args = dynamic_args
+        self.buffer_context = JuliaBufferContext()
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
         raw_args = [
-            tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(args)
         ]
         result = finch_fn(*raw_args)
@@ -150,8 +151,11 @@ class FinchJLKernel(AssemblyKernel):
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
         if jl.isa(result, jl.Finch.Tensor):
-            return (jl_tensor_to_python(result),)
-        return tuple(jl_tensor_to_python(res) for res in result)
+            return (self.buffer_context.tensor_to_python(result),)
+        return tuple(self.buffer_context.tensor_to_python(res) for res in result)
+
+    def close(self):
+        self.buffer_context.close()
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -160,6 +164,10 @@ class FinchJLLibrary(AssemblyLibrary):
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
+    def close(self):
+        for kernel in self.kernel_dict.values():
+            kernel.close()
 
 
 class FinchJLGenerator:

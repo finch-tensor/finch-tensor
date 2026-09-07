@@ -24,6 +24,7 @@ from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.patterns import FillTensor
 
 from . import types as jl_dtypes
+from .buffer import MinusOneBuffer
 from .julia import jc, jl
 
 
@@ -38,6 +39,10 @@ def _as_julia_scalar(val):
 
 
 def _buffer_to_jl(buffer: Buffer, *, offset: int = 0):
+    if isinstance(buffer, MinusOneBuffer):
+        if offset != 1:
+            raise ValueError("MinusOneBuffer can only be unwrapped with offset=1")
+        return _buffer_to_jl(buffer.data)
     if isinstance(buffer, NumpyBuffer):
         return jl_dtypes.to_jl_vector(
             buffer.ftype.element_type,
@@ -48,6 +53,8 @@ def _buffer_to_jl(buffer: Buffer, *, offset: int = 0):
 
 
 def _plus_one_buffer_to_jl(buffer: Buffer):
+    if isinstance(buffer, MinusOneBuffer):
+        return _buffer_to_jl(buffer.data)
     return jl.Finch.PlusOneVector(_buffer_to_jl(buffer))
 
 
@@ -134,32 +141,31 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             raise ValueError(f"Unsupported Finch level type: {type(level)}")
 
 
-def _jl_index_buffer_to_python(v) -> NumpyBuffer:
+def _jl_array_to_python_no_copy(v):
+    """Return a NumPy view of a Julia array without copying its data."""
+    return v.to_numpy(copy=False)
+
+
+def _jl_index_buffer_to_python(v) -> Buffer:
     """
     Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
-    to Python's 0-based indexing in place on Julia's own memory rather than
-    copying to a new array. Safe because the only caller (jl_tensor_to_python,
-    via FinchJLKernel.__call__) converts a freshly-computed result that's
-    discarded on the Julia side right after this call.
+    to Python's 0-based indexing without copying.
     """
     if jl.isa(v, jl.Finch.PlusOneVector):
-        raw = np.asarray(v.data)
-    else:
-        raw = np.asarray(v)
-        raw -= 1
-    return NumpyBuffer(np.ascontiguousarray(raw).astype(np.intp, copy=False))
+        raw = _jl_array_to_python_no_copy(v.data)
+        return NumpyBuffer(raw)
+    return MinusOneBuffer(NumpyBuffer(_jl_array_to_python_no_copy(v)))
 
 
 def _jl_buffer_to_python(v) -> NumpyBuffer:
-    return NumpyBuffer(np.ascontiguousarray(np.asarray(v)))
+    return NumpyBuffer(_jl_array_to_python_no_copy(v))
 
 
-def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> NumpyBuffer:
-    """See _jl_index_buffer_to_python: offset is applied in place, no copy."""
-    raw = np.asarray(v)
-    if offset:
-        for i in range(n_fields):
-            raw[f"f{i}"] -= offset
+def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> Buffer:
+    """Convert a Julia tuple buffer while preserving its Julia-owned data."""
+    if offset not in (0, 1):
+        raise ValueError("Only offset=0 or offset=1 can be represented without a copy")
+    raw = _jl_array_to_python_no_copy(v)
 
     src_fields = raw.dtype.fields
     assert src_fields is not None
@@ -172,13 +178,16 @@ def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> NumpyBuf
             "itemsize": raw.dtype.itemsize,
         }
     )
-    return NumpyBuffer(raw.view(dtype))
+    buffer = NumpyBuffer(raw.view(dtype))
+    if offset:
+        return MinusOneBuffer(buffer)
+    return buffer
 
 
 def jl_level_to_python(jl_lvl) -> Level:
     if jl.isa(jl_lvl, jl.Finch.ElementLevel):
         fill_value = jl.Finch.level_fill_value(jl.typeof(jl_lvl))
-        val = np.ascontiguousarray(np.asarray(jl_lvl.val)).copy()
+        val = _jl_array_to_python_no_copy(jl_lvl.val)
         elem_ftype = element(
             jl_dtypes.to_fl_dtype(val.dtype)(fill_value),
             jl_dtypes.to_fl_dtype(val.dtype),
@@ -248,8 +257,7 @@ def _ndarray_to_jl_tensor(
     elif not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
 
-    jl_type = jl_dtypes._fl_dtype_to_jl()[ftype(arr.dtype)]
-    buf = jl.wrap_numpy_ptr(arr.ctypes.data, arr.size, jl_type)
+    buf = jl_dtypes.to_jl_vector(ftype(arr.dtype), arr.reshape(-1))
     fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
@@ -298,3 +306,44 @@ def jl_tensor_to_python(obj):
     if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
         return obj
     return FiberTensor(jl_level_to_python(obj.lvl))
+
+
+class JuliaBufferContext:
+    """Keep Julia-owned tensor buffers alive across kernel invocations."""
+
+    def __init__(self):
+        self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
+
+    @staticmethod
+    def _cache_key(obj):
+        # defer() can create a fresh wrapper around the same NumPy
+        # allocation, so wrapper identity alone would miss reuse.
+        if isinstance(obj, BufferizedNDArray): 
+            arr = obj.to_numpy()
+            pointer = arr.__array_interface__["data"][0]
+            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
+        if isinstance(obj, NumPyWrapper):
+            arr = obj._data
+            pointer = arr.__array_interface__["data"][0]
+            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
+        # FiberTensors reuse their ids so we restrict cache keys to id.
+        return ("object", id(obj))
+
+    def tensor_to_jl(self, obj, *, pin_fill: bool = False):
+        key = self._cache_key(obj)
+        cached = self._tensors.get(key)
+        if cached is not None:
+            return cached[1]
+
+        jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
+        self._tensors[key] = (obj, jl_obj)
+        return jl_obj
+
+    def tensor_to_python(self, obj):
+        result = jl_tensor_to_python(obj)
+        if isinstance(result, FiberTensor):
+            self._tensors[self._cache_key(result)] = (result, obj)
+        return result
+
+    def close(self):
+        self._tensors.clear()
