@@ -36,6 +36,7 @@ from finch.algebra.ftypes import (
     FDTypeBuiltin,
     FDTypeNumpy,
 )
+from finch.algebra.algebra import is_specializable_value 
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.finch_logic import (
     Aggregate,
@@ -492,7 +493,13 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = Scalar(arr) if _is_numeric_constant(arr) else asarray(arr)
+    if _is_numeric_constant(arr):
+        if is_specializable_value(arr):
+            arr = ConstantScalar(arr)
+        else:
+            arr = Scalar(arr)
+    else:
+        arr = asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
