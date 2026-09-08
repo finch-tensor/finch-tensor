@@ -38,7 +38,11 @@ def test_algebra_selected():
     assert is_identity(ffuncs.add, 0)
     assert is_identity(ffuncs.mul, 1)
     assert is_identity(ffuncs.or_, False)
-    assert is_identity(ffuncs.and_, True)
+    # Bitwise `and`'s identity is all-ones, which is -1 in two's complement.
+    # `True` is all-ones only against another boolean -- `int & True` is
+    # `int & 1` -- and this rule cannot see the other operand's dtype.
+    assert is_identity(ffuncs.and_, -1)
+    assert not is_identity(ffuncs.and_, True)
     assert is_identity(ffuncs.truediv, 1)
     assert is_identity(ffuncs.lshift, 0)
     assert is_identity(ffuncs.rshift, 0)

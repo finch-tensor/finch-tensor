@@ -36,7 +36,6 @@ from finch.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
-from finch.finch_logic import Literal, Query
 from finch.finch_notation.interpreter import NotationInterpreter
 from finch.interface import add, asarray, matmul, sum
 from finch.interface.lazy import LazyTensor
@@ -176,8 +175,9 @@ def test_parse_rejects_while_else_blocks():
 
 def test_parse_reverse_parse_is_lossless_on_supported_subset():
     """
-    Round-tripping recovers the source, except that numeric literals come back
-    as the ConstantScalars the parser turned them into.
+    Round-tripping recovers the source. Numeric literals survive as literals:
+    the parser leaves them alone, and a constant only becomes a ConstantScalar
+    later, when `defer` hands it to the lazy layer.
     """
 
     def roundtrip_fn(n):
@@ -193,14 +193,14 @@ def test_parse_reverse_parse_is_lossless_on_supported_subset():
 
     expected_source = textwrap.dedent("""\
         def roundtrip_fn(n):
-            total = ConstantScalar(0)
+            total = 0
             for i in range(n):
                 if i < n:
                     total = total + i
                 else:
-                    total = total - ConstantScalar(1)
+                    total = total - 1
             while total < n:
-                total = total + ConstantScalar(1)
+                total = total + 1
             return total
         """)
     expected_fn = ast.parse(expected_source).body[0]
@@ -461,15 +461,36 @@ def test_maybedefer_defers_every_tensor():
     assert plain == 2.0
 
 
-def test_constant_scalar_still_inlines_at_a_use_site():
-    """A constant reaching `elementwise` directly is inlined, not bound."""
-    A = asarray(np.arange(3.0))
-    # Deferring the constant would bind it as a table, adding a third query and
-    # dropping the bare Literal that lets the kernel specialize on the value.
-    y = finch.defer(A) * ConstantScalar(2.0)
-    queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
-    assert len(queries) == 2
-    assert Literal(2.0) in queries[-1].rhs.arg.args
+@pytest.mark.parametrize(
+    ("operand", "bound"),
+    [
+        pytest.param(ConstantScalar(2.0), 0, id="constant_scalar"),
+        pytest.param(1.0, 0, id="specializable_literal"),
+        pytest.param(2.0, 1, id="runtime_literal"),
+    ],
+)
+def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):
+    """A constant costs no runtime binding, however it was written.
+
+    Everything is bound as a table on the way in; `inline_constant_scalars`
+    then replaces the constants with their values and drops those bindings. A
+    value the optimizer cannot act on stays a binding, which is the point.
+    """
+    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    executor = LogicExecutor(
+        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+    )
+    arr = np.arange(3.0)
+    with finch.with_default_scheduler(LogicNormalizer(executor)):
+        result = finch.compute(finch.defer(asarray(arr)) + operand)
+    finch_assert_allclose(result, arr + float(np.asarray(operand)))
+    scalars = [
+        t
+        for bindings in capture.all_bindings
+        for t in bindings.values()
+        if isinstance(t, ScalarFType)
+    ]
+    assert len(scalars) == bound
 
 
 @pytest.mark.parametrize(

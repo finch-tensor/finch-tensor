@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 
 import finch
-from finch import ConstantScalar
+from finch import ConstantScalar, Scalar
 from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
@@ -127,7 +127,9 @@ def _same(actual, expected) -> bool:
         (call(ffuncs.add, ntn.Literal(0), x), x),
         (call(ffuncs.mul, x, ntn.Literal(1)), x),
         (call(ffuncs.or_, x, ntn.Literal(False)), x),
-        (call(ffuncs.and_, x, ntn.Literal(True)), x),
+        # Bitwise `and`'s identity is all-ones, i.e. -1 -- not `True`, which is
+        # all-ones only against another boolean. `x & True` is `x & 1`.
+        (call(ffuncs.and_, x, ntn.Literal(-1)), x),
         # annihilators
         (call(ffuncs.mul, x, ntn.Literal(0)), ntn.Literal(0)),
         (call(ffuncs.mul, ntn.Literal(0), x), ntn.Literal(0)),
@@ -179,6 +181,18 @@ def test_simplify_notation(term, expected):
 )
 def test_simplify_leaves_alone(term):
     assert simplify(term) == term
+
+
+@pytest.mark.parametrize("operand", [True, 1, 2, 3])
+def test_simplify_keeps_a_partial_bitwise_and(operand):
+    """`x & v` may only be dropped when every bit of `v` is set.
+
+    `True` is all-ones against a boolean but is `1` against an integer, and the
+    rule cannot see the other operand's dtype -- so only -1 qualifies. Dropping
+    the operand for any truthy value returned `x` where `x & 1` was meant.
+    """
+    term = call(ffuncs.and_, x, ntn.Literal(operand))
+    assert_simplifies_to(term, term)
 
 
 def test_simplify_recurses_into_statements():
@@ -437,13 +451,21 @@ def test_annihilator_empties_the_loop_body():
     The payoff of a compile-time constant: `A * 0` keeps its loop nest, but the
     body loses the multiply and the load of `A`, so the pass over `A` is gone.
     A runtime scalar of the same value cannot be simplified away.
+
+    A literal `0` earns the compile-time treatment too -- `defer` wraps it as a
+    ConstantScalar and the normalizer inlines it -- so the runtime half has to
+    ask for a runtime scalar explicitly with `Scalar`.
     """
     # The remaining `mul`s are stride arithmetic; `mul(load(` is the one that
     # multiplies an element of `A`.
-    code, out, arr = _assembly_for(lambda x, arr: x * ConstantScalar(0))
-    np.testing.assert_array_equal(out, arr * 0)
-    assert "mul(load(" not in code
+    for build in (
+        lambda x, arr: x * ConstantScalar(0),
+        lambda x, arr: x * 0,
+    ):
+        code, out, arr = _assembly_for(build)
+        np.testing.assert_array_equal(out, arr * 0)
+        assert "mul(load(" not in code
 
-    runtime_code, runtime_out, _ = _assembly_for(lambda x, arr: x * 0)
+    runtime_code, runtime_out, arr = _assembly_for(lambda x, arr: x * Scalar(0))
     np.testing.assert_array_equal(runtime_out, arr * 0)
     assert "mul(load(" in runtime_code

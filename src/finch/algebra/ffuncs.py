@@ -261,7 +261,7 @@ class _And(NAryFinchOperator):
         return reduce(operator.and_, args)
 
     def is_identity(self, arg):
-        return bool(arg)
+        return arg == -1
 
     def is_annihilator(self, arg):
         return not bool(arg)

@@ -43,7 +43,16 @@ from finch.autoschedule import (
     LogicExecutor,
     LogicNormalizer,
 )
-from finch.finch_logic import Literal, LogicLoader, MapJoin, Query, Reorder
+from finch.autoschedule.normalize import inline_constant_scalars
+from finch.finch_logic import (
+    Literal,
+    LogicLoader,
+    MapJoin,
+    Plan,
+    Query,
+    Reorder,
+    Table,
+)
 from finch.finch_notation.interpreter import NotationInterpreter
 from finch.symbolic import UnvalidatedForm
 
@@ -166,30 +175,74 @@ def test_constant_scalar_caches_same_value():
     assert len(executor.cached_kernels) == 1
 
 
-def test_plain_scalar_single_kernel():
-    # The design-goal regression: a loop over distinct plain scalar values
-    # compiles exactly one kernel.
+def test_plain_scalar_shares_one_kernel():
+    # The design goal: the kernel count does not grow with the number of
+    # distinct scalar values. Values the optimizer cannot act on all share one
+    # kernel; a specializable value earns one of its own, so the total is
+    # bounded by `SPECIALIZABLE_VALUES` plus one, not by the value count.
     executor, ctx = _cached_scheduler()
     arr = np.arange(3.0)
     x = finch.asarray(arr)
     for v in [1.0, 2.0, 3.0, 4.0, 5.0]:
         out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
-    assert len(executor.cached_kernels) == 1
+    # one specialized for 1.0, one shared by 2.0 through 5.0
+    assert len(executor.cached_kernels) == 2
+
+    # Ten more values the optimizer cannot use add nothing. They have to be
+    # Python floats like the ones above: `np.float64` is a different element
+    # type, so it would earn a kernel for a reason unrelated to fills.
+    for v in [float(i) for i in range(6, 16)]:
+        out = finch.compute(finch.defer(x) + v, ctx=ctx)
+        finch_assert_allclose(out, arr + v)
+    assert len(executor.cached_kernels) == 2
 
 
 def test_constant_scalar_inlines_to_literal():
+    """The trace binds every operand as a table; the normalizer inlines the
+    constant and drops the binding it came from."""
     x = finch.defer(finch.asarray(np.arange(3.0)))
     y = x + ConstantScalar(2.0)
-    queries = [s for s in y.ctx.trace() if isinstance(s, Query)]
-    # One query binds the input table, one the mapjoin; no scalar binding.
-    assert len(queries) == 2
-    (mapjoin_q,) = [q for q in queries if q.lhs == y.data]
+
+    # Three queries in the trace: the input table, the constant table, the
+    # mapjoin. Nothing is inlined yet.
+    trace = Plan(tuple(s for s in y.ctx.trace() if isinstance(s, Query)))
+    assert len(trace.bodies) == 3
+
+    inlined = inline_constant_scalars(trace)
+    # The constant's own binding is gone ...
+    assert len(inlined.bodies) == 2
+    assert not [
+        q
+        for q in inlined.bodies
+        if isinstance(q.rhs, Table) and isinstance(q.rhs.tns.val, ConstantScalar)
+    ]
+    # ... and its value now sits in the mapjoin where the rules can fold on it.
+    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs == y.data]
     match mapjoin_q.rhs:
         case Reorder(MapJoin(Literal(_), args), _):
-            assert Literal(2.0) in args
+            assert Reorder(Literal(2.0), ()) in args
         case _:
             raise AssertionError(f"unexpected rhs: {mapjoin_q.rhs}")
+
+
+@pytest.mark.parametrize(
+    "operand",
+    [
+        pytest.param(ConstantScalar(1), id="constant_scalar"),
+        pytest.param(1.0, id="specializable_literal"),
+        pytest.param(2.0, id="runtime_literal"),
+    ],
+)
+def test_a_produced_constant_keeps_its_binding(operand):
+    """A constant that is itself the result must stay a tensor.
+
+    Inlining reaches the queries the rules read, but not one the program
+    produces: `Query(a, Literal(v))` names no tensor for the backend to hand
+    back, and lowering it failed outright.
+    """
+    out = finch.compute(finch.defer(operand))
+    assert float(np.asarray(out)) == float(np.asarray(operand))
 
 
 def test_plain_scalar_becomes_binding():
@@ -216,7 +269,9 @@ def test_scalar_annihilator_keeps_known_fill():
         out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
-    assert len(executor.cached_kernels) == 1
+    # 1.0 is mul's identity, so it inlines and simplifies to its own kernel;
+    # 2.0 and 3.0 share the other.
+    assert len(executor.cached_kernels) == 2
 
 
 @pytest.mark.parametrize(
@@ -279,7 +334,9 @@ def test_order_independence():
 
     outs_a, kernels_a = run([0.0, 2.0])
     outs_b, kernels_b = run([2.0, 0.0])
-    assert kernels_a == kernels_b == 1
+    # 0.0 annihilates mul and gets its own kernel, 2.0 uses the shared one --
+    # and which came first makes no difference, which is the point here.
+    assert kernels_a == kernels_b == 2
     for v in [0.0, 2.0]:
         np.testing.assert_array_equal(outs_a[v], outs_b[v])
 
@@ -310,8 +367,9 @@ def test_galley_scalar_cache_counts():
         out = finch.compute(finch.defer(x) * v, ctx=ctx)
         finch_assert_allclose(out, arr * v)
         assert out.fill_value == 0.0
-    # one kernel for the adds, one for the muls
-    assert len(executor.cached_kernels) == 2
+    # Two kernels per operator: one specialized on the value the optimizer can
+    # act on (1.0 for add, 0.0 for mul), one shared by the rest.
+    assert len(executor.cached_kernels) == 4
 
 
 def test_galley_order_independence():
@@ -326,7 +384,7 @@ def test_galley_order_independence():
 
     outs_a, kernels_a = run([0.0, 2.0])
     outs_b, kernels_b = run([2.0, 0.0])
-    assert kernels_a == kernels_b == 1
+    assert kernels_a == kernels_b == 2
     for v in [0.0, 2.0]:
         np.testing.assert_array_equal(outs_a[v], outs_b[v])
 
@@ -502,7 +560,10 @@ def test_dynamic_output_feeds_a_reusable_kernel():
     arr = np.arange(3.0)
     x = finch.asarray(arr)
 
-    for v in [1.0, 2.0, 3.0]:
+    # Every value here is one the optimizer cannot act on, so each output fill
+    # is dynamic -- which is the situation this test is about. A specializable
+    # value would keep a static fill and is covered by the tests above.
+    for v in [2.0, 3.0, 4.0]:
         step1 = finch.compute(finch.defer(x) + v, ctx=ctx)
         assert is_dynamic(step1.ftype.fill_value)
         step2 = finch.compute(finch.defer(step1) * 2.0, ctx=ctx)
