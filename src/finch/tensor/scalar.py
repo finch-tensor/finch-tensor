@@ -140,9 +140,6 @@ class Scalar(OverrideTensor):
         return self._device
 
     def with_fill(self, fill_value: AbstractFill) -> Scalar:
-        # A scalar's marking is carried by its class rather than by a fill
-        # field: `Scalar.ftype` is always dynamic and `ConstantScalar.ftype`
-        # always static, so the requested marking picks the class.
         if is_dynamic(fill_value):
             return Scalar(self.val, fill_value=fill_value, device=self._device)
         if not bool(np.all(ffuncs.same(fill_value.value, self.val))):
