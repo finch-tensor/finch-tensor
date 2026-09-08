@@ -63,6 +63,8 @@ def _start_julia() -> tuple[Any, Any]:
     for pkg in _JULIA_PACKAGES:
         Main.seval(f"using {pkg}")
 
+    Main.seval("first_arg(x, y...) = x")
+
     return juliacall, Main
 
 
