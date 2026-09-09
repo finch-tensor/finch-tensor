@@ -167,6 +167,18 @@ class TensorView(Tensor):
         self.tns[*self.idxs] = self.op(lhs, val)
         return
 
+class ConstantTensor():
+    """
+    A tensor that always returns a constant value.
+    This is used to represent a tensor that is filled with a single value.
+    """
+
+    def __init__(self, val):
+        self.val = val
+
+    def unwrap(self):
+        return self.val
+
 
 def access(tns, idxs, op=None):
     """
@@ -387,6 +399,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
+            case ntn.Constant(val):
+                return ConstantTensor(val)
             case ntn.Unwrap(tns):
                 return unwrap(self(tns))
             case ntn.Assign(var, val):

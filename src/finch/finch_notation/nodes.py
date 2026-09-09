@@ -253,6 +253,17 @@ class Access(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.mode, *self.idxs]
 
+@dataclass(eq=True, frozen=True)
+class Constant(NotationTree, NotationStatement):
+    """
+    Notation AST statement for a tensor filled with a value `val` in the current scope.
+    """
+
+    val: NotationExpression
+
+    @property
+    def children(self):
+        return [self.val]
 
 @dataclass(eq=True, frozen=True)
 class Read(AccessMode):
