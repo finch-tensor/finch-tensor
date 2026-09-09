@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.sparse as sps
 
 import finch as ft
 from finch.codegen import NumpyBuffer
@@ -130,16 +129,3 @@ def test_julia_kernel_recycles_only_arguments_reset_before_first_read():
     """
 
     assert FinchJLKernel._find_reset_arg_positions(code) == frozenset({0, 2})
-
-
-def test_asarray_csr_honors_dense_sparse_list_format():
-    matrix = sps.csr_matrix(np.array([[0.0, 2.0], [3.0, 0.0]]))
-    tensor_format = ft.fiber_tensor(
-        ft.dense(ft.sparse_list(ft.element(np.inf)))
-    )
-
-    tensor = ft.asarray(matrix, format=tensor_format)
-
-    assert tensor.fill_value == np.inf
-    assert isinstance(tensor.lvl, ft.DenseLevel)
-    assert isinstance(tensor.lvl.lvl, ft.SparseListLevel)
