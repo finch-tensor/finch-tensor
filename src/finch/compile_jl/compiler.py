@@ -129,6 +129,9 @@ class CompiledJLKernel:
 class FinchJLKernel(AssemblyKernel):
     """A kernel already defined (evaluated) in the running Julia session."""
 
+    _ARG_CACHE_SIZE = 32
+    _OUTPUT_POOL_SIZE = 2
+
     def __init__(
         self,
         func_name,
@@ -146,25 +149,95 @@ class FinchJLKernel(AssemblyKernel):
         self.dynamic_args = dynamic_args
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
+        # JuliaCall attribute lookup is a boundary crossing of its own. Kernel
+        # methods are immutable once generated, so retain the callable proxy.
+        self._finch_fn = getattr(jl, self.func_name)
+        # Keep exact Python-object references, rather than ids, so an object-id
+        # reuse can never select an unrelated Julia tensor. The small LRU is
+        # enough for invariant inputs plus the active ping-pong state buffers.
+        self._arg_cache: list[tuple[object, bool, object]] = []
+        # Filled after the first invocation by matching returned Julia tensors
+        # to positional arguments. Each position keeps two Julia-backed Python
+        # wrappers, allowing an output buffer to be reused without aliasing the
+        # current input state.
+        self._result_arg_positions: tuple[int, ...] | None = None
+        self._output_pools: dict[int, list[object]] = {}
 
-    def __call__(self, *args):
-        finch_fn = getattr(jl, self.func_name)
-        raw_args = [
-            self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
-            for i, arg in enumerate(args)
-        ]
-        result = finch_fn(*raw_args)
+    def _tensor_to_jl(self, arg, *, pin_fill: bool):
+        for i, (cached_arg, cached_pin_fill, cached_jl) in enumerate(
+            self._arg_cache
+        ):
+            if cached_arg is arg and cached_pin_fill == pin_fill:
+                # Promote the hit so alternating ping-pong buffers stay hot.
+                self._arg_cache.append(self._arg_cache.pop(i))
+                return cached_jl
+        jl_arg = self.buffer_context.tensor_to_jl(arg, pin_fill=pin_fill)
+        self._arg_cache.append((arg, pin_fill, jl_arg))
+        if len(self._arg_cache) > self._ARG_CACHE_SIZE:
+            self._arg_cache.pop(0)
+        return jl_arg
 
-        # @finch_kernel-generated functions return a NamedTuple keyed by the
-        # returned variable name(s), unlike @finch's bare Tensor/tuple.
+    def _recycled_output_args(self, args):
+        """Use a non-aliasing Julia-backed output buffer when one is known."""
+
+        if self._result_arg_positions is None:
+            return list(args)
+        recycled = list(args)
+        for arg_pos, pool in self._output_pools.items():
+            for candidate in pool:
+                if all(
+                    candidate is not arg
+                    for i, arg in enumerate(args)
+                    if i != arg_pos
+                ):
+                    recycled[arg_pos] = candidate
+                    break
+        return recycled
+
+    def _learn_result_layout(self, result, raw_args):
+        """Recover first-call outputs and learn which arguments they alias."""
+
         if jl.isa(result, jl.NamedTuple):
             result = jl.values(result)
+        result_items = (result,) if jl.isa(result, jl.Finch.Tensor) else tuple(result)
+        raw_arg_positions = {
+            int(jl.objectid(raw_arg)): i for i, raw_arg in enumerate(raw_args)
+        }
+        result_arg_positions: list[int] = []
+        recovered = []
+        for result_item in result_items:
+            arg_pos = raw_arg_positions.get(int(jl.objectid(result_item)))
+            if arg_pos is None:
+                # This kernel's result is not a supplied output buffer, so
+                # retain Finch's ordinary recovery behavior.
+                return tuple(
+                    self.buffer_context.tensor_to_python(item) for item in result_items
+                )
+            result_arg_positions.append(arg_pos)
+            recovered_item = self.buffer_context.tensor_to_python(result_item)
+            recovered.append(recovered_item)
+            pool = self._output_pools.setdefault(arg_pos, [])
+            if all(existing is not recovered_item for existing in pool):
+                pool.append(recovered_item)
+                if len(pool) > self._OUTPUT_POOL_SIZE:
+                    pool.pop(0)
+        self._result_arg_positions = tuple(result_arg_positions)
+        return tuple(recovered)
 
-        # The finch function returns tuples when multiple values are returned
-        # or a non-tuple when a single value is returned.
-        if jl.isa(result, jl.Finch.Tensor):
-            return (self.buffer_context.tensor_to_python(result),)
-        return tuple(self.buffer_context.tensor_to_python(res) for res in result)
+    def __call__(self, *args):
+        call_args = self._recycled_output_args(args)
+        raw_args = [
+            self._tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            for i, arg in enumerate(call_args)
+        ]
+        result = self._finch_fn(*raw_args)
+
+        if self._result_arg_positions is not None:
+            # The generated Finch kernels return their supplied output tensors.
+            # Once that layout is learned, the Julia return value need not cross
+            # back through tensor recovery at all.
+            return tuple(call_args[pos] for pos in self._result_arg_positions)
+        return self._learn_result_layout(result, raw_args)
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):

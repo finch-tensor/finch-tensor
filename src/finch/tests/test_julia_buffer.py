@@ -4,6 +4,7 @@ import scipy.sparse as sps
 import finch as ft
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
+from finch.compile_jl.compiler import FinchJLKernel
 from finch.compile_jl.interop import JuliaBufferContext, _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
 
@@ -74,6 +75,47 @@ def test_julia_buffer_context_reuses_julia_backed_result_wrapper():
 
     assert first_result is not python_input
     assert second_result is first_result
+
+
+def test_julia_kernel_argument_cache_is_identity_and_fill_sensitive():
+    """The boundary cache must not conflate an equal but distinct tensor."""
+
+    class RecordingContext:
+        def __init__(self):
+            self.calls = []
+
+        def tensor_to_jl(self, arg, *, pin_fill):
+            result = object()
+            self.calls.append((arg, pin_fill, result))
+            return result
+
+    kernel = object.__new__(FinchJLKernel)
+    kernel.buffer_context = RecordingContext()
+    kernel._arg_cache = []
+    first = object()
+    equal_but_distinct = object()
+
+    first_jl = kernel._tensor_to_jl(first, pin_fill=False)
+    assert kernel._tensor_to_jl(first, pin_fill=False) is first_jl
+    assert kernel._tensor_to_jl(first, pin_fill=True) is not first_jl
+    assert kernel._tensor_to_jl(equal_but_distinct, pin_fill=False) is not first_jl
+    assert len(kernel.buffer_context.calls) == 3
+
+
+def test_julia_kernel_output_pool_never_reuses_a_current_input():
+    """Ping-pong selection leaves the active state buffer read-only this call."""
+
+    kernel = object.__new__(FinchJLKernel)
+    active_state = object()
+    spare_state = object()
+    fresh_output = object()
+    kernel._result_arg_positions = (2,)
+    kernel._output_pools = {2: [active_state, spare_state]}
+
+    call_args = kernel._recycled_output_args((active_state, object(), fresh_output))
+
+    assert call_args[0] is active_state
+    assert call_args[2] is spare_state
 
 
 def test_asarray_csr_honors_dense_sparse_list_format():
