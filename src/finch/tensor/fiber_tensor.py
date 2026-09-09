@@ -339,6 +339,18 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         Returns:
             A FiberTensor instance of this type.
         """
+        if sps.issparse(val) and val.format == "csr":
+            from .level import DenseLevelFType, ElementLevelFType, SparseListLevelFType
+
+            match self.lvl_t:
+                case DenseLevelFType(
+                    SparseListLevelFType(ElementLevelFType() as element_format, _), _
+                ):
+                    result = FiberTensor.from_scipy_csr(val)
+                    result.lvl.lvl.lvl._format = result.lvl.lvl.lvl._format.with_fill(
+                        element_format.fill_value
+                    )
+                    return result
         raise NotImplementedError(
             f"Tensor conversion not yet implemented for {type(self).__name__}"
         )

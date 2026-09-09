@@ -314,6 +314,21 @@ class JuliaBufferContext:
 
     def __init__(self):
         self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
+        # JuliaCall can produce a fresh Python proxy for an existing Julia
+        # object, so Python ``id`` cannot identify a returned tensor.  Map
+        # Julia's stable object identity to the Python wrapper that was
+        # recovered from it instead.
+        #
+        # The boolean says the Python wrapper is backed by Julia buffers.  A
+        # Python tensor passed into Julia may have been copied on conversion;
+        # returning that original wrapper after a Julia mutation would expose
+        # stale data and is therefore not safe.
+        self._julia_tensors: dict[int, tuple[Any, bool]] = {}
+
+    @staticmethod
+    def _julia_cache_key(obj) -> int:
+        """Return Julia object identity, stable across JuliaCall proxies."""
+        return int(jl.objectid(obj))
 
     @staticmethod
     def _cache_key(obj):
@@ -338,13 +353,25 @@ class JuliaBufferContext:
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         self._tensors[key] = (obj, jl_obj)
+        # Do not mark a Python-origin tensor reusable for Julia-to-Python
+        # results.  Its conversion may have copied its physical buffers.
+        self._julia_tensors[self._julia_cache_key(jl_obj)] = (obj, False)
         return jl_obj
 
     def tensor_to_python(self, obj):
+        if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
+            cached = self._julia_tensors.get(self._julia_cache_key(obj))
+            if cached is not None and cached[1]:
+                return cached[0]
+
         result = jl_tensor_to_python(obj)
         if isinstance(result, FiberTensor):
             self._tensors[self._cache_key(result)] = (result, obj)
+            # ``jl_tensor_to_python`` exposes Julia arrays as NumPy views, so
+            # this wrapper will see later writes to the same Julia tensor.
+            self._julia_tensors[self._julia_cache_key(obj)] = (result, True)
         return result
 
     def close(self):
         self._tensors.clear()
+        self._julia_tensors.clear()

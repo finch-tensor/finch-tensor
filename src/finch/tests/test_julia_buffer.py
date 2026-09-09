@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.sparse as sps
 
 import finch as ft
 from finch.codegen import NumpyBuffer
@@ -56,3 +57,33 @@ def test_julia_buffer_context_reuses_buffers_after_kernel_invocation():
     second_jl = context.tensor_to_jl(second_arg)
 
     assert second_jl is first_jl
+
+
+def test_julia_buffer_context_reuses_julia_backed_result_wrapper():
+    _requires_julia_backend()
+
+    context = JuliaBufferContext()
+    python_input = ft.asarray(np.arange(4, dtype=np.float64))
+    julia_tensor = context.tensor_to_jl(python_input)
+
+    # JuliaCall returns a fresh Python proxy here, even though Julia returns
+    # the exact same tensor object.  The context should identify it by Julia
+    # object identity and return the previously recovered Python view.
+    first_result = context.tensor_to_python(jl.first_arg(julia_tensor))
+    second_result = context.tensor_to_python(jl.first_arg(julia_tensor))
+
+    assert first_result is not python_input
+    assert second_result is first_result
+
+
+def test_asarray_csr_honors_dense_sparse_list_format():
+    matrix = sps.csr_matrix(np.array([[0.0, 2.0], [3.0, 0.0]]))
+    tensor_format = ft.fiber_tensor(
+        ft.dense(ft.sparse_list(ft.element(np.inf)))
+    )
+
+    tensor = ft.asarray(matrix, format=tensor_format)
+
+    assert tensor.fill_value == np.inf
+    assert isinstance(tensor.lvl, ft.DenseLevel)
+    assert isinstance(tensor.lvl.lvl, ft.SparseListLevel)
