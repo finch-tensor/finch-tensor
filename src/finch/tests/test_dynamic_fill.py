@@ -212,12 +212,13 @@ def test_constant_scalar_inlines_to_literal():
         case _:
             raise AssertionError(f"unexpected rhs: {mapjoin_q.rhs}")
 
+
 def test_a_produced_constant_keeps_its_binding():
-    """ 
+    """
     We shouldn't create `Query(a, Literal(v))` via inlining of constants.
     """
     out = finch.compute(finch.defer(ConstantScalar(1)))
-    assert float(np.asarray(out)) == float(np.asarray(operand))
+    assert float(np.asarray(out)) == float(np.asarray(ConstantScalar(1)))
 
 
 def test_plain_scalar_becomes_binding():

@@ -210,6 +210,7 @@ class _Pow(BinaryFinchOperator):
 
     def is_identity(self, arg):
         return arg == 1
+
     def __repr__(self) -> str:
         return "pow"
 

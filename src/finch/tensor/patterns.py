@@ -46,10 +46,16 @@ class IndexTensorFType(TensorFType):
         _shape_type: tuple[FType | type, ...] = (),
         _fill_value: AbstractFill | None = None,
     ):
-        self._element_type = ftype(_element_type))
-        self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
-        self._fill_value = StaticFill(self._element_type(0)) if _fill_value is None else _fill_value
-        
+        # Frozen dataclass: fields have to be set through `object`.
+        object.__setattr__(self, "_element_type", ftype(_element_type))
+        object.__setattr__(
+            self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
+        )
+        object.__setattr__(
+            self,
+            "_fill_value",
+            StaticFill(self._element_type(0)) if _fill_value is None else _fill_value,
+        )
 
     @property
     def fill_value(self) -> AbstractFill:
