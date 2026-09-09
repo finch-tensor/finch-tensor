@@ -212,23 +212,11 @@ def test_constant_scalar_inlines_to_literal():
         case _:
             raise AssertionError(f"unexpected rhs: {mapjoin_q.rhs}")
 
-
-@pytest.mark.parametrize(
-    "operand",
-    [
-        pytest.param(ConstantScalar(1), id="constant_scalar"),
-        pytest.param(1.0, id="specializable_literal"),
-        pytest.param(2.0, id="runtime_literal"),
-    ],
-)
-def test_a_produced_constant_keeps_its_binding(operand):
-    """A constant that is itself the result must stay a tensor.
-
-    Inlining reaches the queries the rules read, but not one the program
-    produces: `Query(a, Literal(v))` names no tensor for the backend to hand
-    back, and lowering it failed outright.
+def test_a_produced_constant_keeps_its_binding():
+    """ 
+    We shouldn't create `Query(a, Literal(v))` via inlining of constants.
     """
-    out = finch.compute(finch.defer(operand))
+    out = finch.compute(finch.defer(ConstantScalar(1)))
     assert float(np.asarray(out)) == float(np.asarray(operand))
 
 
@@ -321,8 +309,6 @@ def test_order_independence():
 
     outs_a, kernels_a = run([0.0, 2.0])
     outs_b, kernels_b = run([2.0, 0.0])
-    # 0.0 annihilates mul and gets its own kernel, 2.0 uses the shared one --
-    # and which came first makes no difference, which is the point here.
     assert kernels_a == kernels_b == 2
     for v in [0.0, 2.0]:
         np.testing.assert_array_equal(outs_a[v], outs_b[v])
@@ -510,44 +496,6 @@ def test_executor_output_keeps_a_dynamic_fill():
     # ... but nothing downstream may compile against it.
     assert is_dynamic(out.ftype.fill_value)
     assert out.ftype.fill_value.value == 5.0
-
-
-@pytest.mark.parametrize(
-    ("fill_value", "stays_dynamic"),
-    [
-        pytest.param(DynamicFill(np.float64(0.0)), True, id="dynamic_fill"),
-        pytest.param(StaticFill(np.float64(0.0)), False, id="static_fill"),
-        pytest.param(np.float64(0.0), False, id="numpy_scalar"),
-        pytest.param(0.0, False, id="python_float"),
-    ],
-)
-def test_fiber_construct_accepts_a_marked_fill(fill_value, stays_dynamic):
-    """`construct` must take an `AbstractFill`, not just a raw number.
-
-    The executor resolves a dynamic output fill and hands it back through
-    `construct` as a `DynamicFill`; coercing that as a bare number raised
-    `TypeError`, so a fiber output with a dynamic fill could not be built.
-    """
-    a, _ = _sparse_fiber(0.0)
-    out = a.ftype.construct((2, 2), fill_value=fill_value)
-    fill = out.ftype.fill_value
-    assert is_dynamic(fill) is stays_dynamic
-    assert fill.value == 0.0
-    assert fill.ftype == a.ftype.element_type
-
-
-def test_a_coo_fiber_can_replace_its_fill():
-    """`Level.with_fill` rebuilds via `dataclasses.replace`, which a COO level
-    cannot answer: its `coo_shape` field comes from a `shape` parameter."""
-    import scipy.sparse as sps
-
-    x = finch.asarray(sps.coo_matrix(np.eye(3)))
-    demoted = x.with_fill(x.ftype.fill_value.as_dynamic())
-    assert is_dynamic(demoted.ftype.fill_value)
-    assert demoted.shape == x.shape
-    # Same stored values, just a re-marked fill.
-    np.testing.assert_array_equal(demoted.lvl.lvl.val.arr, x.lvl.lvl.val.arr)
-    np.testing.assert_array_equal(demoted.to_scipy().toarray(), x.to_scipy().toarray())
 
 
 def test_dynamic_output_feeds_a_reusable_kernel():

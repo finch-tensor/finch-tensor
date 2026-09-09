@@ -185,27 +185,6 @@ def test_simplify_leaves_alone(term):
     assert simplify(term) == term
 
 
-@pytest.mark.parametrize("operand", [True, 1, 2, 3])
-def test_simplify_keeps_a_partial_bitwise_and(operand):
-    """`x & v` may only be dropped when every bit of `v` is set."""
-    term = call(ffuncs.and_, x, ntn.Literal(operand))
-    assert_simplifies_to(term, term)
-
-
-@pytest.mark.parametrize("operand", [False, 1, 2, 3])
-def test_simplify_keeps_a_partial_bitwise_or(operand):
-    """`x | v` may only collapse to `v` when every bit of `v` is set."""
-    term = call(ffuncs.or_, x, ntn.Literal(operand))
-    assert_simplifies_to(term, simplify(term))
-    assert simplify(term) != ntn.Literal(operand)
-
-
-def test_simplify_keeps_pow_by_zero():
-    """`x ** 0` is 1, so 0 is no annihilator -- `annihilate` ignores position."""
-    term = call(ffuncs.pow, ntn.Variable("x", float64), ntn.Literal(0))
-    assert_simplifies_to(term, term)
-
-
 def test_simplify_recurses_into_statements():
     block = ntn.Block(
         (

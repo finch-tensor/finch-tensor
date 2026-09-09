@@ -245,19 +245,6 @@ class _RShift(BinaryFinchOperator):
 rshift = _RShift()
 
 
-def _is_all_ones(arg: Any) -> builtins.bool:
-    """
-    Whether every bit of `arg` is set, i.e. -1 in two's complement.
-
-    The value bitwise `and` leaves alone and bitwise `or` swallows. Truthiness
-    is the wrong test -- that belongs to the logical operators -- because any
-    other truthy value still changes bits (`2 & 1 == 0`, `2 | 5 == 7`), and
-    `True` is all-ones only against another boolean, which these dtype-blind
-    rules cannot check.
-    """
-    return arg == -1
-
-
 class _And(NAryFinchOperator):
     is_associative = True
     is_commutative = True
@@ -270,7 +257,7 @@ class _And(NAryFinchOperator):
         return reduce(operator.and_, args)
 
     def is_identity(self, arg):
-        return _is_all_ones(arg)
+        return arg == -1
 
     def is_annihilator(self, arg):
         return not bool(arg)
@@ -322,7 +309,7 @@ class _Or(NAryFinchOperator):
         return not bool(arg)
 
     def is_annihilator(self, arg):
-        return _is_all_ones(arg)
+        return arg == -1
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, _And)

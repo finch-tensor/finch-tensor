@@ -218,9 +218,6 @@ class SparseCOOLevel(Level):
         self.__post_init__()
 
     def with_fill(self, fill_value: AbstractFill) -> "SparseCOOLevel":
-        # `Level.with_fill` rebuilds with `dataclasses.replace`, which cannot
-        # reach this level: the `coo_shape` field is filled from an `__init__`
-        # parameter named `shape`.
         return SparseCOOLevel(
             self.lvl.with_fill(fill_value), self.coo_shape, self.ptr, self.tbl
         )

@@ -46,17 +46,10 @@ class IndexTensorFType(TensorFType):
         _shape_type: tuple[FType | type, ...] = (),
         _fill_value: AbstractFill | None = None,
     ):
-        object.__setattr__(self, "_element_type", ftype(_element_type))
-        object.__setattr__(
-            self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
-        )
-        # An index tensor's fill is 0 -- it is only stored so the marking can
-        # be replaced, which is what `with_fill` is for.
-        object.__setattr__(
-            self,
-            "_fill_value",
-            StaticFill(self._element_type(0)) if _fill_value is None else _fill_value,
-        )
+        self._element_type = ftype(_element_type))
+        self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
+        self._fill_value = StaticFill(self._element_type(0)) if _fill_value is None else _fill_value
+        
 
     @property
     def fill_value(self) -> AbstractFill:
@@ -411,8 +404,6 @@ class PatternTensor(OverrideTensor):
         self._constructor_kwargs = tuple(constructor_kwargs.items())
 
     def with_fill(self, fill_value: AbstractFill) -> PatternTensor:
-        # Subclasses take their own `__init__` arguments and none of them
-        # accept a fill, so the instance is copied rather than rebuilt.
         clone = copy(self)
         clone._fill_value = as_fill(fill_value)
         return clone
