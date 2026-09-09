@@ -135,10 +135,9 @@ def compute(arg, ctx=None):
                 len(res[lazy_idx].shape) == 0
             ):  # if the result is a scalar, extract the value and turn it into a
                 # finch `Scalar`
-                out = asarray(res[lazy_idx][()], device=device)
+                outputs[out_idx] = asarray(res[lazy_idx][()], device=device)
             else:
-                out = asarray(res[lazy_idx], device=device)
-            outputs[out_idx] = out
+                outputs[out_idx] = asarray(res[lazy_idx], device=device)
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
 
