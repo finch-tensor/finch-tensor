@@ -61,17 +61,71 @@ class PlusOneBuffer(Buffer, ABC):
         self.data.resize(len)
 
 
+class MinusOneBufferFType(BufferFType):
+    def __init__(self, data_ftype):
+        self.data_ftype = data_ftype
+
+    def __call__(self, *args, **kwargs):
+        return MinusOneBuffer(self.data_ftype(*args, **kwargs))
+
+    @property
+    def element_type(self):
+        return self.data_ftype.element_type
+
+    @property
+    def length_type(self):
+        return self.data_ftype.length_type
+
+
+class MinusOneBuffer(Buffer, ABC):
+    """Buffer that subtracts one on loads and adds one on stores."""
+
+    def __init__(self, data):
+        self.data: Buffer = data
+
+    @property
+    def ftype(self):
+        return MinusOneBufferFType(self.data.ftype)
+
+    def length(self):
+        return self.data.length()
+
+    @property
+    def element_type(self):
+        return self.data.element_type
+
+    @property
+    def arr(self):
+        return self.data.arr - 1
+
+    @property
+    def length_type(self):
+        return self.data.length_type
+
+    def load(self, idx: int):
+        return self.data.load(idx) - 1
+
+    def store(self, idx: int, val):
+        self.data.store(idx, val + 1)
+
+    def resize(self, len: int):
+        self.data.resize(len)
+
+
 def buffer_to_jlobj(buffer: Buffer):
     if isinstance(buffer, PlusOneBuffer):
         return jl.PlusOneVector(buffer_to_jlobj(buffer.data))
+    if isinstance(buffer, MinusOneBuffer):
+        return buffer_to_jlobj(buffer.data)
     if isinstance(buffer, NumpyBuffer):
         return buffer.arr
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
-def jlobj_to_buffer(jlobj):
+def jlobj_to_buffer(jlobj, *, is_index_vector: bool = False):
     if isinstance(jlobj, jl.PlusOneVector):
         return PlusOneBuffer(jlobj_to_buffer(jlobj.data))
     if isinstance(jlobj, np.ndarray):
-        return NumpyBuffer(jlobj)
+        buffer = NumpyBuffer(jlobj)
+        return MinusOneBuffer(buffer) if is_index_vector else buffer
     raise ValueError(f"Unsupported Julia object type: {type(jlobj)}")
