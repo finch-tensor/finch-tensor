@@ -92,6 +92,7 @@ def test_julia_kernel_argument_cache_is_identity_and_fill_sensitive():
     kernel = object.__new__(FinchJLKernel)
     kernel.buffer_context = RecordingContext()
     kernel._arg_cache = []
+    kernel._scalar_arg_cache = []
     first = object()
     equal_but_distinct = object()
 
@@ -116,6 +117,19 @@ def test_julia_kernel_output_pool_never_reuses_a_current_input():
 
     assert call_args[0] is active_state
     assert call_args[2] is spare_state
+
+
+def test_julia_kernel_recycles_only_arguments_reset_before_first_read():
+    code = """
+    Finch.@finch_kernel function kernel_example(v0,v1,v2)
+        v0 .= 0
+        v1[] = v0[]
+        v2 .= false
+        return v1
+    end
+    """
+
+    assert FinchJLKernel._find_reset_arg_positions(code) == frozenset({0, 2})
 
 
 def test_asarray_csr_honors_dense_sparse_list_format():
