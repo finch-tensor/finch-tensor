@@ -9,15 +9,7 @@ import types
 from collections.abc import Callable
 from typing import Any
 
-from finch.tensor.scalar import ConstantScalar
-
 from . import nodes as fzd
-
-
-def _as_python_scalar(val: Any) -> Any:
-    """A numpy scalar as the plain Python value `ast.Constant` accepts."""
-    return val.item() if hasattr(val, "item") else val
-
 
 _BIN_OPS = {
     ast.Add: operator.add,
@@ -441,37 +433,11 @@ class _FusedToPythonAST:
                     f"Unsupported fused expression type: {type(expr).__name__}"
                 )
 
-    def _global_name(self, preferred: str, value: Any) -> str:
-        """
-        Register `value` in the generated module's globals and name it.
-
-        Two distinct objects can want the same name -- a traced function may
-        reference a global of its own called `ConstantScalar` -- so a taken
-        name is freshened rather than overwritten.
-        """
-        name = preferred
-        suffix = 0
-        while self._extra_globals.get(name, value) is not value:
-            suffix += 1
-            name = f"{preferred}_{suffix}"
-        self._extra_globals[name] = value
-        return name
-
     def _literal_to_expr(self, value: Any) -> ast.expr:
         if value is None or isinstance(
             value, str | bytes | int | float | complex | bool
         ):
             return ast.Constant(value=value)
-
-        if isinstance(value, ConstantScalar):
-            return ast.Call(
-                func=ast.Name(
-                    id=self._global_name("ConstantScalar", ConstantScalar),
-                    ctx=ast.Load(),
-                ),
-                args=[ast.Constant(value=_as_python_scalar(value.val))],
-                keywords=[],
-            )
 
         if callable(value):
             if getattr(builtins, getattr(value, "__name__", ""), None) is value:
@@ -479,10 +445,13 @@ class _FusedToPythonAST:
 
             name = getattr(value, "__name__", None)
             if name is not None and name.isidentifier():
-                return ast.Name(id=self._global_name(name, value), ctx=ast.Load())
+                self._extra_globals[name] = value
+                return ast.Name(id=name, ctx=ast.Load())
 
         if isinstance(value, types.ModuleType):
-            return ast.Name(id=self._global_name(value.__name__, value), ctx=ast.Load())
+            name = value.__name__
+            self._extra_globals[name] = value
+            return ast.Name(id=name, ctx=ast.Load())
 
         raise ValueError(f"Literal cannot be represented in Python AST: {value!r}")
 
