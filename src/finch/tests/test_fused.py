@@ -1,5 +1,4 @@
 import ast
-import math
 import operator
 import textwrap
 
@@ -8,9 +7,6 @@ import pytest
 import numpy as np
 
 import finch
-from finch.algebra import (
-    is_dynamic,
-)
 from finch.autoschedule import (
     DefaultLogicFormatter,
     DefaultLogicOptimizer,
@@ -482,16 +478,6 @@ def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):
         if isinstance(t, ScalarFType)
     ]
     assert len(scalars) == bound
-
-
-@pytest.mark.parametrize(
-    ("addend", "stays_static"), [(0.0, True), (math.inf, True), (2.0, False)]
-)
-def test_compute_keeps_only_specializable_tensor_fills(addend, stays_static):
-    """The same rule governs tensors, whose fills also key the kernel cache."""
-    x = asarray(np.arange(3.0))
-    out = finch.compute(finch.defer(x) + ConstantScalar(addend))
-    assert is_dynamic(out.ftype.fill_value) is not stays_static
 
 
 def test_maybedefer_defers_every_tensor():

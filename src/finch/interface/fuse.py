@@ -57,7 +57,7 @@ Performance:
 from collections.abc import Callable
 from typing import Any
 
-from finch.algebra import is_dynamic, is_specializable_value
+from finch.algebra import is_dynamic
 from finch.algebra.tensor import Tensor
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
@@ -138,8 +138,6 @@ def compute(arg, ctx=None):
                 out = asarray(res[lazy_idx][()], device=device)
             else:
                 out = asarray(res[lazy_idx], device=device)
-            if not is_specializable_value(out.fill_value):
-                out = unspecialize_fill(out)
             outputs[out_idx] = out
 
     return tuple(outputs) if isinstance(arg, tuple) else outputs[0]
