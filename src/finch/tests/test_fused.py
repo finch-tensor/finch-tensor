@@ -452,15 +452,6 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
 
 
-def test_maybedefer_defers_every_tensor():
-    """`maybedefer` makes no judgement about fills -- it only defers tensors."""
-    A = asarray(np.arange(3.0))
-    (lazy_A, lazy_c, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
-    assert isinstance(lazy_A, LazyTensor)
-    assert isinstance(lazy_c, LazyTensor)
-    assert plain == 2.0
-
-
 @pytest.mark.parametrize(
     ("operand", "bound"),
     [
@@ -501,6 +492,15 @@ def test_compute_keeps_only_specializable_tensor_fills(addend, stays_static):
     x = asarray(np.arange(3.0))
     out = finch.compute(finch.defer(x) + ConstantScalar(addend))
     assert is_dynamic(out.ftype.fill_value) is not stays_static
+
+
+def test_maybedefer_defers_every_tensor():
+    """`maybedefer` makes no judgement about fills -- it only defers tensors."""
+    A = asarray(np.arange(3.0))
+    (lazy_A, lazy_c, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
+    assert isinstance(lazy_A, LazyTensor)
+    assert isinstance(lazy_c, LazyTensor)
+    assert plain == 2.0
 
 
 class _CollectBindings(LogicCapture):

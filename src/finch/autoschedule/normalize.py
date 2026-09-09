@@ -92,6 +92,18 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
     if not constants:
         return prgm
 
+    def constant_ref(node: LogicNode) -> Alias | None:
+        """The constant `node` refers to, if it is exactly such a reference."""
+        match node:
+            case (
+                Table(Alias() as tns, ())
+                | Reorder(Table(Alias() as tns, ()), ())
+                | Relabel(Table(Alias() as tns, ()), ())
+            ) if tns in constants:
+                return tns
+            case _:
+                return None
+
     def inline(node: LogicNode) -> LogicNode | None:
         match node:
             case Table(Alias() as tns, ()) if tns in constants:
@@ -99,58 +111,45 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
             case _:
                 return None
 
-    def is_bare_value(node: LogicNode) -> bool:
-        """Whether `node` is a literal and nothing else, once unwrapped."""
-        match node:
-            case Literal(_) | Reorder(Literal(_), ()) | Relabel(Literal(_), ()):
-                return True
-            case _:
-                return False
+    # Constants that keep their binding because inlining could not reach them.
+    live: set[Alias] = set()
 
     def inline_stmt(stmt: LogicStatement) -> LogicStatement:
         match stmt:
             case Plan(bodies):
                 return Plan(tuple(inline_stmt(body) for body in bodies))
-            case Query(Alias() as lhs, rhs):
-                new_rhs = Rewrite(PostWalk(inline))(rhs)
-                # We need to avoid `Query(a, Literal(v))` where `a` is produced
-                if lhs in produced and is_bare_value(new_rhs):
-                    return stmt
-                return Query(lhs, cast(LogicExpression, new_rhs))
+            case Query(Alias() as lhs, rhs) if lhs in produced and (
+                ref := constant_ref(rhs)
+            ):
+                # `Query(a, Literal(v))` names no tensor to produce, so a
+                # produced query that is *only* a constant reference is left
+                # alone -- and the binding it reads has to stay.
+                live.add(ref)
+                return stmt
+            case Query(lhs, rhs):
+                return Query(lhs, cast(LogicExpression, Rewrite(PostWalk(inline))(rhs)))
             case _:
                 return stmt
 
     inlined = inline_stmt(cast(LogicStatement, prgm))
 
-    def without(dead: set[Alias]):
-        def drop(node: LogicNode) -> LogicNode | None:
-            match node:
-                case Plan(bodies):
-                    kept = tuple(
-                        body
-                        for body in bodies
-                        if not (isinstance(body, Query) and body.lhs in dead)
-                    )
-                    return Plan(kept) if kept != bodies else None
-                case _:
-                    return None
-
-        return Rewrite(PostWalk(drop))(inlined)
-
-    stripped = without(set(constants))
-
-    # Because some ConstantScalars may still be referenced,
-    # we may need to put their alias definition back.
-    live: set[Alias] = set()
-
-    def mark(node: LogicNode) -> None:
+    def drop(node: LogicNode) -> LogicNode | None:
         match node:
-            case Alias() as a if a in constants:
-                live.add(a)
-        return
+            case Plan(bodies):
+                kept = tuple(
+                    body
+                    for body in bodies
+                    if not (
+                        isinstance(body, Query)
+                        and body.lhs in constants
+                        and body.lhs not in live
+                    )
+                )
+                return Plan(kept) if kept != bodies else None
+            case _:
+                return None
 
-    Rewrite(PostWalk(mark))(stripped)
-    return stripped if not live else without(set(constants) - live)
+    return Rewrite(PostWalk(drop))(inlined)
 
 
 class LogicNormalizer(UnvalidatedForm, LogicEvaluator):

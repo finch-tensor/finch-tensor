@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import builtins
 import operator
-from dataclasses import dataclass
+from copy import copy
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
 
 from finch.algebra import (
     AbstractFill,
+    DynamicFill,
     FType,
     StaticFill,
     TensorFType,
     as_fill,
     ffuncs,
     ftype,
+    is_dynamic,
 )
 
 from .override_tensor import OverrideTensor
@@ -35,20 +38,32 @@ def _shape_size(shape: tuple) -> int:
 class IndexTensorFType(TensorFType):
     _element_type: FType
     _shape_type: tuple[FType, ...]
+    _fill_value: AbstractFill
 
     def __init__(
         self,
         _element_type: FType | type = np.intp,
         _shape_type: tuple[FType | type, ...] = (),
+        _fill_value: AbstractFill | None = None,
     ):
         object.__setattr__(self, "_element_type", ftype(_element_type))
         object.__setattr__(
             self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
         )
+        # An index tensor's fill is 0 -- it is only stored so the marking can
+        # be replaced, which is what `with_fill` is for.
+        object.__setattr__(
+            self,
+            "_fill_value",
+            StaticFill(self._element_type(0)) if _fill_value is None else _fill_value,
+        )
 
     @property
     def fill_value(self) -> AbstractFill:
-        return StaticFill(self._element_type(0))
+        return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> IndexTensorFType:
+        return IndexTensorFType(self._element_type, self._shape_type, fill_value)
 
     @property
     def element_type(self) -> FType:
@@ -106,6 +121,9 @@ class FillTensorFType(TensorFType):
     def fill_value(self) -> AbstractFill:
         return self._fill_value
 
+    def with_fill(self, fill_value: AbstractFill) -> FillTensorFType:
+        return replace(self, _fill_value=fill_value)
+
     @property
     def element_type(self) -> FType:
         return self._element_type
@@ -161,6 +179,9 @@ class FillTensor(OverrideTensor):
     shape is needed but the values are irrelevant.
     """
 
+    def with_fill(self, fill_value: AbstractFill) -> FillTensor:
+        return FillTensor(self._shape, fill_value)
+
     def __init__(self, shape, fill_value):
         self._shape = shape
         self._fill = as_fill(fill_value)
@@ -213,9 +234,18 @@ class IndexTensor(OverrideTensor):
     to access it.
     """
 
-    def __init__(self, shape, element_type: FType | type = np.intp):
+    def __init__(
+        self,
+        shape,
+        element_type: FType | type = np.intp,
+        fill_value: AbstractFill | None = None,
+    ):
         self._shape = tuple(shape)
         self._element_type = ftype(element_type)
+        self._fill = fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> IndexTensor:
+        return IndexTensor(self._shape, self._element_type, fill_value)
 
     def __getitem__(self, idxs):
         if self.ndim == 0 and idxs in ((), Ellipsis, (...,)):
@@ -266,6 +296,7 @@ class IndexTensor(OverrideTensor):
         return IndexTensorFType(
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
+            self._fill,
         )
 
 
@@ -284,6 +315,9 @@ class PatternTensorFType(TensorFType):
     @property
     def fill_value(self) -> AbstractFill:
         return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> PatternTensorFType:
+        return replace(self, _fill_value=fill_value)
 
     @property
     def element_type(self) -> FType:
@@ -366,16 +400,29 @@ class PatternTensor(OverrideTensor):
         if len(self._shape) != ndim:
             raise ValueError(f"Expected a {ndim}D shape, got {self._shape}")
         self._element_type = ftype(dtype if dtype is not None else default_dtype)
-        self._fill_value = self._element_type(fill_value)
+        fill = as_fill(fill_value)
+        coerced = self._element_type(fill.value)
+        self._fill_value: AbstractFill = (
+            DynamicFill(coerced, self._element_type)
+            if is_dynamic(fill)
+            else StaticFill(coerced)
+        )
         self._pattern_value = self._element_type(pattern_value)
         self._constructor_kwargs = tuple(constructor_kwargs.items())
+
+    def with_fill(self, fill_value: AbstractFill) -> PatternTensor:
+        # Subclasses take their own `__init__` arguments and none of them
+        # accept a fill, so the instance is copied rather than rebuilt.
+        clone = copy(self)
+        clone._fill_value = as_fill(fill_value)
+        return clone
 
     def __getitem__(self, idxs):
         if not isinstance(idxs, tuple):
             idxs = (idxs,)
         if len(idxs) != self.ndim:
             raise ValueError(f"{type(self).__name__} requires one index per dimension.")
-        val = self._pattern_value if self.contains(*idxs) else self._fill_value
+        val = self._pattern_value if self.contains(*idxs) else self._fill_value.value
         return Scalar(val, fill_value=self._fill_value)
 
     def contains(self, *idxs) -> bool:

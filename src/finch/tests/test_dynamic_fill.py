@@ -536,6 +536,20 @@ def test_fiber_construct_accepts_a_marked_fill(fill_value, stays_dynamic):
     assert fill.ftype == a.ftype.element_type
 
 
+def test_a_coo_fiber_can_replace_its_fill():
+    """`Level.with_fill` rebuilds via `dataclasses.replace`, which a COO level
+    cannot answer: its `coo_shape` field comes from a `shape` parameter."""
+    import scipy.sparse as sps
+
+    x = finch.asarray(sps.coo_matrix(np.eye(3)))
+    demoted = x.with_fill(x.ftype.fill_value.as_dynamic())
+    assert is_dynamic(demoted.ftype.fill_value)
+    assert demoted.shape == x.shape
+    # Same stored values, just a re-marked fill.
+    np.testing.assert_array_equal(demoted.lvl.lvl.val.arr, x.lvl.lvl.val.arr)
+    np.testing.assert_array_equal(demoted.to_scipy().toarray(), x.to_scipy().toarray())
+
+
 def test_dynamic_output_feeds_a_reusable_kernel():
     """Chaining off a dynamically filled output reuses one kernel across fills,
     which is the whole point of not collapsing the output to a static fill."""

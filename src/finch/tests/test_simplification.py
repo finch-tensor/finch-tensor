@@ -134,7 +134,9 @@ def _same(actual, expected) -> bool:
         (call(ffuncs.mul, x, ntn.Literal(0)), ntn.Literal(0)),
         (call(ffuncs.mul, ntn.Literal(0), x), ntn.Literal(0)),
         (call(ffuncs.and_, x, ntn.Literal(False)), ntn.Literal(False)),
-        (call(ffuncs.or_, x, ntn.Literal(True)), ntn.Literal(True)),
+        # Bitwise `or` swallows its other operand only at all-ones, i.e. -1;
+        # `int | True` is `int | 1`, which keeps bits from the other side.
+        (call(ffuncs.or_, x, ntn.Literal(-1)), ntn.Literal(-1)),
         # flattening and folding literals across an associative call
         (
             call(ffuncs.add, call(ffuncs.add, x, ntn.Literal(1)), ntn.Literal(2)),
@@ -185,13 +187,22 @@ def test_simplify_leaves_alone(term):
 
 @pytest.mark.parametrize("operand", [True, 1, 2, 3])
 def test_simplify_keeps_a_partial_bitwise_and(operand):
-    """`x & v` may only be dropped when every bit of `v` is set.
-
-    `True` is all-ones against a boolean but is `1` against an integer, and the
-    rule cannot see the other operand's dtype -- so only -1 qualifies. Dropping
-    the operand for any truthy value returned `x` where `x & 1` was meant.
-    """
+    """`x & v` may only be dropped when every bit of `v` is set."""
     term = call(ffuncs.and_, x, ntn.Literal(operand))
+    assert_simplifies_to(term, term)
+
+
+@pytest.mark.parametrize("operand", [False, 1, 2, 3])
+def test_simplify_keeps_a_partial_bitwise_or(operand):
+    """`x | v` may only collapse to `v` when every bit of `v` is set."""
+    term = call(ffuncs.or_, x, ntn.Literal(operand))
+    assert_simplifies_to(term, simplify(term))
+    assert simplify(term) != ntn.Literal(operand)
+
+
+def test_simplify_keeps_pow_by_zero():
+    """`x ** 0` is 1, so 0 is no annihilator -- `annihilate` ignores position."""
+    term = call(ffuncs.pow, ntn.Variable("x", float64), ntn.Literal(0))
     assert_simplifies_to(term, term)
 
 
@@ -451,10 +462,6 @@ def test_annihilator_empties_the_loop_body():
     The payoff of a compile-time constant: `A * 0` keeps its loop nest, but the
     body loses the multiply and the load of `A`, so the pass over `A` is gone.
     A runtime scalar of the same value cannot be simplified away.
-
-    A literal `0` earns the compile-time treatment too -- `defer` wraps it as a
-    ConstantScalar and the normalizer inlines it -- so the runtime half has to
-    ask for a runtime scalar explicitly with `Scalar`.
     """
     # The remaining `mul`s are stride arithmetic; `mul(load(` is the one that
     # multiplies an element of `A`.

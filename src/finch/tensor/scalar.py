@@ -147,7 +147,7 @@ class Scalar(OverrideTensor):
                 "a ConstantScalar's fill is its value, so a scalar of "
                 f"{self.val!r} cannot take the static fill {fill_value.value!r}"
             )
-        return ConstantScalar(self.val)
+        return ConstantScalar(self.val, device=self._device)
 
     def to_device(self, device, /, *, stream=None):
         if stream is not None:
@@ -197,8 +197,8 @@ class ConstantScalar(Scalar):
     `Scalar`s, whose values are bound at call time.
     """
 
-    def __init__(self, val: Any):
-        super().__init__(val)
+    def __init__(self, val: Any, device=None):
+        super().__init__(val, device=device)
 
     @property
     def ftype(self):

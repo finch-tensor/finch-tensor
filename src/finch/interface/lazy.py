@@ -501,7 +501,9 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
-    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type, arr.device)
+    return LazyTensor(
+        tns, ctx, shape, arr.ftype.fill_value, arr.element_type, arr.device
+    )
 
 
 def _np_dtype(dtype):

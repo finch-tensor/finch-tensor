@@ -77,7 +77,7 @@ def is_annihilator(op: FinchOperator, val: Any) -> bool:
     return ok and op.is_annihilator(value)
 
 
-SPECIALIZABLE_VALUES = (0, 1, math.inf, -math.inf)
+SPECIALIZABLE_VALUES = (0, 1, -1, math.inf, -math.inf)
 
 
 def is_specializable_value(val: Any) -> bool:

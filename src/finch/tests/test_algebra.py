@@ -30,8 +30,11 @@ def test_algebra_selected():
     assert is_distributive(ffuncs.logical_or, ffuncs.logical_and)
     assert is_annihilator(ffuncs.add, math.inf)
     assert is_annihilator(ffuncs.mul, 0)
-    assert is_annihilator(ffuncs.or_, True)
-    assert is_annihilator(ffuncs.and_, False)
+    # Bitwise `or`/`and` reach all-ones and all-zeros, not truthiness: the
+    # logical pair below is where `True`/`False` are the right values.
+    assert is_annihilator(ffuncs.or_, -1)
+    assert not is_annihilator(ffuncs.or_, True)
+    assert is_annihilator(ffuncs.and_, 0)
     assert is_annihilator(ffuncs.logaddexp, math.inf)
     assert is_annihilator(ffuncs.logical_or, True)
     assert is_annihilator(ffuncs.logical_and, False)
@@ -40,6 +43,7 @@ def test_algebra_selected():
     assert is_identity(ffuncs.or_, False)
     assert is_identity(ffuncs.and_, -1)
     assert not is_identity(ffuncs.and_, True)
+    assert not is_annihilator(ffuncs.pow, 0)
     assert is_identity(ffuncs.truediv, 1)
     assert is_identity(ffuncs.lshift, 0)
     assert is_identity(ffuncs.rshift, 0)

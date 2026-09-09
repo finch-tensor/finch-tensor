@@ -3,7 +3,14 @@ from typing import Any, cast
 
 import numpy as np
 
-from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    ImmutableStructFType,
+    TupleFType,
+    ftype,
+    ftypes,
+)
 
 from .level import Level, LevelFType
 
@@ -209,6 +216,14 @@ class SparseCOOLevel(Level):
         self.ptr = ptr
         self.tbl = tbl
         self.__post_init__()
+
+    def with_fill(self, fill_value: AbstractFill) -> "SparseCOOLevel":
+        # `Level.with_fill` rebuilds with `dataclasses.replace`, which cannot
+        # reach this level: the `coo_shape` field is filled from an `__init__`
+        # parameter named `shape`.
+        return SparseCOOLevel(
+            self.lvl.with_fill(fill_value), self.coo_shape, self.ptr, self.tbl
+        )
 
     def __post_init__(self) -> None:
         if not self.coo_shape:
