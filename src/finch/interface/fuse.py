@@ -57,8 +57,6 @@ Performance:
 from collections.abc import Callable
 from typing import Any
 
-from finch.algebra import is_dynamic
-from finch.algebra.tensor import Tensor
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
     Alias,
@@ -71,16 +69,6 @@ from finch.finch_logic import (
 from finch.symbolic import gensym
 
 from .lazy import LazyTensor, asarray, defer
-
-
-def unspecialize_fill(tns: Tensor) -> Tensor:
-    """
-    `tns` with a static fill demoted to dynamic.
-    """
-    fill = tns.ftype.fill_value
-    if is_dynamic(fill):
-        return tns
-    return tns.with_fill(fill.as_dynamic())
 
 
 def compute(arg, ctx=None):
