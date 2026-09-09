@@ -45,7 +45,6 @@ def bcsstk15_graph():
     matrix = scipy.io.mmread(mtx_path).tocsr()
     matrix.data = np.abs(matrix.data)
     matrix.data[matrix.data == 0] = 1.0
-    # A zero-cost self edge retains D[j] in the min-plus update for j.
     matrix.setdiag(0.0)
     graph = matrix.toarray()
     graph[graph == 0] = np.inf
