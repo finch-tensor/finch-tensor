@@ -96,7 +96,14 @@ def test_dynamic_fill_same():
 
 
 def test_apply_fill_known_folds():
-    assert apply_fill(ffuncs.add, 1.0, 2.0) == StaticFill(3.0)
+    # A static result stays static only while the algebra can act on its value.
+    assert apply_fill(ffuncs.add, 1.0, 0.0) == StaticFill(1.0)
+    assert apply_fill(ffuncs.mul, 2.0, 0.0) == StaticFill(0.0)
+    # The value still folds when it cannot be compiled against; it is only the
+    # marking that goes, so a chain of such folds shares one kernel.
+    folded = apply_fill(ffuncs.add, 1.0, 2.0)
+    assert folded.value == 3.0
+    assert is_dynamic(folded)
     assert np.isnan(apply_fill(ffuncs.add, float("nan"), 2.0).value)
 
 
@@ -187,6 +194,28 @@ def test_plain_scalar_shares_one_kernel():
         out = finch.compute(finch.defer(x) + v, ctx=ctx)
         finch_assert_allclose(out, arr + v)
     assert len(executor.cached_kernels) == 2
+
+
+def test_an_accumulating_fill_does_not_compile_per_iteration():
+    """Chaining a specializable constant must not cost a kernel per step.
+
+    Combining static fills computes an arbitrary value, so `x + 1` repeated
+    walks the output fill through 1, 2, 3, ... A static fill is compared by
+    value, so leaving those static keyed a kernel per iteration -- the
+    O(#iterations) compilation this whole scheme exists to avoid. `apply_fill`
+    keeps a fill static only while its value is one the algebra can act on.
+    """
+    arr = np.arange(3.0)
+    counts = []
+    for trips in (1, 2, 4, 8, 16):
+        executor, ctx = _cached_scheduler()
+        acc = finch.asarray(arr)
+        for _ in range(trips):
+            acc = finch.compute(finch.defer(acc) + 1, ctx=ctx)
+        finch_assert_allclose(acc, arr + trips)
+        counts.append(len(executor.cached_kernels))
+    # Flat once the loop body has been seen, not linear in the trip count.
+    assert counts[-1] == counts[-2] == counts[2], counts
 
 
 def test_constant_scalar_inlines_to_literal():

@@ -163,11 +163,23 @@ def is_dynamic(fill: Any) -> bool:
 def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
     """
     Compute the fill value of mapping `op` over tensors with fills `fills`.
+
+    A fill stays static only while its value is one the algebra can act on.
+    Combining static fills computes an arbitrary value -- adding 1 repeatedly
+    walks a fill through 1, 2, 3, ... -- and a static fill is compared by
+    value, so keeping those static would key a kernel per distinct value and
+    make a loop cost a compilation per iteration.
     """
+    # Imported lazily: `algebra` depends on this module.
+    from .algebra import is_specializable_value
+
     fills = tuple(as_fill(f) for f in fills)
     values = [f.value for f in fills]
     if not any(is_dynamic(f) for f in fills):
-        return StaticFill(op(*values))
+        result = op(*values)
+        if is_specializable_value(result):
+            return StaticFill(result)
+        return DynamicFill(result, op.return_type(*(f.ftype for f in fills)))
     for f in fills:
         if not is_dynamic(f) and op.is_annihilator(f.value):
             result_type = op.return_type(*(g.ftype for g in fills))
