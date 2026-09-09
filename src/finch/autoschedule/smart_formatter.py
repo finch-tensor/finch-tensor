@@ -209,10 +209,10 @@ class FDFormatter(SmartFormatter):
                 required_fields.issubset(dense_fields)
                 for dense_fields in stats.dense_props
             )
-            # Temporary Julia-backend experiment: materialize compiler-created
-            # tensors densely rather than selecting SparseHash for dimensions
-            # whose density cannot be proven by the FD analysis.
-            lvl = dense(lvl, shape_type[dim])
+            if is_dense:
+                lvl = dense(lvl, shape_type[dim])
+            else:
+                lvl = sparse_hash(lvl, shape_type[dim], single_writer=True)
 
         return fiber_tensor(lvl)
 
