@@ -1,9 +1,11 @@
 import numpy as np
 
 import finch as ft
+import finch.finch_notation.nodes as ntn
+from finch.algebra.ffuncs import overwrite
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
-from finch.compile_jl.compiler import FinchJLKernel
+from finch.compile_jl.compiler import find_reset_arg_positions
 from finch.compile_jl.interop import JuliaBufferContext, _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
 
@@ -57,30 +59,72 @@ def test_julia_buffer_context_reuses_buffers_after_kernel_invocation():
     second_jl = context.tensor_to_jl(second_arg)
 
     assert second_jl is first_jl
-def test_julia_kernel_output_pool_never_reuses_a_current_input():
-    """Ping-pong selection leaves the active state buffer read-only this call."""
-
-    kernel = object.__new__(FinchJLKernel)
-    active_state = object()
-    spare_state = object()
-    fresh_output = object()
-    kernel._result_arg_positions = (2,)
-    kernel._output_pools = {2: [active_state, spare_state]}
-
-    call_args = kernel._recycled_output_args((active_state, object(), fresh_output))
-
-    assert call_args[0] is active_state
-    assert call_args[2] is spare_state
 
 
-def test_julia_kernel_recycles_only_arguments_reset_before_first_read():
-    code = """
-    Finch.@finch_kernel function kernel_example(v0,v1,v2)
-        v0 .= 0
-        v1[] = v0[]
-        v2 .= false
-        return v1
-    end
-    """
+def _reset(var):
+    return ntn.Declare(var, ntn.Literal(0), ntn.Literal(overwrite), ())
 
-    assert FinchJLKernel._find_reset_arg_positions(code) == frozenset({0, 2})
+
+def test_julia_kernel_finds_arguments_reset_before_read():
+    v0, v1, v2 = (ntn.Variable(f"v{i}") for i in range(3))
+    func = ntn.Function(
+        ntn.Variable("kernel_example"),
+        (v0, v1, v2),
+        ntn.Block((_reset(v0), ntn.Assign(ntn.Variable("tmp"), v1), _reset(v2))),
+    )
+
+    assert find_reset_arg_positions(func) == frozenset({0, 2})
+
+
+def test_julia_kernel_requires_reset_on_every_path():
+    v0 = ntn.Variable("v0")
+    func = ntn.Function(
+        ntn.Variable("kernel_example"),
+        (v0,),
+        ntn.IfElse(ntn.Literal(True), _reset(v0), ntn.Block(())),
+    )
+
+    assert find_reset_arg_positions(func) == frozenset()
+
+
+def test_julia_kernel_accepts_reset_on_every_branch():
+    v0 = ntn.Variable("v0")
+    func = ntn.Function(
+        ntn.Variable("kernel_example"),
+        (v0,),
+        ntn.IfElse(ntn.Literal(True), _reset(v0), _reset(v0)),
+    )
+
+    assert find_reset_arg_positions(func) == frozenset({0})
+
+
+def test_julia_kernel_rejects_loop_only_reset():
+    v0 = ntn.Variable("v0")
+    func = ntn.Function(
+        ntn.Variable("kernel_example"),
+        (v0,),
+        ntn.Loop(ntn.Variable("i"), ntn.Literal(1), _reset(v0)),
+    )
+
+    assert find_reset_arg_positions(func) == frozenset()
+
+
+def test_julia_buffer_context_reuses_free_compatible_tensor():
+    _requires_julia_backend()
+
+    context = JuliaBufferContext()
+    first = ft.asarray(np.arange(4, dtype=np.float64))
+    first_jl = context.tensor_to_jl(first)
+    first_key = context._cache_key(first)
+    type_name = str(jl.string(jl.typeof(first_jl)))
+    context.release_reset_arguments((first_key,), frozenset({0}))
+
+    second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
+    raw_args, _ = context.resolve_arguments(
+        (second,),
+        reset_positions=frozenset({0}),
+        arg_type_names=(type_name,),
+        dynamic_args=(),
+    )
+
+    assert raw_args[0] is first_jl

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import numpy as np
@@ -310,10 +311,12 @@ def jl_tensor_to_python(obj):
 
 
 class JuliaBufferContext:
-    """Keep Julia-owned tensor buffers alive across kernel invocations."""
+    """Own and reuse Julia tensor buffers across kernel invocations."""
 
     def __init__(self):
-        self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
+        self._tensors: dict[tuple[Any, ...], tuple[Any, _JuliaBufferRecord]] = {}
+        self._records: dict[int, _JuliaBufferRecord] = {}
+        self._groups: dict[tuple[str, tuple[int, ...]], list[_JuliaBufferRecord]] = {}
 
     @staticmethod
     def _cache_key(obj):
@@ -330,21 +333,131 @@ class JuliaBufferContext:
         # FiberTensors reuse their ids so we restrict cache keys to id.
         return ("object", id(obj))
 
+    @staticmethod
+    def _is_poolable(obj) -> bool:
+        return (
+            is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor) and len(jl.size(obj)) > 0
+        )
+
+    @staticmethod
+    def _group(obj) -> tuple[str, tuple[int, ...]]:
+        return (
+            str(jl.string(jl.typeof(obj))),
+            tuple(int(dim) for dim in jl.size(obj)),
+        )
+
+    @staticmethod
+    def _input_group(obj, type_name: str | None):
+        shape = getattr(obj, "shape", None)
+        if type_name is None or shape is None:
+            return None
+        return type_name, tuple(int(dim) for dim in shape)
+
+    def _record(self, obj) -> _JuliaBufferRecord | None:
+        if not self._is_poolable(obj):
+            return None
+        object_id = int(jl.objectid(obj))
+        record = self._records.get(object_id)
+        if record is None:
+            record = _JuliaBufferRecord(obj, self._group(obj))
+            self._records[object_id] = record
+            self._groups.setdefault(record.group, []).append(record)
+        return record
+
+    def _attach(self, key, obj, record: _JuliaBufferRecord) -> None:
+        cached = self._tensors.get(key)
+        if cached is not None:
+            cached[1].owners.discard(key)
+        record.owners.add(key)
+        self._tensors[key] = (obj, record)
+
+    def _detach(self, key) -> None:
+        cached = self._tensors.pop(key, None)
+        if cached is not None:
+            cached[1].owners.discard(key)
+
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         key = self._cache_key(obj)
         cached = self._tensors.get(key)
         if cached is not None:
-            return cached[1]
+            return cached[1].tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
-        self._tensors[key] = (obj, jl_obj)
+        if record := self._record(jl_obj):
+            self._attach(key, obj, record)
         return jl_obj
 
     def tensor_to_python(self, obj):
         result = jl_tensor_to_python(obj)
-        if isinstance(result, FiberTensor):
-            self._tensors[self._cache_key(result)] = (result, obj)
+        if isinstance(result, FiberTensor) and (record := self._record(obj)):
+            self._attach(self._cache_key(result), result, record)
         return result
+
+    def resolve_arguments(
+        self,
+        args,
+        *,
+        reset_positions: frozenset[int],
+        arg_type_names: tuple[str | None, ...],
+        dynamic_args: tuple[int, ...],
+    ) -> tuple[list[Any], tuple[tuple[Any, ...], ...]]:
+        """Resolve call arguments, leasing a free reset buffer when possible."""
+
+        keys = tuple(self._cache_key(arg) for arg in args)
+        raw_args = []
+        for position, (arg, key) in enumerate(zip(args, keys, strict=True)):
+            cached = self._tensors.get(key)
+            if cached is not None:
+                raw_args.append(cached[1].tensor)
+                continue
+
+            group = self._input_group(
+                arg,
+                arg_type_names[position] if position < len(arg_type_names) else None,
+            )
+            if (
+                position in reset_positions
+                and keys.count(key) == 1
+                and group is not None
+            ):
+                record = next(
+                    (
+                        record
+                        for record in self._groups.get(group, ())
+                        if not record.owners
+                    ),
+                    None,
+                )
+                if record is not None:
+                    self._attach(key, arg, record)
+                    raw_args.append(record.tensor)
+                    continue
+
+            raw_args.append(self.tensor_to_jl(arg, pin_fill=position in dynamic_args))
+        return raw_args, keys
+
+    def release_reset_arguments(
+        self, keys: tuple[tuple[Any, ...], ...], reset_positions: frozenset[int]
+    ) -> None:
+        for position in reset_positions:
+            if position >= len(keys):
+                continue
+            key = keys[position]
+            if any(
+                other_key == key and i not in reset_positions
+                for i, other_key in enumerate(keys)
+            ):
+                continue
+            self._detach(key)
 
     def close(self):
         self._tensors.clear()
+        self._records.clear()
+        self._groups.clear()
+
+
+@dataclass
+class _JuliaBufferRecord:
+    tensor: Any
+    group: tuple[str, tuple[int, ...]]
+    owners: set[tuple[Any, ...]] = field(default_factory=set)

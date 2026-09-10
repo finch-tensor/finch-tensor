@@ -1,4 +1,3 @@
-import re
 import uuid
 from typing import ClassVar
 
@@ -104,16 +103,82 @@ _INFIX_OPS = {
 }
 
 
+def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
+    """Find arguments initialized on every path before their contents are read."""
+
+    def references(node, arg: ntn.Variable) -> bool:
+        found = False
+
+        def rule(inner):
+            nonlocal found
+            if isinstance(inner, ntn.Variable) and inner.name == arg.name:
+                found = True
+            return
+
+        Rewrite(PostWalk(rule))(node)
+        return found
+
+    def states(node, arg: ntn.Variable, state: str) -> set[str]:
+        if state != "unseen":
+            return {state}
+        match node:
+            case ntn.Block(bodies):
+                result = {state}
+                for body in bodies:
+                    result = {
+                        next_state
+                        for prior_state in result
+                        for next_state in states(body, arg, prior_state)
+                    }
+                return result
+            case ntn.If(cond, body):
+                branch_state = "read" if references(cond, arg) else state
+                return states(body, arg, branch_state) | {branch_state}
+            case ntn.IfElse(cond, then_body, else_body):
+                branch_state = "read" if references(cond, arg) else state
+                return states(then_body, arg, branch_state) | states(
+                    else_body, arg, branch_state
+                )
+            case ntn.Loop(_, extent, body):
+                loop_state = "read" if references(extent, arg) else state
+                return states(body, arg, loop_state) | {loop_state}
+            case ntn.Declare(tns, init, op, shape):
+                if (
+                    isinstance(tns, ntn.Variable)
+                    and tns.name == arg.name
+                    and not references(init, arg)
+                    and not references(op, arg)
+                    and not any(references(dim, arg) for dim in shape)
+                ):
+                    return {"reset"}
+                return {"read" if references(node, arg) else state}
+            case _:
+                return {"read" if references(node, arg) else state}
+
+    return frozenset(
+        position
+        for position, arg in enumerate(func.args)
+        if states(func.body, arg, "unseen") == {"reset"}
+    )
+
+
 class CompiledJLKernel:
     """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
     source text, with no Python-side values left to inject."""
 
     def __init__(
-        self, func_name: str, jl_code: str, dynamic_args: tuple[int, ...] = ()
+        self,
+        func_name: str,
+        jl_code: str,
+        dynamic_args: tuple[int, ...] = (),
+        reset_arg_positions: frozenset[int] = frozenset(),
+        arg_type_names: tuple[str | None, ...] = (),
     ):
         self.func_name = func_name
         self.jl_code = jl_code
         self.dynamic_args = dynamic_args
+        self.reset_arg_positions = reset_arg_positions
+        self.arg_type_names = arg_type_names
 
     def evaluate(self, buffer_context: JuliaBufferContext) -> "FinchJLKernel":
         """Defines the kernel function in the running Julia session,
@@ -123,6 +188,8 @@ class CompiledJLKernel:
             self.func_name,
             self.jl_code,
             self.dynamic_args,
+            self.reset_arg_positions,
+            self.arg_type_names,
             buffer_context=buffer_context,
         )
 
@@ -130,13 +197,13 @@ class CompiledJLKernel:
 class FinchJLKernel(AssemblyKernel):
     """A kernel already defined (evaluated) in the running Julia session."""
 
-    _OUTPUT_POOL_SIZE = 2
-
     def __init__(
         self,
         func_name,
         jl_code,
         dynamic_args: tuple[int, ...] = (),
+        reset_arg_positions: frozenset[int] = frozenset(),
+        arg_type_names: tuple[str | None, ...] = (),
         *,
         buffer_context: JuliaBufferContext,
     ):
@@ -147,138 +214,28 @@ class FinchJLKernel(AssemblyKernel):
         # arbitrarily set to zero. Other arguments keep their
         # Known fills.
         self.dynamic_args = dynamic_args
+        self.reset_arg_positions = reset_arg_positions
+        self.arg_type_names = arg_type_names
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
 
-        # Filled after the first invocation by matching returned Julia tensors
-        # to positional arguments. Each position keeps two Julia-backed Python
-        # wrappers, allowing an output buffer to be reused without aliasing the
-        # current input state.
-        self._result_arg_positions: tuple[int, ...] | None = None
-        self._output_pools: dict[int, list[object]] = {}
-        self._reset_arg_positions = self._find_reset_arg_positions(self.jl_code)
-
-    @staticmethod
-    def _find_reset_arg_positions(jl_code: str) -> frozenset[int]:
-        """Find kernel arguments whose first body use fully resets them."""
-
-        signature = re.search(
-            r"Finch\.@finch_kernel\s+function\s+\w+\(([^)]*)\)(.*)",
-            jl_code,
-            flags=re.DOTALL,
+    def __call__(self, *args):
+        finch_fn = getattr(jl, self.func_name)
+        raw_args, keys = self.buffer_context.resolve_arguments(
+            args,
+            reset_positions=self.reset_arg_positions,
+            arg_type_names=self.arg_type_names,
+            dynamic_args=self.dynamic_args,
         )
-        if signature is None:
-            return frozenset()
-        args = {
-            match.group(1): int(match.group(2))
-            for arg in signature.group(1).split(",")
-            if (match := re.fullmatch(r"\s*(v(\d+))\s*", arg))
-        }
-        body = signature.group(2)
-        reset_positions = set()
-        for name, position in args.items():
-            first_use = re.search(rf"\b{re.escape(name)}\b", body)
-            if first_use is not None and re.match(
-                rf"\b{re.escape(name)}\s*\.\s*=", body[first_use.start() :]
-            ):
-                reset_positions.add(position)
-        return frozenset(reset_positions)
-
-    def _tensor_to_jl(self, arg, *, pin_fill: bool):
-        return self.buffer_context.tensor_to_jl(arg, pin_fill=pin_fill)
-
-    def _remember_output(self, arg_pos: int, output) -> None:
-        pool = self._output_pools.setdefault(arg_pos, [])
-        if all(existing is not output for existing in pool):
-            pool.append(output)
-            if len(pool) > self._OUTPUT_POOL_SIZE:
-                pool.pop(0)
-
-    def _is_pooled_output(self, arg_pos: int, output) -> bool:
-        return any(
-            candidate is output for candidate in self._output_pools.get(arg_pos, ())
-        )
-
-    def _learn_reset_scratch_buffers(self, raw_args, call_args=None) -> None:
-        """Recover fully-reset, non-returned arguments for later reuse."""
-
-        result_positions = set(self._result_arg_positions or ())
-        for arg_pos in self._reset_arg_positions:
-            if arg_pos >= len(raw_args) or arg_pos in result_positions:
-                continue
-            if call_args is not None and self._is_pooled_output(
-                arg_pos, call_args[arg_pos]
-            ):
-                continue
-            self._remember_output(
-                arg_pos, self.buffer_context.tensor_to_python(raw_args[arg_pos])
-            )
-
-    def _recycled_output_args(self, args):
-        """Use a non-aliasing Julia-backed output buffer when one is known."""
-
-        if self._result_arg_positions is None:
-            return list(args)
-        recycled = list(args)
-        for arg_pos, pool in self._output_pools.items():
-            for candidate in pool:
-                if all(
-                    candidate is not arg for i, arg in enumerate(args) if i != arg_pos
-                ):
-                    recycled[arg_pos] = candidate
-                    break
-        return recycled
-
-    def _learn_result_layout(self, result, raw_args):
-        """Recover first-call outputs and learn which arguments they alias."""
+        result = finch_fn(*raw_args)
+        self.buffer_context.release_reset_arguments(keys, self.reset_arg_positions)
 
         if jl.isa(result, jl.NamedTuple):
             result = jl.values(result)
         result_items = (result,) if jl.isa(result, jl.Finch.Tensor) else tuple(result)
-        raw_arg_positions = {
-            int(jl.objectid(raw_arg)): i for i, raw_arg in enumerate(raw_args)
-        }
-        result_arg_positions: list[int] = []
-        recovered = []
-        for result_item in result_items:
-            arg_pos = raw_arg_positions.get(int(jl.objectid(result_item)))
-            if arg_pos is None:
-                # This kernel's result is not a supplied output buffer, so
-                # retain Finch's ordinary recovery behavior.
-                return tuple(
-                    self.buffer_context.tensor_to_python(item) for item in result_items
-                )
-            result_arg_positions.append(arg_pos)
-            recovered_item = self.buffer_context.tensor_to_python(result_item)
-            recovered.append(recovered_item)
-            self._remember_output(arg_pos, recovered_item)
-        self._result_arg_positions = tuple(result_arg_positions)
-        self._learn_reset_scratch_buffers(raw_args)
-        return tuple(recovered)
-
-    def __call__(self, *args):
-        finch_fn = getattr(jl, self.func_name)
-        call_args = self._recycled_output_args(args)
-        raw_args = [
-            self._tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
-            for i, arg in enumerate(call_args)
-        ]
-        result = finch_fn(*raw_args)
-
-        if self._result_arg_positions is not None:
-            outputs = []
-            for arg_pos in self._result_arg_positions:
-                output = call_args[arg_pos]
-                if not self._is_pooled_output(arg_pos, output):
-                    # A pool may initially contain only the buffer that has
-                    # become this call's input. Recover this fresh output once
-                    # to establish its partner in the ping-pong pair.
-                    output = self.buffer_context.tensor_to_python(raw_args[arg_pos])
-                    self._remember_output(arg_pos, output)
-                outputs.append(output)
-            self._learn_reset_scratch_buffers(raw_args, call_args)
-            return tuple(outputs)
-        return self._learn_result_layout(result, raw_args)
+        return tuple(
+            self.buffer_context.tensor_to_python(item) for item in result_items
+        )
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -490,7 +447,9 @@ class FinchJLCompiler(NotationCompiler):
     # text, so two calls with identical bodies but different argument types
     # would otherwise collide on the same cache entry.
     _kernels: ClassVar[
-        dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
+        dict[
+            tuple[str, tuple[str, ...], tuple[int, ...], frozenset[int]], FinchJLKernel
+        ]
     ] = {}
 
     # Results produced by one compiled kernel are passed to another
@@ -502,16 +461,23 @@ class FinchJLCompiler(NotationCompiler):
 
         kernel_dict = {}
         for orig_func in prgm.children:
+            reset_arg_positions = find_reset_arg_positions(orig_func)
             func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
-            arg_type_strs = tuple(
-                ftype_to_jl_type_str(arg.type_)
+            arg_type_names = tuple(
+                ftype_to_jl_type_str(arg.type_) if arg.type_ is not None else None
                 for arg in func.args
-                if arg.type_ is not None
             )
             # Flat key: source, argument types, and which fills were pinned. All
             # three vary independently, so none may be folded into another.
-            key = (generated_prgm, arg_type_strs, dynamic_args)
+            key = (
+                generated_prgm,
+                tuple(
+                    type_name for type_name in arg_type_names if type_name is not None
+                ),
+                dynamic_args,
+                reset_arg_positions,
+            )
             kernel = self._kernels.get(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
@@ -519,6 +485,8 @@ class FinchJLCompiler(NotationCompiler):
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
                     dynamic_args=dynamic_args,
+                    reset_arg_positions=reset_arg_positions,
+                    arg_type_names=arg_type_names,
                 )
                 kernel = compiled.evaluate(buffer_context=self._buffer_context)
                 self._kernels[key] = kernel
