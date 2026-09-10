@@ -215,9 +215,7 @@ class FinchJLKernel(AssemblyKernel):
                     self._scalar_arg_cache.append(self._scalar_arg_cache.pop(i))
                     return cached_jl
 
-        for i, (cached_arg, cached_pin_fill, cached_jl) in enumerate(
-            self._arg_cache
-        ):
+        for i, (cached_arg, cached_pin_fill, cached_jl) in enumerate(self._arg_cache):
             if cached_arg is arg and cached_pin_fill == pin_fill:
                 # Promote the hit so alternating ping-pong buffers stay hot.
                 self._arg_cache.append(self._arg_cache.pop(i))
@@ -269,9 +267,7 @@ class FinchJLKernel(AssemblyKernel):
         for arg_pos, pool in self._output_pools.items():
             for candidate in pool:
                 if all(
-                    candidate is not arg
-                    for i, arg in enumerate(args)
-                    if i != arg_pos
+                    candidate is not arg for i, arg in enumerate(args) if i != arg_pos
                 ):
                     recycled[arg_pos] = candidate
                     break
@@ -327,12 +323,14 @@ class FinchJLKernel(AssemblyKernel):
             return tuple(outputs)
         return self._learn_result_layout(result, raw_args)
 
+
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
         self.kernel_dict = kernel_dict
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
 
 class FinchJLGenerator:
     def __init__(self):
