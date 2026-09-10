@@ -18,7 +18,7 @@ from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
-from .interop import jl_tensor_to_python, tensor_to_jl
+from .interop import JuliaBufferContext
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
@@ -33,13 +33,21 @@ _JULIA_OPS = {
     ffuncs.pow: "^",
     ffuncs.neg: "-",
     ffuncs.pos: "+",
+    ffuncs.divide: "/",
+    ffuncs.remainder: "mod",
     # comparisons
     ffuncs.eq: "==",
+    ffuncs.equal: "==",
     ffuncs.ne: "!=",
+    ffuncs.not_equal: "!=",
     ffuncs.lt: "<",
+    ffuncs.less: "<",
     ffuncs.le: "<=",
+    ffuncs.less_equal: "<=",
     ffuncs.gt: ">",
+    ffuncs.greater: ">",
     ffuncs.ge: ">=",
+    ffuncs.greater_equal: ">=",
     # bitwise / logical
     ffuncs.and_: "&",
     ffuncs.or_: "|",
@@ -51,6 +59,9 @@ _JULIA_OPS = {
     ffuncs.logical_or: "Finch.or",
     ffuncs.logical_not: "!",
     ffuncs.logical_xor: "xor",
+    # math / elementwise
+    ffuncs.max: "max",
+    ffuncs.min: "min",
     # misc
     ffuncs.divmod: "divrem",
     ffuncs.square: "abs2",
@@ -60,6 +71,7 @@ _JULIA_OPS = {
     ffuncs.where: "ifelse",
     ffuncs.clip: "clamp",
     ffuncs.truth: "Bool",
+    ffuncs.first_arg: "first_arg",
 }
 
 _JULIA_REDUCTION_OPS = {
@@ -120,12 +132,13 @@ class FinchJLKernel(AssemblyKernel):
         # arbitrarily set to zero. Other arguments keep their
         # Known fills.
         self.dynamic_args = dynamic_args
+        self.buffer_context = JuliaBufferContext()
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
         raw_args = [
-            tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(args)
         ]
         result = finch_fn(*raw_args)
@@ -138,8 +151,11 @@ class FinchJLKernel(AssemblyKernel):
         # The finch function returns tuples when multiple values are returned
         # or a non-tuple when a single value is returned.
         if jl.isa(result, jl.Finch.Tensor):
-            return (jl_tensor_to_python(result),)
-        return tuple(jl_tensor_to_python(res) for res in result)
+            return (self.buffer_context.tensor_to_python(result),)
+        return tuple(self.buffer_context.tensor_to_python(res) for res in result)
+
+    def close(self):
+        self.buffer_context.close()
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -148,6 +164,10 @@ class FinchJLLibrary(AssemblyLibrary):
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
+    def close(self):
+        for kernel in self.kernel_dict.values():
+            kernel.close()
 
 
 class FinchJLGenerator:
@@ -306,8 +326,11 @@ class FinchJLGenerator:
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"
-                if isinstance(val, float | np.floating) and np.isinf(val):
-                    return "Inf" if val > 0 else "-Inf"
+                if isinstance(val, float | np.floating):
+                    if np.isinf(val):
+                        return "Inf" if val > 0 else "-Inf"
+                    if np.isnan(val):
+                        return "NaN"
                 return str(val)
 
             case ntn.Variable(name, _):

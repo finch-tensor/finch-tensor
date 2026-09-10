@@ -674,7 +674,7 @@ def expand_dims(
         If provided an invalid ``axis`` position, an ``IndexError`` should be raised.
     """
     x = defer(x)
-    if isinstance(axis, int):
+    if not isinstance(axis, (tuple, list)):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim + len(axis))
     if isinstance(axis, int):
@@ -732,7 +732,7 @@ def squeeze(
         singleton dimension), a ``ValueError`` should be raised.
     """
     x = defer(x)
-    if isinstance(axis, int):
+    if not isinstance(axis, (tuple, list)):
         axis = (axis,)
     axis = normalize_axis_tuple(axis, x.ndim)
     if isinstance(axis, int):

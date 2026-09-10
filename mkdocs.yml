@@ -19,4 +19,3 @@ plugins:
           inventories:
             - https://docs.python.org/3/objects.inv
             - https://numpy.org/doc/stable/objects.inv
-            - http://docs.scipy.org/doc/scipy/reference/objects.inv

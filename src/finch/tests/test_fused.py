@@ -30,7 +30,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
         total = 0
         for i in range(n):
             if i < n:  # noqa: SIM108
-                total = fn(total, i)
+                total = fn(total, i, scale=2)
             else:
                 total = total - 1
         while total < n:
@@ -65,6 +65,12 @@ def test_parse_simple_function_with_control_flow_and_calls():
                                                 (
                                                     fzd.Variable("total"),
                                                     fzd.Variable("i"),
+                                                ),
+                                                (
+                                                    fzd.Keyword(
+                                                        "scale",
+                                                        fzd.Literal(2),
+                                                    ),
                                                 ),
                                             ),
                                         ),
