@@ -106,19 +106,32 @@ _INFIX_OPS = {
 def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
     """Find arguments initialized on every path before their contents are read."""
 
-    def references(node, arg: ntn.Variable) -> bool:
+    def slot_aliases(arg: ntn.Variable) -> set[str]:
+        aliases = {arg.name}
+
+        def rule(node):
+            match node:
+                case ntn.Unpack(ntn.Slot(name, _), ntn.Variable(rhs_name, _)):
+                    if rhs_name in aliases:
+                        aliases.add(name)
+            return
+
+        Rewrite(PostWalk(rule))(func.body)
+        return aliases
+
+    def references(node, aliases: set[str]) -> bool:
         found = False
 
         def rule(inner):
             nonlocal found
-            if isinstance(inner, ntn.Variable) and inner.name == arg.name:
+            if isinstance(inner, (ntn.Variable, ntn.Slot)) and inner.name in aliases:
                 found = True
             return
 
         Rewrite(PostWalk(rule))(node)
         return found
 
-    def states(node, arg: ntn.Variable, state: str) -> set[str]:
+    def states(node, aliases: set[str], state: str) -> set[str]:
         if state != "unseen":
             return {state}
         match node:
@@ -128,38 +141,78 @@ def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
                     result = {
                         next_state
                         for prior_state in result
-                        for next_state in states(body, arg, prior_state)
+                        for next_state in states(body, aliases, prior_state)
                     }
                 return result
             case ntn.If(cond, body):
-                branch_state = "read" if references(cond, arg) else state
-                return states(body, arg, branch_state) | {branch_state}
+                branch_state = "read" if references(cond, aliases) else state
+                return states(body, aliases, branch_state) | {branch_state}
             case ntn.IfElse(cond, then_body, else_body):
-                branch_state = "read" if references(cond, arg) else state
-                return states(then_body, arg, branch_state) | states(
-                    else_body, arg, branch_state
+                branch_state = "read" if references(cond, aliases) else state
+                return states(then_body, aliases, branch_state) | states(
+                    else_body, aliases, branch_state
                 )
             case ntn.Loop(_, extent, body):
-                loop_state = "read" if references(extent, arg) else state
-                return states(body, arg, loop_state) | {loop_state}
+                loop_state = "read" if references(extent, aliases) else state
+                return states(body, aliases, loop_state) | {loop_state}
+            case ntn.Assign(lhs, ntn.Dimension()):
+                return {"read" if references(lhs, aliases) else state}
+            case ntn.Dimension():
+                return {state}
+            case ntn.Unpack(ntn.Slot(name, _), ntn.Variable(rhs_name, _)):
+                if name in aliases and rhs_name in aliases:
+                    return {state}
+                return {"read" if references(node, aliases) else state}
             case ntn.Declare(tns, init, op, shape):
                 if (
-                    isinstance(tns, ntn.Variable)
-                    and tns.name == arg.name
-                    and not references(init, arg)
-                    and not references(op, arg)
-                    and not any(references(dim, arg) for dim in shape)
+                    isinstance(tns, (ntn.Variable, ntn.Slot))
+                    and tns.name in aliases
+                    and not references(init, aliases)
+                    and not references(op, aliases)
+                    and not any(references(dim, aliases) for dim in shape)
                 ):
                     return {"reset"}
-                return {"read" if references(node, arg) else state}
+                return {"read" if references(node, aliases) else state}
             case _:
-                return {"read" if references(node, arg) else state}
+                return {"read" if references(node, aliases) else state}
 
     return frozenset(
         position
         for position, arg in enumerate(func.args)
-        if states(func.body, arg, "unseen") == {"reset"}
+        if states(func.body, slot_aliases(arg), "unseen") == {"reset"}
     )
+
+
+def find_return_arg_positions(func: ntn.Function) -> tuple[int, ...] | None:
+    """Find a fixed return layout that aliases function arguments."""
+
+    arg_positions = {arg.name: position for position, arg in enumerate(func.args)}
+    layouts = []
+
+    def rule(node):
+        match node:
+            case ntn.Return(ntn.Call(ntn.Literal(op), args)) if op == make_tuple:
+                values = args
+            case ntn.Return(ntn.Variable() as value):
+                values = (value,)
+            case ntn.Return():
+                layouts.append(None)
+                return
+            case _:
+                return
+        if all(isinstance(value, ntn.Variable) for value in values):
+            layouts.append(tuple(arg_positions.get(value.name) for value in values))
+        else:
+            layouts.append(None)
+
+    Rewrite(PostWalk(rule))(func.body)
+    if (
+        len(layouts) != 1
+        or layouts[0] is None
+        or any(position is None for position in layouts[0])
+    ):
+        return None
+    return tuple(layouts[0])
 
 
 class CompiledJLKernel:
@@ -173,12 +226,14 @@ class CompiledJLKernel:
         dynamic_args: tuple[int, ...] = (),
         reset_arg_positions: frozenset[int] = frozenset(),
         arg_type_names: tuple[str | None, ...] = (),
+        return_arg_positions: tuple[int, ...] | None = None,
     ):
         self.func_name = func_name
         self.jl_code = jl_code
         self.dynamic_args = dynamic_args
         self.reset_arg_positions = reset_arg_positions
         self.arg_type_names = arg_type_names
+        self.return_arg_positions = return_arg_positions
 
     def evaluate(self, buffer_context: JuliaBufferContext) -> "FinchJLKernel":
         """Defines the kernel function in the running Julia session,
@@ -190,6 +245,7 @@ class CompiledJLKernel:
             self.dynamic_args,
             self.reset_arg_positions,
             self.arg_type_names,
+            self.return_arg_positions,
             buffer_context=buffer_context,
         )
 
@@ -204,6 +260,7 @@ class FinchJLKernel(AssemblyKernel):
         dynamic_args: tuple[int, ...] = (),
         reset_arg_positions: frozenset[int] = frozenset(),
         arg_type_names: tuple[str | None, ...] = (),
+        return_arg_positions: tuple[int, ...] | None = None,
         *,
         buffer_context: JuliaBufferContext,
     ):
@@ -216,25 +273,57 @@ class FinchJLKernel(AssemblyKernel):
         self.dynamic_args = dynamic_args
         self.reset_arg_positions = reset_arg_positions
         self.arg_type_names = arg_type_names
+        self.return_arg_positions = return_arg_positions
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args, keys = self.buffer_context.resolve_arguments(
+        raw_args, keys, arg_records = self.buffer_context.resolve_arguments(
             args,
             reset_positions=self.reset_arg_positions,
             arg_type_names=self.arg_type_names,
             dynamic_args=self.dynamic_args,
+            producer=self,
         )
         result = finch_fn(*raw_args)
-        self.buffer_context.release_reset_arguments(keys, self.reset_arg_positions)
 
-        if jl.isa(result, jl.NamedTuple):
-            result = jl.values(result)
-        result_items = (result,) if jl.isa(result, jl.Finch.Tensor) else tuple(result)
+        if self.return_arg_positions is None:
+            if jl.isa(result, jl.NamedTuple):
+                result = jl.values(result)
+            result_items = (
+                (result,) if jl.isa(result, jl.Finch.Tensor) else tuple(result)
+            )
+        else:
+            result_items = tuple(
+                raw_args[position] for position in self.return_arg_positions
+            )
+            output_records = [
+                self.buffer_context.prepare_result_for_record(arg_records[position])
+                for position in self.return_arg_positions
+            ]
+        self.buffer_context.release_reset_arguments(keys, self.reset_arg_positions)
+        if self.return_arg_positions is None:
+            self.buffer_context.release_consumed_result_arguments(
+                keys, raw_args, result_items
+            )
+            self.buffer_context.mark_reset_results(
+                raw_args, result_items, self.reset_arg_positions, self
+            )
+            return tuple(
+                self.buffer_context.tensor_to_python(item) for item in result_items
+            )
+        self.buffer_context.release_consumed_result_arguments_static(
+            keys, arg_records, self.return_arg_positions
+        )
+        self.buffer_context.mark_reset_results_static(
+            arg_records, self.return_arg_positions, self.reset_arg_positions, self
+        )
         return tuple(
-            self.buffer_context.tensor_to_python(item) for item in result_items
+            self.buffer_context.attach_result(record)
+            if record is not None
+            else self.buffer_context.tensor_to_python(item)
+            for record, item in zip(output_records, result_items, strict=True)
         )
 
 
@@ -462,6 +551,7 @@ class FinchJLCompiler(NotationCompiler):
         kernel_dict = {}
         for orig_func in prgm.children:
             reset_arg_positions = find_reset_arg_positions(orig_func)
+            return_arg_positions = find_return_arg_positions(orig_func)
             func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
             arg_type_names = tuple(
@@ -477,6 +567,7 @@ class FinchJLCompiler(NotationCompiler):
                 ),
                 dynamic_args,
                 reset_arg_positions,
+                return_arg_positions,
             )
             kernel = self._kernels.get(key)
             if kernel is None:
@@ -487,6 +578,7 @@ class FinchJLCompiler(NotationCompiler):
                     dynamic_args=dynamic_args,
                     reset_arg_positions=reset_arg_positions,
                     arg_type_names=arg_type_names,
+                    return_arg_positions=return_arg_positions,
                 )
                 kernel = compiled.evaluate(buffer_context=self._buffer_context)
                 self._kernels[key] = kernel

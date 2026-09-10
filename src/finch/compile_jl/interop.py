@@ -314,7 +314,7 @@ class JuliaBufferContext:
     """Own and reuse Julia tensor buffers across kernel invocations."""
 
     def __init__(self):
-        self._tensors: dict[tuple[Any, ...], tuple[Any, _JuliaBufferRecord]] = {}
+        self._tensors: dict[tuple[Any, ...], _CachedJuliaTensor] = {}
         self._records: dict[int, _JuliaBufferRecord] = {}
         self._groups: dict[tuple[str, tuple[int, ...]], list[_JuliaBufferRecord]] = {}
 
@@ -364,34 +364,66 @@ class JuliaBufferContext:
             self._groups.setdefault(record.group, []).append(record)
         return record
 
-    def _attach(self, key, obj, record: _JuliaBufferRecord) -> None:
+    def _attach(
+        self,
+        key,
+        obj,
+        record: _JuliaBufferRecord,
+        *,
+        is_result: bool,
+    ) -> None:
         cached = self._tensors.get(key)
         if cached is not None:
-            cached[1].owners.discard(key)
+            cached.record.owners.discard(key)
         record.owners.add(key)
-        self._tensors[key] = (obj, record)
+        self._tensors[key] = _CachedJuliaTensor(obj, record, is_result)
 
     def _detach(self, key) -> None:
         cached = self._tensors.pop(key, None)
         if cached is not None:
-            cached[1].owners.discard(key)
+            cached.record.owners.discard(key)
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         key = self._cache_key(obj)
         cached = self._tensors.get(key)
         if cached is not None:
-            return cached[1].tensor
+            return cached.record.tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         if record := self._record(jl_obj):
-            self._attach(key, obj, record)
+            self._attach(key, obj, record, is_result=False)
         return jl_obj
 
     def tensor_to_python(self, obj):
-        result = jl_tensor_to_python(obj)
-        if isinstance(result, FiberTensor) and (record := self._record(obj)):
-            self._attach(self._cache_key(result), result, record)
+        record = self._record(obj)
+        if record is not None and record.result is not None:
+            result = record.result
+        else:
+            result = jl_tensor_to_python(obj)
+            if record is not None and isinstance(result, FiberTensor):
+                record.result = result
+        if isinstance(result, FiberTensor) and record is not None:
+            self._attach(self._cache_key(result), result, record, is_result=True)
         return result
+
+    def prepare_result_for_record(
+        self, record: _JuliaBufferRecord | None
+    ) -> _JuliaBufferRecord | None:
+        if record is None:
+            return None
+        if record.result is None:
+            result = jl_tensor_to_python(record.tensor)
+            if not isinstance(result, FiberTensor):
+                return None
+            record.result = result
+        return record
+
+    def attach_result(self, record: _JuliaBufferRecord) -> FiberTensor:
+        assert record.result is not None
+        self._attach(
+            self._cache_key(record.result), record.result, record, is_result=True
+        )
+        return record.result
 
     def resolve_arguments(
         self,
@@ -400,15 +432,23 @@ class JuliaBufferContext:
         reset_positions: frozenset[int],
         arg_type_names: tuple[str | None, ...],
         dynamic_args: tuple[int, ...],
-    ) -> tuple[list[Any], tuple[tuple[Any, ...], ...]]:
+        producer: object | None = None,
+    ) -> tuple[list[Any], tuple[tuple[Any, ...], ...], list[_JuliaBufferRecord | None]]:
         """Resolve call arguments, leasing a free reset buffer when possible."""
 
         keys = tuple(self._cache_key(arg) for arg in args)
+        active_records = {
+            id(cached.record)
+            for key in keys
+            if (cached := self._tensors.get(key)) is not None
+        }
         raw_args = []
+        arg_records = []
         for position, (arg, key) in enumerate(zip(args, keys, strict=True)):
             cached = self._tensors.get(key)
             if cached is not None:
-                raw_args.append(cached[1].tensor)
+                raw_args.append(cached.record.tensor)
+                arg_records.append(cached.record)
                 continue
 
             group = self._input_group(
@@ -428,13 +468,34 @@ class JuliaBufferContext:
                     ),
                     None,
                 )
+                if record is None:
+                    record = next(
+                        (
+                            record
+                            for record in self._groups.get(group, ())
+                            if record.producer is producer
+                            and id(record) not in active_records
+                            and all(
+                                (cached := self._tensors.get(owner)) is not None
+                                and cached.is_result
+                                for owner in record.owners
+                            )
+                        ),
+                        None,
+                    )
+                    if record is not None:
+                        for owner in tuple(record.owners):
+                            self._detach(owner)
                 if record is not None:
-                    self._attach(key, arg, record)
+                    self._attach(key, arg, record, is_result=False)
                     raw_args.append(record.tensor)
+                    arg_records.append(record)
                     continue
 
             raw_args.append(self.tensor_to_jl(arg, pin_fill=position in dynamic_args))
-        return raw_args, keys
+            cached = self._tensors.get(key)
+            arg_records.append(cached.record if cached is not None else None)
+        return raw_args, keys, arg_records
 
     def release_reset_arguments(
         self, keys: tuple[tuple[Any, ...], ...], reset_positions: frozenset[int]
@@ -450,6 +511,63 @@ class JuliaBufferContext:
                 continue
             self._detach(key)
 
+    def release_consumed_result_arguments(self, keys, raw_args, result_items) -> None:
+        result_ids = {
+            int(jl.objectid(item)) for item in result_items if self._is_poolable(item)
+        }
+        for key, raw_arg in zip(keys, raw_args, strict=True):
+            cached = self._tensors.get(key)
+            if (
+                cached is not None
+                and cached.is_result
+                and self._is_poolable(raw_arg)
+                and int(jl.objectid(raw_arg)) not in result_ids
+            ):
+                self._detach(key)
+
+    def release_consumed_result_arguments_static(
+        self, keys, arg_records, return_arg_positions
+    ) -> None:
+        returned_records = {
+            id(arg_records[position])
+            for position in return_arg_positions
+            if arg_records[position] is not None
+        }
+        for key, record in zip(keys, arg_records, strict=True):
+            cached = self._tensors.get(key)
+            if (
+                cached is not None
+                and cached.is_result
+                and record is not None
+                and id(record) not in returned_records
+            ):
+                self._detach(key)
+
+    def mark_reset_results(
+        self, raw_args, result_items, reset_positions, producer
+    ) -> None:
+        reset_ids = {
+            int(jl.objectid(raw_args[position]))
+            for position in reset_positions
+            if position < len(raw_args) and self._is_poolable(raw_args[position])
+        }
+        for item in result_items:
+            if self._is_poolable(item) and int(jl.objectid(item)) in reset_ids:
+                record = self._record(item)
+                assert record is not None
+                record.producer = producer
+
+    @staticmethod
+    def mark_reset_results_static(
+        arg_records, return_arg_positions, reset_positions, producer
+    ) -> None:
+        for position in return_arg_positions:
+            if (
+                position in reset_positions
+                and (record := arg_records[position]) is not None
+            ):
+                record.producer = producer
+
     def close(self):
         self._tensors.clear()
         self._records.clear()
@@ -461,3 +579,12 @@ class _JuliaBufferRecord:
     tensor: Any
     group: tuple[str, tuple[int, ...]]
     owners: set[tuple[Any, ...]] = field(default_factory=set)
+    result: FiberTensor | None = None
+    producer: object | None = None
+
+
+@dataclass
+class _CachedJuliaTensor:
+    obj: Any
+    record: _JuliaBufferRecord
+    is_result: bool

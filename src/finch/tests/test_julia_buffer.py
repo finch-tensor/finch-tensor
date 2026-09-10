@@ -109,6 +109,25 @@ def test_julia_kernel_rejects_loop_only_reset():
     assert find_reset_arg_positions(func) == frozenset()
 
 
+def test_julia_kernel_finds_reset_through_unpack_slot():
+    v0 = ntn.Variable("v0")
+    v0_slot = ntn.Slot("v0_slot", None)
+    size = ntn.Variable("size")
+    func = ntn.Function(
+        ntn.Variable("kernel_example"),
+        (v0,),
+        ntn.Block(
+            (
+                ntn.Unpack(v0_slot, v0),
+                ntn.Assign(size, ntn.Dimension(v0_slot, ntn.Literal(0))),
+                _reset(v0_slot),
+            )
+        ),
+    )
+
+    assert find_reset_arg_positions(func) == frozenset({0})
+
+
 def test_julia_buffer_context_reuses_free_compatible_tensor():
     _requires_julia_backend()
 
@@ -120,7 +139,7 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     context.release_reset_arguments((first_key,), frozenset({0}))
 
     second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
-    raw_args, _ = context.resolve_arguments(
+    raw_args, _, _ = context.resolve_arguments(
         (second,),
         reset_positions=frozenset({0}),
         arg_type_names=(type_name,),
