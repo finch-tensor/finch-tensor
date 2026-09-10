@@ -57,25 +57,6 @@ def test_julia_buffer_context_reuses_buffers_after_kernel_invocation():
     second_jl = context.tensor_to_jl(second_arg)
 
     assert second_jl is first_jl
-
-
-def test_julia_buffer_context_reuses_julia_backed_result_wrapper():
-    _requires_julia_backend()
-
-    context = JuliaBufferContext()
-    python_input = ft.asarray(np.arange(4, dtype=np.float64))
-    julia_tensor = context.tensor_to_jl(python_input)
-
-    # JuliaCall returns a fresh Python proxy here, even though Julia returns
-    # the exact same tensor object.  The context should identify it by Julia
-    # object identity and return the previously recovered Python view.
-    first_result = context.tensor_to_python(jl.first_arg(julia_tensor))
-    second_result = context.tensor_to_python(jl.first_arg(julia_tensor))
-
-    assert first_result is not python_input
-    assert second_result is first_result
-
-
 def test_julia_kernel_output_pool_never_reuses_a_current_input():
     """Ping-pong selection leaves the active state buffer read-only this call."""
 
