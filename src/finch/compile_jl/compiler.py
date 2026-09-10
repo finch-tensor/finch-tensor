@@ -299,12 +299,13 @@ class FinchJLKernel(AssemblyKernel):
         return tuple(recovered)
 
     def __call__(self, *args):
+        finch_fn = getattr(jl, self.func_name)
         call_args = self._recycled_output_args(args)
         raw_args = [
             self._tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(call_args)
         ]
-        result = getattr(jl, self.func_name)(*raw_args)
+        result = finch_fn(*raw_args)
 
         if self._result_arg_positions is not None:
             outputs = []
