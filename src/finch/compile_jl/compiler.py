@@ -492,8 +492,8 @@ class FinchJLCompiler(NotationCompiler):
     _kernels: ClassVar[
         dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
     ] = {}
-    
-    # Results produced by one compiled kernel are passed to another 
+
+    # Results produced by one compiled kernel are passed to another
     # without rebuilding its Julia wrapper.
     _buffer_context: ClassVar[JuliaBufferContext] = JuliaBufferContext()
 

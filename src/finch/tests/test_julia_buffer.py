@@ -74,6 +74,8 @@ def test_julia_buffer_context_reuses_julia_backed_result_wrapper():
 
     assert first_result is not python_input
     assert second_result is first_result
+
+
 def test_julia_kernel_output_pool_never_reuses_a_current_input():
     """Ping-pong selection leaves the active state buffer read-only this call."""
 
