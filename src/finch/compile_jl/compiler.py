@@ -18,7 +18,6 @@ from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
-from finch.tensor import Scalar
 
 from .interop import JuliaBufferContext
 from .julia import jl
@@ -131,7 +130,6 @@ class CompiledJLKernel:
 class FinchJLKernel(AssemblyKernel):
     """A kernel already defined (evaluated) in the running Julia session."""
 
-    _ARG_CACHE_SIZE = 32
     _OUTPUT_POOL_SIZE = 2
 
     def __init__(
@@ -152,14 +150,6 @@ class FinchJLKernel(AssemblyKernel):
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
 
-        # Keep exact Python-object references, rather than ids, so an object-id
-        # reuse can never select an unrelated Julia tensor. The small LRU is
-        # enough for invariant inputs plus the active ping-pong state buffers.
-        self._arg_cache: list[tuple[object, bool, object]] = []
-        # Scalars are commonly reconstructed by the lazy API even when their
-        # immutable value is loop-invariant.  Their value cache avoids a
-        # scalar Tensor allocation and Julia conversion in that case.
-        self._scalar_arg_cache: list[tuple[object, object]] = []
         # Filled after the first invocation by matching returned Julia tensors
         # to positional arguments. Each position keeps two Julia-backed Python
         # wrappers, allowing an output buffer to be reused without aliasing the
@@ -194,40 +184,8 @@ class FinchJLKernel(AssemblyKernel):
                 reset_positions.add(position)
         return frozenset(reset_positions)
 
-    @staticmethod
-    def _scalar_cache_key(arg, pin_fill: bool):
-        if not isinstance(arg, Scalar):
-            return None
-        key = (type(arg.val), arg.val, pin_fill)
-        try:
-            hash(key)
-        except TypeError:
-            return None
-        return key
-
     def _tensor_to_jl(self, arg, *, pin_fill: bool):
-        scalar_key = self._scalar_cache_key(arg, pin_fill)
-        if scalar_key is not None:
-            for i, (cached_key, cached_jl) in enumerate(self._scalar_arg_cache):
-                if cached_key == scalar_key:
-                    self._scalar_arg_cache.append(self._scalar_arg_cache.pop(i))
-                    return cached_jl
-
-        for i, (cached_arg, cached_pin_fill, cached_jl) in enumerate(self._arg_cache):
-            if cached_arg is arg and cached_pin_fill == pin_fill:
-                # Promote the hit so alternating ping-pong buffers stay hot.
-                self._arg_cache.append(self._arg_cache.pop(i))
-                return cached_jl
-        jl_arg = self.buffer_context.tensor_to_jl(arg, pin_fill=pin_fill)
-        if scalar_key is not None:
-            self._scalar_arg_cache.append((scalar_key, jl_arg))
-            if len(self._scalar_arg_cache) > self._ARG_CACHE_SIZE:
-                self._scalar_arg_cache.pop(0)
-            return jl_arg
-        self._arg_cache.append((arg, pin_fill, jl_arg))
-        if len(self._arg_cache) > self._ARG_CACHE_SIZE:
-            self._arg_cache.pop(0)
-        return jl_arg
+        return self.buffer_context.tensor_to_jl(arg, pin_fill=pin_fill)
 
     def _remember_output(self, arg_pos: int, output) -> None:
         pool = self._output_pools.setdefault(arg_pos, [])
