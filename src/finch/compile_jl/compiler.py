@@ -151,9 +151,7 @@ class FinchJLKernel(AssemblyKernel):
         self.dynamic_args = dynamic_args
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
-        # JuliaCall attribute lookup is a boundary crossing of its own. Kernel
-        # methods are immutable once generated, so retain the callable proxy.
-        self._finch_fn = getattr(jl, self.func_name)
+
         # Keep exact Python-object references, rather than ids, so an object-id
         # reuse can never select an unrelated Julia tensor. The small LRU is
         # enough for invariant inputs plus the active ping-pong state buffers.
@@ -306,7 +304,7 @@ class FinchJLKernel(AssemblyKernel):
             self._tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(call_args)
         ]
-        result = self._finch_fn(*raw_args)
+        result = getattr(jl, self.func_name)(*raw_args)
 
         if self._result_arg_positions is not None:
             outputs = []
