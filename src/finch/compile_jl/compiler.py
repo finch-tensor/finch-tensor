@@ -534,9 +534,9 @@ class FinchJLCompiler(NotationCompiler):
     _kernels: ClassVar[
         dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
     ] = {}
-    # Kernels are cached process-wide, so their Julia tensor wrappers must be
-    # cached process-wide as well. This lets a result produced by one compiled
-    # kernel be passed to another without rebuilding its Julia wrapper.
+    
+    # Results produced by one compiled kernel are passed to another 
+    # without rebuilding its Julia wrapper.
     _buffer_context: ClassVar[JuliaBufferContext] = JuliaBufferContext()
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
