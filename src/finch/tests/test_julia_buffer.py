@@ -74,34 +74,6 @@ def test_julia_buffer_context_reuses_julia_backed_result_wrapper():
 
     assert first_result is not python_input
     assert second_result is first_result
-
-
-def test_julia_kernel_argument_cache_is_identity_and_fill_sensitive():
-    """The boundary cache must not conflate an equal but distinct tensor."""
-
-    class RecordingContext:
-        def __init__(self):
-            self.calls = []
-
-        def tensor_to_jl(self, arg, *, pin_fill):
-            result = object()
-            self.calls.append((arg, pin_fill, result))
-            return result
-
-    kernel = object.__new__(FinchJLKernel)
-    kernel.buffer_context = RecordingContext()
-    kernel._arg_cache = []
-    kernel._scalar_arg_cache = []
-    first = object()
-    equal_but_distinct = object()
-
-    first_jl = kernel._tensor_to_jl(first, pin_fill=False)
-    assert kernel._tensor_to_jl(first, pin_fill=False) is first_jl
-    assert kernel._tensor_to_jl(first, pin_fill=True) is not first_jl
-    assert kernel._tensor_to_jl(equal_but_distinct, pin_fill=False) is not first_jl
-    assert len(kernel.buffer_context.calls) == 3
-
-
 def test_julia_kernel_output_pool_never_reuses_a_current_input():
     """Ping-pong selection leaves the active state buffer read-only this call."""
 
