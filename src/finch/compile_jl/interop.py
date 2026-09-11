@@ -326,10 +326,16 @@ class JuliaKernelArgs:
         )
 
 
+@dataclass(frozen=True)
+class JuliaBufferGroup:
+    type_name: str
+    shape: tuple[int, ...]
+
+
 @dataclass
 class _JuliaBufferRecord:
     tensor: Any
-    group: tuple[str, tuple[int, ...]]
+    group: JuliaBufferGroup
     owners: dict[tuple[Any, ...], tuple[Any, bool]] = field(default_factory=dict)
     result: FiberTensor | None = None
     producer: object | None = None
@@ -341,7 +347,7 @@ class JuliaBufferContext:
     def __init__(self):
         self._tensors: dict[tuple[Any, ...], _JuliaBufferRecord] = {}
         self._records: dict[int, _JuliaBufferRecord] = {}
-        self._groups: dict[tuple[str, tuple[int, ...]], list[_JuliaBufferRecord]] = {}
+        self._groups: dict[JuliaBufferGroup, list[_JuliaBufferRecord]] = {}
 
     @staticmethod
     def _cache_key(obj):
@@ -367,20 +373,19 @@ class JuliaBufferContext:
         )
 
     @staticmethod
-    def _group(obj) -> tuple[str, tuple[int, ...]]:
+    def _group(obj) -> JuliaBufferGroup:
         """Return the concrete Julia type and shape that define pool compatibility."""
-        return (
-            str(jl.string(jl.typeof(obj))),
-            tuple(int(dim) for dim in jl.size(obj)),
+        return JuliaBufferGroup(
+            str(jl.string(jl.typeof(obj))), tuple(int(dim) for dim in jl.size(obj))
         )
 
     @staticmethod
-    def _input_group(obj, type_name: str | None):
+    def _input_group(obj, type_name: str | None) -> JuliaBufferGroup | None:
         """Return the pool group expected by a Python argument, if known."""
         shape = getattr(obj, "shape", None)
         if type_name is None or shape is None:
             return None
-        return type_name, tuple(int(dim) for dim in shape)
+        return JuliaBufferGroup(type_name, tuple(int(dim) for dim in shape))
 
     def _record(self, obj) -> _JuliaBufferRecord | None:
         """Get or register the pool record for a reusable Julia tensor."""
