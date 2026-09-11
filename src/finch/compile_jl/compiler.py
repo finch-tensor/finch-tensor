@@ -143,11 +143,6 @@ class FinchJLKernel(AssemblyKernel):
         output_records = [
             resolved_args.argument_records[position] for position in return_positions
         ]
-        self.buffer_context.release_consumed_result_arguments_static(
-            resolved_args.argument_keys,
-            resolved_args.argument_records,
-            return_positions,
-        )
         self.buffer_context.mark_reset_results_static(
             resolved_args.argument_records,
             return_positions,

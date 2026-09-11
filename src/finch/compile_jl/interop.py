@@ -575,27 +575,6 @@ class JuliaBufferContext:
                 continue
             self._detach(key)
 
-    def release_consumed_result_arguments_static(
-        self, keys, arg_records, return_arg_positions
-    ) -> None:
-        """Release consumed result mappings using statically known returns."""
-        returned_records = {
-            id(arg_records[position])
-            for position in return_arg_positions
-            if arg_records[position] is not None
-        }
-        for key, argument_record in zip(keys, arg_records, strict=True):
-            record = self._tensors.get(key)
-            if record is None:
-                continue
-            if not record.owners[key].is_result:
-                continue
-            if (
-                argument_record is not None
-                and id(argument_record) not in returned_records
-            ):
-                self._detach(key)
-
     @staticmethod
     def mark_reset_results_static(
         arg_records, return_arg_positions, reset_positions, producer
