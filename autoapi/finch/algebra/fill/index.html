@@ -6009,6 +6009,11 @@ distinct kernels.</p>
     <div class="doc doc-contents ">
 
         <p>Compute the fill value of mapping <code>op</code> over tensors with fills <code>fills</code>.</p>
+<p>A fill stays static only while its value is one the algebra can act on.
+Combining static fills computes an arbitrary value -- adding 1 repeatedly
+walks a fill through 1, 2, 3, ... -- and a static fill is compared by
+value, so keeping those static would key a kernel per distinct value and
+make a loop cost a compilation per iteration.</p>
 
 
             <details class="mkdocstrings-source">
@@ -6024,17 +6029,43 @@ distinct kernels.</p>
 <span class="normal">171</span>
 <span class="normal">172</span>
 <span class="normal">173</span>
-<span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compute the fill value of mapping `op` over tensors with fills `fills`.</span>
+
+<span class="sd">    A fill stays static only while its value is one the algebra can act on.</span>
+<span class="sd">    Combining static fills computes an arbitrary value -- adding 1 repeatedly</span>
+<span class="sd">    walks a fill through 1, 2, 3, ... -- and a static fill is compared by</span>
+<span class="sd">    value, so keeping those static would key a kernel per distinct value and</span>
+<span class="sd">    make a loop cost a compilation per iteration.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Imported lazily: `algebra` depends on this module.</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.algebra</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_specializable_value</span>
+
     <span class="n">fills</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">as_fill</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">)</span>
     <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">value</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">]</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">is_dynamic</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">))</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_specializable_value</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">and</span> <span class="n">op</span><span class="o">.</span><span class="n">is_annihilator</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">value</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">f</span>
+            <span class="n">result_type</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">g</span><span class="o">.</span><span class="n">ftype</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">result_type</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="n">values</span><span class="p">),</span> <span class="n">op</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">ftype</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fills</span><span class="p">)))</span>
 </code></pre></div></td></tr></table></div>
             </details>
