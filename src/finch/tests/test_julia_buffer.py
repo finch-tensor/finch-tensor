@@ -140,7 +140,13 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     first_jl = context.tensor_to_jl(first)
     first_key = context._cache_key(first)
     type_name = str(jl.string(jl.typeof(first_jl)))
-    context.release_reset_arguments((first_key,), frozenset({0}))
+    context.release_reset_arguments(
+        (first_key,),
+        [context._tensors[first_key]],
+        frozenset({0}),
+        (),
+        object(),
+    )
 
     second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
     raw_args, _, _ = context.resolve_arguments(

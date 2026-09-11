@@ -130,25 +130,20 @@ class FinchJLKernel(AssemblyKernel):
         )
         finch_fn(*resolved_args.julia_args)
         self.buffer_context.release_reset_arguments(
-            resolved_args.argument_keys, self.kernel_args.reset_positions
-        )
-        return self._return_results(resolved_args)
-
-    def _return_results(self, resolved_args: ResolvedJuliaArguments):
-        """Return buffers at the kernel's return positions."""
-        return_positions = self.kernel_args.return_positions
-        result_items = tuple(
-            resolved_args.julia_args[position] for position in return_positions
-        )
-        output_records = [
-            resolved_args.argument_records[position] for position in return_positions
-        ]
-        self.buffer_context.mark_reset_results_static(
+            resolved_args.argument_keys,
             resolved_args.argument_records,
-            return_positions,
             self.kernel_args.reset_positions,
+            self.kernel_args.return_positions,
             self,
         )
+        result_items = tuple(
+            resolved_args.julia_args[position]
+            for position in self.kernel_args.return_positions
+        )
+        output_records = [
+            resolved_args.argument_records[position]
+            for position in self.kernel_args.return_positions
+        ]
         results = []
         for record, item in zip(output_records, result_items, strict=True):
             if record is None:

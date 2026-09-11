@@ -563,27 +563,20 @@ class JuliaBufferContext:
         return ResolvedJuliaArguments(julia_args, argument_keys, argument_records)
 
     def release_reset_arguments(
-        self, keys: tuple[tuple[Any, ...], ...], reset_positions: frozenset[int]
+        self,
+        argument_keys: tuple[tuple[Any, ...], ...],
+        argument_records: list[_JuliaBufferRecord | None],
+        reset_positions: frozenset[int],
+        return_positions: tuple[int, ...],
+        producer: object,
     ) -> None:
-        """Release mappings for inputs overwritten by the completed kernel call."""
+        """Release reset inputs and mark returned reset buffers for reuse."""
+        returned_positions = set(return_positions)
         for position in reset_positions:
-            key = keys[position]
-            if any(
-                other_key == key and i not in reset_positions
-                for i, other_key in enumerate(keys)
-            ):
+            self._detach(argument_keys[position])
+            if position not in returned_positions:
                 continue
-            self._detach(key)
-
-    @staticmethod
-    def mark_reset_results_static(
-        arg_records, return_arg_positions, reset_positions, producer
-    ) -> None:
-        """Mark statically returned reset buffers as eligible for producer reuse."""
-        for position in return_arg_positions:
-            if position not in reset_positions:
-                continue
-            record = arg_records[position]
+            record = argument_records[position]
             if record is not None:
                 record.producer = producer
 
