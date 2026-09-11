@@ -137,17 +137,12 @@ class FinchJLKernel(AssemblyKernel):
             self,
         )
         
-        results = []
-        for position in self.kernel_args.return_positions:
-            record = resolved_args.argument_records[position]
-            if record is None:
-                result = self.buffer_context.tensor_to_python(
-                    resolved_args.julia_args[position]
-                )
-            else:
-                result = self.buffer_context.attach_result(record)
-            results.append(result)
-        return tuple(results)
+        return tuple(
+            self.buffer_context.tensor_to_python(
+                resolved_args.julia_args[position]
+            )
+            for position in self.kernel_args.return_positions
+        )
 
 
 class FinchJLLibrary(AssemblyLibrary):
