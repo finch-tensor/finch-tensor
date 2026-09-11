@@ -564,6 +564,27 @@ def test_fd_stats_records_dense_projections_without_chasing():
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
 
 
+def test_exact_construction_snapshots_and_defers_count(monkeypatch):
+    from unittest.mock import Mock
+
+    from finch.autoschedule import with_default_scheduler
+    from finch.autoschedule.tensor_stats import exact_stats
+
+    evaluate = Mock(wraps=ft.get_default_scheduler())
+    monkeypatch.setattr(exact_stats, "get_default_scheduler", lambda: evaluate)
+    data = np.array([[2.0, 0.0, 3.0], [0.0, 4.0, 0.0]])
+    tensor = ft.BufferizedNDArray.from_numpy(data)
+    with with_default_scheduler(evaluate):
+        stats = ExactStatsFactory()(tensor, (Field("i"), Field("j")))
+    evaluate.assert_not_called()
+
+    data[:] = 0
+    assert stats.estimate_non_fill_values() == 3
+    assert stats.nnz == 3
+    np.testing.assert_allclose(stats.get_embedding(), np.log2([2, 3, 4]))
+    evaluate.assert_called_once()
+
+
 def test_exact_elementwise_mul():
     i, j = Field("i"), Field("j")
     A = np.array([[1.0, 0.0], [0.0, 1.0]])
