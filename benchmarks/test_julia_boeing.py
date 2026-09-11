@@ -12,12 +12,16 @@ Statistics use default factory settings and warm kernel/factory caches. Matrix
 loading and compilation are excluded. SamplingStats leaves its scan deferred;
 ExactStats copies the tensor and defers counting. BlockedStats is
 excluded because its block extraction builds large dense selectors.
+
+The sampling scan benchmark constructs fresh stats and scans the sketch each
+iteration, using fixed sample masks and excluding Julia compilation.
 """
 
 from pathlib import Path
 
 import pytest
 
+import numpy as np
 import scipy.io
 
 import finch as ft
@@ -88,3 +92,16 @@ def test_julia_stats_ct20stif(boeing_tensor, benchmark, factory):
     with with_default_scheduler(COMPILE_JULIA):
         stats_factory(boeing_tensor, fields)
         benchmark(stats_factory, boeing_tensor, fields)
+
+
+def test_julia_sampling_stats_scan_ct20stif(boeing_tensor, benchmark):
+    stats_factory = SamplingStatsFactory()
+    stats_factory._rng = np.random.default_rng(42)
+    fields = (Field("i"), Field("j"))
+
+    def build_and_scan():
+        return stats_factory(boeing_tensor, fields).scan(needs_freq=False)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        build_and_scan()
+        benchmark(build_and_scan)

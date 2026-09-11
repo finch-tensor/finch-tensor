@@ -38,6 +38,11 @@ def materialize(sketch):
     out = Alias("sketch_out")
     prgm = Plan((Query(out, sketch), Produces((out,))))
     result = NON_RECURSIVE_SCHEDULER(prgm)[0]
+    if isinstance(result, fl.FiberTensor):
+        from finch.compile_jl.interop import tensor_to_jl
+        from finch.compile_jl.julia import jl
+
+        return jl.Array(tensor_to_jl(result)).to_numpy().transpose()
     return result.to_numpy() if hasattr(result, "to_numpy") else np.asarray(result)
 
 
