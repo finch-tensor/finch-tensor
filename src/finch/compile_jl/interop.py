@@ -326,10 +326,19 @@ class JuliaKernelArgs:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class JuliaBufferGroup:
     type_name: str
     shape: tuple[int, ...]
+
+    def __init__(self, obj, type_name: str | None = None):
+        if type_name is None:
+            type_name = str(jl.string(jl.typeof(obj)))
+            shape = jl.size(obj)
+        else:
+            shape = obj.shape
+        object.__setattr__(self, "type_name", type_name)
+        object.__setattr__(self, "shape", tuple(int(dim) for dim in shape))
 
 
 @dataclass
@@ -412,21 +421,6 @@ class JuliaBufferContext:
             is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor) and len(jl.size(obj)) > 0
         )
 
-    @staticmethod
-    def _group(obj) -> JuliaBufferGroup:
-        """Return the concrete Julia type and shape that define pool compatibility."""
-        return JuliaBufferGroup(
-            str(jl.string(jl.typeof(obj))), tuple(int(dim) for dim in jl.size(obj))
-        )
-
-    @staticmethod
-    def _input_group(obj, type_name: str | None) -> JuliaBufferGroup | None:
-        """Return the pool group expected by a Python argument, if known."""
-        shape = getattr(obj, "shape", None)
-        if type_name is None or shape is None:
-            return None
-        return JuliaBufferGroup(type_name, tuple(int(dim) for dim in shape))
-
     def _record(self, obj) -> _JuliaBufferRecord | None:
         """Get or register the pool record for a reusable Julia tensor."""
         if not self._is_poolable(obj):
@@ -434,7 +428,7 @@ class JuliaBufferContext:
         object_id = int(jl.objectid(obj))
         record = self._records_by_julia_id.get(object_id)
         if record is None:
-            record = _JuliaBufferRecord(obj, self._group(obj))
+            record = _JuliaBufferRecord(obj, JuliaBufferGroup(obj))
             self._records_by_julia_id[object_id] = record
         return record
 
@@ -545,8 +539,13 @@ class JuliaBufferContext:
                 julia_args.append(record.tensor)
                 continue
 
-            group = self._input_group(arg, kernel_args.type_names[position])
-            if position in kernel_args.reset_positions and group is not None:
+            type_name = kernel_args.type_names[position]
+            if (
+                position in kernel_args.reset_positions
+                and type_name is not None
+                and getattr(arg, "shape", None) is not None
+            ):
+                group = JuliaBufferGroup(arg, type_name)
                 record = self._lease_reset_record(group)
                 if record is not None:
                     self._assign_owner(key, arg, record)
