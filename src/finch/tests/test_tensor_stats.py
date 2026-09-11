@@ -46,6 +46,45 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
+def test_sampling_reuses_random_masks():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory._rng = np.random.default_rng(42)
+    first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
+    mask_i = factory._get_mask(i, 5)
+    assert isinstance(mask_i, ft.RandomMaskTensor)
+    assert mask_i.element_type == ftype(np.intp)
+
+    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
+    assert factory._get_mask(i, 5) is mask_i
+    assert first.masks_ref is second.masks_ref is factory._masks
+    assert len(factory._masks) == 3
+    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
+    assert factory._get_mask(j, 7).ftype != mask_i.ftype
+    assert factory._get_mask(i, 6) is not mask_i
+
+
+@pytest.mark.parametrize("shape", [(12, 9), (0, 5)])
+@pytest.mark.parametrize("sample_prob", [0.0, 0.5, 1.0])
+def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_prob=sample_prob)
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    expected_count = math.prod(
+        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        for field, size in zip((i, j), shape, strict=True)
+    )
+    assert stats.scan(needs_freq=True) == (
+        expected_count,
+        expected_count,
+        expected_count,
+        {1: expected_count} if expected_count else None,
+    )
+    expected_coverage = math.prod(shape) if expected_count else 0
+    assert stats.coverage_correction() == pytest.approx(expected_coverage)
+
+
 def test_sampling_from_tensor():
     i, j = Field("i"), Field("j")
     data = np.eye(20)

@@ -152,12 +152,14 @@ def test_random_mask_bit_mixing_matches_julia():
     from finch.compile_jl.julia import jl
     from finch.tensor.patterns import _randommask_mix, _randommask_uniform
 
+    mix = jl.seval("seed -> Finch.randommask_mix(UInt64(seed))")
+    uniform = jl.seval("seed -> Finch.randommask_uniform(UInt64(seed))")
     rng = np.random.default_rng(42)
     seeds = [0, 1, 1 << 63, (1 << 64) - 1]
     seeds.extend(map(int, rng.integers(0, 1 << 64, size=32, dtype=np.uint64)))
     for seed in seeds:
-        assert _randommask_mix(seed) == int(jl.Finch.randommask_mix(jl.UInt64(seed)))
-        assert _randommask_uniform(seed) == jl.Finch.randommask_uniform(jl.UInt64(seed))
+        assert _randommask_mix(seed) == int(mix(seed))
+        assert _randommask_uniform(seed) == uniform(seed)
 
 
 @pytest.mark.parametrize("shape", [(), (7,), (4, 5), (2, 3, 4)])
@@ -180,10 +182,15 @@ def test_random_mask_large_coordinates_match_julia():
     from finch.compile_jl.julia import jl
 
     shape = (int(np.iinfo(np.intp).max), int(np.iinfo(np.intp).max), 8)
+    large_index = (shape[0] + 1) // 2
     for seed in (42, (1 << 64) - 1):
         mask = RandomMaskTensor(shape, 0.5, seed=seed)
         native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
-        for idx in ((2, 3, 1), tuple(dim - 1 for dim in shape), (1 << 62, 1 << 62, 7)):
+        for idx in (
+            (2, 3, 1),
+            tuple(dim - 1 for dim in shape),
+            (large_index, large_index, 7),
+        ):
             assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
 
 
@@ -221,10 +228,61 @@ def test_compile_julia_pattern_lowering(file_regression):
         RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
     ):
         compiler.sources.append(f"# {type(mask).__name__}")
-        data = np.full(mask.shape, 2, dtype=np.int64)
+        data = np.full(mask.shape or (1,), 2, dtype=np.int64)
         with with_default_scheduler(scheduler):
             ft.compute(ft.defer(mask) + ft.defer(data))
 
+    file_regression.check("\n\n".join(compiler.sources), extension=".jl")
+
+
+def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
+    _requires_julia_backend()
+    from finch.autoschedule import default_schedulers
+    from finch.autoschedule.tensor_stats import SamplingStatsFactory
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+    from finch.compile_jl.julia import jl
+    from finch.finch_logic import Field, LogicSimplify
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                source = FinchJLGenerator()(func)
+                expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
+                self.sources.append(
+                    f"# Finch kernel\n{source}\n\n"
+                    f"# Generated Julia\n{jl.string(expanded)}"
+                )
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicOptimizer(
+                LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
+            ),
+            stats_factory=FDStatsFactory(),
+        )
+    )
+    monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
+    i, j = Field("i"), Field("j")
+    data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
+    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory._rng = np.random.default_rng(42)
+    stats = factory(_csr_tensor(data), (i, j))
+    rows, cols = (
+        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        for field, size in zip((i, j), data.shape, strict=True)
+    )
+    expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])
+    assert stats.scan(needs_freq=False) == (expected, expected, expected, None)
     file_regression.check("\n\n".join(compiler.sources), extension=".jl")
 
 

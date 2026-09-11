@@ -139,6 +139,21 @@ end)
 # RandomMaskTensor
 
 eval(let
+        v0 = Finch.window(Finch.randommask((), 0.4; seed=UInt64(42)))
+        v1 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
+        v2 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
+    Finch.@finch_kernel function main(v0,v1,v2)
+        v2 .= 0
+        for v3 = _
+            v2[v3] = (Bool(v0[]) + v1[v3])
+        end
+        return v2
+    end
+end)
+
+# RandomMaskTensor
+
+eval(let
         v0 = Finch.window(Finch.randommask((1,), 0.25; seed=UInt64(42)), Finch.Extent(1, 1))
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
