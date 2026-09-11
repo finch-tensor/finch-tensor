@@ -375,11 +375,12 @@ class ObjectBufferID(BufferID):
 @dataclass
 class _JuliaBufferRecord:
     tensor: Any
-    group: JuliaBufferGroup
+    group: JuliaBufferGroup = field(init=False)
     py_wrapper: FiberTensor = field(init=False)
     owner_key: BufferID | None = None
 
     def __post_init__(self):
+        self.group = JuliaBufferGroup(self.tensor)
         self.py_wrapper = jl_tensor_to_python(self.tensor)
 
 
@@ -431,7 +432,7 @@ class JuliaBufferContext:
         object_id = int(jl.objectid(obj))
         record = self._julia_id_to_record_map.get(object_id)
         if record is None:
-            record = _JuliaBufferRecord(obj, JuliaBufferGroup(obj))
+            record = _JuliaBufferRecord(obj)
             self._julia_id_to_record_map[object_id] = record
         return record
 
@@ -499,32 +500,37 @@ class JuliaBufferContext:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
         argument_keys = tuple(BufferID.from_object(arg) for arg in args)
-        julia_args = []
-        for position, (arg, key) in enumerate(zip(args, argument_keys, strict=True)):
+        positions = tuple(
+            position
+            for position in range(len(args))
+            if position not in kernel_args.reset_positions
+        ) + tuple(
+            position
+            for position in range(len(args))
+            if position in kernel_args.reset_positions
+        )
+        julia_args: list[Any] = [None] * len(args)
+        for position in positions:
+            arg = args[position]
+            key = argument_keys[position]
             record = self._owned_records.get(key)
             if record is None:
                 record = self._claim_result_record(key)
             if record is not None:
-                julia_args.append(record.tensor)
+                julia_args[position] = record.tensor
                 continue
 
             type_name = kernel_args.type_names[position]
-            if (
-                position in kernel_args.reset_positions
-                and type_name is not None
-                and getattr(arg, "shape", None) is not None
-            ):
+            if position in kernel_args.reset_positions:
                 group = JuliaBufferGroup(arg, type_name)
                 record = self._free_pool.remove(group)
                 if record is not None:
                     self._assign_owner(key, record)
-                    julia_args.append(record.tensor)
+                    julia_args[position] = record.tensor
                     continue
 
-            julia_args.append(
-                self.tensor_to_jl(
-                    arg, pin_fill=position in kernel_args.dynamic_positions
-                )
+            julia_args[position] = self.tensor_to_jl(
+                arg, pin_fill=position in kernel_args.dynamic_positions
             )
         return ResolvedJuliaArguments(julia_args, argument_keys)
 
