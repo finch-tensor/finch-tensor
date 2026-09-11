@@ -46,6 +46,14 @@ class TensorFType(FType, ABC):
         """AbstractFill value of the tensor, either static or dynamic."""
         ...
 
+    def with_fill(self, fill_value: AbstractFill) -> TensorFType:
+        """
+        This ftype carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
     @property
     @abstractmethod
     def element_type(self) -> FType:
@@ -125,6 +133,14 @@ class Tensor(FTyped, ABC):
         Note: this is the raw value NOT the AbstractFill.
         """
         return self.ftype.fill_value.value
+
+    def with_fill(self, fill_value: AbstractFill) -> Tensor:
+        """
+        An equivalent tensor carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
 
     @property
     def element_type(self) -> FType:

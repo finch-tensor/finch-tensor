@@ -31,6 +31,7 @@ from finch.algebra import (
     result_type,
     return_type,
 )
+from finch.algebra.algebra import is_specializable_value
 from finch.algebra.ftypes import (
     FDTypeBoolean,
     FDTypeBuiltin,
@@ -492,12 +493,17 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = Scalar(arr) if _is_numeric_constant(arr) else asarray(arr)
+    if _is_numeric_constant(arr):
+        arr = ConstantScalar(arr) if is_specializable_value(arr) else Scalar(arr)
+    else:
+        arr = asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
-    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type, arr.device)
+    return LazyTensor(
+        tns, ctx, shape, arr.ftype.fill_value, arr.element_type, arr.device
+    )
 
 
 def _np_dtype(dtype):
@@ -891,8 +897,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
 
     The function will automatically handle broadcasting of the input tensors to
     ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
-    x, y)` is equivalent to `x + y`. If an input is a ConstantScalar, it will
-    be unwrapped into a Literal(val) node.
+    x, y)` is equivalent to `x + y`.
 
     Parameters:
     - f: The function to apply elementwise.
@@ -904,19 +909,13 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    is_constant = tuple(isinstance(a, ConstantScalar) for a in args)
-    if builtins.all(is_constant):
-        return defer(ConstantScalar(f(*[a.val for a in args])))
-    args = tuple(a if c else defer(a) for a, c in zip(args, is_constant, strict=True))
-    shapes = tuple(() if c else a.shape for a, c in zip(args, is_constant, strict=True))
+    args = tuple(defer(a) for a in args)
+    shapes = tuple(a.shape for a in args)
     shape = _broadcast_shape(*shapes)
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs: list[LogicExpression] = []
-    for arg, constant, arg_shape in zip(args, is_constant, shapes, strict=True):
-        if constant:
-            bargs.append(Literal(arg.val))
-            continue
+    for arg, arg_shape in zip(args, shapes, strict=True):
         arg_ndim = len(arg_shape)
         idims = []
         odims = []
@@ -932,8 +931,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = apply_fill(f, *[a.ftype.fill_value for a in args])
     new_element_type = return_type(f, *[a.element_type for a in args])
-    tensors = [a for a, s in zip(args, is_constant, strict=True) if not s]
-    ctx = tensors[0].ctx.join(*[x.ctx for x in tensors[1:]])
+    ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
     data, ctx = ctx.eval(expr)
     return LazyTensor(
         data,
@@ -941,7 +939,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
         shape,
         new_fill_value,
         new_element_type,
-        common_device(*(t.device for t in tensors)),
+        common_device(*(t.device for t in args)),
     )
 
 
