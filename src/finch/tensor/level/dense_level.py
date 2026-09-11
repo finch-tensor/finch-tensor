@@ -11,7 +11,6 @@ from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
 from .level import Level, LevelFType
@@ -69,19 +68,6 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         raise NotImplementedError(
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
-
-    def from_numpy(self, shape: tuple[Any, ...], val: Any) -> DenseLevel:
-        """
-        Creates an instance of DenseLevel with the given shape.
-
-        Args:
-            shape: The shape to be used for the level.
-            val: Value to pass to ElementLevel.
-        Returns:
-            An instance of DenseLevel.
-        """
-        lvl = self.lvl_t.from_numpy(shape[1:], val)
-        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
         return f"DenseLevelFType({self.lvl_t})"
@@ -175,8 +161,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         pos: asm.AssemblyExpression,
     ):
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl = ctx.fiber_level(tns)
+        level = tns.lvl
+        lvl = ctx(level)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -204,20 +190,15 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                     ),
                 )
             )
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
-            return ntn.Fiber(
-                tns.root,
-                ntn.Child(tns.lvl),
-                pos_2,
-                child_type,
-                (*tns.idxs, idx),
+            return lplt.Run(
+                ntn.Fiber(
+                    ntn.Child(level),
+                    pos_2,
+                    (*tns.idxs, idx),
+                )
             )
 
-        return lplt.Lookup(
-            body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx: child_accessor(ctx, idx),
-            )
-        )
+        return lplt.Lookup(child_accessor)
 
     def from_fields(self, lvl, dimension, stride) -> DenseLevel:
         return DenseLevel(lvl=lvl, dimension=dimension)
@@ -243,9 +224,11 @@ class DenseLevel(Level):
     @property
     def stride(self) -> np.integer:
         dim_t = ftype(self.dimension)
-        if self.lvl.ndim == 0 or self.lvl.stride == 0:
-            return dim_t(1)
-        return dim_t(self.lvl.shape[0] * self.lvl.stride)
+        match self.lvl:
+            case DenseLevel():
+                return dim_t(self.lvl.dimension * self.lvl.stride)
+            case _:
+                return dim_t(1)
 
     @property
     def ftype(self) -> DenseLevelFType:

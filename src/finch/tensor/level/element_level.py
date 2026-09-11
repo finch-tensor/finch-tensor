@@ -155,7 +155,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):
-        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
         return asm.Load(buf, pos)
 
     def level_lower_increment(
@@ -166,7 +166,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         val: ntn.NotationExpression,
         pos: ntn.Variable,
     ):
-        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
         pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
@@ -187,11 +187,6 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
 
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
-
-    def from_numpy(self, shape, val):
-        if len(shape) != 0:
-            raise ValueError("ElementLevelFType must be called with an empty shape.")
-        return self.from_fields(val)
 
 
 def element(
@@ -239,10 +234,6 @@ class ElementLevel(Level):
     @property
     def shape(self) -> tuple:
         return ()
-
-    @property
-    def stride(self) -> np.integer:
-        return np.intp(1)  # TODO: add dimension_type to element_level.py
 
     @property
     def ftype(self) -> ElementLevelFType:

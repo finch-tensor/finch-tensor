@@ -104,7 +104,7 @@ class ScalarFType(TensorFType, ImmutableStructFType):
         match obj:
             case ntn.Fiber():
                 # A slot-bound scalar argument: read the value struct field.
-                return asm.GetAttr(obj.root, asm.Literal("val"))
+                return asm.GetAttr(ctx(obj.lvl.root), asm.Literal("val"))
             case _:
                 # An inline scalar value (e.g. a sparse gap read).
                 return ctx(obj)

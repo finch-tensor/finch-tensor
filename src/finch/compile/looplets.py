@@ -7,7 +7,7 @@ from typing import Any
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs
-from finch.compile.lower import LoopletContext, LoopletPass, SymbolicExtent
+from finch.compile.lower import DefaultPass, LoopletContext, LoopletPass, SymbolicExtent
 from finch.finch_notation.proves import prove
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
 
@@ -232,7 +232,7 @@ class Sequence(Looplet):
                 ),
             )
         ):
-            return Run(self.head)
+            return self.head(ctx, ctx.idx)
         if prove(
             ntn.Call(
                 ntn.L(ffuncs.eq),
@@ -246,7 +246,7 @@ class Sequence(Looplet):
                 (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
             ),
             self,
-            Run(self.head),
+            self.head(ctx, ctx.idx),
         )
 
 
@@ -331,7 +331,7 @@ class SequencePass(LoopletPass):
 
 @dataclass
 class Run(Looplet):
-    body: Any
+    body: ntn.NotationExpression
 
     @property
     def pass_request(self):
@@ -346,24 +346,17 @@ class RunPass(LoopletPass):
     def __call__(self, ctx, idx, ext, body):
         def run_node(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Run):
-                        if isinstance(tns.body, ntn.Value):
-                            # The body is already a lowered expression (e.g. a
-                            # runtime fill read).
-                            leaf = Leaf(lambda ctx, body=tns.body: body)
-                        else:
-                            leaf = Leaf(
-                                lambda ctx, body=tns.body: ntn.Value(
-                                    asm.Literal(body), body.ftype
-                                )
-                            )
-                        return ntn.Access(leaf, mode, (j, *idxs))
+                case ntn.Access(Run(body), mode, (j, *idxs)) if j == idx:
+                    return ntn.Access(body, mode, tuple(idxs))
             return None
 
         body_2 = PostWalk(run_node)(body)
         ctx_2 = ctx.scope()
-        ctx_2(ext, body_2)
+        match ctx_2.select_pass(body_2):
+            case DefaultPass():
+                ctx_2.ctx(body_2)
+            case _:
+                ctx_2(ext, body_2)
         ctx.exec(asm.Block(ctx_2.emit()))
 
 
@@ -384,7 +377,7 @@ class AcceptRunPass(LoopletPass):
 
 @dataclass
 class Lookup(Looplet):
-    body: Callable
+    body: Callable[[LoopletContext, ntn.Variable], Looplet]
 
     @property
     def pass_request(self):
@@ -397,21 +390,16 @@ class LookupPass(LoopletPass):
         return 2
 
     def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
+        ctx_2 = ctx.scope()
+
         def lookup_node(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Lookup):
-                        tns_2 = tns.body(
-                            ctx,
-                            idx,
-                        )
-                        return ntn.Access(tns_2, mode, (j, *idxs))
+                case ntn.Access(Lookup(lookup), mode, (j, *idxs)) if j == idx:
+                    return ntn.Access(lookup(ctx_2, idx), mode, (j, *idxs))
             return None
 
         body_2 = PostWalk(lookup_node)(body)
-        ctx_2 = ctx.scope()
-        ext_2 = SymbolicExtent.point(idx)
-        ctx_2(ext_2, body_2)
+        ctx_2(SymbolicExtent(idx, idx), body_2)
         body_3 = asm.Block(ctx_2.emit())
 
         if ext.is_sym_point():
@@ -451,29 +439,3 @@ class JumperPass(LoopletPass):
     @property
     def priority(self):
         return 0
-
-
-@dataclass
-class Leaf(Looplet):
-    body: Callable
-
-    @property
-    def pass_request(self):
-        return LeafPass()
-
-
-class LeafPass(LoopletPass):
-    @property
-    def priority(self):
-        return 0
-
-    def __call__(self, ctx, idx, ext, body):
-        def leaf_node(node):
-            match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Leaf):
-                        return ntn.Access(tns.body(ctx), mode, tuple(idxs))
-            return None
-
-        body_2 = PostWalk(leaf_node)(body)
-        ctx.ctx(body_2)  # calling AssemblyContext

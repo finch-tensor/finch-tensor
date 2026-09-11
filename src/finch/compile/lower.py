@@ -5,6 +5,7 @@ from typing import Any, overload
 
 import numpy as np
 
+from finch import compile as comp
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
@@ -24,7 +25,7 @@ from finch.finch_assembly import (
     AssemblyTransform,
     LowerPackedStructSlots,
 )
-from finch.finch_notation import LoopletSimplify, NotationLoader
+from finch.finch_notation.stages import NotationLoader
 from finch.symbolic import (
     Context,
     PostOrderDFS,
@@ -41,6 +42,16 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
 
 class FinchTensorFType(TensorFType, ABC):
+    @abstractmethod
+    def get_child_type(self, attr: str) -> FType:
+        """Return the type of a logical child level."""
+
+    @abstractmethod
+    def get_child(
+        self, obj: asm.AssemblyExpression, attr: str
+    ) -> asm.AssemblyExpression:
+        """Lower a logical child level to its storage expression."""
+
     @abstractmethod
     def lower_dim(self, ctx, obj, i):
         """
@@ -369,23 +380,10 @@ class AssemblyContext(Context):
         self.types = types
         self.func_state = func_state
 
-    def fiber_level(self, fiber: ntn.Fiber):
-        def descend(root, cursor):
-            match cursor:
-                case ntn.Root():
-                    return asm.GetAttr(root, asm.Literal("lvl"))
-                case ntn.Child(parent, attr):
-                    return asm.GetAttr(descend(root, parent), asm.Literal(attr))
-                case _:
-                    raise TypeError(f"Unrecognized fiber cursor: {cursor}")
-
-        return descend(fiber.root, fiber.lvl)
-
-    @staticmethod
-    def _slot_expr(slot):
+    def _slot_expr(self, slot):
         match slot:
-            case ntn.Fiber(root, _, _, _):
-                return root
+            case ntn.Fiber(lvl, _):
+                return self(lvl.root)
             case _:
                 raise TypeError(f"Unrecognized slot state: {slot}")
 
@@ -402,7 +400,7 @@ class AssemblyContext(Context):
             pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")
-        return ntn.Fiber(slot, ntn.Root(), asm.Literal(pos_t(0)), type_)
+        return ntn.Fiber(ntn.Root(slot), asm.Literal(pos_t(0)))
 
     def block(self):
         """
@@ -452,12 +450,14 @@ class AssemblyContext(Context):
                         return view
                     raise TypeError(f"Unrecognized slot state: {view}")
                 raise KeyError(f"Slot {var_n} not found in context")
-            case ntn.Fiber(_, _, _, _):
+            case ntn.Fiber():
                 return node
-            case ntn.Value(_, _):
+            case ntn.Value(_, _) | ntn.Full():
                 return node
             case _:
-                raise ValueError(f"Expected Slot, Fiber, or Value, got: {type(node)}")
+                raise ValueError(
+                    f"Expected Slot, Fiber, Value, or Full, got: {type(node)}"
+                )
 
     def _freeze_tensor(self, tns_var: str, op: ntn.Literal | None) -> None:
         if op is None:
@@ -507,6 +507,12 @@ class AssemblyContext(Context):
                 return asm.Literal(value)
             case ntn.Value(expr, _):
                 return expr
+            case ntn.Root(tns):
+                return tns.result_type.get_child(self(tns), "lvl")
+            case ntn.Child(parent, attr):
+                return parent.result_type.level_get_child(self(parent), attr)
+            case asm.AssemblyExpression():
+                return prgm
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = tuple(self(arg) for arg in args)
@@ -527,8 +533,8 @@ class AssemblyContext(Context):
                 if var_n in self.slots:
                     return self._slot_expr(self.slots[var_n])
                 raise KeyError(f"Slot '{var_n}' is not defined in the current context.")
-            case ntn.Fiber(root, _, _, _):
-                return root
+            case ntn.Fiber(lvl, _):
+                return self(lvl.root)
             case ntn.Unpack(ntn.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
@@ -556,6 +562,12 @@ class AssemblyContext(Context):
                 self._rm_tensor_from_accesses(var_n)
                 self.exec(asm.Repack(asm.Slot(var_n, var_t)))
                 return None
+            case ntn.Unwrap(ntn.Full(val, ())):
+                return self(val)
+            case ntn.Unwrap(ntn.Access(ntn.Full(val, ()), ntn.Read(), ())):
+                return self(val)
+            case ntn.Dimension(ntn.Full(_, shape), ntn.Literal(r)):
+                return self(shape[r])
             case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
                 assert isinstance(mode, ntn.Read)
                 assert idxs == ()
@@ -695,7 +707,13 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_type.unfurl(ctx_2, tns, ext, mode, proto=None)
+                    match tns:
+                        case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
+                            tns_2 = comp.looplets.Run(ntn.Full(val, tuple(shape)))
+                        case _:
+                            tns_2 = tns.result_type.unfurl(
+                                ctx_2, tns, ext, mode, proto=None
+                            )
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 
@@ -710,7 +728,7 @@ class LoopletPass(ABC):
     def priority(self): ...
 
     def __init__(self):
-        self.looplet_simplify = LoopletSimplify()
+        self.looplet_simplify = ntn.LoopletSimplify()
 
     def __lt__(self, other):
         assert isinstance(other, LoopletPass)

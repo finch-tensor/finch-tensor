@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import scipy.sparse as sps
 
+from finch import finch_assembly as asm
 from finch.algebra import (
     DynamicFillError,
     ImmutableStructFType,
@@ -18,6 +19,7 @@ from finch.algebra import (
 from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
+from . import level as levels
 from .override_tensor import OverrideTensor
 from .traits import FormatProperty
 
@@ -55,10 +57,6 @@ class FiberTensor(OverrideTensor):
     @property
     def shape(self):
         return self.lvl.shape
-
-    @property
-    def stride(self):
-        return self.lvl.stride
 
     @property
     def val(self):
@@ -302,6 +300,15 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", bool_),
         ]
 
+    def get_child_type(self, attr):
+        if attr != "lvl":
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def get_child(self, obj, attr):
+        self.get_child_type(attr)
+        return asm.GetAttr(obj, asm.Literal(attr))
+
     def with_fill(self, fill_value: Any) -> FiberTensorFType:
         """Rebuild this ftype with the leaf fill value replaced."""
         return FiberTensorFType(self.lvl_t.with_fill(fill_value), self._device)
@@ -387,10 +394,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.level_lower_freeze(ctx, ctx.fiber_level(tns), op, tns.pos)
+        return self.lvl_t.level_lower_freeze(ctx, ctx(tns.lvl), op, tns.pos)
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.level_lower_thaw(ctx, ctx.fiber_level(tns), op, tns.pos)
+        return self.lvl_t.level_lower_thaw(ctx, ctx(tns.lvl), op, tns.pos)
 
     def lower_unwrap(self, ctx, tns):
         return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)
@@ -400,20 +407,37 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
-            ctx, ctx.fiber_level(tns), init, op, shape, tns.pos
+            ctx, ctx(tns.lvl), init, op, shape, tns.pos
         )
 
     def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), r)
+        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args
         return FiberTensor(lvl, pos, dirty_bit, self.device)
 
-    # TODO: To be removed - use BufferizedNDArray instead.
     def from_numpy(self, arr: np.ndarray) -> FiberTensor:
+        def build_level(lvl_t, shape):
+            match lvl_t:
+                case levels.DenseLevelFType():
+                    if not shape:
+                        raise ValueError("Array rank does not match the fiber format")
+                    return levels.DenseLevel(
+                        build_level(lvl_t.lvl_t, shape[1:]),
+                        lvl_t.dimension_type(shape[0]),
+                    )
+                case levels.ElementLevelFType():
+                    if shape:
+                        raise ValueError("Array rank does not match the fiber format")
+                    return lvl_t.from_fields(arr)
+                case _:
+                    raise NotImplementedError(
+                        f"NumPy conversion does not support {type(lvl_t).__name__}"
+                    )
+
         return FiberTensor(
-            self.lvl_t.from_numpy(arr.shape, arr),
+            build_level(self.lvl_t, arr.shape),
             pos=self.position_type(0),
             dirty_bit=False,
             _device=self.device,

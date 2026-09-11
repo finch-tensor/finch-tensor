@@ -15,9 +15,7 @@ from finch.algebra import (
 )
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
-from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.level import Level, LevelFType
-from finch.tensor.scalar import Scalar, ScalarFType
 
 
 @dataclass(unsafe_hash=True)
@@ -41,7 +39,6 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         return [
             ("lvl", self.lvl_t),
             ("dimension", self.dimension_type),
-            ("stride", self.dimension_type),
             ("ptr", self.ptr_type),
             ("idx", self.idx_type),
         ]
@@ -153,9 +150,6 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("sparse list level doesn't support from_numpy")
-
     def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
             return asm.GetAttr(lvl, asm.Literal("dimension"))
@@ -208,11 +202,9 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        if not isinstance(fiber.type, FiberTensorFType):
-            raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl_asm = ctx.fiber_level(tns)
+        level = tns.lvl
+        lvl_asm = ctx(level)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
 
@@ -221,17 +213,18 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
         pos = tns.pos
-        scalar: ntn.Value | Scalar
-        if is_dynamic(self.fill_value):
-            # The fill arrives at bind time: gap reads load it from the leaf
-            # level's fill field rather than baking a literal.
-            scalar = ntn.Value(
-                self.lower_fill(lvl_asm),
-                ScalarFType(self.element_type, self.fill_value),
-            )
-        else:
-            scalar = Scalar(self.fill_value.value, self.fill_value)
-
+        fill = (
+            ntn.Value(self.lower_fill(lvl_asm), self.element_type)
+            if is_dynamic(self.fill_value)
+            else ntn.Literal(self.fill_value.value)
+        )
+        full = ntn.Full(
+            fill,
+            tuple(
+                ntn.Value(self.level_lower_dim(ctx, lvl_asm, r), self.shape_type[r])
+                for r in range(1, self.ndim)
+            ),
+        )
         tmp_locals = locals()
 
         def thunk_preamble(ctx, idx):
@@ -268,13 +261,10 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(asm.Assign(pos_2, q))
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
-            return lplt.Leaf(
-                lambda ctx: ntn.Fiber(
-                    tns.root,
-                    ntn.Child(tns.lvl),
+            return lplt.Run(
+                ntn.Fiber(
+                    ntn.Child(level),
                     pos_2,
-                    child_type,
                     (*tns.idxs, idx),
                 )
             )
@@ -297,7 +287,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
-                        head=lambda ctx, idx: lplt.Run(scalar),
+                        head=lambda ctx, idx: lplt.Run(full),
                         split=lambda ctx, ext: ntn.Variable(
                             i_stop.name, self.position_type
                         ),
@@ -317,7 +307,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
-                tail=lambda ctx, idx: lplt.Run(scalar),
+                tail=lambda ctx, idx: lplt.Run(full),
             ),
         )
 
@@ -349,12 +339,6 @@ class SparseListLevel(Level):
             self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.idx is None:
             self.idx = self.lvl.buffer_factory(ftype(self.dimension))(0)
-
-    @property
-    def stride(self) -> np.integer:
-        # `stride` is a struct field of type `dimension_type`, so it must be
-        # returned with that exact type rather than the default `intp`.
-        return ftype(self.dimension)(0)
 
     @property
     def ftype(self) -> SparseListLevelFType:

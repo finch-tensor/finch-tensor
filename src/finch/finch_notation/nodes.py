@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from finch.algebra import FType, ftype, return_type
+from finch import tensor
+from finch.algebra import DynamicFill, FType, StaticFill, ftype, return_type
 from finch.finch_assembly import AssemblyNode
 from finch.symbolic import (
     CallTerm,
@@ -217,7 +218,7 @@ class Dimension(NotationTree, NotationExpression):
 
     @property
     def result_type(self):
-        return self.tns.shape_type[self.r.val]
+        return self.tns.result_type.shape_type[self.r.val]
 
     @classmethod
     def from_children(cls, tns, r):
@@ -252,6 +253,33 @@ class Access(NotationTree, NotationExpression):
     @property
     def children(self):
         return [self.tns, self.mode, *self.idxs]
+
+
+@dataclass(eq=True, frozen=True)
+class Full(NotationTree, NotationExpression):
+    """A read-only tensor filled with `val`, with scalar shape by default."""
+
+    val: NotationExpression
+    shape: tuple[NotationExpression, ...] = ()
+
+    @property
+    def result_type(self):
+        match self.val:
+            case Literal(val):
+                fill = StaticFill(val)
+            case _:
+                fill = DynamicFill(self.val.result_type(0))
+        return tensor.patterns.FillTensorFType(
+            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+        )
+
+    @classmethod
+    def from_children(cls, val, *shape):
+        return cls(val, tuple(shape))
+
+    @property
+    def children(self):
+        return [self.val, *self.shape]
 
 
 @dataclass(eq=True, frozen=True)
@@ -401,45 +429,74 @@ class Assign(NotationTree, NotationStatement):
         return [self.lhs, self.rhs]
 
 
-class Cursor(NotationNode):
-    """
-    A cursor path into a tensor's level tree.
-    """
+class Cursor(NotationExpression, ABC):
+    """A level expression that retains its owning tensor."""
+
+    @property
+    @abstractmethod
+    def root(self) -> NotationExpression: ...
 
 
 @dataclass(eq=True, frozen=True)
-class Root(Cursor):
-    """
-    The root level of a fiber tensor.
-    """
+class Root(NotationTree, Cursor):
+    """The first level of a tensor."""
+
+    tns: NotationExpression
+
+    @property
+    def root(self):
+        return self.tns
+
+    @property
+    def result_type(self):
+        return self.tns.result_type.get_child_type("lvl")
+
+    @property
+    def children(self):
+        return [self.tns]
 
 
 @dataclass(eq=True, frozen=True)
-class Child(Cursor):
-    """
-    A child level reached from another cursor path.
-    """
+class Child(NotationTree, Cursor):
+    """A sublevel of a level expression."""
 
     parent: Cursor
     attr: str = "lvl"
 
+    @property
+    def root(self):
+        return self.parent.root
+
+    @property
+    def result_type(self):
+        return self.parent.result_type.level_get_child_type(self.attr)
+
+    @property
+    def children(self):
+        return [self.parent, Literal(self.attr)]
+
+    @classmethod
+    def from_children(cls, parent, attr):
+        return cls(parent, attr.val)
+
 
 @dataclass(eq=True, frozen=True)
 class Fiber(NotationExpression):
-    """
-    A lowering cursor for fiber-tree access.
-    """
+    """A positioned level view, retaining the owning tensor type at the root."""
 
-    root: Any
     lvl: Cursor
     pos: Any
-    type: Any
     idxs: tuple[Any, ...] = ()
     dirty: bool = False
 
     @property
     def result_type(self):
-        return self.type
+        match self.lvl:
+            case Root(tns):
+                return tns.result_type
+        return tensor.FiberTensorFType(
+            self.lvl.result_type, self.lvl.root.result_type.device
+        )
 
 
 @dataclass(eq=True, frozen=True)
@@ -687,16 +744,16 @@ class NotationPrinterContext(Context):
                 return str(name)
             case Slot(name, _):
                 return str(name)
-            case Root():
-                return "Root"
-            case Child(parent, "lvl"):
-                return f"Child({self(parent)})"
+            case Root(tns):
+                return f"Root({tns})"
             case Child(parent, attr):
                 return f"Child({self(parent)}, {attr})"
-            case Fiber(root, lvl, pos, _):
-                return f"fiber({root}, {self(lvl)}, {pos})"
+            case Fiber(lvl, pos):
+                return f"fiber({self(lvl)}, {pos})"
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
+            case Full(val, shape):
+                return f"full({self(val)}, ({', '.join(self(dim) for dim in shape)}))"
             case Unwrap(tns):
                 return f"unwrap({self(tns)})"
             case Assign(Variable(var_n, var_t), val):

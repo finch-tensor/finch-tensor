@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, overload
 
 import numpy as np
@@ -166,6 +166,50 @@ class TensorView(Tensor):
         lhs = lhs.item()
         self.tns[*self.idxs] = self.op(lhs, val)
         return
+
+
+class FullView(Tensor):
+    """An interpreter view of a read-only tensor filled with one value."""
+
+    def __init__(self, val, shape, type_):
+        self.val = val
+        self._shape = shape
+        self._type = type_
+
+    @property
+    def ftype(self):
+        return self._type
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self):
+        return self.val
+
+    def access(self, idxs, op=None):
+        if op is not None:
+            raise TypeError("Full views are read-only")
+        return FullView(
+            self.val,
+            self.shape[len(idxs) :],
+            replace(self.ftype, _shape_type=self.ftype.shape_type[len(idxs) :]),
+        )
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.val
+
+    def unwrap(self):
+        return self.item()
+
+    def to_numpy(self):
+        return np.full(self.shape, self.val)
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
 
 def access(tns, idxs, op=None):
@@ -387,6 +431,14 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
+            case ntn.Root(tns):
+                return self(tns).lvl
+            case ntn.Child(parent, attr):
+                return getattr(self(parent), attr)
+            case ntn.Full(val, shape):
+                return FullView(
+                    self(val), tuple(self(dim) for dim in shape), prgm.result_type
+                )
             case ntn.Unwrap(tns):
                 return unwrap(self(tns))
             case ntn.Assign(var, val):
@@ -432,7 +484,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                     return None
                 raise NotImplementedError(f"Unrecognized repack obj target: {val}")
             case ntn.Access(tns, mode, idxs):
-                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
@@ -445,7 +496,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                         raise NotImplementedError(f"Unrecognized access mode: {mode}")
 
             case ntn.Dimension(tns, r):
-                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 r_e = self(r)
                 shape_ft = tns_e.ftype.shape_type[r_e]
