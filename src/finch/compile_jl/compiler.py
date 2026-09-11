@@ -18,7 +18,11 @@ from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
-from .interop import JuliaBufferContext
+from .analyze import find_reset_arg_positions, find_return_arg_positions
+from .interop import (
+    JuliaBufferContext,
+    JuliaKernelArgs,
+)
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
@@ -103,59 +107,49 @@ _INFIX_OPS = {
 }
 
 
-class CompiledJLKernel:
-    """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
-    source text, with no Python-side values left to inject."""
+class FinchJLKernel(AssemblyKernel):
+    """A callable Julia kernel."""
 
     def __init__(
-        self, func_name: str, jl_code: str, dynamic_args: tuple[int, ...] = ()
+        self,
+        func_name,
+        jl_code,
+        kernel_args: JuliaKernelArgs,
+        buffer_context: JuliaBufferContext,
     ):
-        self.func_name = func_name
-        self.jl_code = jl_code
-        self.dynamic_args = dynamic_args
-
-    def evaluate(self) -> "FinchJLKernel":
-        """Defines the kernel function in the running Julia session,
-        returning the now-callable kernel."""
-        jl.seval(self.jl_code)
-        return FinchJLKernel(self.func_name, self.jl_code, self.dynamic_args)
-
-
-class FinchJLKernel(AssemblyKernel):
-    """A kernel already defined (evaluated) in the running Julia session."""
-
-    def __init__(self, func_name, jl_code, dynamic_args: tuple[int, ...] = ()):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
-        # Argument positions with dynamic fill values that are
-        # arbitrarily set to zero. Other arguments keep their
-        # Known fills.
-        self.dynamic_args = dynamic_args
-        self.buffer_context = JuliaBufferContext()
+        self.kernel_args = kernel_args
+        self.buffer_context = buffer_context
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args = [
-            self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
-            for i, arg in enumerate(args)
-        ]
-        result = finch_fn(*raw_args)
-
-        # @finch_kernel-generated functions return a NamedTuple keyed by the
-        # returned variable name(s), unlike @finch's bare Tensor/tuple.
-        if jl.isa(result, jl.NamedTuple):
-            result = jl.values(result)
-
-        # The finch function returns tuples when multiple values are returned
-        # or a non-tuple when a single value is returned.
-        if jl.isa(result, jl.Finch.Tensor):
-            return (self.buffer_context.tensor_to_python(result),)
-        return tuple(self.buffer_context.tensor_to_python(res) for res in result)
-
-    def close(self):
-        self.buffer_context.close()
+        claimed_result_positions: set[int] = set()
+        julia_args, argument_keys = self.buffer_context.resolve_arguments(
+            args,
+            kernel_args=self.kernel_args,
+            claimed_result_positions=claimed_result_positions,
+        )
+        finch_fn(*julia_args)
+        self.buffer_context.release_reset_arguments(
+            argument_keys,
+            self.kernel_args.reset_positions,
+            self.kernel_args.return_positions,
+        )
+        self.buffer_context.release_consumed_result_arguments(
+            argument_keys,
+            claimed_result_positions,
+            julia_args,
+            self.kernel_args.return_positions,
+        )
+        return tuple(
+            self.buffer_context.tensor_to_python(
+                julia_args[position],
+            )
+            for position in self.kernel_args.return_positions
+        )
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -164,10 +158,6 @@ class FinchJLLibrary(AssemblyLibrary):
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
-
-    def close(self):
-        for kernel in self.kernel_dict.values():
-            kernel.close()
 
 
 class FinchJLGenerator:
@@ -374,30 +364,39 @@ class FinchJLCompiler(NotationCompiler):
         dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
     ] = {}
 
+    # Results produced by one compiled kernel are passed to another
+    # without rebuilding its Julia wrapper.
+    _buffer_context: ClassVar[JuliaBufferContext] = JuliaBufferContext()
+
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
 
         kernel_dict = {}
         for orig_func in prgm.children:
+            reset_arg_positions = find_reset_arg_positions(orig_func)
+            return_arg_positions = find_return_arg_positions(orig_func)
             func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
-            arg_type_strs = tuple(
-                ftype_to_jl_type_str(arg.type_)
+            arg_type_names = tuple(
+                ftype_to_jl_type_str(arg.type_) if arg.type_ is not None else None
                 for arg in func.args
-                if arg.type_ is not None
             )
-            # Flat key: source, argument types, and which fills were pinned. All
-            # three vary independently, so none may be folded into another.
-            key = (generated_prgm, arg_type_strs, dynamic_args)
+            kernel_args = JuliaKernelArgs(
+                type_names=arg_type_names,
+                dynamic_positions=dynamic_args,
+                reset_positions=reset_arg_positions,
+                return_positions=return_arg_positions,
+            )
+            key = (generated_prgm, *kernel_args.cache_key)
             kernel = self._kernels.get(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
-                compiled = CompiledJLKernel(
+                kernel = FinchJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
-                    dynamic_args=dynamic_args,
+                    kernel_args,
+                    self._buffer_context,
                 )
-                kernel = compiled.evaluate()
                 self._kernels[key] = kernel
             kernel_dict[func.name.name] = kernel
 

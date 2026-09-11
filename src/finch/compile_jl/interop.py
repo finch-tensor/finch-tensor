@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, cast
 
 import numpy as np
@@ -309,42 +310,277 @@ def jl_tensor_to_python(obj):
     return FiberTensor(jl_level_to_python(obj.lvl))
 
 
-class JuliaBufferContext:
-    """Keep Julia-owned tensor buffers alive across kernel invocations."""
+@dataclass(frozen=True)
+class JuliaKernelArgs:
+    type_names: tuple[str | None, ...]
+    dynamic_positions: tuple[int, ...]
+    reset_positions: frozenset[int]
+    return_positions: tuple[int, ...]
 
-    def __init__(self):
-        self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
+    @property
+    def cache_key(self) -> tuple[tuple[str, ...], tuple[int, ...]]:
+        """Return the metadata that selects a compatible compiled kernel."""
+        return (
+            tuple(type_name for type_name in self.type_names if type_name is not None),
+            self.dynamic_positions,
+        )
 
+
+@dataclass(frozen=True, init=False)
+class JuliaBufferGroup:
+    type_name: str
+    shape: tuple[int, ...]
+
+    def __init__(self, obj, type_name: str | None = None):
+        if type_name is None:
+            type_name = str(jl.string(jl.typeof(obj)))
+            shape = jl.size(obj)
+        else:
+            shape = obj.shape
+        object.__setattr__(self, "type_name", type_name)
+        object.__setattr__(self, "shape", tuple(int(dim) for dim in shape))
+
+
+class BufferID:
     @staticmethod
-    def _cache_key(obj):
+    def from_object(obj) -> BufferID:
+        """Return the identifier for a Python object backing a Julia buffer."""
         # defer() can create a fresh wrapper around the same NumPy
         # allocation, so wrapper identity alone would miss reuse.
         if isinstance(obj, BufferizedNDArray):
             arr = obj.to_numpy()
             pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
+            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
         if isinstance(obj, NumPyWrapper):
             arr = obj._data
             pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
+            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
         # FiberTensors reuse their ids so we restrict cache keys to id.
-        return ("object", id(obj))
+        return ObjectBufferID(id(obj))
+
+
+@dataclass(frozen=True)
+class NumpyBufferID(BufferID):
+    pointer: int
+    shape: tuple[int, ...]
+    strides: tuple[int, ...]
+    dtype: str
+
+
+@dataclass(frozen=True)
+class ObjectBufferID(BufferID):
+    object_id: int
+
+
+@dataclass
+class _JuliaBufferRecord:
+    tensor: Any
+    group: JuliaBufferGroup = field(init=False)
+    py_wrapper: FiberTensor = field(init=False)
+    owner_key: BufferID | None = None
+
+    def __post_init__(self):
+        self.group = JuliaBufferGroup(self.tensor)
+        self.py_wrapper = jl_tensor_to_python(self.tensor)
+
+
+@dataclass
+class JuliaFreeBufferPool:
+    records: dict[JuliaBufferGroup, list[_JuliaBufferRecord]] = field(
+        default_factory=dict
+    )
+
+    def add(self, record: _JuliaBufferRecord) -> None:
+        self.records.setdefault(record.group, []).append(record)
+
+    def claim(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+        records = self.records.get(group)
+        if not records:
+            return None
+        return records.pop()
+
+    def clear(self) -> None:
+        self.records.clear()
+
+
+class JuliaBufferContext:
+    """Own and reuse Julia tensor buffers across kernel invocations."""
+
+    def __init__(self):
+        self._owned_records: dict[BufferID, _JuliaBufferRecord] = {}
+        self._result_records: dict[BufferID, _JuliaBufferRecord] = {}
+        self._julia_id_to_record_map: dict[int, _JuliaBufferRecord] = {}
+        self._free_pool = JuliaFreeBufferPool()
+
+
+    @staticmethod
+    def _is_poolable(obj) -> bool:
+        """Return whether an object is a non-scalar Julia tensor that can be reused."""
+        if not (
+            is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor) and len(jl.size(obj)) > 0
+        ):
+            return False
+
+        lvl = obj.lvl
+        while not jl.isa(lvl, jl.Finch.ElementLevel):
+            if jl.isa(lvl, jl.Finch.PatternLevel):
+                return False
+            lvl = lvl.lvl
+        return True
+
+    def _get_or_create_record(self, obj) -> _JuliaBufferRecord | None:
+        """Get or register the pool record for a reusable Julia tensor."""
+        if not self._is_poolable(obj):
+            return None
+        object_id = int(jl.objectid(obj))
+        record = self._julia_id_to_record_map.get(object_id)
+        if record is None:
+            record = _JuliaBufferRecord(obj)
+            self._julia_id_to_record_map[object_id] = record
+        return record
+
+    def _assign_owner(self, key: BufferID, record: _JuliaBufferRecord) -> None:
+        """Assign a Python argument key as the active owner of a buffer record."""
+        if record.owner_key is not None:
+            self._owned_records.pop(record.owner_key, None)
+        record.owner_key = key
+        self._owned_records[key] = record
+
+    def _release_owner(self, key: BufferID) -> _JuliaBufferRecord | None:
+        """Remove an active owner mapping without placing its record in a pool."""
+        record = self._owned_records.pop(key, None)
+        if record is not None:
+            record.owner_key = None
+        return record
+
+    def _claim_result_record(self, key: BufferID) -> _JuliaBufferRecord | None:
+        """Move a returned record into the active-owner pool for an argument."""
+        record = self._result_records.pop(key, None)
+        if record is not None:
+            self._assign_owner(key, record)
+            return record
+        return None
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
-        key = self._cache_key(obj)
-        cached = self._tensors.get(key)
-        if cached is not None:
-            return cached[1]
+        """Return an existing Julia tensor mapping or materialize a new one."""
+        key = BufferID.from_object(obj)
 
+        # If the tensor is already owned reuse
+        record = self._owned_records.get(key)
+        if record is not None:
+            return record.tensor
+
+        # Otherwise claim the tensor from result records produced by another kernel
+        record = self._claim_result_record(key)
+        if record is not None:
+            return record.tensor
+
+        # Initialize the tensor in julia by copying from python. This is expensive
+        # and should only be triggered for the first call of the kernel with said arguments.
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
-        self._tensors[key] = (obj, jl_obj)
+        record = self._get_or_create_record(jl_obj)
+        if record is not None:
+            self._assign_owner(key, record)
         return jl_obj
 
     def tensor_to_python(self, obj):
-        result = jl_tensor_to_python(obj)
-        if isinstance(result, FiberTensor):
-            self._tensors[self._cache_key(result)] = (result, obj)
-        return result
+        """Return a cached Python wrapper for a Julia tensor, creating one if needed."""
+        record = self._get_or_create_record(obj)
+        if record is None:
+            return jl_tensor_to_python(obj)
+        if record.owner_key is not None:
+            self._release_owner(record.owner_key)
+        key = BufferID.from_object(record.py_wrapper)
+        self._result_records[key] = record
+        return record.py_wrapper
+
+    def resolve_arguments(
+        self,
+        args,
+        *,
+        kernel_args: JuliaKernelArgs,
+        claimed_result_positions: set[int] | None = None,
+    ) -> tuple[list[Any], tuple[BufferID, ...]]:
+        """Resolve call arguments and lease compatible free buffers for reset inputs."""
+
+        argument_keys = tuple(BufferID.from_object(arg) for arg in args)
+        positions = tuple(
+            position
+            for position in range(len(args))
+            if position not in kernel_args.reset_positions
+        ) + tuple(
+            position
+            for position in range(len(args))
+            if position in kernel_args.reset_positions
+        )
+        julia_args: list[Any] = [None] * len(args)
+        for position in positions:
+            arg = args[position]
+            key = argument_keys[position]
+            record = self._owned_records.get(key)
+            if record is not None:
+                julia_args[position] = record.tensor
+                continue
+
+            record = self._claim_result_record(key)
+            if record is not None:
+                if claimed_result_positions is not None:
+                    claimed_result_positions.add(position)
+                julia_args[position] = record.tensor
+                continue
+
+            type_name = kernel_args.type_names[position]
+            if position in kernel_args.reset_positions:
+                group = JuliaBufferGroup(arg, type_name)
+                record = self._free_pool.claim(group)
+                if record is not None:
+                    self._assign_owner(key, record)
+                    julia_args[position] = record.tensor
+                    continue
+
+            julia_args[position] = self.tensor_to_jl(
+                arg, pin_fill=position in kernel_args.dynamic_positions
+            )
+        return julia_args, argument_keys
+
+    def release_consumed_result_arguments(
+        self,
+        argument_keys: tuple[BufferID, ...],
+        claimed_result_positions: set[int],
+        julia_args: list[Any],
+        return_positions: tuple[int, ...],
+    ) -> None:
+        """Release result-pool buffers consumed by a kernel but not returned from it."""
+        returned_ids = {
+            int(jl.objectid(julia_args[position]))
+            for position in return_positions
+            if self._is_poolable(julia_args[position])
+        }
+        for position in claimed_result_positions:
+            record = self._owned_records.get(argument_keys[position])
+            if record is None or int(jl.objectid(record.tensor)) in returned_ids:
+                continue
+            self._release_owner(argument_keys[position])
+            self._free_pool.add(record)
+
+    def release_reset_arguments(
+        self,
+        argument_keys: tuple[BufferID, ...],
+        reset_positions: frozenset[int],
+        return_positions: tuple[int, ...],
+    ) -> None:
+        """Release reset buffers that are not returned by the completed kernel."""
+        returned_positions = set(return_positions)
+        for position in reset_positions:
+            if position in returned_positions:
+                continue
+            record = self._release_owner(argument_keys[position])
+            if record is not None:
+                self._free_pool.add(record)
 
     def close(self):
-        self._tensors.clear()
+        """Discard all Python mappings and pooled Julia tensor records."""
+        self._owned_records.clear()
+        self._julia_id_to_record_map.clear()
+        self._free_pool.clear()
+        self._result_records.clear()
