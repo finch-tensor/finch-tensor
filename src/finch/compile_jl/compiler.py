@@ -19,7 +19,7 @@ from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
 from .analyze import find_reset_arg_positions, find_return_arg_positions
-from .interop import JuliaBufferContext
+from .interop import JuliaBufferContext, JuliaKernelArgs
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
@@ -111,23 +111,14 @@ class FinchJLKernel(AssemblyKernel):
         self,
         func_name,
         jl_code,
-        dynamic_args: tuple[int, ...] = (),
-        reset_arg_positions: frozenset[int] = frozenset(),
-        arg_type_names: tuple[str | None, ...] = (),
-        return_arg_positions: tuple[int, ...] | None = None,
+        kernel_args: JuliaKernelArgs,
         *,
         buffer_context: JuliaBufferContext,
     ):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
-        # Argument positions with dynamic fill values that are
-        # arbitrarily set to zero. Other arguments keep their
-        # Known fills.
-        self.dynamic_args = dynamic_args
-        self.reset_arg_positions = reset_arg_positions
-        self.arg_type_names = arg_type_names
-        self.return_arg_positions = return_arg_positions
+        self.kernel_args = kernel_args
         self.buffer_context = buffer_context
         jl.seval(self.jl_code)
 
@@ -135,14 +126,12 @@ class FinchJLKernel(AssemblyKernel):
         finch_fn = getattr(jl, self.func_name)
         raw_args, keys, arg_records = self.buffer_context.resolve_arguments(
             args,
-            reset_positions=self.reset_arg_positions,
-            arg_type_names=self.arg_type_names,
-            dynamic_args=self.dynamic_args,
+            kernel_args=self.kernel_args,
             producer=self,
         )
         result = finch_fn(*raw_args)
 
-        if self.return_arg_positions is None:
+        if self.kernel_args.return_positions is None:
             if jl.isa(result, jl.NamedTuple):
                 result = jl.values(result)
             result_items = (
@@ -150,28 +139,33 @@ class FinchJLKernel(AssemblyKernel):
             )
         else:
             result_items = tuple(
-                raw_args[position] for position in self.return_arg_positions
+                raw_args[position] for position in self.kernel_args.return_positions
             )
             output_records = [
                 self.buffer_context.prepare_result_for_record(arg_records[position])
-                for position in self.return_arg_positions
+                for position in self.kernel_args.return_positions
             ]
-        self.buffer_context.release_reset_arguments(keys, self.reset_arg_positions)
-        if self.return_arg_positions is None:
+        self.buffer_context.release_reset_arguments(
+            keys, self.kernel_args.reset_positions
+        )
+        if self.kernel_args.return_positions is None:
             self.buffer_context.release_consumed_result_arguments(
                 keys, raw_args, result_items
             )
             self.buffer_context.mark_reset_results(
-                raw_args, result_items, self.reset_arg_positions, self
+                raw_args, result_items, self.kernel_args.reset_positions, self
             )
             return tuple(
                 self.buffer_context.tensor_to_python(item) for item in result_items
             )
         self.buffer_context.release_consumed_result_arguments_static(
-            keys, arg_records, self.return_arg_positions
+            keys, arg_records, self.kernel_args.return_positions
         )
         self.buffer_context.mark_reset_results_static(
-            arg_records, self.return_arg_positions, self.reset_arg_positions, self
+            arg_records,
+            self.kernel_args.return_positions,
+            self.kernel_args.reset_positions,
+            self,
         )
         return tuple(
             self.buffer_context.attach_result(record)
@@ -410,25 +404,20 @@ class FinchJLCompiler(NotationCompiler):
                 ftype_to_jl_type_str(arg.type_) if arg.type_ is not None else None
                 for arg in func.args
             )
-            # Flat key: source, argument types, and which fills were pinned. All
-            # three vary independently, so none may be folded into another.
-            key = (
-                generated_prgm,
-                tuple(
-                    type_name for type_name in arg_type_names if type_name is not None
-                ),
-                dynamic_args,
+            kernel_args = JuliaKernelArgs(
+                type_names=arg_type_names,
+                dynamic_positions=dynamic_args,
+                reset_positions=reset_arg_positions,
+                return_positions=return_arg_positions,
             )
+            key = (generated_prgm, *kernel_args.cache_key)
             kernel = self._kernels.get(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
                 kernel = FinchJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
-                    dynamic_args=dynamic_args,
-                    reset_arg_positions=reset_arg_positions,
-                    arg_type_names=arg_type_names,
-                    return_arg_positions=return_arg_positions,
+                    kernel_args,
                     buffer_context=self._buffer_context,
                 )
                 self._kernels[key] = kernel

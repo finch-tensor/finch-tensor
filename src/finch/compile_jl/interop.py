@@ -33,6 +33,21 @@ def is_julia_obj(obj: Any) -> bool:
     return isinstance(obj, jc.AnyValue)
 
 
+@dataclass(frozen=True)
+class JuliaKernelArgs:
+    type_names: tuple[str | None, ...]
+    dynamic_positions: tuple[int, ...]
+    reset_positions: frozenset[int]
+    return_positions: tuple[int, ...] | None
+
+    @property
+    def cache_key(self) -> tuple[tuple[str, ...], tuple[int, ...]]:
+        return (
+            tuple(type_name for type_name in self.type_names if type_name is not None),
+            self.dynamic_positions,
+        )
+
+
 def _as_julia_scalar(val):
     if isinstance(val, np.bool_):
         return val.item()
@@ -429,9 +444,7 @@ class JuliaBufferContext:
         self,
         args,
         *,
-        reset_positions: frozenset[int],
-        arg_type_names: tuple[str | None, ...],
-        dynamic_args: tuple[int, ...],
+        kernel_args: JuliaKernelArgs,
         producer: object | None = None,
     ) -> tuple[list[Any], tuple[tuple[Any, ...], ...], list[_JuliaBufferRecord | None]]:
         """Resolve call arguments, leasing a free reset buffer when possible."""
@@ -453,10 +466,12 @@ class JuliaBufferContext:
 
             group = self._input_group(
                 arg,
-                arg_type_names[position] if position < len(arg_type_names) else None,
+                kernel_args.type_names[position]
+                if position < len(kernel_args.type_names)
+                else None,
             )
             if (
-                position in reset_positions
+                position in kernel_args.reset_positions
                 and keys.count(key) == 1
                 and group is not None
             ):
@@ -492,7 +507,11 @@ class JuliaBufferContext:
                     arg_records.append(record)
                     continue
 
-            raw_args.append(self.tensor_to_jl(arg, pin_fill=position in dynamic_args))
+            raw_args.append(
+                self.tensor_to_jl(
+                    arg, pin_fill=position in kernel_args.dynamic_positions
+                )
+            )
             cached = self._tensors.get(key)
             arg_records.append(cached.record if cached is not None else None)
         return raw_args, keys, arg_records

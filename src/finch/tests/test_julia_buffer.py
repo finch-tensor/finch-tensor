@@ -6,7 +6,11 @@ from finch.algebra.ffuncs import overwrite
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.analyze import find_reset_arg_positions
 from finch.compile_jl.buffer import MinusOneBuffer
-from finch.compile_jl.interop import JuliaBufferContext, _jl_index_buffer_to_python
+from finch.compile_jl.interop import (
+    JuliaBufferContext,
+    JuliaKernelArgs,
+    _jl_index_buffer_to_python,
+)
 from finch.compile_jl.julia import jl, julia_available
 
 
@@ -141,9 +145,12 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
     raw_args, _, _ = context.resolve_arguments(
         (second,),
-        reset_positions=frozenset({0}),
-        arg_type_names=(type_name,),
-        dynamic_args=(),
+        kernel_args=JuliaKernelArgs(
+            type_names=(type_name,),
+            dynamic_positions=(),
+            reset_positions=frozenset({0}),
+            return_positions=None,
+        ),
     )
 
     assert raw_args[0] is first_jl
