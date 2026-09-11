@@ -5,7 +5,7 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ffuncs, ftype, ftypes
 
-from .level import Level, LevelFType, SingleDimensionLevelFType
+from .level import Level, LevelFType, SingleDimensionLevelFType, SingleDimensionLevel
 
 _LOWERING_ERROR = "SparseHashLevelFType lowering is not implemented."
 
@@ -193,7 +193,7 @@ def sparse_hash(lvl_t, dimension_type=None, *, single_writer: bool = True):
 
 
 @dataclass(init=False)
-class SparseHashLevel(Level):
+class SparseHashLevel(SingleDimensionLevel):
     lvl: Level
     dimension: np.integer
     ptr: Any | None

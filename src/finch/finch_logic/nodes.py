@@ -436,7 +436,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value | Alias
+    tns: Literal | Alias
     idxs: tuple[Field, ...]
 
     @property

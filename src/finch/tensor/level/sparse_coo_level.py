@@ -12,7 +12,7 @@ from finch.algebra import (
     ftypes,
 )
 
-from .level import Level, LevelFType, MultiDimensionLevelFType
+from .level import Level, LevelFType, MultiDimensionLevelFType, MultiDimensionLevel
 
 
 class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
@@ -204,7 +204,7 @@ def sparse_coo(lvl_t, coo_ndim: int, dimension_type=None):
 
 
 @dataclass(init=False)
-class SparseCOOLevel(Level):
+class SparseCOOLevel(MultiDimensionLevel):
     lvl: Level
     coo_shape: tuple[Any, ...]
     ptr: Any

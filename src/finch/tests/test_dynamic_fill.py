@@ -228,13 +228,16 @@ def test_constant_scalar_inlines_to_literal():
     assert len(trace.bodies) == 3
 
     inlined = inline_constant_scalars(trace)
+    assert isinstance(inlined, Plan)
     assert len(inlined.bodies) == 2
-    assert not [
+    assert len([
         q
         for q in inlined.bodies
-        if isinstance(q.rhs, Table) and isinstance(q.rhs.tns.val, ConstantScalar)
-    ]
-    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs == y.data]
+        if not isinstance(q, Query) or isinstance(q.rhs, Table) and (not isinstance(q.rhs.tns, Literal) or isinstance(q.rhs.tns.val, ConstantScalar))
+    ]) == 0
+    assert all(isinstance(q, Query) for q in inlined.bodies)
+    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs == y.data]  # ty: ignore[unresolved-attribute]
+    assert isinstance(mapjoin_q, Query)
     match mapjoin_q.rhs:
         case Reorder(MapJoin(Literal(_), args), _):
             assert Reorder(Literal(2.0), ()) in args

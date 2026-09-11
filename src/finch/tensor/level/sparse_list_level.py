@@ -17,7 +17,7 @@ from finch.finch_assembly import parse_assembly
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.scalar import Scalar, ScalarFType
 
-from .level import Level, LevelFType, SingleDimensionLevelFType
+from .level import Level, LevelFType, SingleDimensionLevelFType, SingleDimensionLevel
 
 
 @dataclass(unsafe_hash=True)
@@ -330,7 +330,7 @@ def sparse_list(lvl_t, dimension_type=None):
 
 
 @dataclass
-class SparseListLevel(Level):
+class SparseListLevel(SingleDimensionLevel):
     """
     A class representing sparse list level.
     """

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Self
 
 import numpy as np
 
@@ -175,6 +176,7 @@ class LevelFType(FType, ABC):
         ...
 
 
+@dataclass
 class Level(FTyped, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
@@ -207,10 +209,6 @@ class Level(FTyped, ABC):
         dynamic vs static."""
         return self.ftype.fill_value.value
 
-    def with_fill(self, fill_value: AbstractFill) -> "Level":
-        """Rebuild this level with the leaf fill value replaced."""
-        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
-
     @property
     def element_type(self):
         return self.ftype.element_type
@@ -231,6 +229,31 @@ class Level(FTyped, ABC):
     def buffer_type(self):
         return self.ftype.buffer_type
 
+    @abstractmethod
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        ...
+
+
+class SingleDimensionLevel(Level):
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+    @property
+    @abstractmethod
+    def lvl(self) -> Level:
+        ...
+
+
+class MultiDimensionLevel(Level):
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+    @property
+    @abstractmethod
+    def lvl(self) -> Level:
+        ...
 
 class SingleDimensionLevelFType(LevelFType):
     dimension_type: ftypes.FDTypeInteger = ftypes.intp

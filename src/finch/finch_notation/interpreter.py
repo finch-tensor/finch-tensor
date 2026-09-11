@@ -155,7 +155,7 @@ class TensorView(Tensor):
         """
         Unwrap the tensor view to get a scalar.
         """
-        val = self.tns[*self.idxs]
+        val = self.tns[*self.idxs]  # ty: ignore[not-subscriptable]
         assert isinstance(val, Tensor) and val.ndim == 0
         return val.item()
 
@@ -164,10 +164,10 @@ class TensorView(Tensor):
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        lhs = self.tns[*self.idxs]
+        lhs = self.tns[*self.idxs]  # ty: ignore[not-subscriptable]
         assert isinstance(lhs, Tensor) and lhs.ndim == 0
         lhs = lhs.item()
-        self.tns[*self.idxs] = self.op(lhs, val)
+        self.tns[*self.idxs] = self.op(lhs, val)  # ty: ignore[invalid-assignment]
         return
 
 

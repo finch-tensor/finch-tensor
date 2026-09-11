@@ -146,7 +146,7 @@ def _jl_array_to_python_no_copy(v):
     return v.to_numpy(copy=False)
 
 
-def _jl_index_buffer_to_python(v) -> Buffer:
+def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
     """
     Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
     to Python's 0-based indexing without copying.

@@ -14,7 +14,7 @@ from finch.compile.lower import SymbolicExtent
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
-from .level import Level, LevelFType, SingleDimensionLevelFType
+from .level import Level, LevelFType, SingleDimensionLevelFType, SingleDimensionLevel
 
 
 @dataclass(unsafe_hash=True)
@@ -227,7 +227,7 @@ def dense(lvl, dimension_type=ftypes.intp):
 
 
 @dataclass
-class DenseLevel(Level):
+class DenseLevel(SingleDimensionLevel):
     """
     A class representing dense level.
     """

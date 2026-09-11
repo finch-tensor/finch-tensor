@@ -34,6 +34,7 @@ def test_minus_one_buffer_does_not_copy_backing_data():
 
     assert isinstance(buffer, MinusOneBuffer)
     raw = jl_vec.to_numpy(copy=False)
+    assert isinstance(buffer.data, NumpyBuffer)
     assert buffer.data.arr.ctypes.data == raw.ctypes.data
 
     buffer.store(1, 7)

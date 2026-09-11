@@ -5,7 +5,7 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, ftype, ftypes
 
-from .level import Level, LevelFType, SingleDimensionLevelFType
+from .level import Level, LevelFType, SingleDimensionLevelFType, SingleDimensionLevel
 
 _LOWERING_ERROR = "SparseByteMapLevelFType lowering is not implemented."
 
@@ -142,7 +142,7 @@ def sparse_bytemap(lvl_t, dimension_type=None):
 
 
 @dataclass
-class SparseByteMapLevel(Level):
+class SparseByteMapLevel(SingleDimensionLevel):
     lvl: Level
     dimension: np.integer
     ptr: Any | None = None
