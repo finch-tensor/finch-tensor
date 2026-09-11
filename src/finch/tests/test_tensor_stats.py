@@ -16,6 +16,7 @@ from finch.autoschedule.tensor_stats import (
     BaseTensorStats,
     BaseTensorStatsFactory,
     BlockedStatsFactory,
+    BlockedUniformStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStatsFactory,
@@ -1491,6 +1492,52 @@ def test_uniform_aggregate():
     assert us_agg.index_order == (Field("i"),)
     assert us_agg.get_dim_size(Field("i")) == 10
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
+
+
+@pytest.mark.parametrize("fill_value", [0.0, -1.0])
+@pytest.mark.parametrize(
+    "shape, counts",
+    [
+        ((4, 6), (2, 3)),
+        ((4, 6, 2), (2, 3, 1)),
+        ((5, 7), (2, 3)),
+        ((3, 2), (5, 3)),
+        ((0, 7), (2, 3)),
+        ((), ()),
+    ],
+)
+def test_blocked_uniform_grid(shape, counts, fill_value):
+    fields = tuple(Field(f"x{axis}") for axis in range(len(shape)))
+    data = np.full(shape, fill_value)
+    data.flat[::3] = fill_value + 1
+    tensor = ft.BufferizedNDArray.from_numpy(data, fill_value=fill_value)
+    factory = BlockedUniformStatsFactory(
+        blocks_per_dim=dict(zip(fields, counts, strict=True))
+    )
+    stats = factory(tensor, fields)
+
+    expected = np.zeros(counts, dtype=np.intp)
+    for coord in np.ndindex(counts):
+        slices = tuple(
+            slice(n * block // count, n * (block + 1) // count)
+            for n, block, count in zip(shape, coord, counts, strict=True)
+        )
+        expected[coord] = np.count_nonzero(data[slices] != fill_value)
+
+    np.testing.assert_array_equal(stats.nnz_grid, expected)
+    assert stats.nnz_grid.dtype == np.dtype(np.intp)
+    assert stats.blocks_per_dim == dict(zip(fields, counts, strict=True))
+    assert stats.estimate_non_fill_values() == np.count_nonzero(data != fill_value)
+    for field, n, count in zip(fields, shape, counts, strict=True):
+        assert stats.block_sizes[field].dtype == np.dtype(np.intp)
+        np.testing.assert_array_equal(
+            stats.block_sizes[field], np.diff(np.arange(count + 1) * n // count)
+        )
+    volume = stats._block_volume_grid()
+    expected_density = np.divide(
+        expected, volume, out=np.zeros(counts, dtype=float), where=volume > 0
+    )
+    np.testing.assert_allclose(stats.density_grid(), expected_density)
 
 
 # ------------------------------ BlockedStats -------------------------------------

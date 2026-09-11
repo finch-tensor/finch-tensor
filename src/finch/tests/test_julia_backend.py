@@ -176,6 +176,64 @@ def test_compile_julia_pattern_lowering(file_regression):
     file_regression.check("\n\n".join(compiler.sources), extension=".jl")
 
 
+def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regression):
+    _requires_julia_backend()
+    from finch.autoschedule import default_schedulers
+    from finch.autoschedule.formatter import DefaultLogicFormatter
+    from finch.autoschedule.tensor_stats import BlockedUniformStatsFactory
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+    from finch.compile_jl.julia import jl
+    from finch.finch_logic import Field, LogicSimplify
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                source = FinchJLGenerator()(func)
+                expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
+                self.sources.append(
+                    f"# Finch kernel\n{source}\n\n"
+                    f"# Generated Julia\n{jl.string(expanded)}"
+                )
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = LogicNormalizer(
+        LogicExecutor(
+            LogicSimplify(DefaultLogicFormatter(LogicCompiler(compiler))),
+            stats_factory=FDStatsFactory(),
+        )
+    )
+    monkeypatch.setattr(
+        default_schedulers, "NON_RECURSIVE_STANDARD_SCHEDULER", scheduler
+    )
+    i, j = Field("i"), Field("j")
+    data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
+    stats = BlockedUniformStatsFactory(blocks_per_dim={i: 2, j: 3})(
+        _csr_tensor(data), (i, j)
+    )
+    expected = np.array(
+        [
+            [
+                np.count_nonzero(data[rows, cols])
+                for cols in (slice(0, 2), slice(2, 4), slice(4, 7))
+            ]
+            for rows in (slice(0, 2), slice(2, 5))
+        ]
+    )
+    np.testing.assert_array_equal(stats.nnz_grid, expected)
+    np.testing.assert_array_equal(stats.block_sizes[i], [2, 3])
+    np.testing.assert_array_equal(stats.block_sizes[j], [2, 2, 3])
+    file_regression.check("\n\n".join(compiler.sources), extension=".jl")
+
+
 def test_julia_element_ftype_can_customize_vector_lowering():
     _requires_julia_backend()
     from finch.compile_jl import JuliaElementFType
