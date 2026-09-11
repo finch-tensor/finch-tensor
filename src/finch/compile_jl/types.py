@@ -15,7 +15,23 @@ from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
 from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
 from finch.tensor.level.sparse_list_level import SparseListLevelFType
-from finch.tensor.patterns import FillTensorFType
+from finch.tensor.patterns import (
+    EyeTensor,
+    FillTensorFType,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
+    ParityMaskTensor,
+    PatternTensorFType,
+    RepeatTensor,
+    ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    UpperTriangleTensor,
+)
 from finch.tensor.scalar import ScalarFType
 
 from .julia import get_jl, jc
@@ -286,6 +302,59 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"
+    match ftype:
+        case PatternTensorFType():
+            shape = (1,) * ftype.ndim
+            obj = ftype.construct(shape)
+            reverse_axes = True
+            match obj:
+                case EyeTensor():
+                    ctor = "Finch.diagmask"
+                    if obj._k:
+                        ctor = f"Finch.offset({ctor}, 0, {int(obj._k)})"
+                    reverse_axes = False
+                case UpperTriangleTensor():
+                    ctor = f"Finch.offset(Finch.uptrimask, 0, {-int(obj._k)})"
+                case LowerTriangleTensor():
+                    ctor = f"Finch.offset(Finch.lotrimask, 0, {-int(obj._k)})"
+                case PairSumTensor():
+                    ctor = "Finch.pairsummask"
+                case PairCarryTensor():
+                    ctor = "Finch.paircarrymask"
+                case ReverseTensor():
+                    ctor = f"Finch.reversemask({int(obj.shape[1])})"
+                case RollTensor():
+                    ctor = f"Finch.rollmask({int(obj.shape[1])}, {int(obj._k)})"
+                case RepeatTensor():
+                    ctor = f"Finch.repeatmask({int(obj._k)})"
+                case OddEvenMergeSortPartnerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortpartnermask("
+                        f"{int(obj.shape[1])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OddEvenMergeSortLowerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortlowermask("
+                        f"{int(obj.shape[0])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OneHotMaskTensor():
+                    ctor = f"Finch.onehotmask({int(obj._index) + 1})"
+                case ParityMaskTensor():
+                    ctor = f"Finch.paritymask({int(obj._parity)})"
+                case ReshapeMaskTensor():
+                    old_shape = tuple(int(dim) for dim in obj._old_shape)
+                    new_shape = tuple(int(dim) for dim in obj._new_shape)
+                    ctor = f"Finch.reshapemask({old_shape}, {new_shape})"
+                case _:
+                    raise ValueError(
+                        f"Unsupported Julia pattern tensor type: {type(obj)}"
+                    )
+            dims = ", ".join("Finch.Extent(1, 1)" for _ in shape)
+            ctor = f"Finch.window({ctor}{', ' if dims else ''}{dims})"
+            if reverse_axes and ftype.ndim > 1:
+                axes = ", ".join(map(str, reversed(range(1, ftype.ndim + 1))))
+                ctor = f"Finch.swizzle({ctor}, {axes})"
+            return ctor
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported ftype kind {type(ftype).__name__}"
     )
