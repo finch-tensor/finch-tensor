@@ -416,9 +416,17 @@ class JuliaBufferContext:
     @staticmethod
     def _is_poolable(obj) -> bool:
         """Return whether an object is a non-scalar Julia tensor that can be reused."""
-        return (
+        if not (
             is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor) and len(jl.size(obj)) > 0
-        )
+        ):
+            return False
+
+        lvl = obj.lvl
+        while not jl.isa(lvl, jl.Finch.ElementLevel):
+            if jl.isa(lvl, jl.Finch.PatternLevel):
+                return False
+            lvl = lvl.lvl
+        return True
 
     def _get_or_create_record(self, obj) -> _JuliaBufferRecord | None:
         """Get or register the pool record for a reusable Julia tensor."""
@@ -491,6 +499,7 @@ class JuliaBufferContext:
         args,
         *,
         kernel_args: JuliaKernelArgs,
+        claimed_result_positions: set[int] | None = None,
     ) -> tuple[list[Any], tuple[BufferID, ...]]:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
@@ -509,9 +518,14 @@ class JuliaBufferContext:
             arg = args[position]
             key = argument_keys[position]
             record = self._owned_records.get(key)
-            if record is None:
-                record = self._claim_result_record(key)
             if record is not None:
+                julia_args[position] = record.tensor
+                continue
+
+            record = self._claim_result_record(key)
+            if record is not None:
+                if claimed_result_positions is not None:
+                    claimed_result_positions.add(position)
                 julia_args[position] = record.tensor
                 continue
 
@@ -529,6 +543,26 @@ class JuliaBufferContext:
             )
         return julia_args, argument_keys
 
+    def release_consumed_result_arguments(
+        self,
+        argument_keys: tuple[BufferID, ...],
+        claimed_result_positions: set[int],
+        julia_args: list[Any],
+        return_positions: tuple[int, ...],
+    ) -> None:
+        """Release result-pool buffers consumed by a kernel but not returned from it."""
+        returned_ids = {
+            int(jl.objectid(julia_args[position]))
+            for position in return_positions
+            if self._is_poolable(julia_args[position])
+        }
+        for position in claimed_result_positions:
+            record = self._owned_records.get(argument_keys[position])
+            if record is None or int(jl.objectid(record.tensor)) in returned_ids:
+                continue
+            self._release_owner(argument_keys[position])
+            self._free_pool.add(record)
+
     def release_reset_arguments(
         self,
         argument_keys: tuple[BufferID, ...],
@@ -538,8 +572,10 @@ class JuliaBufferContext:
         """Release reset buffers that are not returned by the completed kernel."""
         returned_positions = set(return_positions)
         for position in reset_positions:
+            if position in returned_positions:
+                continue
             record = self._release_owner(argument_keys[position])
-            if record is not None and position not in returned_positions:
+            if record is not None:
                 self._free_pool.add(record)
 
     def close(self):

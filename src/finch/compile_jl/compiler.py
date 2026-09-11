@@ -126,14 +126,22 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
+        claimed_result_positions: set[int] = set()
         julia_args, argument_keys = self.buffer_context.resolve_arguments(
             args,
             kernel_args=self.kernel_args,
+            claimed_result_positions=claimed_result_positions,
         )
         finch_fn(*julia_args)
         self.buffer_context.release_reset_arguments(
             argument_keys,
             self.kernel_args.reset_positions,
+            self.kernel_args.return_positions,
+        )
+        self.buffer_context.release_consumed_result_arguments(
+            argument_keys,
+            claimed_result_positions,
+            julia_args,
             self.kernel_args.return_positions,
         )
         return tuple(
