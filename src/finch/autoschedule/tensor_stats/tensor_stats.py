@@ -22,8 +22,8 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Table,
@@ -188,7 +188,8 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         new_index_order = MapJoin(
             Literal(op),
             tuple(
-                Table(Alias(f"_{i}"), tuple(a.index_order)) for i, a in enumerate(args)
+                Table(HardAlias(f"_{i}"), tuple(a.index_order))
+                for i, a in enumerate(args)
             ),
         ).fields()
         new_dim_sizes: dict = {}

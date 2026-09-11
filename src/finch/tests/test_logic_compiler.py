@@ -5,8 +5,8 @@ from finch import ffuncs, ftype
 from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -26,7 +26,7 @@ def test_logic_compiler(file_regression):
     plan = Plan(
         bodies=(
             Query(
-                lhs=Alias(name="A2"),
+                lhs=HardAlias(name="A2"),
                 rhs=Reorder(
                     arg=Aggregate(
                         op=logic.Literal(val=ffuncs.add),
@@ -36,11 +36,11 @@ def test_logic_compiler(file_regression):
                                 op=logic.Literal(val=ffuncs.mul),
                                 args=(
                                     Table(
-                                        Alias(name="A0"),
+                                        HardAlias(name="A0"),
                                         (Field(name="i0"), Field(name="i1")),
                                     ),
                                     Table(
-                                        Alias(name="A1"),
+                                        HardAlias(name="A1"),
                                         (Field(name="i1"), Field(name="i2")),
                                     ),
                                 ),
@@ -52,14 +52,14 @@ def test_logic_compiler(file_regression):
                     idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
-            Produces(args=(Alias(name="A2"),)),
+            Produces(args=(HardAlias(name="A2"),)),
         ),
     )
 
     bindings = {
-        Alias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
-        Alias(name="A1"): BufferizedNDArray.from_numpy(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
+        HardAlias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
+        HardAlias(name="A1"): BufferizedNDArray.from_numpy(np.array([[5, 6], [7, 8]])),
+        HardAlias(name="A2"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
     }
 
     program = NotationGenerator()(
@@ -75,8 +75,8 @@ def test_logic_compiler(file_regression):
     result = INTERPRET_NOTATION(plan, bindings)
 
     expected = np.matmul(
-        bindings[Alias(name="A0")].to_numpy(),
-        bindings[Alias(name="A1")].to_numpy(),
+        bindings[HardAlias(name="A0")].to_numpy(),
+        bindings[HardAlias(name="A1")].to_numpy(),
         dtype=float,
     )
 
@@ -87,12 +87,14 @@ def test_logic_compiler_inplace(file_regression):
     plan = Plan(
         bodies=(
             Query(
-                lhs=Alias(name="A2"),
+                lhs=HardAlias(name="A2"),
                 rhs=Reorder(
                     arg=MapJoin(
                         op=Literal(ffuncs.add),
                         args=(
-                            Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
+                            Table(
+                                HardAlias("A2"), (Field(name="i0"), Field(name="i2"))
+                            ),
                             Aggregate(
                                 op=logic.Literal(val=ffuncs.add),
                                 init=logic.Literal(val=0),
@@ -101,11 +103,11 @@ def test_logic_compiler_inplace(file_regression):
                                         op=logic.Literal(val=ffuncs.mul),
                                         args=(
                                             Table(
-                                                Alias(name="A0"),
+                                                HardAlias(name="A0"),
                                                 (Field(name="i0"), Field(name="i1")),
                                             ),
                                             Table(
-                                                Alias(name="A1"),
+                                                HardAlias(name="A1"),
                                                 (Field(name="i1"), Field(name="i2")),
                                             ),
                                         ),
@@ -123,14 +125,14 @@ def test_logic_compiler_inplace(file_regression):
                     idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
-            Produces(args=(Alias(name="A2"),)),
+            Produces(args=(HardAlias(name="A2"),)),
         ),
     )
 
     bindings = {
-        Alias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
-        Alias(name="A1"): BufferizedNDArray.from_numpy(np.array([[5, 6], [7, 8]])),
-        Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[1, 1], [1, 1]])),
+        HardAlias(name="A0"): BufferizedNDArray.from_numpy(np.array([[1, 2], [3, 4]])),
+        HardAlias(name="A1"): BufferizedNDArray.from_numpy(np.array([[5, 6], [7, 8]])),
+        HardAlias(name="A2"): BufferizedNDArray.from_numpy(np.array([[1, 1], [1, 1]])),
     }
 
     program = NotationGenerator()(
@@ -145,9 +147,9 @@ def test_logic_compiler_inplace(file_regression):
 
     result = INTERPRET_NOTATION(plan, bindings)
 
-    expected = np.ones_like(bindings[Alias(name="A2")].to_numpy()) + np.matmul(
-        bindings[Alias(name="A0")].to_numpy(),
-        bindings[Alias(name="A1")].to_numpy(),
+    expected = np.ones_like(bindings[HardAlias(name="A2")].to_numpy()) + np.matmul(
+        bindings[HardAlias(name="A0")].to_numpy(),
+        bindings[HardAlias(name="A1")].to_numpy(),
         dtype=float,
     )
 

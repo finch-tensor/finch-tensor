@@ -26,7 +26,7 @@ from finch.autoschedule.tensor_stats import UniformStatsFactory
 from finch.codegen.numba_codegen.numba import NumbaCompiler
 from finch.compile.lower import NotationCompiler
 from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
-from finch.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finch.finch_logic import Field, HardAlias, Plan, Produces, Query, Table
 from finch.symbolic import gensym
 
 from .utils import patch_benchmark
@@ -45,7 +45,7 @@ def _plan_from_lazy(expr):
     Build the same `Plan` as `finch.interface.fuse.compute`.
     """
     args = (expr,)
-    vars_ = tuple(Alias(gensym("A")) for _ in args)
+    vars_ = tuple(HardAlias(gensym("A")) for _ in args)
     ctx = args[0].ctx.join()
     bodies = tuple(
         Query(

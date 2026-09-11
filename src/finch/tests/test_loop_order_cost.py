@@ -27,8 +27,8 @@ from finch.autoschedule.loop_order_greedy import (
 from finch.autoschedule.normalize import LogicNormalizer
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Table,
@@ -39,7 +39,7 @@ from finch.finch_notation.interpreter import NotationInterpreter
 def test_empty_input_ordered_first_is_cheaper():
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     bindings = {
         a: sf(fl.asarray(np.ones((4, 4))), (i, j)),
@@ -56,7 +56,7 @@ def test_empty_relation():
     sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (Alias(name) for name in "ABCD")
+    a, b, c, d = (HardAlias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -158,7 +158,7 @@ def test_greedy_order_breaks_ties_by_field_order():
     """
     sf = DCStatsFactory()
     i, j, k, m = (Field(name) for name in "ijkm")
-    a, b, c = Alias("A"), Alias("B"), Alias("C")
+    a, b, c = HardAlias("A"), HardAlias("B"), HardAlias("C")
     ones = fl.asarray(np.ones((4, 4)))
 
     forward = MapJoin(
@@ -209,7 +209,7 @@ def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
     """
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     n = 16
     diagonal = np.zeros((n, n))
     diagonal[np.arange(n), np.arange(n)] = 1.0
@@ -250,7 +250,7 @@ def test_transpose_penalty_totals_match_loop_order_cost():
     """
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     ones = fl.asarray(np.ones((3, 3)))
     bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}

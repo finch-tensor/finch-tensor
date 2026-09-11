@@ -9,6 +9,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     Literal,
     LogicStatement,
     MapJoin,
@@ -182,7 +183,10 @@ class LoopOrderedForm(SingleAggregateForm):
                     return None
                 case Query(Alias(), Aggregate(_, _, Reorder(arg, idxs), _)):
                     return validate(arg, idxs)
-                case Query(Alias(), Reorder(Aggregate(_, _, Reorder(arg, idxs)), _)):
+                case Query(
+                    Alias(),
+                    Reorder(Aggregate(_, _, Reorder(arg, idxs)), _),
+                ):
                     return validate(arg, idxs)
                 case Query(Alias(), Aggregate(_, _, arg, _)):
                     raise ValueError(
@@ -206,7 +210,8 @@ class LoopOrderedForm(SingleAggregateForm):
                         raise ValueError("Table index order does not match loop order.")
                     return validate(agg_arg, idxs_1)
                 case Query(
-                    Alias(), Reorder(MapJoin(_, (Table(), Aggregate(_, _, arg, _))), _)
+                    Alias(),
+                    Reorder(MapJoin(_, (Table(), Aggregate(_, _, arg, _))), _),
                 ):
                     raise ValueError(
                         "In-place queries must have an interior loop order!"
@@ -286,9 +291,10 @@ class FormattedForm(LoopOrderedForm):
                     for arg in args:
                         validate(arg)
                 case Table(tns, _):
-                    if tns not in bindings:
+                    key = tns.alias if isinstance(tns, FusedAlias) else tns
+                    if key not in bindings:
                         raise ValueError(
-                            f"Alias {tns.name} is not defined in bindings. All aliase\
+                            f"Alias {key.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
                         )
                 case Literal():

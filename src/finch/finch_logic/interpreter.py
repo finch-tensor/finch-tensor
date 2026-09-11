@@ -17,6 +17,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     Literal,
     MapJoin,
     Plan,
@@ -39,6 +40,50 @@ def make_tensor(shape, fill_value, *, dtype=None):
     arr = np.empty(shape, dtype=np.dtype(to_numpy_type(dtype)))
     arr[...] = fill_value
     return finch.asarray(arr)
+
+
+class MockFusedTensor:
+    # Dividing the shape into inner and outer so we know what to materialize
+    def __init__(self, dims, n, fill_value, dtype, make_tensor=make_tensor):
+        self.dims = tuple(dims)
+        self.n = n
+        self.outer_shape = self.dims[:n]  # fused
+        self.inner_shape = self.dims[n:]  # materialised
+        self.fill_value = fill_value
+        self.dtype = dtype
+        self._make_tensor = make_tensor
+        self.store_tns: dict[
+            tuple[int, ...], object
+        ] = {}  # storing copies per iteration
+
+    # Alloting tensors of materilized dimension fresh or one we already have
+    def slot(self, outer_crds):
+        outer_crds = tuple(outer_crds)
+        if outer_crds not in self.store_tns:
+            self.store_tns[outer_crds] = self._make_tensor(
+                self.inner_shape, self.fill_value, dtype=self.dtype
+            )
+        return self.store_tns[outer_crds]
+
+    @property
+    def shape(self):
+        return self.dims
+
+    @property
+    def element_type(self):
+        return ftype(self.dtype)
+
+    def __getitem__(self, crds):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        outer, inner = crds[: self.n], crds[self.n :]
+        return self.slot(outer)[inner]
+
+    def __setitem__(self, crds, val):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        outer, inner = crds[: self.n], crds[self.n :]
+        self.slot(outer)[inner] = val
 
 
 class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
@@ -74,15 +119,27 @@ class LogicMachine:
                 )
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
-            case Table(Alias() as var, idxs):
-                val = self.bindings.get(var, None)
+            case Table(Literal(val), idxs):
+                return TableValue(val, idxs)
+            case Table(FusedAlias(alias, _), idxs):
+                val = self.bindings.get(alias, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return TableValue(val, idxs)
-            case Table(Literal(val), idxs):
+            case Table(Alias() as var, idxs):
+                key = var.alias if isinstance(var, FusedAlias) else var
+                val = self.bindings.get(key, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
                 return TableValue(val, idxs)
+            case FusedAlias(alias, _):
+                val = self.bindings.get(alias, None)
+                if val is None:
+                    raise ValueError(f"undefined tensor alias {node}")
+                return val
             case Alias() as var:
-                val = self.bindings.get(var, None)
+                key = var.alias if isinstance(var, FusedAlias) else var
+                val = self.bindings.get(key, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
                 return val
@@ -157,13 +214,23 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
-                if lhs not in self.bindings:
-                    tns = self.make_tensor(
-                        rhs.tns.shape,
-                        rhs.tns.fill_value,
-                        dtype=rhs.tns.element_type,
-                    )
-                    self.bindings[lhs] = tns
+                key = lhs.alias if isinstance(lhs, FusedAlias) else lhs
+                if key not in self.bindings:
+                    if isinstance(lhs, FusedAlias):
+                        tns = MockFusedTensor(
+                            rhs.tns.shape,
+                            lhs.n,
+                            rhs.tns.fill_value,
+                            rhs.tns.element_type,
+                            make_tensor=self.make_tensor,
+                        )
+                    else:
+                        tns = self.make_tensor(
+                            rhs.tns.shape,
+                            rhs.tns.fill_value,
+                            dtype=rhs.tns.element_type,
+                        )
+                    self.bindings[key] = tns
                 lhs = self(lhs)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
                     lhs[*crds] = rhs.tns[*crds].item()

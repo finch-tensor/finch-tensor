@@ -59,8 +59,8 @@ from typing import Any
 
 from finch.autoschedule import get_default_scheduler
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Plan,
     Produces,
     Query,
@@ -100,7 +100,7 @@ def compute(arg, ctx=None):
             lazy_arg_idxs.append(i)
 
     if lazy_args:
-        vars = tuple(Alias(gensym("A")) for _ in lazy_args)
+        vars = tuple(HardAlias(gensym("A")) for _ in lazy_args)
         ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
         bodies = tuple(
             map(

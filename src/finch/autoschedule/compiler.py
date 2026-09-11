@@ -18,6 +18,7 @@ from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyLibrary
 from finch.finch_logic import (
     Alias,
+    FusedAlias,
     LogicLoader,
     StatsFactory,
     TensorStats,
@@ -53,6 +54,14 @@ class PointwiseContext:
                         for arg in args
                     ),
                 )
+            case lgc.Table(lgc.FusedAlias(alias, _), idxs):
+                return ntn.Unwrap(
+                    ntn.Access(
+                        self.ctx.slots[alias],
+                        ntn.Read(),
+                        tuple(loops[idx] for idx in idxs),
+                    )
+                )
             case lgc.Table(lgc.Alias() as var, idxs):
                 return ntn.Unwrap(
                     ntn.Access(
@@ -61,6 +70,7 @@ class PointwiseContext:
                         tuple(loops[idx] for idx in idxs),
                     )
                 )
+
             case lgc.Literal(val):
                 return ntn.Literal(val)
             case lgc.Relabel(arg, idxs):
@@ -261,9 +271,15 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
-                body = self._lower_query_of_reorder(lhs, ffuncs.overwrite, arg, idxs_2)
-                match self.bindings[lhs].fill_value:
+            case lgc.Query(
+                lhs,
+                lgc.Reorder(
+                    lgc.Table(lgc.Alias() | lgc.FusedAlias(), _) as arg, idxs_2
+                ),
+            ):
+                key = lhs.alias if isinstance(lhs, FusedAlias) else lhs
+                body = self._lower_query_of_reorder(key, ffuncs.overwrite, arg, idxs_2)
+                match self.bindings[key].fill_value:
                     case DynamicFill() as fill:
                         init = ntn.Literal(fill)
                     case StaticFill() as fill:
@@ -271,14 +287,14 @@ class NotationContext:
                 return ntn.Block(
                     (
                         ntn.Declare(
-                            self.slots[lhs],
+                            self.slots[key],
                             init,
                             ntn.Literal(ffuncs.overwrite),
                             (),
                         ),
                         body,
                         ntn.Freeze(
-                            self.slots[lhs],
+                            self.slots[key],
                             ntn.Literal(ffuncs.overwrite),
                         ),
                     )
@@ -295,18 +311,19 @@ class NotationContext:
                     output_idxs,
                 ),
             ):
-                body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
+                key = lhs.alias if isinstance(lhs, lgc.FusedAlias) else lhs
+                body = self._lower_query_of_aggregate(key, op, arg_2, output_idxs)
                 return ntn.Block(
                     (
                         ntn.Declare(
-                            self.slots[lhs],
+                            self.slots[key],
                             ntn.Literal(init),
                             ntn.Literal(op),
                             (),
                         ),
                         body,
                         ntn.Freeze(
-                            self.slots[lhs],
+                            self.slots[key],
                             ntn.Literal(op),
                         ),
                     )
@@ -329,16 +346,17 @@ class NotationContext:
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)
+                key = lhs.alias if isinstance(lhs, lgc.FusedAlias) else lhs
+                body = self._lower_query_of_aggregate(key, op_1, agg_arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Thaw(
-                            self.slots[lhs],
+                            self.slots[key],
                             ntn.Literal(op),
                         ),
                         body,
                         ntn.Freeze(
-                            self.slots[lhs],
+                            self.slots[key],
                             ntn.Literal(op),
                         ),
                     )
