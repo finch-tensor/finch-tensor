@@ -359,7 +359,7 @@ class JuliaFreeBufferPool:
     def add(self, record: _JuliaBufferRecord) -> None:
         self.records.setdefault(record.group, []).append(record)
 
-    def claim(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+    def remove(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
         records = self.records.get(group)
         if not records:
             return None
@@ -376,7 +376,7 @@ class JuliaResultBufferPool:
     def add(self, key, record: _JuliaBufferRecord) -> None:
         self.records[key] = record
 
-    def claim(self, key: tuple[Any, ...]) -> _JuliaBufferRecord | None:
+    def remove(self, key: tuple[Any, ...]) -> _JuliaBufferRecord | None:
         return self.records.pop(key, None)
 
     def clear(self) -> None:
@@ -440,18 +440,12 @@ class JuliaBufferContext:
 
     def _claim_result_record(self, key) -> _JuliaBufferRecord | None:
         """Move a returned record into the active-owner pool for an argument."""
-        record = self._result_pool.claim(key)
+        record = self._result_pool.remove(key)
         if record is not None:
-            self._remove_result_record(record)
+            record.result_key = None
             self._assign_owner(key, record)
             return record
         return None
-
-    def _remove_result_record(self, record: _JuliaBufferRecord) -> None:
-        """Remove a record from the result pool before it is claimed."""
-        if record.result_key is not None:
-            self._result_pool.claim(record.result_key)
-            record.result_key = None
 
     def _release_owner(self, key) -> _JuliaBufferRecord | None:
         """Remove an active owner mapping without placing its record in a pool."""
@@ -459,14 +453,6 @@ class JuliaBufferContext:
         if record is not None:
             record.owner_key = None
         return record
-
-    def _release_free_record(self, record: _JuliaBufferRecord) -> None:
-        """Place an unowned record in the free pool for its compatibility group."""
-        self._free_pool.add(record)
-
-    def _lease_reset_record(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
-        """Claim a compatible record from the free pool for a reset input."""
-        return self._free_pool.claim(group)
 
     def _result_wrapper(self, record: _JuliaBufferRecord) -> FiberTensor | None:
         """Return a record's Python result wrapper, creating it when needed."""
@@ -487,7 +473,8 @@ class JuliaBufferContext:
         if record.owner_key is not None:
             self._release_owner(record.owner_key)
         if record.result_key is not None:
-            self._remove_result_record(record)
+            self._result_pool.remove(record.result_key)
+            record.result_key = None
         self._result_pool.add(key, record)
         record.result_key = key
 
@@ -543,7 +530,7 @@ class JuliaBufferContext:
                 and getattr(arg, "shape", None) is not None
             ):
                 group = JuliaBufferGroup(arg, type_name)
-                record = self._lease_reset_record(group)
+                record = self._free_pool.remove(group)
                 if record is not None:
                     self._assign_owner(key, record)
                     julia_args.append(record.tensor)
@@ -567,7 +554,7 @@ class JuliaBufferContext:
         for position in reset_positions:
             record = self._release_owner(argument_keys[position])
             if record is not None and position not in returned_positions:
-                self._release_free_record(record)
+                self._free_pool.add(record)
 
     def close(self):
         """Discard all Python mappings and pooled Julia tensor records."""
