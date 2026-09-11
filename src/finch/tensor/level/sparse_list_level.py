@@ -15,7 +15,6 @@ from finch.algebra import (
 )
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
-from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.level import Level, LevelFType
 
 
@@ -207,11 +206,9 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(
         self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
-        if not isinstance(fiber.type, FiberTensorFType):
-            raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl_asm = ctx.fiber_level(tns)
+        level = tns.lvl
+        lvl_asm = ctx(level)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
 
@@ -268,13 +265,10 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
             ctx.exec(asm.Assign(pos_2, q))
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
             return lplt.Run(
                 ntn.Fiber(
-                    tns.root,
-                    ntn.Child(tns.lvl),
+                    ntn.Child(level),
                     pos_2,
-                    child_type,
                     (*tns.idxs, idx),
                 )
             )

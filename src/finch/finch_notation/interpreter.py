@@ -431,6 +431,10 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
+            case ntn.Root(tns):
+                return self(tns).lvl
+            case ntn.Child(parent, attr):
+                return getattr(self(parent), attr)
             case ntn.Full(val, shape):
                 return FullView(
                     self(val), tuple(self(dim) for dim in shape), prgm.result_type

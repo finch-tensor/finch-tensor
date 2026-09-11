@@ -9,6 +9,7 @@ from finch.compile import NotationCompiler, make_extent
 from finch.compile.looplets import Run
 from finch.finch_notation.interpreter import FullView
 from finch.symbolic import Reflector
+from finch.tensor import BufferizedNDArray
 
 
 @pytest.mark.parametrize("shape", [(), (2,), (2, 3)])
@@ -39,8 +40,6 @@ def test_full_interpreter(shape):
 
 
 def test_full_compiler():
-    from finch.tensor import BufferizedNDArray
-
     value = ntn.Variable("value", ftype(np.int64))
     buf = BufferizedNDArray.from_numpy(np.zeros((2, 3), dtype=np.int64))
     output = ntn.Variable("output", buf.ftype)

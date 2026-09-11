@@ -9,6 +9,7 @@ from finch.algebra import (
     AbstractFill,
     FType,
     FTyped,
+    StructFType,
 )
 
 
@@ -16,6 +17,21 @@ class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
+
+    def level_get_child_type(self, attr: str) -> "LevelFType":
+        match self:
+            case StructFType() if self.struct_hasattr(attr):
+                child = self.struct_attrtype(attr)
+                match child:
+                    case LevelFType():
+                        return child
+        raise TypeError(f"{self} does not support child {attr!r}")
+
+    def level_get_child(
+        self, obj: asm.AssemblyExpression, attr: str
+    ) -> asm.AssemblyExpression:
+        self.level_get_child_type(attr)
+        return asm.GetAttr(obj, asm.Literal(attr))
 
     def with_fill(self, fill_value: Any) -> "LevelFType":
         """Rebuild this level ftype with the leaf fill value replaced."""

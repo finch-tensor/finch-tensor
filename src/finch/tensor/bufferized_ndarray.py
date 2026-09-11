@@ -1,4 +1,4 @@
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, cast
 
 import numpy as np
@@ -24,6 +24,8 @@ from finch.codegen.numba_codegen import to_numpy_type
 from finch.compile import looplets as lplt
 from finch.compile.lower import AssemblyContext, FinchTensorFType
 
+from .fiber_tensor import FiberTensorFType
+from .level import Level, LevelFType
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
 from .traits import Dense, FormatProperty
@@ -173,6 +175,10 @@ class BufferizedNDArray(OverrideTensor):
     def thaw(self, op):
         return self
 
+    @property
+    def lvl(self):
+        return BufferizedNDArrayLevel(self)
+
     def access(self, indices, op):
         return BufferizedNDArrayAccessor(self).access(indices, op)
 
@@ -265,6 +271,19 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             # The fill value is bound at call time through a struct field.
             fields.append(("fill", self.element_type))
         return fields
+
+    @property
+    def lvl_t(self):
+        return BufferizedNDArrayLevelFType(self)
+
+    def get_child_type(self, attr):
+        if attr != "lvl":
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def get_child(self, obj, attr):
+        self.get_child_type(attr)
+        return obj
 
     def from_fields(self, buf, shape, strides, fill=None):
         return BufferizedNDArray(
@@ -417,17 +436,14 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return [Dense(tuple(range(n + 1))) for n in range(self.ndim)]
 
     def lower_dim(self, ctx, obj, r):
-        return asm.GetAttr(
-            asm.GetAttr(obj.root, asm.Literal("shape")),
-            asm.Literal(f"element_{r}"),
-        )
+        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
     def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
         i_var = asm.Variable("i", self.buf_t.length_type)
-        buf = asm.GetAttr(tns.root, asm.Literal("val"))
+        buf = asm.GetAttr(ctx(tns.lvl.root), asm.Literal("val"))
         init_e: asm.AssemblyExpression = (
             # The init value arrives at bind time through the fill field.
-            asm.GetAttr(tns.root, asm.Literal("fill"))
+            asm.GetAttr(ctx(tns.lvl.root), asm.Literal("fill"))
             if is_dynamic(getattr(init, "val", None))
             else asm.Literal(init.val)
         )
@@ -437,8 +453,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             init_e,
         )
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
-        if isinstance(tns.root, asm.Slot):
-            ctx.slots[tns.root.name] = replace(tns, dirty=True)
+        if isinstance(tns.lvl.root, asm.Slot):
+            ctx.slots[tns.lvl.root.name] = replace(tns, dirty=True)
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -448,20 +464,8 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return tns
 
     def unfurl(self, ctx, tns, ext, mode, proto):
-        op = None
-        if isinstance(mode, ntn.Update):
-            op = mode.op
         tns = ctx.resolve(tns)
-        acc_t = BufferizedNDArrayAccessorFType(self, 0, self.buf_t.length_type, op)
-        view = ntn.Fiber(
-            tns.root,
-            tns.lvl,
-            asm.Literal(self.buf_t.length_type(0)),
-            acc_t,
-            tns.idxs,
-            tns.dirty,
-        )
-        return acc_t.unfurl(ctx, view, ext, mode, proto)
+        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
 
     def reshape(self, arr, new_shape: tuple):
         new_shape = tuple(np.intp(s) for s in new_shape)
@@ -487,9 +491,11 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             device=arr.device,
         )
 
-    def lower_unwrap(self, ctx, obj): ...
+    def lower_unwrap(self, ctx, obj):
+        return self.lvl_t.level_lower_unwrap(ctx, obj, obj.pos)
 
-    def lower_increment(self, ctx, obj, op, val): ...
+    def lower_increment(self, ctx, obj, op, val):
+        return self.lvl_t.level_lower_increment(ctx, obj, op, val, obj.pos)
 
 
 class BufferizedNDArrayAccessor(Tensor):
@@ -510,10 +516,16 @@ class BufferizedNDArrayAccessor(Tensor):
         self.nind = nind
 
     @property
+    def lvl(self):
+        return BufferizedNDArrayLevel(self.tns, self.nind)
+
+    @property
     def ftype(self):
-        return BufferizedNDArrayAccessorFType(
-            ftype(self.tns), self.nind, ftype(self.pos), self.op
-        )
+        return FiberTensorFType(self.lvl.ftype, self.tns.device)
+
+    @property
+    def dirty_bit(self):
+        return False
 
     @property
     def shape(self):
@@ -585,58 +597,87 @@ class BufferizedNDArrayAccessor(Tensor):
         return self
 
 
-class BufferizedNDArrayAccessorFType(FinchTensorFType):
-    def __init__(self, tns, nind, pos, op):
-        self.tns = tns
-        self.nind = nind
-        self.pos = pos
-        self.op = op
+@dataclass(frozen=True)
+class BufferizedNDArrayLevel(Level):
+    """A level cursor sharing an ndarray's storage and shape metadata."""
 
-    def __eq__(self, other):
-        return (
-            isinstance(other, BufferizedNDArrayAccessorFType)
-            and self.tns == other.tns
-            and self.nind == other.nind
-            and self.pos == other.pos
-            and self.op == other.op
-        )
-
-    def __hash__(self):
-        return hash((self.tns, self.nind, self.pos, self.op))
-
-    def construct(self, shape: tuple) -> BufferizedNDArrayAccessor:
-        raise NotImplementedError(
-            "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
-        )
-
-    def __call__(self, val: Any) -> BufferizedNDArrayAccessor:
-        """
-        Convert a tensor to this bufferized ndarray accessor type.
-
-        Args:
-            val: A tensor to convert to this type.
-        Returns:
-            A BufferizedNDArrayAccessor instance of this type.
-        """
-        raise NotImplementedError(
-            f"Tensor conversion not yet implemented for {type(self).__name__}"
-        )
-
-    def from_numpy(self, arr):
-        raise NotImplementedError(
-            "Cannot directly instantiate BufferizedNDArrayAccessor from ftype"
-        )
+    tns: BufferizedNDArray
+    nind: int = 0
 
     @property
-    def ndim(self) -> int:
+    def ftype(self):
+        return BufferizedNDArrayLevelFType(self.tns.ftype, self.nind)
+
+    @property
+    def shape(self):
+        return self.tns.shape[self.nind :]
+
+    @property
+    def stride(self):
+        return self.tns.strides[self.nind] if self.ndim else self.position_type(1)
+
+    @property
+    def val(self):
+        return self.tns.val
+
+    @property
+    def lvl(self):
+        if self.ndim == 0:
+            raise TypeError("Scalar ndarray levels have no child level")
+        return BufferizedNDArrayLevel(self.tns, self.nind + 1)
+
+
+@dataclass(frozen=True)
+class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
+    tns: BufferizedNDArrayFType
+    nind: int = 0
+
+    @property
+    def struct_name(self):
+        return "BufferizedNDArrayLevel"
+
+    @property
+    def struct_fields(self):
+        return [("tns", self.tns)]
+
+    def from_fields(self, tns):
+        return BufferizedNDArrayLevel(tns, self.nind)
+
+    def with_fill(self, fill_value):
+        tns = BufferizedNDArrayFType(
+            buffer_type=self.tns.buf_t,
+            ndim=self.tns.ndim,
+            dimension_type=self.tns.shape_t,
+            fill_value=fill_value,
+            device=self.tns.device,
+        )
+        return BufferizedNDArrayLevelFType(tns, self.nind)
+
+    def level_get_child_type(self, attr):
+        if attr != "lvl" or self.ndim == 0:
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def level_get_child(self, obj, attr):
+        self.level_get_child_type(attr)
+        return obj
+
+    @property
+    def lvl_t(self):
+        if self.ndim == 0:
+            raise TypeError("Scalar ndarray levels have no child level")
+        return BufferizedNDArrayLevelFType(self.tns, self.nind + 1)
+
+    @property
+    def ndim(self):
         return self.tns.ndim - self.nind
 
     @property
-    def shape_type(self) -> tuple:
+    def shape_type(self):
         return self.tns.shape_type[self.nind :]
 
     @property
-    def fill_value(self) -> Any:
+    def fill_value(self):
         return self.tns.fill_value
 
     @property
@@ -644,45 +685,72 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
         return self.tns.element_type
 
     @property
-    def level_format_properties(self) -> list[FormatProperty]:
-        return [Dense(tuple(range(n + 1))) for n in range(self.ndim)]
+    def position_type(self):
+        return self.tns.buf_t.length_type
 
-    def lower_dim(self, ctx, obj, r):
+    @property
+    def buffer_type(self):
+        return self.tns.buf_t
+
+    @property
+    def buffer_factory(self):
+        return type(self.buffer_type)
+
+    def level_format_properties(self, n):
+        return [Dense(tuple(range(n + r + 1))) for r in range(self.ndim)]
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        for r in range(self.ndim):
+            num_pos *= stats.get_dim_size(fields[lvl + r])
+        return num_pos * np.dtype(to_numpy_type(self.element_type)).itemsize
+
+    def construct(self, shape, *, pos):
+        raise NotImplementedError("An ndarray level is a view of existing storage")
+
+    def __call__(self, val):
+        raise NotImplementedError("An ndarray level is a view of existing storage")
+
+    def from_numpy(self, shape, val):
+        raise NotImplementedError("An ndarray level is a view of existing storage")
+
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        raise NotImplementedError(
+            "Declare the owning ndarray before accessing its levels"
+        )
+
+    def level_lower_freeze(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_thaw(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_dim(self, ctx, obj, r):
         return asm.GetAttr(
-            asm.GetAttr(obj.root, asm.Literal("shape")),
+            asm.GetAttr(obj, asm.Literal("shape")),
             asm.Literal(f"element_{self.nind + r}"),
         )
 
-    def lower_declare(self, ctx, tns, init, op, shape):
-        raise NotImplementedError(
-            "BufferizedNDArrayAccessorFType does not support lower_declare."
-        )
+    def lower_fill(self, lvl_expr):
+        if is_dynamic(self.fill_value):
+            return asm.GetAttr(lvl_expr, asm.Literal("fill"))
+        return asm.Literal(self.fill_value.value)
 
-    def lower_freeze(self, ctx, tns, op):
-        raise NotImplementedError(
-            "BufferizedNDArrayAccessorFType does not support lower_freeze."
-        )
-
-    def lower_thaw(self, ctx, tns, op):
-        raise NotImplementedError(
-            "BufferizedNDArrayAccessorFType does not support lower_thaw."
-        )
-
-    def lower_unwrap(self, ctx, tns):
+    def level_lower_unwrap(self, ctx, tns, pos):
         return asm.Load(
-            asm.GetAttr(tns.root, asm.Literal("val")),
-            tns.pos,
+            asm.GetAttr(ctx(tns.lvl), asm.Literal("val")),
+            pos,
         )
 
-    def lower_increment(
+    def level_lower_increment(
         self,
         ctx: AssemblyContext,
         tns: ntn.Fiber,
         op: ntn.Literal,
         val: ntn.NotationExpression,
+        pos: asm.AssemblyExpression,
     ):
-        buf = asm.GetAttr(tns.root, asm.Literal("val"))
-        op_e, pos_e, val_e = ctx(op), tns.pos, ctx(val)
+        buf = asm.GetAttr(ctx(tns.lvl), asm.Literal("val"))
+        op_e, pos_e, val_e = ctx(op), pos, ctx(val)
         increment_call = asm.Call(
             op_e,
             (asm.Load(buf, pos_e), val_e),
@@ -691,30 +759,35 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
             tns.dirty
             and op.val is ffuncs.overwrite
             # init_write only helps the simplifier elide stores of a Known fill
-            and not is_dynamic(tns.type.fill_value)
+            and not is_dynamic(self.fill_value)
         ):
             increment_call = asm.Call(
-                asm.Literal(ffuncs.init_write(tns.type.fill_value)),
+                asm.Literal(ffuncs.init_write(self.fill_value)),
                 (asm.Load(buf, pos_e), increment_call),
             )
 
         ctx.exec(asm.Store(buf, pos_e, increment_call))
 
-    def unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto):
+    def level_unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto, pos):
+        level = tns.lvl
+        root = ctx(level)
+
         def child_accessor(ctx, idx):
-            pos_2 = asm.Variable(ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.pos)
+            pos_2 = asm.Variable(
+                ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
+            )
             ctx.exec(
                 asm.Assign(
                     pos_2,
                     asm.Call(
                         asm.Literal(ffuncs.add),
                         (
-                            tns.pos,
+                            pos,
                             asm.Call(
                                 asm.Literal(ffuncs.mul),
                                 (
                                     asm.GetAttr(
-                                        asm.GetAttr(tns.root, asm.Literal("strides")),
+                                        asm.GetAttr(root, asm.Literal("strides")),
                                         asm.Literal(f"element_{self.nind}"),
                                     ),
                                     asm.Variable(idx.name, idx.type_),
@@ -724,15 +797,10 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                     ),
                 )
             )
-            child_type = BufferizedNDArrayAccessorFType(
-                self.tns, self.nind + 1, self.pos, self.op
-            )
             return ntn.Fiber(
-                tns.root,
-                tns.lvl,
+                ntn.Child(level),
                 pos_2,
-                child_type,
-                tns.idxs,
+                (*tns.idxs, idx),
                 tns.dirty,
             )
 

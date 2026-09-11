@@ -1,5 +1,6 @@
 from finch import finch_notation as ntn
 from finch.algebra import is_annihilator
+from finch.compile import looplets
 from finch.symbolic import simplify_rules
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 from finch.symbolic.stage import UnvalidatedForm
@@ -14,15 +15,13 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
 
     @staticmethod
     def simplify(term: ntn.NotationNode):
-        from finch.compile import looplets as lplt
-
         match term:
             case ntn.Call(ntn.Literal(_) as op, args):
                 for arg in args:
                     match arg:
                         case ntn.Unwrap(
                             ntn.Access(
-                                lplt.Run(ntn.Full(ntn.Literal(val))) as tns,
+                                looplets.Run(ntn.Full(ntn.Literal(val))) as tns,
                                 ntn.Read(),
                                 idxs,
                             )

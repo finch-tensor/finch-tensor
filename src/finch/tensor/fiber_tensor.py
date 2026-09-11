@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import scipy.sparse as sps
 
+from finch import finch_assembly as asm
 from finch.algebra import (
     DynamicFillError,
     ImmutableStructFType,
@@ -302,6 +303,15 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("dirty_bit", bool_),
         ]
 
+    def get_child_type(self, attr):
+        if attr != "lvl":
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def get_child(self, obj, attr):
+        self.get_child_type(attr)
+        return asm.GetAttr(obj, asm.Literal(attr))
+
     def with_fill(self, fill_value: Any) -> FiberTensorFType:
         """Rebuild this ftype with the leaf fill value replaced."""
         return FiberTensorFType(self.lvl_t.with_fill(fill_value), self._device)
@@ -387,10 +397,10 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.level_lower_freeze(ctx, ctx.fiber_level(tns), op, tns.pos)
+        return self.lvl_t.level_lower_freeze(ctx, ctx(tns.lvl), op, tns.pos)
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.level_lower_thaw(ctx, ctx.fiber_level(tns), op, tns.pos)
+        return self.lvl_t.level_lower_thaw(ctx, ctx(tns.lvl), op, tns.pos)
 
     def lower_unwrap(self, ctx, tns):
         return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)
@@ -400,11 +410,11 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
-            ctx, ctx.fiber_level(tns), init, op, shape, tns.pos
+            ctx, ctx(tns.lvl), init, op, shape, tns.pos
         )
 
     def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), r)
+        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args

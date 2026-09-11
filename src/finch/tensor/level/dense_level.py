@@ -11,7 +11,6 @@ from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
 from .level import Level, LevelFType
@@ -175,8 +174,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         pos: asm.AssemblyExpression,
     ):
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl = ctx.fiber_level(tns)
+        level = tns.lvl
+        lvl = ctx(level)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -204,12 +203,9 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                     ),
                 )
             )
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
             return ntn.Fiber(
-                tns.root,
-                ntn.Child(tns.lvl),
+                ntn.Child(level),
                 pos_2,
-                child_type,
                 (*tns.idxs, idx),
             )
 
