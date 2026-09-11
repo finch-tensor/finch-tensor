@@ -727,13 +727,18 @@ class Query(LogicTree, LogicStatement):
         else:
             tns = self.lhs
         key = tns.alias if isinstance(tns, FusedAlias) else tns
+        rhs = (
+            Reorder(self.rhs, self.lhs.idxs)
+            if isinstance(self.lhs, Table)
+            else self.rhs
+        )
         if key in dim_bindings:
             for dim1, dim2 in zip(
-                self.rhs.dimmap(op, dim_bindings), dim_bindings[key], strict=True
+                rhs.dimmap(op, dim_bindings), dim_bindings[key], strict=True
             ):
                 op(dim1, dim2)
         else:
-            dim_bindings[key] = self.rhs.dimmap(op, dim_bindings)
+            dim_bindings[key] = rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return dim_bindings

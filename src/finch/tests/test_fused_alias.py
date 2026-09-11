@@ -50,7 +50,7 @@ def test_use_fused_alias():
     assert (result.to_numpy() == expected).all()
 
 
-""""
+"""
 # 3. Adding FusedAlias to compiler.py in places it can occur
 def test_fused_alias_compiles(file_regression):
     i, j = Field("i"), Field("j")

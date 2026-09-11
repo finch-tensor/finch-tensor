@@ -213,7 +213,10 @@ class LogicMachine:
                     result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
-                rhs = self(rhs)
+                if isinstance(lhs, Table):
+                    rhs = self(Reorder(rhs, lhs.idxs))
+                else:
+                    rhs = self(rhs)
                 tns_node = lhs.tns if isinstance(lhs, Table) else lhs
                 key = tns_node.alias if isinstance(tns_node, FusedAlias) else tns_node
                 if key not in self.bindings:
