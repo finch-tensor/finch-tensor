@@ -33,22 +33,6 @@ def is_julia_obj(obj: Any) -> bool:
     return isinstance(obj, jc.AnyValue)
 
 
-@dataclass(frozen=True)
-class JuliaKernelArgs:
-    type_names: tuple[str | None, ...]
-    dynamic_positions: tuple[int, ...]
-    reset_positions: frozenset[int]
-    return_positions: tuple[int, ...] | None
-
-    @property
-    def cache_key(self) -> tuple[tuple[str, ...], tuple[int, ...]]:
-        """Return the metadata that selects a compatible compiled kernel."""
-        return (
-            tuple(type_name for type_name in self.type_names if type_name is not None),
-            self.dynamic_positions,
-        )
-
-
 def _as_julia_scalar(val):
     if isinstance(val, np.bool_):
         return val.item()
@@ -326,11 +310,42 @@ def jl_tensor_to_python(obj):
     return FiberTensor(jl_level_to_python(obj.lvl))
 
 
+@dataclass(frozen=True)
+class JuliaKernelArgs:
+    type_names: tuple[str | None, ...]
+    dynamic_positions: tuple[int, ...]
+    reset_positions: frozenset[int]
+    return_positions: tuple[int, ...] | None
+
+    @property
+    def cache_key(self) -> tuple[tuple[str, ...], tuple[int, ...]]:
+        """Return the metadata that selects a compatible compiled kernel."""
+        return (
+            tuple(type_name for type_name in self.type_names if type_name is not None),
+            self.dynamic_positions,
+        )
+
+
+@dataclass
+class _JuliaBufferRecord:
+    tensor: Any
+    group: tuple[str, tuple[int, ...]]
+    owners: set[tuple[Any, ...]] = field(default_factory=set)
+    result: FiberTensor | None = None
+    producer: object | None = None
+
+
+@dataclass
+class _CachedJuliaTensor:
+    obj: Any
+    record: _JuliaBufferRecord
+    is_result: bool
+
+
 class JuliaBufferContext:
     """Own and reuse Julia tensor buffers across kernel invocations."""
 
     def __init__(self):
-        """Initialize tensor mappings, buffer records, and compatibility groups."""
         self._tensors: dict[tuple[Any, ...], _CachedJuliaTensor] = {}
         self._records: dict[int, _JuliaBufferRecord] = {}
         self._groups: dict[tuple[str, tuple[int, ...]], list[_JuliaBufferRecord]] = {}
@@ -610,19 +625,3 @@ class JuliaBufferContext:
         self._tensors.clear()
         self._records.clear()
         self._groups.clear()
-
-
-@dataclass
-class _JuliaBufferRecord:
-    tensor: Any
-    group: tuple[str, tuple[int, ...]]
-    owners: set[tuple[Any, ...]] = field(default_factory=set)
-    result: FiberTensor | None = None
-    producer: object | None = None
-
-
-@dataclass
-class _CachedJuliaTensor:
-    obj: Any
-    record: _JuliaBufferRecord
-    is_result: bool
