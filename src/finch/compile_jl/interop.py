@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, NamedTuple, cast
+from typing import Any, cast
 
 import numpy as np
 
@@ -403,11 +403,6 @@ class JuliaFreeBufferPool:
         self.records.clear()
 
 
-class ResolvedJuliaArguments(NamedTuple):
-    julia_args: list[Any]
-    argument_keys: tuple[BufferID, ...]
-
-
 class JuliaBufferContext:
     """Own and reuse Julia tensor buffers across kernel invocations."""
 
@@ -496,7 +491,7 @@ class JuliaBufferContext:
         args,
         *,
         kernel_args: JuliaKernelArgs,
-    ) -> ResolvedJuliaArguments:
+    ) -> tuple[list[Any], tuple[BufferID, ...]]:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
         argument_keys = tuple(BufferID.from_object(arg) for arg in args)
@@ -532,7 +527,7 @@ class JuliaBufferContext:
             julia_args[position] = self.tensor_to_jl(
                 arg, pin_fill=position in kernel_args.dynamic_positions
             )
-        return ResolvedJuliaArguments(julia_args, argument_keys)
+        return julia_args, argument_keys
 
     def release_reset_arguments(
         self,

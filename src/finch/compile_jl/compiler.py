@@ -22,7 +22,6 @@ from .analyze import find_reset_arg_positions, find_return_arg_positions
 from .interop import (
     JuliaBufferContext,
     JuliaKernelArgs,
-    ResolvedJuliaArguments,
 )
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
@@ -127,19 +126,19 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        resolved_args = self.buffer_context.resolve_arguments(
+        julia_args, argument_keys = self.buffer_context.resolve_arguments(
             args,
             kernel_args=self.kernel_args,
         )
-        finch_fn(*resolved_args.julia_args)
+        finch_fn(*julia_args)
         self.buffer_context.release_reset_arguments(
-            resolved_args.argument_keys,
+            argument_keys,
             self.kernel_args.reset_positions,
             self.kernel_args.return_positions,
         )
         return tuple(
             self.buffer_context.tensor_to_python(
-                resolved_args.julia_args[position],
+                julia_args[position],
             )
             for position in self.kernel_args.return_positions
         )

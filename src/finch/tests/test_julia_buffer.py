@@ -143,7 +143,7 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     context.release_reset_arguments((first_key,), frozenset({0}), ())
 
     second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
-    resolved_args = context.resolve_arguments(
+    julia_args, _ = context.resolve_arguments(
         (second,),
         kernel_args=JuliaKernelArgs(
             type_names=(type_name,),
@@ -153,4 +153,4 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
         ),
     )
 
-    assert resolved_args.julia_args[0] is first_jl
+    assert julia_args[0] is first_jl
