@@ -38,6 +38,7 @@ from finch.tensor.patterns import (
     PairCarryTensor,
     PairSumTensor,
     ParityMaskTensor,
+    RandomMaskTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
@@ -83,6 +84,14 @@ def _requires_julia_backend():
         SplitMaskTensor((3, 5)),
         SplitMaskTensor((3, 1)),
         SplitMaskTensor((0, 3)),
+        RandomMaskTensor((), 0.4, seed=42),
+        RandomMaskTensor((), 0.5, seed=1 << 63),
+        RandomMaskTensor((0,), 0.5, seed=42),
+        RandomMaskTensor((3, 0), 0.5, seed=42),
+        RandomMaskTensor(9, 0.0, seed=42),
+        RandomMaskTensor((3, 5), 1.0, seed=42),
+        RandomMaskTensor((3, 5), 0.5, seed=42),
+        RandomMaskTensor((2, 3, 4), 0.4, seed=(1 << 64) - 1, dtype=np.intp),
         *(
             OddEvenMergeSortPartnerMaskTensor((7, 7), p=p, k=k)
             for p, k in ((1, 1), (2, 1), (4, 2))
@@ -138,6 +147,46 @@ def test_compile_julia_numeric_pattern_mask():
     assert actual.dtype == expected.dtype
 
 
+def test_random_mask_bit_mixing_matches_julia():
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+    from finch.tensor.patterns import _randommask_mix, _randommask_uniform
+
+    rng = np.random.default_rng(42)
+    seeds = [0, 1, 1 << 63, (1 << 64) - 1]
+    seeds.extend(map(int, rng.integers(0, 1 << 64, size=32, dtype=np.uint64)))
+    for seed in seeds:
+        assert _randommask_mix(seed) == int(jl.Finch.randommask_mix(jl.UInt64(seed)))
+        assert _randommask_uniform(seed) == jl.Finch.randommask_uniform(jl.UInt64(seed))
+
+
+@pytest.mark.parametrize("shape", [(), (7,), (4, 5), (2, 3, 4)])
+def test_random_mask_matches_julia(shape):
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+
+    materialize = jl.seval("mask -> copyto!(zeros(Bool, size(mask)), mask)")
+    for seed in (0, 1, 42, (1 << 63) - 1, 1 << 63, (1 << 64) - 1):
+        for p in (0.0, np.nextafter(0.0, 1.0), 0.4, 0.5, np.nextafter(1.0, 0.0), 1.0):
+            mask = RandomMaskTensor(shape, p, seed=seed)
+            native = jl.Finch.randommask(shape, p, seed=jl.UInt64(seed))
+            expected = materialize(native).to_numpy()
+            actual = np.array([mask[idx].item() for idx in np.ndindex(shape)])
+            np.testing.assert_array_equal(actual.reshape(shape), expected)
+
+
+def test_random_mask_large_coordinates_match_julia():
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+
+    shape = (int(np.iinfo(np.intp).max), int(np.iinfo(np.intp).max), 8)
+    for seed in (42, (1 << 64) - 1):
+        mask = RandomMaskTensor(shape, 0.5, seed=seed)
+        native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
+        for idx in ((2, 3, 1), tuple(dim - 1 for dim in shape), (1 << 62, 1 << 62, 7)):
+            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
+
+
 def test_compile_julia_pattern_lowering(file_regression):
     _requires_julia_backend()
     from finch.compile_jl.compiler import (
@@ -167,6 +216,9 @@ def test_compile_julia_pattern_lowering(file_regression):
         ReshapeMaskTensor((2, 3), (3, 2)),
         ChunkMaskTensor((10, 4), b=3),
         SplitMaskTensor((10, 3)),
+        RandomMaskTensor((), 0.4, seed=42),
+        RandomMaskTensor(7, 0.25, seed=42),
+        RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
     ):
         compiler.sources.append(f"# {type(mask).__name__}")
         data = np.full(mask.shape, 2, dtype=np.int64)

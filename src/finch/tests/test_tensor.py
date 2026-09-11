@@ -31,6 +31,7 @@ from finch.tensor import (
     PairSumTensor,
     ParityMaskTensor,
     PatternTensor,
+    RandomMaskTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
@@ -403,6 +404,125 @@ def test_split_mask_requires_positive_region_count(p):
 def test_partition_masks_require_nonnegative_length(make_mask):
     with pytest.raises(ValueError, match="n must be nonnegative"):
         make_mask()
+
+
+@pytest.mark.parametrize(
+    "shape, expected",
+    [
+        (16, [0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1]),
+        ((4, 5), [[1, 0, 1, 0, 0], [0, 1, 0, 0, 1], [0, 1, 0, 1, 0], [0, 1, 0, 0, 0]]),
+    ],
+)
+def test_random_mask_matches_julia_seeded_values(shape, expected):
+    mask = finch.RandomMaskTensor(shape, 0.5, seed=42, dtype=np.intp)
+    reconstructed = mask.ftype.construct(mask.shape)
+    assert reconstructed.ftype == mask.ftype
+    for tensor in (mask, reconstructed):
+        actual = np.array([tensor[idx].item() for idx in np.ndindex(tensor.shape)])
+        np.testing.assert_array_equal(actual.reshape(tensor.shape), expected)
+        assert actual.dtype == np.dtype(np.intp)
+    result = finch.compute(finch.defer(mask) + finch.defer(np.zeros(mask.shape)))
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
+@pytest.mark.parametrize("shape", [(), (0,), (3, 0), (5,), (2, 3, 4)])
+@pytest.mark.parametrize("p", [0.0, 1.0])
+def test_random_mask_constant_probabilities(shape, p):
+    mask = RandomMaskTensor(shape, p, seed=(1 << 64) - 1)
+    assert mask.shape == shape
+    assert mask.fill_value.dtype == np.dtype(np.bool_)
+    for idx in np.ndindex(shape):
+        assert mask[idx].item() == bool(p)
+    if not shape:
+        assert mask.item() == bool(p)
+
+
+@pytest.mark.parametrize(
+    "seed, p, expected",
+    [
+        (0, np.nextafter(0.0, 1.0), True),
+        (42, 0.4, True),
+        ((1 << 63) - 1, 0.5, True),
+        (1 << 63, 0.5, False),
+        ((1 << 64) - 1, np.nextafter(1.0, 0.0), False),
+    ],
+)
+def test_random_mask_scalar_uses_seed_directly(seed, p, expected):
+    mask = RandomMaskTensor((), p, seed=seed)
+    assert mask[()].item() == expected
+    assert mask.item() == expected
+
+
+def test_random_mask_draws_one_seed(monkeypatch):
+    rng = np.random.default_rng(42)
+    reference = np.random.default_rng(42)
+    monkeypatch.setattr(np.random, "default_rng", lambda: rng)
+    mask = RandomMaskTensor((3, 4), 0.5)
+    same = RandomMaskTensor((3, 4), 0.5, seed=int(reference.bit_generator.random_raw()))
+    for idx in reversed(list(np.ndindex(mask.shape))):
+        assert mask[idx].item() == same[idx].item()
+        assert mask[idx].item() == same[idx].item()
+    assert rng.bit_generator.random_raw() == reference.bit_generator.random_raw()
+
+
+@pytest.mark.parametrize("bit_generator", [np.random.PCG64, np.random.MT19937])
+def test_random_mask_accepts_rng(bit_generator):
+    rng = np.random.Generator(bit_generator(42))
+    reference = np.random.Generator(bit_generator(42))
+    seed = int(reference.integers(0, 1 << 64, dtype=np.uint64))
+    mask = RandomMaskTensor((3, 4), 0.5, rng=rng)
+    same = RandomMaskTensor((3, 4), 0.5, seed=seed)
+    assert mask.ftype == same.ftype
+    reconstructed = mask.ftype.construct(mask.shape)
+    for idx in reversed(list(np.ndindex(mask.shape))):
+        assert mask[idx].item() == same[idx].item() == reconstructed[idx].item()
+    RandomMaskTensor((3, 4), 0.5, rng=rng, seed=42)
+    assert rng.integers(0, 1 << 64, dtype=np.uint64) == reference.integers(
+        0, 1 << 64, dtype=np.uint64
+    )
+
+
+def test_random_mask_coordinates_do_not_depend_on_shape():
+    shape = (int(np.iinfo(np.intp).max), int(np.iinfo(np.intp).max), 8)
+    huge = RandomMaskTensor(shape, 0.5, seed=42)
+    small = RandomMaskTensor((4, 5, 2), 0.5, seed=42)
+    assert huge.shape == shape
+    for idx in np.ndindex(small.shape):
+        assert huge[idx].item() == small[idx].item()
+
+
+@pytest.mark.parametrize("p", [-0.1, 1.1, np.nan, np.inf, -np.inf])
+def test_random_mask_requires_probability(p):
+    with pytest.raises(ValueError, match="p must lie"):
+        RandomMaskTensor(3, p)
+
+
+def test_random_mask_validates_probability_before_rounding():
+    from fractions import Fraction
+
+    with pytest.raises(ValueError, match="p must lie"):
+        RandomMaskTensor(3, Fraction((1 << 64) + 1, 1 << 64))
+
+
+@pytest.mark.parametrize("seed", [-1, 1 << 64])
+def test_random_mask_requires_uint64_seed(seed):
+    with pytest.raises(ValueError, match="seed must lie"):
+        RandomMaskTensor(3, 0.5, seed=seed)
+
+
+def test_random_mask_requires_integer_seed():
+    with pytest.raises(TypeError):
+        RandomMaskTensor(3, 0.5, seed=0.5)
+
+
+def test_random_mask_requires_nonnegative_shape():
+    with pytest.raises(ValueError, match="shape dimensions must be nonnegative"):
+        RandomMaskTensor((3, -1), 0.5)
+
+
+def test_random_mask_requires_intp_dimensions():
+    with pytest.raises(OverflowError, match="shape dimensions must fit in intp"):
+        RandomMaskTensor((int(np.iinfo(np.intp).max) + 1,), 0.5)
 
 
 def test_lazy_matrix_pattern_tensor_compute():

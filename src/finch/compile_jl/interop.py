@@ -33,6 +33,7 @@ from finch.tensor.patterns import (
     PairSumTensor,
     ParityMaskTensor,
     PatternTensor,
+    RandomMaskTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
@@ -312,6 +313,10 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
             mask = jl.Finch.chunkmask(int(obj.shape[0]), int(obj._b))
         case SplitMaskTensor():
             mask = jl.Finch.splitmask(int(obj.shape[0]), int(obj.shape[1]))
+        case RandomMaskTensor():
+            mask = jl.Finch.randommask(
+                tuple(int(dim) for dim in obj.shape), obj._p, seed=jl.UInt64(obj._seed)
+            )
         case OddEvenMergeSortPartnerMaskTensor():
             mask = jl.Finch.oddevenmergesortpartnermask(
                 int(obj.shape[1]), int(obj._p), int(obj._k)

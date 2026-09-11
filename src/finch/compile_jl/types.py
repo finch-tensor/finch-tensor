@@ -27,6 +27,7 @@ from finch.tensor.patterns import (
     PairSumTensor,
     ParityMaskTensor,
     PatternTensorFType,
+    RandomMaskTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
@@ -333,6 +334,10 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
                     ctor = f"Finch.chunkmask({int(obj.shape[0])}, {int(obj._b)})"
                 case SplitMaskTensor():
                     ctor = f"Finch.splitmask({int(obj.shape[0])}, {int(obj.shape[1])})"
+                case RandomMaskTensor():
+                    ctor = (
+                        f"Finch.randommask({shape}, {obj._p}; seed=UInt64({obj._seed}))"
+                    )
                 case OddEvenMergeSortPartnerMaskTensor():
                     ctor = (
                         "Finch.oddevenmergesortpartnermask("
