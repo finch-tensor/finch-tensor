@@ -336,30 +336,58 @@ class JuliaBufferGroup:
 class _JuliaBufferRecord:
     tensor: Any
     group: JuliaBufferGroup
-    owners: dict[tuple[Any, ...], _JuliaBufferOwner] = field(default_factory=dict)
+    owner: Any = None
+    owner_key: tuple[Any, ...] | None = None
     result: FiberTensor | None = None
-    producer: object | None = None
+    result_key: tuple[Any, ...] | None = None
 
 
 @dataclass
-class _JuliaBufferOwner:
-    python_object: Any
-    is_result: bool
+class JuliaFreeBufferPool:
+    records: dict[JuliaBufferGroup, list[_JuliaBufferRecord]] = field(
+        default_factory=dict
+    )
+
+    def add(self, record: _JuliaBufferRecord) -> None:
+        self.records.setdefault(record.group, []).append(record)
+
+    def claim(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+        records = self.records.get(group)
+        if not records:
+            return None
+        return records.pop()
+
+    def clear(self) -> None:
+        self.records.clear()
+
+
+@dataclass
+class JuliaResultBufferPool:
+    records: dict[tuple[Any, ...], _JuliaBufferRecord] = field(default_factory=dict)
+
+    def add(self, key, record: _JuliaBufferRecord) -> None:
+        self.records[key] = record
+
+    def claim(self, key: tuple[Any, ...]) -> _JuliaBufferRecord | None:
+        return self.records.pop(key, None)
+
+    def clear(self) -> None:
+        self.records.clear()
 
 
 class ResolvedJuliaArguments(NamedTuple):
     julia_args: list[Any]
     argument_keys: tuple[tuple[Any, ...], ...]
-    argument_records: list[_JuliaBufferRecord | None]
 
 
 class JuliaBufferContext:
     """Own and reuse Julia tensor buffers across kernel invocations."""
 
     def __init__(self):
-        self._tensors: dict[tuple[Any, ...], _JuliaBufferRecord] = {}
-        self._records: dict[int, _JuliaBufferRecord] = {}
-        self._groups: dict[JuliaBufferGroup, list[_JuliaBufferRecord]] = {}
+        self._owned_records: dict[tuple[Any, ...], _JuliaBufferRecord] = {}
+        self._records_by_julia_id: dict[int, _JuliaBufferRecord] = {}
+        self._free_pool = JuliaFreeBufferPool()
+        self._result_pool = JuliaResultBufferPool()
 
     @staticmethod
     def _cache_key(obj):
@@ -404,84 +432,50 @@ class JuliaBufferContext:
         if not self._is_poolable(obj):
             return None
         object_id = int(jl.objectid(obj))
-        record = self._records.get(object_id)
+        record = self._records_by_julia_id.get(object_id)
         if record is None:
             record = _JuliaBufferRecord(obj, self._group(obj))
-            self._records[object_id] = record
-            self._groups.setdefault(record.group, []).append(record)
+            self._records_by_julia_id[object_id] = record
         return record
 
-    def _attach(
-        self,
-        key,
-        obj,
-        record: _JuliaBufferRecord,
-        *,
-        is_result: bool,
-    ) -> None:
-        """Map a Python key to a record and record whether it represents a result."""
-        previous_record = self._tensors.get(key)
-        if previous_record is not None:
-            previous_record.owners.pop(key, None)
-        record.owners[key] = _JuliaBufferOwner(obj, is_result)
-        self._tensors[key] = record
+    def _assign_owner(self, key, obj, record: _JuliaBufferRecord) -> None:
+        """Assign a Python argument as the active owner of a buffer record."""
+        if record.owner_key is not None:
+            self._owned_records.pop(record.owner_key, None)
+        record.owner = obj
+        record.owner_key = key
+        self._owned_records[key] = record
 
-    def _detach(self, key) -> None:
-        """Remove a Python-to-record mapping and release that record ownership."""
-        record = self._tensors.pop(key, None)
+    def _claim_result_record(self, key, obj) -> _JuliaBufferRecord | None:
+        """Move a returned record into the active-owner pool for an argument."""
+        record = self._result_pool.claim(key)
         if record is not None:
-            record.owners.pop(key, None)
-
-    def _detach_record_owners(self, record: _JuliaBufferRecord) -> None:
-        """Release every Python mapping to a buffer record."""
-        for key in tuple(record.owners):
-            self._detach(key)
-
-    def _active_record_ids(self, argument_keys) -> set[int]:
-        """Return records already used as arguments in the current call."""
-        active_record_ids = set()
-        for key in argument_keys:
-            record = self._tensors.get(key)
-            if record is not None:
-                active_record_ids.add(id(record))
-        return active_record_ids
-
-    def _free_record(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
-        """Return an unowned record compatible with a requested input group."""
-        for record in self._groups.get(group, ()):
-            if not record.owners:
-                return record
-        return None
-
-    def _producer_result_record(
-        self,
-        group: JuliaBufferGroup,
-        producer: object | None,
-        active_record_ids: set[int],
-    ) -> _JuliaBufferRecord | None:
-        """Release and return an inactive result record owned by this producer."""
-        for record in self._groups.get(group, ()):
-            if record.producer is not producer:
-                continue
-            if id(record) in active_record_ids:
-                continue
-            if not all(owner.is_result for owner in record.owners.values()):
-                continue
-            self._detach_record_owners(record)
+            self._remove_result_record(record)
+            self._assign_owner(key, obj, record)
             return record
         return None
 
-    def _lease_reset_record(
-        self,
-        group: JuliaBufferGroup,
-        producer: object | None,
-        active_record_ids: set[int],
-    ) -> _JuliaBufferRecord | None:
-        """Return a compatible record available for a reset kernel argument."""
-        record = self._free_record(group)
+    def _remove_result_record(self, record: _JuliaBufferRecord) -> None:
+        """Remove a record from the result pool before it is claimed."""
+        if record.result_key is not None:
+            self._result_pool.claim(record.result_key)
+            record.result_key = None
+
+    def _release_owner(self, key) -> _JuliaBufferRecord | None:
+        """Remove an active owner mapping without placing its record in a pool."""
+        record = self._owned_records.pop(key, None)
         if record is not None:
-            return record
-        return self._producer_result_record(group, producer, active_record_ids)
+            record.owner = None
+            record.owner_key = None
+        return record
+
+    def _release_free_record(self, record: _JuliaBufferRecord) -> None:
+        """Place an unowned record in the free pool for its compatibility group."""
+        self._free_pool.add(record)
+
+    def _lease_reset_record(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+        """Claim a compatible record from the free pool for a reset input."""
+        return self._free_pool.claim(group)
 
     def _result_wrapper(self, record: _JuliaBufferRecord) -> FiberTensor | None:
         """Return a record's Python result wrapper, creating it when needed."""
@@ -492,17 +486,34 @@ class JuliaBufferContext:
             record.result = result
         return record.result
 
+    def _stage_result(
+        self,
+        record: _JuliaBufferRecord,
+        result: FiberTensor,
+    ) -> None:
+        """Move a returned tensor from active ownership into the result pool."""
+        key = self._cache_key(result)
+        if record.owner_key is not None:
+            self._release_owner(record.owner_key)
+        if record.result_key is not None:
+            self._remove_result_record(record)
+        self._result_pool.add(key, record)
+        record.result_key = key
+
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Return an existing Julia tensor mapping or materialize a new one."""
         key = self._cache_key(obj)
-        cached = self._tensors.get(key)
-        if cached is not None:
-            return cached.tensor
+        record = self._owned_records.get(key)
+        if record is not None:
+            return record.tensor
+        record = self._claim_result_record(key, obj)
+        if record is not None:
+            return record.tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         record = self._record(jl_obj)
         if record is not None:
-            self._attach(key, obj, record, is_result=False)
+            self._assign_owner(key, obj, record)
         return jl_obj
 
     def tensor_to_python(self, obj):
@@ -513,7 +524,7 @@ class JuliaBufferContext:
         result = self._result_wrapper(record)
         if result is None:
             return jl_tensor_to_python(obj)
-        self._attach(self._cache_key(result), result, record, is_result=True)
+        self._stage_result(record, result)
         return result
 
     def resolve_arguments(
@@ -521,30 +532,25 @@ class JuliaBufferContext:
         args,
         *,
         kernel_args: JuliaKernelArgs,
-        producer: object | None = None,
     ) -> ResolvedJuliaArguments:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
         argument_keys = tuple(self._cache_key(arg) for arg in args)
-        active_record_ids = self._active_record_ids(argument_keys)
         julia_args = []
-        argument_records = []
         for position, (arg, key) in enumerate(zip(args, argument_keys, strict=True)):
-            record = self._tensors.get(key)
+            record = self._owned_records.get(key)
+            if record is None:
+                record = self._claim_result_record(key, arg)
             if record is not None:
                 julia_args.append(record.tensor)
-                argument_records.append(record)
                 continue
 
             group = self._input_group(arg, kernel_args.type_names[position])
             if position in kernel_args.reset_positions and group is not None:
-                record = self._lease_reset_record(
-                    group, producer, active_record_ids
-                )
+                record = self._lease_reset_record(group)
                 if record is not None:
-                    self._attach(key, arg, record, is_result=False)
+                    self._assign_owner(key, arg, record)
                     julia_args.append(record.tensor)
-                    argument_records.append(record)
                     continue
 
             julia_args.append(
@@ -552,28 +558,24 @@ class JuliaBufferContext:
                     arg, pin_fill=position in kernel_args.dynamic_positions
                 )
             )
-            argument_records.append(self._tensors.get(key))
-        return ResolvedJuliaArguments(julia_args, argument_keys, argument_records)
+        return ResolvedJuliaArguments(julia_args, argument_keys)
 
     def release_reset_arguments(
         self,
         argument_keys: tuple[tuple[Any, ...], ...],
-        argument_records: list[_JuliaBufferRecord | None],
         reset_positions: frozenset[int],
         return_positions: tuple[int, ...],
-        producer: object,
     ) -> None:
-        """Release reset inputs and mark returned reset buffers for reuse."""
+        """Release reset buffers that are not returned by the completed kernel."""
         returned_positions = set(return_positions)
         for position in reset_positions:
-            self._detach(argument_keys[position])
-            if position in returned_positions:
-                record = argument_records[position]
-                if record is not None:
-                    record.producer = producer
+            record = self._release_owner(argument_keys[position])
+            if record is not None and position not in returned_positions:
+                self._release_free_record(record)
 
     def close(self):
         """Discard all Python mappings and pooled Julia tensor records."""
-        self._tensors.clear()
-        self._records.clear()
-        self._groups.clear()
+        self._owned_records.clear()
+        self._records_by_julia_id.clear()
+        self._free_pool.clear()
+        self._result_pool.clear()

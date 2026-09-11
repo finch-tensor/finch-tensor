@@ -57,10 +57,9 @@ def test_julia_buffer_context_reuses_buffers_after_kernel_invocation():
     first_jl = context.tensor_to_jl(first_arg)
 
     returned_jl = jl.first_arg(first_jl)
-    context.tensor_to_python(returned_jl)
+    returned = context.tensor_to_python(returned_jl)
 
-    second_arg = ft.asarray(data)
-    second_jl = context.tensor_to_jl(second_arg)
+    second_jl = context.tensor_to_jl(returned)
 
     assert second_jl is first_jl
 
@@ -140,16 +139,10 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     first_jl = context.tensor_to_jl(first)
     first_key = context._cache_key(first)
     type_name = str(jl.string(jl.typeof(first_jl)))
-    context.release_reset_arguments(
-        (first_key,),
-        [context._tensors[first_key]],
-        frozenset({0}),
-        (),
-        object(),
-    )
+    context.release_reset_arguments((first_key,), frozenset({0}), ())
 
     second = ft.asarray(np.arange(4, dtype=np.float64) + 1)
-    raw_args, _, _ = context.resolve_arguments(
+    resolved_args = context.resolve_arguments(
         (second,),
         kernel_args=JuliaKernelArgs(
             type_names=(type_name,),
@@ -159,4 +152,4 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
         ),
     )
 
-    assert raw_args[0] is first_jl
+    assert resolved_args.julia_args[0] is first_jl
