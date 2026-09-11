@@ -112,7 +112,6 @@ class FinchJLKernel(AssemblyKernel):
         func_name,
         jl_code,
         kernel_args: JuliaKernelArgs,
-        *,
         buffer_context: JuliaBufferContext,
     ):
         # We store this code so that we can verify it in pytest
@@ -418,7 +417,7 @@ class FinchJLCompiler(NotationCompiler):
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
                     kernel_args,
-                    buffer_context=self._buffer_context,
+                    self._buffer_context,
                 )
                 self._kernels[key] = kernel
             kernel_dict[func.name.name] = kernel
