@@ -393,7 +393,7 @@ class JuliaFreeBufferPool:
     def add(self, record: _JuliaBufferRecord) -> None:
         self.records.setdefault(record.group, []).append(record)
 
-    def remove(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+    def claim(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
         records = self.records.get(group)
         if not records:
             return None
@@ -523,7 +523,7 @@ class JuliaBufferContext:
             type_name = kernel_args.type_names[position]
             if position in kernel_args.reset_positions:
                 group = JuliaBufferGroup(arg, type_name)
-                record = self._free_pool.remove(group)
+                record = self._free_pool.claim(group)
                 if record is not None:
                     self._assign_owner(key, record)
                     julia_args[position] = record.tensor
