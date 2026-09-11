@@ -151,9 +151,6 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return self.lvl_t.level_format_properties(n + 1)
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("sparse list level doesn't support from_numpy")
-
     def level_lower_dim(self, ctx, lvl, r):
         if r == 0:
             return asm.GetAttr(lvl, asm.Literal("dimension"))

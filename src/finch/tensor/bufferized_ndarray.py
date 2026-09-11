@@ -710,9 +710,6 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
     def __call__(self, val):
         raise NotImplementedError("An ndarray level is a view of existing storage")
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("An ndarray level is a view of existing storage")
-
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError(
             "Declare the owning ndarray before accessing its levels"

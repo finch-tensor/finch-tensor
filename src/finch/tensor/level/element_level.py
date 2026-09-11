@@ -188,11 +188,6 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
-    def from_numpy(self, shape, val):
-        if len(shape) != 0:
-            raise ValueError("ElementLevelFType must be called with an empty shape.")
-        return self.from_fields(val)
-
 
 def element(
     fill_value: Any = None,

@@ -19,6 +19,7 @@ from finch.algebra import (
 from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
 
+from . import level as levels
 from .override_tensor import OverrideTensor
 from .traits import FormatProperty
 
@@ -420,10 +421,27 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         lvl, shape, pos, dirty_bit = args
         return FiberTensor(lvl, pos, dirty_bit, self.device)
 
-    # TODO: To be removed - use BufferizedNDArray instead.
     def from_numpy(self, arr: np.ndarray) -> FiberTensor:
+        def build_level(lvl_t, shape):
+            match lvl_t:
+                case levels.DenseLevelFType():
+                    if not shape:
+                        raise ValueError("Array rank does not match the fiber format")
+                    return levels.DenseLevel(
+                        build_level(lvl_t.lvl_t, shape[1:]),
+                        lvl_t.dimension_type(shape[0]),
+                    )
+                case levels.ElementLevelFType():
+                    if shape:
+                        raise ValueError("Array rank does not match the fiber format")
+                    return lvl_t.from_fields(arr)
+                case _:
+                    raise NotImplementedError(
+                        f"NumPy conversion does not support {type(lvl_t).__name__}"
+                    )
+
         return FiberTensor(
-            self.lvl_t.from_numpy(arr.shape, arr),
+            build_level(self.lvl_t, arr.shape),
             pos=self.position_type(0),
             dirty_bit=False,
             _device=self.device,

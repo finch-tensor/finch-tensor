@@ -138,9 +138,6 @@ class SparseCOOLevelFType(ImmutableStructFType, LevelFType):
             tbl,
         )
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("SparseCOOLevelFType has no from_numpy yet.")
-
     def __call__(
         self, lvl, shape=None, ptr=None, idx=None, tbl=None
     ) -> "SparseCOOLevel":

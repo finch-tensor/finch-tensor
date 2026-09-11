@@ -69,19 +69,6 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape: tuple[Any, ...], val: Any) -> DenseLevel:
-        """
-        Creates an instance of DenseLevel with the given shape.
-
-        Args:
-            shape: The shape to be used for the level.
-            val: Value to pass to ElementLevel.
-        Returns:
-            An instance of DenseLevel.
-        """
-        lvl = self.lvl_t.from_numpy(shape[1:], val)
-        return DenseLevel(lvl, self.dimension_type(shape[0]))
-
     def __str__(self):
         return f"DenseLevelFType({self.lvl_t})"
 

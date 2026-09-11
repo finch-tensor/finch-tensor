@@ -49,6 +49,33 @@ from finch.tensor.traits import (
 )
 
 
+@pytest.mark.parametrize("shape", [(), (4,), (2, 3), (2, 0, 3)])
+def test_fiber_tensor_from_numpy(shape):
+    arr = np.arange(np.prod(shape), dtype=np.int32).reshape(shape)
+    lvl_t = element(7, finch.int32)
+    for _ in shape:
+        lvl_t = dense(lvl_t, finch.int32)
+    fmt = fiber_tensor(lvl_t)
+    tensor = asarray(arr, format=fmt)
+    assert tensor.ftype == fmt
+    assert tensor.shape == shape
+    assert tensor.fill_value == 7
+    np.testing.assert_array_equal(tensor.to_numpy(), arr)
+
+
+@pytest.mark.parametrize("shape", [(), (2, 3)])
+def test_fiber_tensor_from_numpy_rank_mismatch(shape):
+    fmt = fiber_tensor(dense(element(0, finch.int32)))
+    with pytest.raises(ValueError, match="Array rank"):
+        fmt.from_numpy(np.zeros(shape, dtype=np.int32))
+
+
+def test_fiber_tensor_from_numpy_sparse_unsupported():
+    fmt = fiber_tensor(sparse_list(element(0, finch.int32)))
+    with pytest.raises(NotImplementedError, match="SparseListLevelFType"):
+        fmt.from_numpy(np.zeros(3, dtype=np.int32))
+
+
 def test_fiber_tensor_attributes():
     fmt = fiber_tensor(dense(dense(element(0.0, finch.float64))))
     shape = (3, 4)

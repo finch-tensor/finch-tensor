@@ -65,9 +65,6 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, arr):
-        return LoTriMask(self.lvl_t.from_numpy(shape, arr))
-
     def level_lower_freeze(self, ctx, tns, op, pos):
         return self.body.level_lower_freeze(
             ctx, asm.GetAttr(tns, asm.Literal("body")), op, pos

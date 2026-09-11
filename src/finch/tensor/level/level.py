@@ -170,14 +170,6 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def from_numpy(self, shape, val):
-        """
-        Construct level from numpy array
-        (TODO not strictly safe, only works for dense, replace later)
-        """
-        ...
-
-    @abstractmethod
     def level_format_properties(self, n):
         """
         Return the format properties contributed by this level type and children.

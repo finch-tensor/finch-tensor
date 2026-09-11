@@ -103,9 +103,6 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("sparse bytemap level doesn't support from_numpy")
-
     def level_asm_unpack(self, ctx, var_n, val):
         raise NotImplementedError(_LOWERING_ERROR)
 
