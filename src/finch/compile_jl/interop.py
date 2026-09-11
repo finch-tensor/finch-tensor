@@ -346,7 +346,7 @@ class _JuliaBufferRecord:
     tensor: Any
     group: JuliaBufferGroup
     owner_key: tuple[Any, ...] | None = None
-    result: FiberTensor | None = None
+    py_wrapper: FiberTensor | None = None
     result_key: tuple[Any, ...] | None = None
 
 
@@ -454,22 +454,22 @@ class JuliaBufferContext:
             record.owner_key = None
         return record
 
-    def _result_wrapper(self, record: _JuliaBufferRecord) -> FiberTensor | None:
+    def _py_wrapper(self, record: _JuliaBufferRecord) -> FiberTensor | None:
         """Return a record's Python result wrapper, creating it when needed."""
-        if record.result is None:
-            result = jl_tensor_to_python(record.tensor)
-            if not isinstance(result, FiberTensor):
+        if record.py_wrapper is None:
+            py_wrapper = jl_tensor_to_python(record.tensor)
+            if not isinstance(py_wrapper, FiberTensor):
                 return None
-            record.result = result
-        return record.result
+            record.py_wrapper = py_wrapper
+        return record.py_wrapper
 
     def _stage_result(
         self,
         record: _JuliaBufferRecord,
-        result: FiberTensor,
+        py_wrapper: FiberTensor,
     ) -> None:
         """Move a returned tensor from active ownership into the result pool."""
-        key = self._cache_key(result)
+        key = self._cache_key(py_wrapper)
         if record.owner_key is not None:
             self._release_owner(record.owner_key)
         if record.result_key is not None:
@@ -481,13 +481,19 @@ class JuliaBufferContext:
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Return an existing Julia tensor mapping or materialize a new one."""
         key = self._cache_key(obj)
+
+        # If the tensor is already owned reuse
         record = self._owned_records.get(key)
         if record is not None:
             return record.tensor
+
+        # Otherwise claim the tensor from the result pool if produced by another kernel
         record = self._claim_result_record(key)
         if record is not None:
             return record.tensor
 
+        # Initialize the tensor in julia by copying from python. This is expensive
+        # and should only be triggered for the first call of the kernel with said arguments.
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         record = self._get_or_create_record(jl_obj)
         if record is not None:
@@ -499,11 +505,11 @@ class JuliaBufferContext:
         record = self._get_or_create_record(obj)
         if record is None:
             return jl_tensor_to_python(obj)
-        result = self._result_wrapper(record)
-        if result is None:
+        py_wrapper = self._py_wrapper(record)
+        if py_wrapper is None:
             return jl_tensor_to_python(obj)
-        self._stage_result(record, result)
-        return result
+        self._stage_result(record, py_wrapper)
+        return py_wrapper
 
     def resolve_arguments(
         self,
