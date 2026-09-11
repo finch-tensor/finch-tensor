@@ -4,8 +4,8 @@ import finch as ft
 import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import overwrite
 from finch.codegen import NumpyBuffer
+from finch.compile_jl.analyze import find_reset_arg_positions
 from finch.compile_jl.buffer import MinusOneBuffer
-from finch.compile_jl.compiler import find_reset_arg_positions
 from finch.compile_jl.interop import JuliaBufferContext, _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
 
