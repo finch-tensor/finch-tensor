@@ -1,23 +1,45 @@
 """
-Julia backend ASV benchmark: sparse-sparse matmul on the Boeing ct20stif
-matrix (from the SuiteSparse Matrix Collection), fetched via ssgetpy.
+Julia backend benchmarks: sparse-sparse matmul and statistics construction on
+the Boeing ct20stif matrix, fetched from SuiteSparse via ssgetpy.
 
 Skipped if the Julia backend (juliacall/juliapkg) or ssgetpy aren't
 installed -- both are part of the ``julia`` extra, see pyproject.toml.
 
-Run: ``pixi run --environment=test-julia pytest --codspeed
+Run: ``pixi run --environment=benchmark-julia pytest --codspeed
 benchmarks/test_julia_boeing.py``
+
+Statistics use default factory settings and warm kernel/factory caches. Matrix
+loading and compilation are excluded. SamplingStats leaves its scan deferred;
+ExactStats copies the tensor and defers counting. BlockedStats is
+excluded because its block extraction builds large dense selectors.
+
+The sampling scan benchmark constructs fresh stats and scans the sketch each
+iteration, using fixed sample masks and excluding Julia compilation.
 """
 
 from pathlib import Path
 
 import pytest
 
+import numpy as np
 import scipy.io
 
 import finch as ft
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
+from finch.autoschedule.tensor_stats import (
+    BlockedUniformStatsFactory,
+    DCStatsFactory,
+    DenseStatsFactory,
+    DummyStatsFactory,
+    FDStatsFactory,
+    LPStatsFactory,
+    SamplingStatsFactory,
+    UniformStatsFactory,
+    VPStatsFactory,
+)
+from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.compile_jl.julia import julia_available
+from finch.finch_logic import Field
 
 try:
     import ssgetpy
@@ -47,3 +69,39 @@ def test_julia_matmul_ct20stif(boeing_tensor, benchmark):
         ft.compute(expr)
 
         benchmark(ft.compute, expr)
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        pytest.param(DummyStatsFactory, id="dummy"),
+        pytest.param(DenseStatsFactory, id="dense"),
+        pytest.param(FDStatsFactory, id="fd"),
+        pytest.param(UniformStatsFactory, id="uniform"),
+        pytest.param(VPStatsFactory, id="vp"),
+        pytest.param(DCStatsFactory, id="dc"),
+        pytest.param(LPStatsFactory, id="lp"),
+        pytest.param(SamplingStatsFactory, id="sampling"),
+        pytest.param(ExactStatsFactory, id="exact"),
+        pytest.param(BlockedUniformStatsFactory, id="blocked_uniform"),
+    ],
+)
+def test_julia_stats_ct20stif(boeing_tensor, benchmark, factory):
+    stats_factory = factory()
+    fields = (Field("i"), Field("j"))
+    with with_default_scheduler(COMPILE_JULIA):
+        stats_factory(boeing_tensor, fields)
+        benchmark(stats_factory, boeing_tensor, fields)
+
+
+def test_julia_sampling_stats_scan_ct20stif(boeing_tensor, benchmark):
+    stats_factory = SamplingStatsFactory()
+    stats_factory._rng = np.random.default_rng(42)
+    fields = (Field("i"), Field("j"))
+
+    def build_and_scan():
+        return stats_factory(boeing_tensor, fields).scan(needs_freq=False)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        build_and_scan()
+        benchmark(build_and_scan)

@@ -20,14 +20,14 @@ from finch.finch_logic import (
     Table,
 )
 from finch.finch_logic.nodes import LogicExpression
-from finch.tensor import BufferizedNDArray
+from finch.tensor import RandomMaskTensor
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 
 
-def mask_table(field: Field, mask: np.ndarray) -> Table:
-    return Table(Literal(BufferizedNDArray.from_numpy(mask)), (field,))
+def mask_table(field: Field, mask: RandomMaskTensor) -> Table:
+    return Table(Literal(mask), (field,))
 
 
 def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
@@ -286,15 +286,14 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
         self.estimator = estimator
-        self._masks: dict = {}
+        self._masks: dict[tuple[Field, int], RandomMaskTensor] = {}
         self._rng = np.random.default_rng()
 
-    def _get_mask(self, field: Field, size: int) -> np.ndarray:
-        "Returns mask for dimension that already exists or creates a new one"
+    def _get_mask(self, field: Field, size: int) -> RandomMaskTensor:
         mask_key = (field, size)
         if mask_key not in self._masks:
-            self._masks[mask_key] = (self._rng.random(size) < self.sample_prob).astype(
-                float
+            self._masks[mask_key] = RandomMaskTensor(
+                size, self.sample_prob, rng=self._rng, dtype=np.intp
             )
         return self._masks[mask_key]
 
@@ -302,9 +301,8 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
         base = super().__call__(tensor, fields)
         fill = base.fill_value.value
 
-        # defining one Bernoulli mask per dimension, an entry will survive
-        # only if all its indices are kept
-        # masks has the 0's 1's combination for each entry in a dimension
+        # Reuse each field's Bernoulli mask across tensors so joins sample the
+        # same coordinates. An entry survives only if every dimension is kept.
         masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
         non_fill = MapJoin(
             Literal(ffuncs.ne), (Table(Literal(tensor), fields), Literal(fill))
@@ -425,7 +423,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
             new_sketch = (
                 Aggregate(
                     Literal(ffuncs.add),
-                    Literal(np.float64(0.0)),
+                    Literal(np.intp(0)),
                     stats.sketch,
                     reduce_fields,
                 )
@@ -498,7 +496,7 @@ class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
 
 class SamplingStats(NumericStats):
     """
-    sketch : numpy array over bound dimension
+    sketch : deferred expression over bound dimensions
     remainder_dims : 'free' dimension -> absent in the output
     sample_prob : Bernoulli sample prob
     """
@@ -544,13 +542,15 @@ class SamplingStats(NumericStats):
             bodies = [
                 Query(
                     n_a,
-                    Aggregate(Literal(ffuncs.add), Literal(0.0), self.sketch, fields),
+                    Aggregate(
+                        Literal(ffuncs.add), Literal(np.intp(0)), self.sketch, fields
+                    ),
                 ),
                 Query(
                     dn_a,
                     Aggregate(
                         Literal(ffuncs.add),
-                        Literal(0.0),
+                        Literal(np.intp(0)),
                         MapJoin(Literal(ffuncs.gt), (self.sketch, Literal(0.0))),
                         fields,
                     ),
@@ -559,7 +559,7 @@ class SamplingStats(NumericStats):
                     f1_a,
                     Aggregate(
                         Literal(ffuncs.add),
-                        Literal(0.0),
+                        Literal(np.intp(0)),
                         MapJoin(Literal(ffuncs.eq), (self.sketch, Literal(1.0))),
                         fields,
                     ),
@@ -574,7 +574,10 @@ class SamplingStats(NumericStats):
                     Query(
                         max_a,
                         Aggregate(
-                            Literal(ffuncs.max), Literal(0.0), self.sketch, fields
+                            Literal(ffuncs.max),
+                            Literal(np.intp(0)),
+                            self.sketch,
+                            fields,
                         ),
                     )
                 )
@@ -596,7 +599,7 @@ class SamplingStats(NumericStats):
                             a,
                             Aggregate(
                                 Literal(ffuncs.add),
-                                Literal(0.0),
+                                Literal(np.intp(0)),
                                 MapJoin(
                                     Literal(ffuncs.eq), (self.sketch, Literal(float(i)))
                                 ),
@@ -617,6 +620,7 @@ class SamplingStats(NumericStats):
         return n, d_n, f_1, frequencies
 
     def coverage_correction(self) -> float:
+        from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
 
         _, d_n_raw, _, _ = self.scan(needs_freq=False)
         coverage = 1.0
@@ -625,7 +629,18 @@ class SamplingStats(NumericStats):
             mask = self.masks_ref.get((field, size))
             if mask is None or size == 0:
                 continue
-            actual_fraction = mask.sum() / size
+            out = Alias("sampled_count")
+            query = Query(
+                out,
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(np.intp(0)),
+                    mask_table(field, mask),
+                    (field,),
+                ),
+            )
+            (count,) = NON_RECURSIVE_SCHEDULER(Plan((query, Produces((out,)))))
+            actual_fraction = float(np.asarray(count)[()]) / size
             if actual_fraction <= 0:
                 continue
             coverage *= actual_fraction

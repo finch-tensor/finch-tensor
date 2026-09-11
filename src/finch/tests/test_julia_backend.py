@@ -28,6 +28,24 @@ from finch.autoschedule import (
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
 from finch.compile_jl.julia import julia_available
+from finch.tensor.patterns import (
+    ChunkMaskTensor,
+    EyeTensor,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
+    ParityMaskTensor,
+    RandomMaskTensor,
+    RepeatTensor,
+    ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    SplitMaskTensor,
+    UpperTriangleTensor,
+)
 
 DTYPE = np.int64
 ROWS = np.intp(3)
@@ -41,6 +59,289 @@ EXPECTED_ROW_SUMS = np.array([3, 3, 9], dtype=DTYPE)
 def _requires_julia_backend():
     if not julia_available():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
+
+
+@pytest.mark.parametrize(
+    "mask",
+    [
+        *(
+            cls((3, 5), k=k)
+            for cls in (EyeTensor, UpperTriangleTensor, LowerTriangleTensor)
+            for k in (-5, -1, 0, 2, 5)
+        ),
+        PairSumTensor((3, 5)),
+        PairCarryTensor((5, 3)),
+        ReverseTensor((3, 5)),
+        *(RollTensor((7, 3), k=k) for k in (-4, 0, 5)),
+        *(RepeatTensor((7, 3), k=k) for k in (-1, 0, 2)),
+        ChunkMaskTensor((10, 4), b=3),
+        ChunkMaskTensor((6, 3), b=2, dtype=np.int32),
+        ChunkMaskTensor((3, 3), b=1),
+        ChunkMaskTensor((2, 1), b=5),
+        ChunkMaskTensor((0, 0), b=3),
+        SplitMaskTensor((10, 3)),
+        SplitMaskTensor((6, 3), dtype=np.float64),
+        SplitMaskTensor((3, 5)),
+        SplitMaskTensor((3, 1)),
+        SplitMaskTensor((0, 3)),
+        RandomMaskTensor((), 0.4, seed=42),
+        RandomMaskTensor((), 0.5, seed=1 << 63),
+        RandomMaskTensor((0,), 0.5, seed=42),
+        RandomMaskTensor((3, 0), 0.5, seed=42),
+        RandomMaskTensor(9, 0.0, seed=42),
+        RandomMaskTensor((3, 5), 1.0, seed=42),
+        RandomMaskTensor((3, 5), 0.5, seed=42),
+        RandomMaskTensor((2, 3, 4), 0.4, seed=(1 << 64) - 1, dtype=np.intp),
+        *(
+            OddEvenMergeSortPartnerMaskTensor((7, 7), p=p, k=k)
+            for p, k in ((1, 1), (2, 1), (4, 2))
+        ),
+        *(
+            OddEvenMergeSortLowerMaskTensor(7, p=p, k=k)
+            for p, k in ((1, 1), (2, 1), (4, 2))
+        ),
+        *(OneHotMaskTensor(5, index=i) for i in (-1, 0, 2, 5)),
+        *(ParityMaskTensor(5, parity=p) for p in (-1, 0, 1, 2)),
+        ReshapeMaskTensor((2, 3), (3, 2)),
+        ReshapeMaskTensor((), (1,)),
+        ReshapeMaskTensor((1,), ()),
+        ReshapeMaskTensor((), ()),
+        ReshapeMaskTensor((0, 3), (0,)),
+        RollTensor((3, 0), k=2),
+    ],
+)
+def test_compile_julia_pattern_masks(mask):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+    from finch.compile_jl.interop import tensor_to_jl
+    from finch.compile_jl.julia import jl
+    from finch.compile_jl.types import ftype_to_jl_constructor_str
+
+    jl_mask = tensor_to_jl(mask)
+    prototype = jl.seval(ftype_to_jl_constructor_str(mask.ftype))
+    assert jl.typeof(jl_mask) == jl.typeof(prototype)
+
+    data = np.full(mask.shape or (1,), 2, dtype=np.int64)
+    expected = data + np.array(
+        [mask[idx].item() for idx in np.ndindex(mask.shape)]
+    ).reshape(mask.shape)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.defer(mask) + ft.defer(data))
+
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
+def test_compile_julia_numeric_pattern_mask():
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+    from finch.compile_jl.interop import tensor_to_jl
+    from finch.compile_jl.julia import jl
+
+    mask = EyeTensor((3, 5), k=1, dtype=np.int64)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.bitwise_invert(ft.defer(mask)))
+
+    actual = jl.Array(tensor_to_jl(result)).to_numpy().T
+    expected = np.bitwise_invert(np.eye(3, 5, k=1, dtype=np.int64))
+    np.testing.assert_array_equal(actual, expected)
+    assert actual.dtype == expected.dtype
+
+
+def test_random_mask_bit_mixing_matches_julia():
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+    from finch.tensor.patterns import _randommask_mix, _randommask_uniform
+
+    mix = jl.seval("seed -> Finch.randommask_mix(UInt64(seed))")
+    uniform = jl.seval("seed -> Finch.randommask_uniform(UInt64(seed))")
+    rng = np.random.default_rng(42)
+    seeds = [0, 1, 1 << 63, (1 << 64) - 1]
+    seeds.extend(map(int, rng.integers(0, 1 << 64, size=32, dtype=np.uint64)))
+    for seed in seeds:
+        assert _randommask_mix(seed) == int(mix(seed))
+        assert _randommask_uniform(seed) == uniform(seed)
+
+
+@pytest.mark.parametrize("shape", [(), (7,), (4, 5), (2, 3, 4)])
+def test_random_mask_matches_julia(shape):
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+
+    materialize = jl.seval("mask -> copyto!(zeros(Bool, size(mask)), mask)")
+    for seed in (0, 1, 42, (1 << 63) - 1, 1 << 63, (1 << 64) - 1):
+        for p in (0.0, np.nextafter(0.0, 1.0), 0.4, 0.5, np.nextafter(1.0, 0.0), 1.0):
+            mask = RandomMaskTensor(shape, p, seed=seed)
+            native = jl.Finch.randommask(shape, p, seed=jl.UInt64(seed))
+            expected = materialize(native).to_numpy()
+            actual = np.array([mask[idx].item() for idx in np.ndindex(shape)])
+            np.testing.assert_array_equal(actual.reshape(shape), expected)
+
+
+def test_random_mask_large_coordinates_match_julia():
+    _requires_julia_backend()
+    from finch.compile_jl.julia import jl
+
+    shape = (int(np.iinfo(np.intp).max), int(np.iinfo(np.intp).max), 8)
+    large_index = (shape[0] + 1) // 2
+    for seed in (42, (1 << 64) - 1):
+        mask = RandomMaskTensor(shape, 0.5, seed=seed)
+        native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
+        for idx in (
+            (2, 3, 1),
+            tuple(dim - 1 for dim in shape),
+            (large_index, large_index, 7),
+        ):
+            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
+
+
+def test_compile_julia_pattern_lowering(file_regression):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                self.sources.append(FinchJLGenerator()(func))
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    for mask in (
+        EyeTensor((3, 5), k=1),
+        UpperTriangleTensor((3, 5), k=-1),
+        PairSumTensor((3, 5)),
+        RollTensor((7, 3), k=-4),
+        OneHotMaskTensor(5, index=2),
+        ReshapeMaskTensor((2, 3), (3, 2)),
+        ChunkMaskTensor((10, 4), b=3),
+        SplitMaskTensor((10, 3)),
+        RandomMaskTensor((), 0.4, seed=42),
+        RandomMaskTensor(7, 0.25, seed=42),
+        RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
+    ):
+        compiler.sources.append(f"# {type(mask).__name__}")
+        data = np.full(mask.shape or (1,), 2, dtype=np.int64)
+        with with_default_scheduler(scheduler):
+            ft.compute(ft.defer(mask) + ft.defer(data))
+
+    file_regression.check("\n\n".join(compiler.sources), extension=".jl")
+
+
+def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
+    _requires_julia_backend()
+    from finch.autoschedule import default_schedulers
+    from finch.autoschedule.tensor_stats import SamplingStatsFactory
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+    from finch.compile_jl.julia import jl
+    from finch.finch_logic import Field, LogicSimplify
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                source = FinchJLGenerator()(func)
+                expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
+                self.sources.append(
+                    f"# Finch kernel\n{source}\n\n"
+                    f"# Generated Julia\n{jl.string(expanded)}"
+                )
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicOptimizer(
+                LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
+            ),
+            stats_factory=FDStatsFactory(),
+        )
+    )
+    monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
+    i, j = Field("i"), Field("j")
+    data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
+    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory._rng = np.random.default_rng(42)
+    stats = factory(_csr_tensor(data), (i, j))
+    rows, cols = (
+        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        for field, size in zip((i, j), data.shape, strict=True)
+    )
+    expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])
+    assert stats.scan(needs_freq=False) == (expected, expected, expected, None)
+    file_regression.check("\n\n".join(compiler.sources), extension=".jl")
+
+
+def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regression):
+    _requires_julia_backend()
+    from finch.autoschedule import default_schedulers
+    from finch.autoschedule.formatter import DefaultLogicFormatter
+    from finch.autoschedule.tensor_stats import BlockedUniformStatsFactory
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+    from finch.compile_jl.julia import jl
+    from finch.finch_logic import Field, LogicSimplify
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                source = FinchJLGenerator()(func)
+                expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
+                self.sources.append(
+                    f"# Finch kernel\n{source}\n\n"
+                    f"# Generated Julia\n{jl.string(expanded)}"
+                )
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = LogicNormalizer(
+        LogicExecutor(
+            LogicSimplify(DefaultLogicFormatter(LogicCompiler(compiler))),
+            stats_factory=FDStatsFactory(),
+        )
+    )
+    monkeypatch.setattr(
+        default_schedulers, "NON_RECURSIVE_STANDARD_SCHEDULER", scheduler
+    )
+    i, j = Field("i"), Field("j")
+    data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
+    stats = BlockedUniformStatsFactory(blocks_per_dim={i: 2, j: 3})(
+        _csr_tensor(data), (i, j)
+    )
+    expected = np.array(
+        [
+            [
+                np.count_nonzero(data[rows, cols])
+                for cols in (slice(0, 2), slice(2, 4), slice(4, 7))
+            ]
+            for rows in (slice(0, 2), slice(2, 5))
+        ]
+    )
+    np.testing.assert_array_equal(stats.nnz_grid, expected)
+    np.testing.assert_array_equal(stats.block_sizes[i], [2, 3])
+    np.testing.assert_array_equal(stats.block_sizes[j], [2, 2, 3])
+    file_regression.check("\n\n".join(compiler.sources), extension=".jl")
 
 
 def test_julia_element_ftype_can_customize_vector_lowering():
@@ -179,6 +480,74 @@ def _to_csr(fbr: FiberTensor) -> FiberTensor:
     jl_obj = tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
     return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
+
+
+@pytest.fixture
+def sparse_diagonal_data():
+    return np.array(
+        [
+            [1, 2, 0, 3, 0],
+            [4, 5, 6, 0, 0],
+            [7, 0, 0, 8, 0],
+            [0, 9, 0, 10, 11],
+            [0, 0, 0, 0, 0],
+            [12, 0, 13, 0, 14],
+        ],
+        dtype=DTYPE,
+    )
+
+
+@pytest.mark.parametrize("sparse_format", ["csr", "dcsr"])
+@pytest.mark.parametrize("k", [-2, 0, 1])
+@pytest.mark.parametrize("dtype", [np.int64, np.float64])
+def test_compile_julia_sparse_diagonal(sparse_diagonal_data, sparse_format, k, dtype):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    data = sparse_diagonal_data
+    arg = _formatted_tensor(data, sparse_format)
+    mask = EyeTensor(data.shape, k=k, dtype=dtype)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.defer(arg) * ft.defer(mask))
+
+    expected = data * np.eye(*data.shape, k=k, dtype=dtype)
+    np.testing.assert_array_equal(_to_csr(result).to_scipy().toarray(), expected)
+
+
+def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regression):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import (
+        FinchJLCompiler,
+        FinchJLGenerator,
+        handle_fills,
+    )
+    from finch.compile_jl.julia import jl
+
+    class RecordingJLCompiler(FinchJLCompiler):
+        def __init__(self):
+            self.sources = []
+
+        def __call__(self, prgm):
+            for func in prgm.children:
+                func, _ = handle_fills(func)
+                source = FinchJLGenerator()(func)
+                # @finch_kernel returns the expanded function expression;
+                # omit the outer eval to inspect Finch's sparse loops.
+                expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
+                self.sources.append(str(jl.string(expanded)))
+            return super().__call__(prgm)
+
+    compiler = RecordingJLCompiler()
+    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    data = sparse_diagonal_data
+    mask = EyeTensor(data.shape, dtype=DTYPE)
+    with with_default_scheduler(scheduler):
+        result = ft.compute(ft.defer(_csr_tensor(data)) * ft.defer(mask))
+
+    expected = data * np.eye(*data.shape, dtype=DTYPE)
+    np.testing.assert_array_equal(_to_csr(result).to_scipy().toarray(), expected)
+    lowered = "\n\n".join(compiler.sources)
+    file_regression.check(lowered, extension=".jl")
 
 
 def test_compile_julia_sums_sparse_list_level():

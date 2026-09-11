@@ -38,6 +38,11 @@ def materialize(sketch):
     out = Alias("sketch_out")
     prgm = Plan((Query(out, sketch), Produces((out,))))
     result = NON_RECURSIVE_SCHEDULER(prgm)[0]
+    if isinstance(result, fl.FiberTensor):
+        from finch.compile_jl.interop import tensor_to_jl
+        from finch.compile_jl.julia import jl
+
+        return jl.Array(tensor_to_jl(result)).to_numpy().transpose()
     return result.to_numpy() if hasattr(result, "to_numpy") else np.asarray(result)
 
 
@@ -47,16 +52,9 @@ def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
     A = (rs.random((n, n)) < density).astype(float)
     B = (rs.random((n, n)) < density).astype(float)
 
-    # masks
-    mask_i = (rs.random(n) < sample_prob).astype(float)
-    mask_k = (rs.random(n) < sample_prob).astype(float)
-    mask_j = (rs.random(n) < sample_prob).astype(float)
-
     # SamplingStats
     factory = SamplingStatsFactory(sample_prob=sample_prob, estimator="uj1")
-    factory._masks[(i, n)] = mask_i
-    factory._masks[(j, n)] = mask_j
-    factory._masks[(k, n)] = mask_k
+    factory._rng = rs
 
     s_a = factory(fl.asarray(A), (i, k))
     s_b = factory(fl.asarray(B), (k, j))
@@ -64,6 +62,10 @@ def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
     factory_sketch = materialize(factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch)
 
     # manually calculating
+    mask_i, mask_k, mask_j = (
+        np.array([factory._get_mask(field, n)[idx].item() for idx in range(n)])
+        for field in (i, k, j)
+    )
     pat_a = (A != 0).astype(float)
     pat_b = (B != 0).astype(float)
     triple = (

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from collections.abc import Mapping
 from typing import Any
 
@@ -17,6 +16,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    Reorder,
     StatsFactory,
     Table,
 )
@@ -28,46 +28,61 @@ from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
 def build_grid_uniform(
     d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: Any
 ) -> tuple[np.ndarray, dict[Field, np.ndarray]]:
-    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_STANDARD_SCHEDULER
 
     index_order = d.index_order
-    base_block_size = {
-        idx: d.dim_sizes[idx] / blocks_per_dim[idx] for idx in index_order
-    }
-    block_starts: dict[Field, list[int]] = {
-        idx: [math.floor(k * base_block_size[idx]) for k in range(blocks_per_dim[idx])]
-        for idx in index_order
-    }
-
-    block_sizes: dict[Field, np.ndarray] = {}
-    for idx in index_order:
-        starts = [*block_starts[idx], int(d.dim_sizes[idx])]
-        block_sizes[idx] = np.diff(np.array(starts, dtype=float))
-
+    block_order = tuple(Field(f"out_{idx.name}") for idx in index_order)
     data_table = Table(Literal(data), index_order)
     non_fill = MapJoin(Literal(ffuncs.ne), (data_table, Literal(data.fill_value)))
 
-    select_tbls = []
-    for idx in index_order:
-        n_blocks = blocks_per_dim[idx]
-        dim_size = int(d.dim_sizes[idx])
-        starts = [*block_starts[idx], dim_size]
-        out_f = Field(f"out_{idx.name}")
+    masks = tuple(
+        Table(
+            Literal(
+                fl.SplitMaskTensor(
+                    (int(d.dim_sizes[idx]), blocks_per_dim[idx]), dtype=np.intp
+                )
+            ),
+            (idx, block_idx),
+        )
+        for idx, block_idx in zip(index_order, block_order, strict=True)
+    )
 
-        select = np.zeros((n_blocks, dim_size), dtype=np.float64)
-        for b in range(n_blocks):
-            select[b, starts[b] : starts[b + 1]] = 1
-        select_tbls.append(Table(Literal(fl.asarray(select)), (out_f, idx)))
-
-    joined = MapJoin(Literal(ffuncs.mul), (non_fill, *select_tbls))
+    joined = MapJoin(Literal(ffuncs.mul), (non_fill, *masks))
+    # Visit each block before its input indices so split masks restrict the walk.
+    loop_order = tuple(
+        idx for pair in zip(block_order, index_order, strict=True) for idx in pair
+    )
     nnz_grid_expr = Aggregate(
-        Literal(ffuncs.add), Literal(np.float64(0.0)), joined, index_order
+        Literal(ffuncs.add),
+        Literal(np.intp(0)),
+        Reorder(joined, loop_order),
+        index_order,
     )
     out = Alias("blocked_uniform_nnz_grid")
-    prgm = Plan((Query(out, nnz_grid_expr), Produces((out,))))
-    (nnz_grid,) = NON_RECURSIVE_SCHEDULER(prgm)
+    size_outputs = tuple(Alias(f"block_sizes_{axis}") for axis in range(len(masks)))
+    size_queries = tuple(
+        Query(
+            size_out,
+            Aggregate(
+                Literal(ffuncs.add),
+                Literal(np.intp(0)),
+                Reorder(mask, (block_idx, idx)),
+                (idx,),
+            ),
+        )
+        for idx, block_idx, mask, size_out in zip(
+            index_order, block_order, masks, size_outputs, strict=True
+        )
+    )
+    prgm = Plan(
+        (Query(out, nnz_grid_expr), *size_queries, Produces((out, *size_outputs)))
+    )
+    nnz_grid, *sizes = NON_RECURSIVE_STANDARD_SCHEDULER(prgm)
 
-    return np.asarray(nnz_grid, dtype=float), block_sizes
+    return np.asarray(fl.to_numpy(nnz_grid), dtype=np.intp), {
+        idx: np.asarray(fl.to_numpy(size), dtype=np.intp)
+        for idx, size in zip(index_order, sizes, strict=True)
+    }
 
 
 def _block_volume_grid(
@@ -298,7 +313,10 @@ class BlockedUniformStats(NumericStats):
     def density_grid(self) -> np.ndarray:
         vol = self._block_volume_grid()
         return np.divide(
-            self.nnz_grid, vol, out=np.zeros_like(self.nnz_grid), where=vol > 0
+            self.nnz_grid,
+            vol,
+            out=np.zeros_like(self.nnz_grid, dtype=float),
+            where=vol > 0,
         )
 
     def _align_density(self, base_index_order: tuple[Field, ...]) -> np.ndarray:
