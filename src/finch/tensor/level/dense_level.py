@@ -203,10 +203,12 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                     ),
                 )
             )
-            return ntn.Fiber(
-                ntn.Child(level),
-                pos_2,
-                (*tns.idxs, idx),
+            return lplt.Run(
+                ntn.Fiber(
+                    ntn.Child(level),
+                    pos_2,
+                    (*tns.idxs, idx),
+                )
             )
 
         return lplt.Lookup(child_accessor)

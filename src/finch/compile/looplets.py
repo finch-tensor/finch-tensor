@@ -18,10 +18,6 @@ class Looplet(ABC):
     def pass_request(self): ...
 
 
-class TerminalLooplet(Looplet):
-    """Consumes one index and produces a notation expression, not another looplet."""
-
-
 @dataclass
 class Thunk(Looplet):
     preamble: Any = None
@@ -334,7 +330,7 @@ class SequencePass(LoopletPass):
 
 
 @dataclass
-class Run(TerminalLooplet):
+class Run(Looplet):
     body: ntn.NotationExpression
 
     @property
@@ -380,8 +376,8 @@ class AcceptRunPass(LoopletPass):
 
 
 @dataclass
-class Lookup(TerminalLooplet):
-    body: Callable[[LoopletContext, ntn.Variable], ntn.NotationExpression]
+class Lookup(Looplet):
+    body: Callable[[LoopletContext, ntn.Variable], Looplet]
 
     @property
     def pass_request(self):
@@ -399,11 +395,11 @@ class LookupPass(LoopletPass):
         def lookup_node(node):
             match node:
                 case ntn.Access(Lookup(lookup), mode, (j, *idxs)) if j == idx:
-                    return ntn.Access(lookup(ctx_2, idx), mode, tuple(idxs))
+                    return ntn.Access(lookup(ctx_2, idx), mode, (j, *idxs))
             return None
 
         body_2 = PostWalk(lookup_node)(body)
-        ctx_2.ctx(body_2)
+        ctx_2(SymbolicExtent(idx, idx), body_2)
         body_3 = asm.Block(ctx_2.emit())
 
         if ext.is_sym_point():

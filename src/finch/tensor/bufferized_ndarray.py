@@ -797,11 +797,13 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
                     ),
                 )
             )
-            return ntn.Fiber(
-                ntn.Child(level),
-                pos_2,
-                (*tns.idxs, idx),
-                tns.dirty,
+            return lplt.Run(
+                ntn.Fiber(
+                    ntn.Child(level),
+                    pos_2,
+                    (*tns.idxs, idx),
+                    tns.dirty,
+                )
             )
 
         return lplt.Lookup(child_accessor)
