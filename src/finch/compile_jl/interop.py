@@ -356,7 +356,7 @@ class BufferID:
             pointer = arr.__array_interface__["data"][0]
             return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
         # FiberTensors reuse their ids so we restrict cache keys to id.
-        return ObjectID(id(obj))
+        return ObjectBufferID(id(obj))
 
 
 @dataclass(frozen=True)
@@ -368,7 +368,7 @@ class NumpyBufferID(BufferID):
 
 
 @dataclass(frozen=True)
-class ObjectID(BufferID):
+class ObjectBufferID(BufferID):
     object_id: int
 
 
@@ -412,9 +412,10 @@ class JuliaBufferContext:
 
     def __init__(self):
         self._owned_records: dict[BufferID, _JuliaBufferRecord] = {}
-        self._records_by_julia_id: dict[int, _JuliaBufferRecord] = {}
-        self._free_pool = JuliaFreeBufferPool()
         self._result_records: dict[BufferID, _JuliaBufferRecord] = {}
+        self._julia_id_to_record_map: dict[int, _JuliaBufferRecord] = {}
+        self._free_pool = JuliaFreeBufferPool()
+
 
     @staticmethod
     def _is_poolable(obj) -> bool:
@@ -428,10 +429,10 @@ class JuliaBufferContext:
         if not self._is_poolable(obj):
             return None
         object_id = int(jl.objectid(obj))
-        record = self._records_by_julia_id.get(object_id)
+        record = self._julia_id_to_record_map.get(object_id)
         if record is None:
             record = _JuliaBufferRecord(obj, JuliaBufferGroup(obj))
-            self._records_by_julia_id[object_id] = record
+            self._julia_id_to_record_map[object_id] = record
         return record
 
     def _assign_owner(self, key: BufferID, record: _JuliaBufferRecord) -> None:
@@ -543,6 +544,6 @@ class JuliaBufferContext:
     def close(self):
         """Discard all Python mappings and pooled Julia tensor records."""
         self._owned_records.clear()
-        self._records_by_julia_id.clear()
+        self._julia_id_to_record_map.clear()
         self._free_pool.clear()
         self._result_records.clear()
