@@ -574,11 +574,10 @@ class JuliaBufferContext:
         returned_positions = set(return_positions)
         for position in reset_positions:
             self._detach(argument_keys[position])
-            if position not in returned_positions:
-                continue
-            record = argument_records[position]
-            if record is not None:
-                record.producer = producer
+            if position in returned_positions:
+                record = argument_records[position]
+                if record is not None:
+                    record.producer = producer
 
     def close(self):
         """Discard all Python mappings and pooled Julia tensor records."""
