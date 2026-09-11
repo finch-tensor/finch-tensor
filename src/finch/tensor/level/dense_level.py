@@ -213,11 +213,7 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
                 (*tns.idxs, idx),
             )
 
-        return lplt.Lookup(
-            body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx: child_accessor(ctx, idx),
-            )
-        )
+        return lplt.Lookup(child_accessor)
 
     def from_fields(self, lvl, dimension, stride) -> DenseLevel:
         return DenseLevel(lvl=lvl, dimension=dimension)

@@ -217,7 +217,7 @@ class Dimension(NotationTree, NotationExpression):
 
     @property
     def result_type(self):
-        return self.tns.shape_type[self.r.val]
+        return self.tns.result_type.shape_type[self.r.val]
 
     @classmethod
     def from_children(cls, tns, r):
@@ -253,17 +253,36 @@ class Access(NotationTree, NotationExpression):
     def children(self):
         return [self.tns, self.mode, *self.idxs]
 
+
 @dataclass(eq=True, frozen=True)
-class Full(NotationTree, NotationStatement):
-    """
-    Notation AST statement for a tensor filled with a value `val` in the current scope.
-    """
+class Full(NotationTree, NotationExpression):
+    """A read-only tensor filled with `val`, with scalar shape by default."""
 
     val: NotationExpression
+    shape: tuple[NotationExpression, ...] = ()
+
+    @property
+    def result_type(self):
+        from finch.algebra import DynamicFill, StaticFill
+        from finch.tensor.patterns import FillTensorFType
+
+        match self.val:
+            case Literal(val):
+                fill = StaticFill(val)
+            case _:
+                fill = DynamicFill(self.val.result_type(0))
+        return FillTensorFType(
+            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+        )
+
+    @classmethod
+    def from_children(cls, val, *shape):
+        return cls(val, tuple(shape))
 
     @property
     def children(self):
-        return [self.val]
+        return [self.val, *self.shape]
+
 
 @dataclass(eq=True, frozen=True)
 class Read(AccessMode):
@@ -708,6 +727,8 @@ class NotationPrinterContext(Context):
                 return f"fiber({root}, {self(lvl)}, {pos})"
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
+            case Full(val, shape):
+                return f"full({self(val)}, ({', '.join(self(dim) for dim in shape)}))"
             case Unwrap(tns):
                 return f"unwrap({self(tns)})"
             case Assign(Variable(var_n, var_t), val):

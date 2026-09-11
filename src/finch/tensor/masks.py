@@ -4,12 +4,11 @@ from typing import Any
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs
+from finch.algebra import ImmutableStructFType, ffuncs, is_dynamic
 from finch.compile import looplets as lplt
 
 from .fiber_tensor import FiberTensor, FiberTensorFType
 from .level import Level, LevelFType
-from .scalar import Scalar
 
 
 @dataclass(unsafe_hash=True)
@@ -127,14 +126,26 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             )
             return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
-        scalar = Scalar(self.fill_value.value, self.fill_value)
+        lvl = asm.GetAttr(ctx.fiber_level(tns), asm.Literal("body"))
+        fill = (
+            ntn.Value(self.body.lower_fill(lvl), self.element_type)
+            if is_dynamic(self.fill_value)
+            else ntn.Literal(self.fill_value.value)
+        )
+        full = ntn.Full(
+            fill,
+            tuple(
+                ntn.Value(self.body.level_lower_dim(ctx, lvl, r), self.shape_type[r])
+                for r in range(1, self.ndim)
+            ),
+        )
         visited_idxs = tns.idxs
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, ext: ntn.Call(
                 ntn.L(ffuncs.add), (visited_idxs[-1], ext.get_unit())
             ),
-            tail=lambda ctx, idx: lplt.Run(scalar),
+            tail=lambda ctx, idx: lplt.Run(full),
         )
 
     def level_lower_dim(self, ctx, obj, r):

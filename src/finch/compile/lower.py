@@ -454,10 +454,12 @@ class AssemblyContext(Context):
                 raise KeyError(f"Slot {var_n} not found in context")
             case ntn.Fiber(_, _, _, _):
                 return node
-            case ntn.Value(_, _):
+            case ntn.Value(_, _) | ntn.Full():
                 return node
             case _:
-                raise ValueError(f"Expected Slot, Fiber, or Value, got: {type(node)}")
+                raise ValueError(
+                    f"Expected Slot, Fiber, Value, or Full, got: {type(node)}"
+                )
 
     def _freeze_tensor(self, tns_var: str, op: ntn.Literal | None) -> None:
         if op is None:
@@ -556,6 +558,12 @@ class AssemblyContext(Context):
                 self._rm_tensor_from_accesses(var_n)
                 self.exec(asm.Repack(asm.Slot(var_n, var_t)))
                 return None
+            case ntn.Unwrap(ntn.Full(val, ())):
+                return self(val)
+            case ntn.Unwrap(ntn.Access(ntn.Full(val, ()), ntn.Read(), ())):
+                return self(val)
+            case ntn.Dimension(ntn.Full(_, shape), ntn.Literal(r)):
+                return self(shape[r])
             case ntn.Unwrap(ntn.Access(tns, mode, idxs)):
                 assert isinstance(mode, ntn.Read)
                 assert idxs == ()
@@ -695,7 +703,15 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    tns_2 = tns.result_type.unfurl(ctx_2, tns, ext, mode, proto=None)
+                    match tns:
+                        case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
+                            from finch.compile.looplets import Run
+
+                            tns_2 = Run(ntn.Full(val, tuple(shape)))
+                        case _:
+                            tns_2 = tns.result_type.unfurl(
+                                ctx_2, tns, ext, mode, proto=None
+                            )
                     return ntn.Access(tns_2, mode, (j, *idxs))
         return None
 

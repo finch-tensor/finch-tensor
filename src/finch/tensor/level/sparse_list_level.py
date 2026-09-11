@@ -220,6 +220,18 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
         pos = tns.pos
+        fill = (
+            ntn.Value(self.lower_fill(lvl_asm), self.element_type)
+            if is_dynamic(self.fill_value)
+            else ntn.Literal(self.fill_value.value)
+        )
+        full = ntn.Full(
+            fill,
+            tuple(
+                ntn.Value(self.level_lower_dim(ctx, lvl_asm, r), self.shape_type[r])
+                for r in range(1, self.ndim)
+            ),
+        )
         tmp_locals = locals()
 
         def thunk_preamble(ctx, idx):
@@ -257,8 +269,8 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             )
             ctx.exec(asm.Assign(pos_2, q))
             child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
-            return lplt.Leaf(
-                lambda ctx: ntn.Fiber(
+            return lplt.Run(
+                ntn.Fiber(
                     tns.root,
                     ntn.Child(tns.lvl),
                     pos_2,
@@ -285,7 +297,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
-                        head=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Full(self.lower_fill()))),
+                        head=lambda ctx, idx: lplt.Run(full),
                         split=lambda ctx, ext: ntn.Variable(
                             i_stop.name, self.position_type
                         ),
@@ -305,7 +317,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
-                tail=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Full(self.lower_fill()))),
+                tail=lambda ctx, idx: lplt.Run(full),
             ),
         )
 

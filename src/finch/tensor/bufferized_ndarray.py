@@ -736,8 +736,4 @@ class BufferizedNDArrayAccessorFType(FinchTensorFType):
                 tns.dirty,
             )
 
-        return lplt.Lookup(
-            body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx: child_accessor(ctx, idx),
-            )
-        )
+        return lplt.Lookup(child_accessor)

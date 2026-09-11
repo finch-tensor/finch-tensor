@@ -15,17 +15,18 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
     @staticmethod
     def simplify(term: ntn.NotationNode):
         from finch.compile import looplets as lplt
-        from finch.tensor.scalar import Scalar
 
         match term:
             case ntn.Call(ntn.Literal(_) as op, args):
                 for arg in args:
                     match arg:
                         case ntn.Unwrap(
-                            ntn.Access(lplt.Run() as tns, ntn.Read(), idxs)
+                            ntn.Access(
+                                lplt.Run(ntn.Full(ntn.Literal(val))) as tns,
+                                ntn.Read(),
+                                idxs,
+                            )
                         ):
-                            if isinstance(tns.body, Scalar) and is_annihilator(
-                                op.val, tns.body.val
-                            ):
+                            if is_annihilator(op.val, val):
                                 return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
         return None
