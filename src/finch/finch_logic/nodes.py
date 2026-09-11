@@ -377,6 +377,7 @@ class Field(LogicNode, NamedTerm):
         return self.name
 
 
+@dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
     __match_args__ = ("name",)
     name: str
@@ -428,12 +429,16 @@ class HardAlias(Alias):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True, frozen=True, init=False)
 class FusedAlias(Alias):
+    __match_args__ = ("alias", "n")
     alias: HardAlias
     n: int
+    name: str
 
-    def __post_init__(self) -> None:
+    def __init__(self, alias: HardAlias, n: int) -> None:
+        object.__setattr__(self, "alias", alias)
+        object.__setattr__(self, "n", n)
         object.__setattr__(self, "name", self.alias.name)
 
     @property
@@ -868,6 +873,8 @@ class LogicPrinterContext(Context):
             case FusedAlias(alias, n):
                 return f"FusedAlias({self(alias)},{n})"
             case HardAlias(name):
+                return str(name)
+            case Alias(name):
                 return str(name)
             case Table(tns, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
