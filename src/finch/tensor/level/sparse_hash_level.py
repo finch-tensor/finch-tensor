@@ -249,10 +249,6 @@ class SparseHashLevel(Level):
         return (self.dimension, *self.lvl.shape)
 
     @property
-    def stride(self) -> np.integer:
-        return np.intp(0)
-
-    @property
     def ftype(self) -> SparseHashLevelFType:
         return SparseHashLevelFType(
             self.lvl.ftype,

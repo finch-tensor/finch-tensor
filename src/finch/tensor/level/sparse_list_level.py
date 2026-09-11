@@ -39,7 +39,6 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
         return [
             ("lvl", self.lvl_t),
             ("dimension", self.dimension_type),
-            ("stride", self.dimension_type),
             ("ptr", self.ptr_type),
             ("idx", self.idx_type),
         ]
@@ -340,12 +339,6 @@ class SparseListLevel(Level):
             self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.idx is None:
             self.idx = self.lvl.buffer_factory(ftype(self.dimension))(0)
-
-    @property
-    def stride(self) -> np.integer:
-        # `stride` is a struct field of type `dimension_type`, so it must be
-        # returned with that exact type rather than the default `intp`.
-        return ftype(self.dimension)(0)
 
     @property
     def ftype(self) -> SparseListLevelFType:

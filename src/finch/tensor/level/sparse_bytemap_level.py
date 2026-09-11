@@ -159,10 +159,6 @@ class SparseByteMapLevel(Level):
         return (self.dimension, *self.lvl.shape)
 
     @property
-    def stride(self) -> np.integer:
-        return np.intp(0)
-
-    @property
     def ftype(self) -> SparseByteMapLevelFType:
         return SparseByteMapLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
 

@@ -155,7 +155,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
 
     @property
     def struct_fields(self):
-        return [("body", self.body), ("stride", self.body.dimension_type)]
+        return [("body", self.body)]
 
 
 @dataclass
@@ -177,10 +177,6 @@ class LoTriMask(Level):
     @property
     def shape(self):
         return self.lvl.shape
-
-    @property
-    def stride(self):
-        return self.lvl.stride
 
     @property
     def dimension(self):

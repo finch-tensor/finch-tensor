@@ -2,8 +2,6 @@ from abc import ABC, abstractmethod
 from dataclasses import replace
 from typing import Any
 
-import numpy as np
-
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
@@ -194,10 +192,6 @@ class Level(FTyped, ABC):
         Shape of the fibers in the structure.
         """
         ...
-
-    @property
-    @abstractmethod
-    def stride(self) -> np.integer: ...
 
     @property
     @abstractmethod

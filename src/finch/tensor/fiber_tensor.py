@@ -59,10 +59,6 @@ class FiberTensor(OverrideTensor):
         return self.lvl.shape
 
     @property
-    def stride(self):
-        return self.lvl.stride
-
-    @property
     def val(self):
         return self.lvl.val
 

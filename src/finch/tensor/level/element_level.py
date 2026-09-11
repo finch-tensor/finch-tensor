@@ -236,10 +236,6 @@ class ElementLevel(Level):
         return ()
 
     @property
-    def stride(self) -> np.integer:
-        return np.intp(1)  # TODO: add dimension_type to element_level.py
-
-    @property
     def ftype(self) -> ElementLevelFType:
         return self._format
 

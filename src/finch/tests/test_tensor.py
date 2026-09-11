@@ -701,3 +701,29 @@ def test_fiber_tensor_to_coo():
     assert np.shares_memory(scipy_tensor.data, data)
     assert np.shares_memory(scipy_tensor.row, row)
     assert np.shares_memory(scipy_tensor.col, col)
+
+
+@pytest.mark.parametrize("dimension_type", [np.int32, np.int64])
+def test_dense_stride_stops_at_sparse_level(dimension_type):
+    elem = ElementLevel(element(0, finch.int32))
+    sparse = SparseListLevel(DenseLevel(elem, dimension_type(7)), dimension_type(5))
+    inner = DenseLevel(sparse, dimension_type(3))
+    outer = DenseLevel(inner, dimension_type(2))
+    assert inner.stride == 1
+    assert outer.stride == 3
+    assert type(outer.stride) is dimension_type
+    assert not hasattr(sparse, "stride")
+    fields = [getattr(sparse, name) for name, _ in sparse.ftype.struct_fields]
+    rebuilt = sparse.ftype.from_fields(*fields)
+    assert rebuilt.lvl is sparse.lvl
+    assert rebuilt.ptr is sparse.ptr
+    assert rebuilt.idx is sparse.idx
+
+
+@pytest.mark.parametrize("inner_size, expected", [(4, 4), (0, 0)])
+def test_dense_stride(inner_size, expected):
+    elem = ElementLevel(element(0, finch.int32))
+    inner = DenseLevel(elem, np.intp(inner_size))
+    outer = DenseLevel(inner, np.intp(2))
+    assert inner.stride == 1
+    assert outer.stride == expected

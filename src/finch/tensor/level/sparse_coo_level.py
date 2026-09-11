@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, cast
 
-import numpy as np
-
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ftype, ftypes
 
 from .level import Level, LevelFType
@@ -237,10 +235,6 @@ class SparseCOOLevel(Level):
     @property
     def shape(self) -> tuple[Any, ...]:
         return (*self.lvl.shape, *self.coo_shape)
-
-    @property
-    def stride(self) -> np.intp:
-        return np.intp(0)
 
     @property
     def ftype(self) -> SparseCOOLevelFType:
