@@ -167,7 +167,7 @@ class TensorView(Tensor):
         self.tns[*self.idxs] = self.op(lhs, val)
         return
 
-class ConstantTensor():
+class FullTensor():
     """
     A tensor that always returns a constant value.
     This is used to represent a tensor that is filled with a single value.
@@ -399,8 +399,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
-            case ntn.Constant(val):
-                return ConstantTensor(val)
+            case ntn.Full(val):
+                return FullTensor(val)
             case ntn.Unwrap(tns):
                 return unwrap(self(tns))
             case ntn.Assign(var, val):

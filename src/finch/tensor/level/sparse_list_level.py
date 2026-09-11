@@ -285,7 +285,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ),
                     stop=lambda ctx: ntn.Variable(i_stop.name, self.position_type),
                     chunk=lplt.Sequence(
-                        head=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Constant(self.lower_fill()))),
+                        head=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Full(self.lower_fill()))),
                         split=lambda ctx, ext: ntn.Variable(
                             i_stop.name, self.position_type
                         ),
@@ -305,7 +305,7 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
                     ntn.L(ffuncs.add),
                     (ntn.Variable(i_last.name, self.position_type), ext.get_unit()),
                 ),
-                tail=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Constant(self.lower_fill()))),
+                tail=lambda ctx, idx: lplt.Run(lplt.Leaf(ntn.Full(self.lower_fill()))),
             ),
         )
 

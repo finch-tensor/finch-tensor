@@ -254,7 +254,7 @@ class Access(NotationTree, NotationExpression):
         return [self.tns, self.mode, *self.idxs]
 
 @dataclass(eq=True, frozen=True)
-class Constant(NotationTree, NotationStatement):
+class Full(NotationTree, NotationStatement):
     """
     Notation AST statement for a tensor filled with a value `val` in the current scope.
     """
