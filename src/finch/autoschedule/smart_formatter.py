@@ -149,6 +149,7 @@ class SmartFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
                 case lgc.Query(lhs, rhs):
+                    assert isinstance(lhs, lgc.Alias)
                     rhs_stats = stats_interpreter(rhs, stats_bindings)
                     if not isinstance(rhs_stats, TensorStats):
                         raise TypeError("Expected query RHS to produce TensorStats.")

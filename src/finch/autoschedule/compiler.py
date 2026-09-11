@@ -277,6 +277,7 @@ class NotationContext:
                     lgc.Table(lgc.Alias() | lgc.FusedAlias(), _) as arg, idxs_2
                 ),
             ):
+                assert isinstance(lhs, lgc.Alias)
                 key = lhs.alias if isinstance(lhs, FusedAlias) else lhs
                 body = self._lower_query_of_reorder(key, ffuncs.overwrite, arg, idxs_2)
                 match self.bindings[key].fill_value:
@@ -311,6 +312,7 @@ class NotationContext:
                     output_idxs,
                 ),
             ):
+                assert isinstance(lhs, lgc.Alias)
                 key = lhs.alias if isinstance(lhs, lgc.FusedAlias) else lhs
                 body = self._lower_query_of_aggregate(key, op, arg_2, output_idxs)
                 return ntn.Block(
@@ -346,6 +348,7 @@ class NotationContext:
                     idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
+                assert isinstance(lhs, lgc.Alias)
                 key = lhs.alias if isinstance(lhs, lgc.FusedAlias) else lhs
                 body = self._lower_query_of_aggregate(key, op_1, agg_arg, idxs_2)
                 return ntn.Block(

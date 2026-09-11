@@ -214,12 +214,13 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(lhs, rhs):
                 rhs = self(rhs)
-                key = lhs.alias if isinstance(lhs, FusedAlias) else lhs
+                tns_node = lhs.tns if isinstance(lhs, Table) else lhs
+                key = tns_node.alias if isinstance(tns_node, FusedAlias) else tns_node
                 if key not in self.bindings:
-                    if isinstance(lhs, FusedAlias):
+                    if isinstance(tns_node, FusedAlias):
                         tns = MockFusedTensor(
                             rhs.tns.shape,
-                            lhs.n,
+                            tns_node.n,
                             rhs.tns.fill_value,
                             rhs.tns.element_type,
                             make_tensor=self.make_tensor,
@@ -231,9 +232,9 @@ class LogicMachine:
                             dtype=rhs.tns.element_type,
                         )
                     self.bindings[key] = tns
-                lhs = self(lhs)
+                lhs_tns = self(tns_node)
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs[*crds] = rhs.tns[*crds].item()
+                    lhs_tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()

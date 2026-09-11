@@ -704,8 +704,12 @@ class Query(LogicTree, LogicStatement):
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Alias | FusedAlias
+    lhs: Alias | Table
     rhs: LogicExpression
+
+    def __post_init__(self):
+        if isinstance(self.lhs, Table) and not isinstance(self.lhs.tns, Alias):
+            raise ValueError("Query.lhs when given as Table must wrap Alias only")
 
     @property
     def children(self):
@@ -717,7 +721,12 @@ class Query(LogicTree, LogicStatement):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
-        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if isinstance(self.lhs, Table):
+            assert isinstance(self.lhs.tns, Alias)
+            tns = self.lhs.tns
+        else:
+            tns = self.lhs
+        key = tns.alias if isinstance(tns, FusedAlias) else tns
         if key in dim_bindings:
             for dim1, dim2 in zip(
                 self.rhs.dimmap(op, dim_bindings), dim_bindings[key], strict=True
@@ -737,7 +746,12 @@ class Query(LogicTree, LogicStatement):
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        key = self.lhs.alias if isinstance(self.lhs, FusedAlias) else self.lhs
+        if isinstance(self.lhs, Table):
+            assert isinstance(self.lhs.tns, Alias)
+            tns = self.lhs.tns
+        else:
+            tns = self.lhs
+        key = tns.alias if isinstance(tns, FusedAlias) else tns
         if key in bindings:
             val = self.rhs.valmap(f, g, bindings)
             prev = bindings[key]

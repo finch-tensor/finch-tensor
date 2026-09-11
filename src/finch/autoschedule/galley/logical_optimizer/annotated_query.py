@@ -95,6 +95,7 @@ class AnnotatedQuery:
             cache=cache,
         )
         self.cache = cache
+        assert isinstance(q.lhs, Alias)
         output_name = q.lhs
         expr = q.rhs
         output_order: None | list[Field] = []
@@ -759,7 +760,7 @@ class AnnotatedQuery:
         query, replace_path, removal_paths, reduced_idxs = self.get_reduce_query(
             reduce_idx
         )
-
+        assert isinstance(query.lhs, Alias)
         alias_expr = HardAlias(query.lhs.name)
         stats_cache = self.cache_point
         insert_statistics(

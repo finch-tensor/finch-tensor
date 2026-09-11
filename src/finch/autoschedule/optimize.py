@@ -197,6 +197,7 @@ def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
         case Produces(args):
             return args
         case Query(lhs, _):
+            assert isinstance(lhs, Alias)
             return (lhs,)
         case _:
             raise ValueError(f"Invalid node type: {type(root)}")
