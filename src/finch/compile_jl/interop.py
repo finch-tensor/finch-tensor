@@ -330,23 +330,16 @@ class JuliaKernelArgs:
 class _JuliaBufferRecord:
     tensor: Any
     group: tuple[str, tuple[int, ...]]
-    owners: set[tuple[Any, ...]] = field(default_factory=set)
+    owners: dict[tuple[Any, ...], tuple[Any, bool]] = field(default_factory=dict)
     result: FiberTensor | None = None
     producer: object | None = None
-
-
-@dataclass
-class _CachedJuliaTensor:
-    obj: Any
-    record: _JuliaBufferRecord
-    is_result: bool
 
 
 class JuliaBufferContext:
     """Own and reuse Julia tensor buffers across kernel invocations."""
 
     def __init__(self):
-        self._tensors: dict[tuple[Any, ...], _CachedJuliaTensor] = {}
+        self._tensors: dict[tuple[Any, ...], _JuliaBufferRecord] = {}
         self._records: dict[int, _JuliaBufferRecord] = {}
         self._groups: dict[tuple[str, tuple[int, ...]], list[_JuliaBufferRecord]] = {}
 
@@ -412,22 +405,22 @@ class JuliaBufferContext:
         """Map a Python key to a record and record whether it represents a result."""
         cached = self._tensors.get(key)
         if cached is not None:
-            cached.record.owners.discard(key)
-        record.owners.add(key)
-        self._tensors[key] = _CachedJuliaTensor(obj, record, is_result)
+            cached.owners.pop(key, None)
+        record.owners[key] = (obj, is_result)
+        self._tensors[key] = record
 
     def _detach(self, key) -> None:
         """Remove a Python-to-record mapping and release that record ownership."""
         cached = self._tensors.pop(key, None)
         if cached is not None:
-            cached.record.owners.discard(key)
+            cached.owners.pop(key, None)
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Return an existing Julia tensor mapping or materialize a new one."""
         key = self._cache_key(obj)
         cached = self._tensors.get(key)
         if cached is not None:
-            return cached.record.tensor
+            return cached.tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         if record := self._record(jl_obj):
@@ -479,17 +472,15 @@ class JuliaBufferContext:
 
         keys = tuple(self._cache_key(arg) for arg in args)
         active_records = {
-            id(cached.record)
-            for key in keys
-            if (cached := self._tensors.get(key)) is not None
+            id(cached) for key in keys if (cached := self._tensors.get(key)) is not None
         }
         raw_args = []
         arg_records = []
         for position, (arg, key) in enumerate(zip(args, keys, strict=True)):
             cached = self._tensors.get(key)
             if cached is not None:
-                raw_args.append(cached.record.tensor)
-                arg_records.append(cached.record)
+                raw_args.append(cached.tensor)
+                arg_records.append(cached)
                 continue
 
             group = self._input_group(
@@ -519,9 +510,7 @@ class JuliaBufferContext:
                             if record.producer is producer
                             and id(record) not in active_records
                             and all(
-                                (cached := self._tensors.get(owner)) is not None
-                                and cached.is_result
-                                for owner in record.owners
+                                is_result for _, is_result in record.owners.values()
                             )
                         ),
                         None,
@@ -541,7 +530,7 @@ class JuliaBufferContext:
                 )
             )
             cached = self._tensors.get(key)
-            arg_records.append(cached.record if cached is not None else None)
+            arg_records.append(cached)
         return raw_args, keys, arg_records
 
     def release_reset_arguments(
@@ -568,7 +557,7 @@ class JuliaBufferContext:
             cached = self._tensors.get(key)
             if (
                 cached is not None
-                and cached.is_result
+                and cached.owners[key][1]
                 and self._is_poolable(raw_arg)
                 and int(jl.objectid(raw_arg)) not in result_ids
             ):
@@ -587,7 +576,7 @@ class JuliaBufferContext:
             cached = self._tensors.get(key)
             if (
                 cached is not None
-                and cached.is_result
+                and cached.owners[key][1]
                 and record is not None
                 and id(record) not in returned_records
             ):
