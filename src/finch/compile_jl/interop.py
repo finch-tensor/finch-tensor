@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 import numpy as np
 
@@ -315,7 +315,7 @@ class JuliaKernelArgs:
     type_names: tuple[str | None, ...]
     dynamic_positions: tuple[int, ...]
     reset_positions: frozenset[int]
-    return_positions: tuple[int, ...] | None
+    return_positions: tuple[int, ...]
 
     @property
     def cache_key(self) -> tuple[tuple[str, ...], tuple[int, ...]]:
@@ -347,8 +347,7 @@ class _JuliaBufferOwner:
     is_result: bool
 
 
-@dataclass
-class ResolvedJuliaArguments:
+class ResolvedJuliaArguments(NamedTuple):
     julia_args: list[Any]
     argument_keys: tuple[tuple[Any, ...], ...]
     argument_records: list[_JuliaBufferRecord | None]
@@ -586,23 +585,6 @@ class JuliaBufferContext:
                 continue
             self._detach(key)
 
-    def release_consumed_result_arguments(self, keys, raw_args, result_items) -> None:
-        """Release prior results consumed by a kernel but absent from its output."""
-        result_ids = {
-            int(jl.objectid(item)) for item in result_items if self._is_poolable(item)
-        }
-        for key, raw_arg in zip(keys, raw_args, strict=True):
-            record = self._tensors.get(key)
-            if record is None:
-                continue
-            if not record.owners[key].is_result:
-                continue
-            if (
-                self._is_poolable(raw_arg)
-                and int(jl.objectid(raw_arg)) not in result_ids
-            ):
-                self._detach(key)
-
     def release_consumed_result_arguments_static(
         self, keys, arg_records, return_arg_positions
     ) -> None:
@@ -623,21 +605,6 @@ class JuliaBufferContext:
                 and id(argument_record) not in returned_records
             ):
                 self._detach(key)
-
-    def mark_reset_results(
-        self, raw_args, result_items, reset_positions, producer
-    ) -> None:
-        """Mark returned reset buffers as eligible for reuse by their producer."""
-        reset_ids = set()
-        for position in reset_positions:
-            raw_arg = raw_args[position]
-            if self._is_poolable(raw_arg):
-                reset_ids.add(int(jl.objectid(raw_arg)))
-        for item in result_items:
-            if self._is_poolable(item) and int(jl.objectid(item)) in reset_ids:
-                record = self._record(item)
-                assert record is not None
-                record.producer = producer
 
     @staticmethod
     def mark_reset_results_static(

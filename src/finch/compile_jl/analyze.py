@@ -82,7 +82,7 @@ def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
     )
 
 
-def find_return_arg_positions(func: ntn.Function) -> tuple[int, ...] | None:
+def find_return_arg_positions(func: ntn.Function) -> tuple[int, ...]:
     """Find the position of return arguments in the function header."""
 
     arg_positions = {arg.name: position for position, arg in enumerate(func.args)}
@@ -99,11 +99,11 @@ def find_return_arg_positions(func: ntn.Function) -> tuple[int, ...] | None:
 
     Rewrite(PostWalk(rule))(func.body)
     if len(return_values) != 1:
-        return None
+        raise ValueError("Julia kernels must contain exactly one return statement")
     values = return_values[0]
     if values is None or not all(
         isinstance(value, ntn.Variable) and value.name in arg_positions
         for value in values
     ):
-        return None
+        raise ValueError("Julia kernel return values must be function arguments")
     return tuple(arg_positions[value.name] for value in values)

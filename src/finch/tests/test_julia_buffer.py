@@ -149,7 +149,7 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
             type_names=(type_name,),
             dynamic_positions=(),
             reset_positions=frozenset({0}),
-            return_positions=None,
+            return_positions=(),
         ),
     )
 

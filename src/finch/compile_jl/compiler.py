@@ -128,40 +128,15 @@ class FinchJLKernel(AssemblyKernel):
             kernel_args=self.kernel_args,
             producer=self,
         )
-        result = finch_fn(*resolved_args.julia_args)
+        finch_fn(*resolved_args.julia_args)
         self.buffer_context.release_reset_arguments(
             resolved_args.argument_keys, self.kernel_args.reset_positions
         )
+        return self._return_results(resolved_args)
 
-        if self.kernel_args.return_positions is None:
-            return self._dynamic_results(resolved_args, result)
-        return self._static_results(resolved_args)
-
-    def _dynamic_results(self, resolved_args: ResolvedJuliaArguments, result):
-        """Release consumed inputs and convert dynamically returned Julia values."""
-        if jl.isa(result, jl.NamedTuple):
-            result = jl.values(result)
-        if jl.isa(result, jl.Finch.Tensor):
-            result_items = (result,)
-        else:
-            result_items = tuple(result)
-        self.buffer_context.release_consumed_result_arguments(
-            resolved_args.argument_keys, resolved_args.julia_args, result_items
-        )
-        self.buffer_context.mark_reset_results(
-            resolved_args.julia_args,
-            result_items,
-            self.kernel_args.reset_positions,
-            self,
-        )
-        return tuple(
-            self.buffer_context.tensor_to_python(item) for item in result_items
-        )
-
-    def _static_results(self, resolved_args: ResolvedJuliaArguments):
-        """Return the buffers at statically known return positions."""
+    def _return_results(self, resolved_args: ResolvedJuliaArguments):
+        """Return buffers at the kernel's return positions."""
         return_positions = self.kernel_args.return_positions
-        assert return_positions is not None
         result_items = tuple(
             resolved_args.julia_args[position] for position in return_positions
         )
