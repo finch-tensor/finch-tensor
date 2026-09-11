@@ -516,16 +516,6 @@ class JuliaBufferContext:
         self._attach(self._cache_key(result), result, record, is_result=True)
         return result
 
-    def prepare_result_for_record(
-        self, record: _JuliaBufferRecord | None
-    ) -> _JuliaBufferRecord | None:
-        """Ensure a record has a Python result wrapper before returning it."""
-        if record is None:
-            return None
-        if self._result_wrapper(record) is None:
-            return None
-        return record
-
     def attach_result(self, record: _JuliaBufferRecord) -> FiberTensor:
         """Map a record's result wrapper back to its Julia tensor record."""
         result = self._result_wrapper(record)

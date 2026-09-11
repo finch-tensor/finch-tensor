@@ -141,10 +141,7 @@ class FinchJLKernel(AssemblyKernel):
             resolved_args.julia_args[position] for position in return_positions
         )
         output_records = [
-            self.buffer_context.prepare_result_for_record(
-                resolved_args.argument_records[position]
-            )
-            for position in return_positions
+            resolved_args.argument_records[position] for position in return_positions
         ]
         self.buffer_context.release_consumed_result_arguments_static(
             resolved_args.argument_keys,
