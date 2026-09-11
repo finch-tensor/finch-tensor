@@ -390,9 +390,7 @@ class FinchJLCompiler(NotationCompiler):
     # text, so two calls with identical bodies but different argument types
     # would otherwise collide on the same cache entry.
     _kernels: ClassVar[
-        dict[
-            tuple[str, tuple[str, ...], tuple[int, ...], frozenset[int]], FinchJLKernel
-        ]
+        dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
     ] = {}
 
     # Results produced by one compiled kernel are passed to another
@@ -420,8 +418,6 @@ class FinchJLCompiler(NotationCompiler):
                     type_name for type_name in arg_type_names if type_name is not None
                 ),
                 dynamic_args,
-                reset_arg_positions,
-                return_arg_positions,
             )
             kernel = self._kernels.get(key)
             if kernel is None:
