@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -6,6 +6,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    AbstractFill,
     DynamicFill,
     FType,
     ImmutableStructFType,
@@ -247,6 +248,9 @@ class ElementLevel(Level):
     @property
     def ftype(self) -> ElementLevelFType:
         return self._format
+
+    def with_fill(self, fill_value: AbstractFill) -> "ElementLevel":
+        return replace(self, _format=self._format.with_fill(fill_value))
 
     @property
     def val(self) -> Any:

@@ -55,6 +55,15 @@ class BufferizedNDArray(OverrideTensor):
 
         self._device = normalize_device(device)
 
+    def with_fill(self, fill_value: AbstractFill) -> "BufferizedNDArray":
+        return BufferizedNDArray(
+            self.val,
+            self._shape,
+            self.strides,
+            fill_value,
+            device=self._device,
+        )
+
     def to_numpy(self):
         """
         Convert the bufferized NDArray to a NumPy array.
@@ -360,17 +369,20 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             and self.device == other.device
         )
 
+    def with_fill(self, fill_value: AbstractFill) -> "BufferizedNDArrayFType":
+        return BufferizedNDArrayFType(
+            buffer_type=self.buf_t,
+            ndim=self.ndim,
+            dimension_type=self.shape_t,
+            fill_value=fill_value,
+            device=self.device,
+        )
+
     def fisinstance(self, other):
         other_t = ftype(other)
         if is_dynamic(self._fill_value) and isinstance(other_t, BufferizedNDArrayFType):
             # A dynamic-fill ftype accepts any fill value of matching dtype.
-            other_t = BufferizedNDArrayFType(
-                buffer_type=other_t.buf_t,
-                ndim=other_t.ndim,
-                dimension_type=other_t.shape_t,
-                fill_value=self._fill_value,
-                device=other_t.device,
-            )
+            other_t = other_t.with_fill(self._fill_value)
         return other_t == self
 
     def __hash__(self):
