@@ -7,6 +7,7 @@ from finch.codegen import NumpyBuffer
 from finch.compile_jl.analyze import find_reset_arg_positions
 from finch.compile_jl.buffer import MinusOneBuffer
 from finch.compile_jl.interop import (
+    BufferID,
     JuliaBufferContext,
     JuliaKernelArgs,
     _jl_index_buffer_to_python,
@@ -137,7 +138,7 @@ def test_julia_buffer_context_reuses_free_compatible_tensor():
     context = JuliaBufferContext()
     first = ft.asarray(np.arange(4, dtype=np.float64))
     first_jl = context.tensor_to_jl(first)
-    first_key = context._cache_key(first)
+    first_key = BufferID.from_object(first)
     type_name = str(jl.string(jl.typeof(first_jl)))
     context.release_reset_arguments((first_key,), frozenset({0}), ())
 

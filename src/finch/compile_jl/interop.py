@@ -342,7 +342,21 @@ class JuliaBufferGroup:
 
 
 class BufferID:
-    pass
+    @staticmethod
+    def from_object(obj) -> BufferID:
+        """Return the identifier for a Python object backing a Julia buffer."""
+        # defer() can create a fresh wrapper around the same NumPy
+        # allocation, so wrapper identity alone would miss reuse.
+        if isinstance(obj, BufferizedNDArray):
+            arr = obj.to_numpy()
+            pointer = arr.__array_interface__["data"][0]
+            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
+        if isinstance(obj, NumPyWrapper):
+            arr = obj._data
+            pointer = arr.__array_interface__["data"][0]
+            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
+        # FiberTensors reuse their ids so we restrict cache keys to id.
+        return ObjectID(id(obj))
 
 
 @dataclass(frozen=True)
@@ -400,23 +414,7 @@ class JuliaBufferContext:
         self._owned_records: dict[BufferID, _JuliaBufferRecord] = {}
         self._records_by_julia_id: dict[int, _JuliaBufferRecord] = {}
         self._free_pool = JuliaFreeBufferPool()
-        self._result_pool: dict[BufferID, _JuliaBufferRecord] = {}
-
-    @staticmethod
-    def _cache_key(obj) -> BufferID:
-        """Return the Python-side identity used to find a mapped Julia tensor."""
-        # defer() can create a fresh wrapper around the same NumPy
-        # allocation, so wrapper identity alone would miss reuse.
-        if isinstance(obj, BufferizedNDArray):
-            arr = obj.to_numpy()
-            pointer = arr.__array_interface__["data"][0]
-            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
-        if isinstance(obj, NumPyWrapper):
-            arr = obj._data
-            pointer = arr.__array_interface__["data"][0]
-            return NumpyBufferID(pointer, arr.shape, arr.strides, arr.dtype.str)
-        # FiberTensors reuse their ids so we restrict cache keys to id.
-        return ObjectID(id(obj))
+        self._result_records: dict[BufferID, _JuliaBufferRecord] = {}
 
     @staticmethod
     def _is_poolable(obj) -> bool:
@@ -452,7 +450,7 @@ class JuliaBufferContext:
 
     def _claim_result_record(self, key: BufferID) -> _JuliaBufferRecord | None:
         """Move a returned record into the active-owner pool for an argument."""
-        record = self._result_pool.pop(key, None)
+        record = self._result_records.pop(key, None)
         if record is not None:
             self._assign_owner(key, record)
             return record
@@ -460,14 +458,14 @@ class JuliaBufferContext:
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Return an existing Julia tensor mapping or materialize a new one."""
-        key = self._cache_key(obj)
+        key = BufferID.from_object(obj)
 
         # If the tensor is already owned reuse
         record = self._owned_records.get(key)
         if record is not None:
             return record.tensor
 
-        # Otherwise claim the tensor from the result pool if produced by another kernel
+        # Otherwise claim the tensor from result records produced by another kernel
         record = self._claim_result_record(key)
         if record is not None:
             return record.tensor
@@ -487,8 +485,8 @@ class JuliaBufferContext:
             return jl_tensor_to_python(obj)
         if record.owner_key is not None:
             self._release_owner(record.owner_key)
-        key = self._cache_key(record.py_wrapper)
-        self._result_pool[key] = record
+        key = BufferID.from_object(record.py_wrapper)
+        self._result_records[key] = record
         return record.py_wrapper
 
     def resolve_arguments(
@@ -499,7 +497,7 @@ class JuliaBufferContext:
     ) -> ResolvedJuliaArguments:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
-        argument_keys = tuple(self._cache_key(arg) for arg in args)
+        argument_keys = tuple(BufferID.from_object(arg) for arg in args)
         julia_args = []
         for position, (arg, key) in enumerate(zip(args, argument_keys, strict=True)):
             record = self._owned_records.get(key)
@@ -547,4 +545,4 @@ class JuliaBufferContext:
         self._owned_records.clear()
         self._records_by_julia_id.clear()
         self._free_pool.clear()
-        self._result_pool.clear()
+        self._result_records.clear()
