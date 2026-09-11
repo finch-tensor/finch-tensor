@@ -11,6 +11,7 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
+    is_specializable_value,
     repeat_operator,
     return_type,
 )
@@ -167,6 +168,7 @@ __all__ = [
     "is_identity",
     "is_on_device",
     "is_parent_device",
+    "is_specializable_value",
     "isdtype",
     "none_",
     "normalize_device",

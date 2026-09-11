@@ -91,13 +91,14 @@ class ScalarFType(TensorFType, ImmutableStructFType):
     def from_fields(self, val):
         return Scalar(val, fill_value=self._fill_value, device=self._device)
 
+    def with_fill(self, fill_value: AbstractFill) -> ScalarFType:
+        return ScalarFType(self._element_type, fill_value, self._device)
+
     def fisinstance(self, other):
         other_t = ftype(other)
         if is_dynamic(self._fill_value) and isinstance(other_t, ScalarFType):
             # A dynamic-fill ftype accepts any fill value of matching dtype.
-            other_t = ScalarFType(
-                other_t._element_type, self._fill_value, other_t._device
-            )
+            other_t = other_t.with_fill(self._fill_value)
         return other_t == self
 
     def lower_unwrap(self, ctx, obj):
@@ -137,6 +138,16 @@ class Scalar(OverrideTensor):
     @property
     def device(self):
         return self._device
+
+    def with_fill(self, fill_value: AbstractFill) -> Scalar:
+        if is_dynamic(fill_value):
+            return Scalar(self.val, fill_value=fill_value, device=self._device)
+        if not bool(np.all(ffuncs.same(fill_value.value, self.val))):
+            raise NotImplementedError(
+                "a ConstantScalar's fill is its value, so a scalar of "
+                f"{self.val!r} cannot take the static fill {fill_value.value!r}"
+            )
+        return ConstantScalar(self.val, device=self._device)
 
     def to_device(self, device, /, *, stream=None):
         if stream is not None:
@@ -186,8 +197,8 @@ class ConstantScalar(Scalar):
     `Scalar`s, whose values are bound at call time.
     """
 
-    def __init__(self, val: Any):
-        super().__init__(val)
+    def __init__(self, val: Any, device=None):
+        super().__init__(val, device=device)
 
     @property
     def ftype(self):

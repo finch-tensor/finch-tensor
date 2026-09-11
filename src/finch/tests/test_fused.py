@@ -1,5 +1,4 @@
 import ast
-import inspect
 import operator
 import textwrap
 
@@ -8,6 +7,15 @@ import pytest
 import numpy as np
 
 import finch
+from finch.autoschedule import (
+    DefaultLogicFormatter,
+    DefaultLogicOptimizer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+)
 from finch.finch_fused import jit
 from finch.finch_fused import nodes as fzd
 from finch.finch_fused.cfg_builder import (
@@ -15,12 +23,19 @@ from finch.finch_fused.cfg_builder import (
     fused_desugar,
     number_statements,
 )
-from finch.finch_fused.dataflow import LivenessAnalysis, insert_lazy_and_compute
+from finch.finch_fused.dataflow import (
+    LivenessAnalysis,
+    insert_lazy_and_compute,
+    maybedefer,
+)
 from finch.finch_fused.parser import (
     fused_function_to_python_ast,
     parse_fused_function,
 )
+from finch.finch_notation.interpreter import NotationInterpreter
 from finch.interface import add, asarray, matmul, sum
+from finch.interface.lazy import LazyTensor
+from finch.tensor.scalar import ConstantScalar, ScalarFType
 
 from .conftest import finch_assert_allclose
 
@@ -44,7 +59,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
         (fzd.Variable("fn"), fzd.Variable("n")),
         fzd.Block(
             (
-                fzd.Assign(fzd.Variable("total"), fzd.Literal(0)),
+                fzd.Assign(fzd.Variable("total"), fzd.Literal(ConstantScalar(0))),
                 fzd.For(
                     fzd.Variable("i"),
                     fzd.Call(fzd.Literal(range), (fzd.Variable("n"),)),
@@ -83,7 +98,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
                                             fzd.BinaryOp(
                                                 fzd.Variable("total"),
                                                 fzd.Literal(operator.sub),
-                                                fzd.Literal(1),
+                                                fzd.Literal(ConstantScalar(1)),
                                             ),
                                         ),
                                     )
@@ -105,7 +120,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
                                 fzd.BinaryOp(
                                     fzd.Variable("total"),
                                     fzd.Literal(operator.add),
-                                    fzd.Literal(1),
+                                    fzd.Literal(ConstantScalar(1)),
                                 ),
                             ),
                         )
@@ -155,6 +170,12 @@ def test_parse_rejects_while_else_blocks():
 
 
 def test_parse_reverse_parse_is_lossless_on_supported_subset():
+    """
+    Round-tripping recovers the source. Numeric literals survive as literals:
+    the parser leaves them alone, and a constant only becomes a ConstantScalar
+    later, when `defer` hands it to the lazy layer.
+    """
+
     def roundtrip_fn(n):
         total = 0
         for i in range(n):
@@ -166,14 +187,24 @@ def test_parse_reverse_parse_is_lossless_on_supported_subset():
             total = total + 1
         return total
 
-    source = textwrap.dedent(inspect.getsource(roundtrip_fn))
-    original_module = ast.parse(source)
-    original_fn = original_module.body[0]
+    expected_source = textwrap.dedent("""\
+        def roundtrip_fn(n):
+            total = 0
+            for i in range(n):
+                if i < n:
+                    total = total + i
+                else:
+                    total = total - 1
+            while total < n:
+                total = total + 1
+            return total
+        """)
+    expected_fn = ast.parse(expected_source).body[0]
 
     fused_fn = parse_fused_function(roundtrip_fn)
     roundtrip_fn_ast = fused_function_to_python_ast(fused_fn)
 
-    assert ast.dump(original_fn, include_attributes=False) == ast.dump(
+    assert ast.dump(expected_fn, include_attributes=False) == ast.dump(
         roundtrip_fn_ast,
         include_attributes=False,
     )
@@ -416,6 +447,129 @@ def test_jit_two_independent_ops_inserted_code(file_regression):
         return F  # noqa: RET504
 
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
+@pytest.mark.parametrize(
+    ("operand", "bound"),
+    [
+        pytest.param(ConstantScalar(2.0), 0, id="constant_scalar"),
+        pytest.param(1.0, 0, id="specializable_literal"),
+        pytest.param(2.0, 1, id="runtime_literal"),
+    ],
+)
+def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):
+    """A constant costs no runtime binding, however it was written.
+
+    Everything is bound as a table on the way in; `inline_constant_scalars`
+    then replaces the constants with their values and drops those bindings. A
+    value the optimizer cannot act on stays a binding, which is the point.
+    """
+    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    executor = LogicExecutor(
+        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+    )
+    arr = np.arange(3.0)
+    with finch.with_default_scheduler(LogicNormalizer(executor)):
+        result = finch.compute(finch.defer(asarray(arr)) + operand)
+    finch_assert_allclose(result, arr + float(np.asarray(operand)))
+    scalars = [
+        t
+        for bindings in capture.all_bindings
+        for t in bindings.values()
+        if isinstance(t, ScalarFType)
+    ]
+    assert len(scalars) == bound
+
+
+def test_maybedefer_defers_every_tensor():
+    """`maybedefer` makes no judgement about fills -- it only defers tensors."""
+    A = asarray(np.arange(3.0))
+    (lazy_A, lazy_c, plain) = maybedefer((A, ConstantScalar(2.0), 2.0))
+    assert isinstance(lazy_A, LazyTensor)
+    assert isinstance(lazy_c, LazyTensor)
+    assert plain == 2.0
+
+
+class _CollectBindings(LogicCapture):
+    """A LogicCapture that keeps the bindings of every lowering, not just the last."""
+
+    def __init__(self, ctx):
+        super().__init__(ctx)
+        self.all_bindings: list[dict] = []
+
+    def lower(self, prgm, bindings, stats, stats_factory):
+        self.all_bindings.append(bindings.copy())
+        return super().lower(prgm, bindings, stats, stats_factory)
+
+
+def test_jit_inlines_literal_operands():
+    """A specializable literal in a jit body reaches the kernel as a constant."""
+
+    @jit
+    def opt_fn(A):
+        return add(A, 1.0)
+
+    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    executor = LogicExecutor(
+        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+    )
+
+    arr = np.arange(3.0)
+    with finch.with_default_scheduler(LogicNormalizer(executor)):
+        result = opt_fn(asarray(arr))
+    finch_assert_allclose(result, arr + 1.0)
+    scalars = [
+        t
+        for bindings in capture.all_bindings
+        for t in bindings.values()
+        if isinstance(t, ScalarFType)
+    ]
+    assert not scalars
+
+
+@pytest.mark.parametrize("trip_counts", [(1, 2, 4, 8, 16)])
+def test_jit_constant_folded_in_a_loop_does_not_grow_the_kernel_cache(trip_counts):
+    """A constant incremented in a loop must not cost a kernel per iteration.
+
+    `n` folds to a fresh value on every trip. Without the demotion in
+    `maybedefer` each fresh value is a fresh literal, so the program -- and the
+    kernel compiled from it -- differs per iteration and the cache grows without
+    bound in the trip count.
+    """
+
+    @jit
+    def const_loop(A, k):
+        n = 1
+        B = A
+        for _i in range(k):
+            n = n + 1
+            B = add(B, n)
+        return B
+
+    arr = np.arange(3.0)
+    counts = []
+    for k in trip_counts:
+        executor = LogicExecutor(
+            DefaultLogicOptimizer(
+                DefaultLoopOrderer(
+                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                )
+            ),
+            cache=True,
+        )
+        with finch.with_default_scheduler(LogicNormalizer(executor)):
+            result = const_loop(asarray(arr), k)
+        want = arr.copy()
+        n = 1
+        for _ in range(k):
+            n += 1
+            want = want + n
+        finch_assert_allclose(result, want)
+        counts.append(len(executor.cached_kernels))
+
+    # Flat, not linear: once the loop body has been compiled the cache stops
+    # growing, however many more trips are added.
+    assert counts[-1] == counts[-2] == counts[len(counts) // 2], counts
 
 
 def test_jit_scalar_loop():

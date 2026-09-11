@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
+    AbstractFill,
+    DynamicFill,
     DynamicFillError,
     ImmutableStructFType,
+    StaticFill,
     TupleFType,
+    as_fill,
     bool_,
     ftype,
     is_dynamic,
@@ -51,6 +55,9 @@ class FiberTensor(OverrideTensor):
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
         return FiberTensorFType(self.lvl.ftype, self._device)
+
+    def with_fill(self, fill_value: AbstractFill) -> FiberTensor:
+        return replace(self, lvl=self.lvl.with_fill(fill_value))
 
     @property
     def shape(self):
@@ -319,7 +326,13 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         """
         fmt = self
         if fill_value is not None:
-            fmt = self.with_fill(self.element_type(fill_value))
+            fill = as_fill(fill_value)
+            coerced = self.element_type(fill.value)
+            fmt = self.with_fill(
+                DynamicFill(coerced, self.element_type)
+                if is_dynamic(fill)
+                else StaticFill(coerced)
+            )
         elif is_dynamic(self.fill_value):
             raise DynamicFillError(
                 f"cannot construct {self!r} without a resolved fill value"
