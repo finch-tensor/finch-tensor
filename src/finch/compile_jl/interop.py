@@ -336,9 +336,22 @@ class JuliaBufferGroup:
 class _JuliaBufferRecord:
     tensor: Any
     group: JuliaBufferGroup
-    owners: dict[tuple[Any, ...], tuple[Any, bool]] = field(default_factory=dict)
+    owners: dict[tuple[Any, ...], _JuliaBufferOwner] = field(default_factory=dict)
     result: FiberTensor | None = None
     producer: object | None = None
+
+
+@dataclass
+class _JuliaBufferOwner:
+    python_object: Any
+    is_result: bool
+
+
+@dataclass
+class ResolvedJuliaArguments:
+    julia_args: list[Any]
+    argument_keys: tuple[tuple[Any, ...], ...]
+    argument_records: list[_JuliaBufferRecord | None]
 
 
 class JuliaBufferContext:
@@ -408,17 +421,77 @@ class JuliaBufferContext:
         is_result: bool,
     ) -> None:
         """Map a Python key to a record and record whether it represents a result."""
-        cached = self._tensors.get(key)
-        if cached is not None:
-            cached.owners.pop(key, None)
-        record.owners[key] = (obj, is_result)
+        previous_record = self._tensors.get(key)
+        if previous_record is not None:
+            previous_record.owners.pop(key, None)
+        record.owners[key] = _JuliaBufferOwner(obj, is_result)
         self._tensors[key] = record
 
     def _detach(self, key) -> None:
         """Remove a Python-to-record mapping and release that record ownership."""
-        cached = self._tensors.pop(key, None)
-        if cached is not None:
-            cached.owners.pop(key, None)
+        record = self._tensors.pop(key, None)
+        if record is not None:
+            record.owners.pop(key, None)
+
+    def _detach_record_owners(self, record: _JuliaBufferRecord) -> None:
+        """Release every Python mapping to a buffer record."""
+        for key in tuple(record.owners):
+            self._detach(key)
+
+    def _active_record_ids(self, argument_keys) -> set[int]:
+        """Return records already used as arguments in the current call."""
+        active_record_ids = set()
+        for key in argument_keys:
+            record = self._tensors.get(key)
+            if record is not None:
+                active_record_ids.add(id(record))
+        return active_record_ids
+
+    def _free_record(self, group: JuliaBufferGroup) -> _JuliaBufferRecord | None:
+        """Return an unowned record compatible with a requested input group."""
+        for record in self._groups.get(group, ()):
+            if not record.owners:
+                return record
+        return None
+
+    def _producer_result_record(
+        self,
+        group: JuliaBufferGroup,
+        producer: object | None,
+        active_record_ids: set[int],
+    ) -> _JuliaBufferRecord | None:
+        """Release and return an inactive result record owned by this producer."""
+        for record in self._groups.get(group, ()):
+            if record.producer is not producer:
+                continue
+            if id(record) in active_record_ids:
+                continue
+            if not all(owner.is_result for owner in record.owners.values()):
+                continue
+            self._detach_record_owners(record)
+            return record
+        return None
+
+    def _lease_reset_record(
+        self,
+        group: JuliaBufferGroup,
+        producer: object | None,
+        active_record_ids: set[int],
+    ) -> _JuliaBufferRecord | None:
+        """Return a compatible record available for a reset kernel argument."""
+        record = self._free_record(group)
+        if record is not None:
+            return record
+        return self._producer_result_record(group, producer, active_record_ids)
+
+    def _result_wrapper(self, record: _JuliaBufferRecord) -> FiberTensor | None:
+        """Return a record's Python result wrapper, creating it when needed."""
+        if record.result is None:
+            result = jl_tensor_to_python(record.tensor)
+            if not isinstance(result, FiberTensor):
+                return None
+            record.result = result
+        return record.result
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Return an existing Julia tensor mapping or materialize a new one."""
@@ -428,21 +501,20 @@ class JuliaBufferContext:
             return cached.tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
-        if record := self._record(jl_obj):
+        record = self._record(jl_obj)
+        if record is not None:
             self._attach(key, obj, record, is_result=False)
         return jl_obj
 
     def tensor_to_python(self, obj):
         """Return a cached Python wrapper for a Julia tensor, creating one if needed."""
         record = self._record(obj)
-        if record is not None and record.result is not None:
-            result = record.result
-        else:
-            result = jl_tensor_to_python(obj)
-            if record is not None and isinstance(result, FiberTensor):
-                record.result = result
-        if isinstance(result, FiberTensor) and record is not None:
-            self._attach(self._cache_key(result), result, record, is_result=True)
+        if record is None:
+            return jl_tensor_to_python(obj)
+        result = self._result_wrapper(record)
+        if result is None:
+            return jl_tensor_to_python(obj)
+        self._attach(self._cache_key(result), result, record, is_result=True)
         return result
 
     def prepare_result_for_record(
@@ -451,20 +523,16 @@ class JuliaBufferContext:
         """Ensure a record has a Python result wrapper before returning it."""
         if record is None:
             return None
-        if record.result is None:
-            result = jl_tensor_to_python(record.tensor)
-            if not isinstance(result, FiberTensor):
-                return None
-            record.result = result
+        if self._result_wrapper(record) is None:
+            return None
         return record
 
     def attach_result(self, record: _JuliaBufferRecord) -> FiberTensor:
         """Map a record's result wrapper back to its Julia tensor record."""
-        assert record.result is not None
-        self._attach(
-            self._cache_key(record.result), record.result, record, is_result=True
-        )
-        return record.result
+        result = self._result_wrapper(record)
+        assert result is not None
+        self._attach(self._cache_key(result), result, record, is_result=True)
+        return result
 
     def resolve_arguments(
         self,
@@ -472,79 +540,44 @@ class JuliaBufferContext:
         *,
         kernel_args: JuliaKernelArgs,
         producer: object | None = None,
-    ) -> tuple[list[Any], tuple[tuple[Any, ...], ...], list[_JuliaBufferRecord | None]]:
+    ) -> ResolvedJuliaArguments:
         """Resolve call arguments and lease compatible free buffers for reset inputs."""
 
-        keys = tuple(self._cache_key(arg) for arg in args)
-        active_records = {
-            id(cached) for key in keys if (cached := self._tensors.get(key)) is not None
-        }
-        raw_args = []
-        arg_records = []
-        for position, (arg, key) in enumerate(zip(args, keys, strict=True)):
-            cached = self._tensors.get(key)
-            if cached is not None:
-                raw_args.append(cached.tensor)
-                arg_records.append(cached)
+        argument_keys = tuple(self._cache_key(arg) for arg in args)
+        active_record_ids = self._active_record_ids(argument_keys)
+        julia_args = []
+        argument_records = []
+        for position, (arg, key) in enumerate(zip(args, argument_keys, strict=True)):
+            record = self._tensors.get(key)
+            if record is not None:
+                julia_args.append(record.tensor)
+                argument_records.append(record)
                 continue
 
-            group = self._input_group(
-                arg,
-                kernel_args.type_names[position]
-                if position < len(kernel_args.type_names)
-                else None,
-            )
-            if (
-                position in kernel_args.reset_positions
-                and keys.count(key) == 1
-                and group is not None
-            ):
-                record = next(
-                    (
-                        record
-                        for record in self._groups.get(group, ())
-                        if not record.owners
-                    ),
-                    None,
+            group = self._input_group(arg, kernel_args.type_names[position])
+            if position in kernel_args.reset_positions and group is not None:
+                record = self._lease_reset_record(
+                    group, producer, active_record_ids
                 )
-                if record is None:
-                    record = next(
-                        (
-                            record
-                            for record in self._groups.get(group, ())
-                            if record.producer is producer
-                            and id(record) not in active_records
-                            and all(
-                                is_result for _, is_result in record.owners.values()
-                            )
-                        ),
-                        None,
-                    )
-                    if record is not None:
-                        for owner in tuple(record.owners):
-                            self._detach(owner)
                 if record is not None:
                     self._attach(key, arg, record, is_result=False)
-                    raw_args.append(record.tensor)
-                    arg_records.append(record)
+                    julia_args.append(record.tensor)
+                    argument_records.append(record)
                     continue
 
-            raw_args.append(
+            julia_args.append(
                 self.tensor_to_jl(
                     arg, pin_fill=position in kernel_args.dynamic_positions
                 )
             )
-            cached = self._tensors.get(key)
-            arg_records.append(cached)
-        return raw_args, keys, arg_records
+            argument_records.append(self._tensors.get(key))
+        return ResolvedJuliaArguments(julia_args, argument_keys, argument_records)
 
     def release_reset_arguments(
         self, keys: tuple[tuple[Any, ...], ...], reset_positions: frozenset[int]
     ) -> None:
         """Release mappings for inputs overwritten by the completed kernel call."""
         for position in reset_positions:
-            if position >= len(keys):
-                continue
             key = keys[position]
             if any(
                 other_key == key and i not in reset_positions
@@ -559,11 +592,13 @@ class JuliaBufferContext:
             int(jl.objectid(item)) for item in result_items if self._is_poolable(item)
         }
         for key, raw_arg in zip(keys, raw_args, strict=True):
-            cached = self._tensors.get(key)
+            record = self._tensors.get(key)
+            if record is None:
+                continue
+            if not record.owners[key].is_result:
+                continue
             if (
-                cached is not None
-                and cached.owners[key][1]
-                and self._is_poolable(raw_arg)
+                self._is_poolable(raw_arg)
                 and int(jl.objectid(raw_arg)) not in result_ids
             ):
                 self._detach(key)
@@ -577,13 +612,15 @@ class JuliaBufferContext:
             for position in return_arg_positions
             if arg_records[position] is not None
         }
-        for key, record in zip(keys, arg_records, strict=True):
-            cached = self._tensors.get(key)
+        for key, argument_record in zip(keys, arg_records, strict=True):
+            record = self._tensors.get(key)
+            if record is None:
+                continue
+            if not record.owners[key].is_result:
+                continue
             if (
-                cached is not None
-                and cached.owners[key][1]
-                and record is not None
-                and id(record) not in returned_records
+                argument_record is not None
+                and id(argument_record) not in returned_records
             ):
                 self._detach(key)
 
@@ -591,11 +628,11 @@ class JuliaBufferContext:
         self, raw_args, result_items, reset_positions, producer
     ) -> None:
         """Mark returned reset buffers as eligible for reuse by their producer."""
-        reset_ids = {
-            int(jl.objectid(raw_args[position]))
-            for position in reset_positions
-            if position < len(raw_args) and self._is_poolable(raw_args[position])
-        }
+        reset_ids = set()
+        for position in reset_positions:
+            raw_arg = raw_args[position]
+            if self._is_poolable(raw_arg):
+                reset_ids.add(int(jl.objectid(raw_arg)))
         for item in result_items:
             if self._is_poolable(item) and int(jl.objectid(item)) in reset_ids:
                 record = self._record(item)
@@ -608,10 +645,10 @@ class JuliaBufferContext:
     ) -> None:
         """Mark statically returned reset buffers as eligible for producer reuse."""
         for position in return_arg_positions:
-            if (
-                position in reset_positions
-                and (record := arg_records[position]) is not None
-            ):
+            if position not in reset_positions:
+                continue
+            record = arg_records[position]
+            if record is not None:
                 record.producer = producer
 
     def close(self):

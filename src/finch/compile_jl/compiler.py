@@ -19,7 +19,7 @@ from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
 from .analyze import find_reset_arg_positions, find_return_arg_positions
-from .interop import JuliaBufferContext, JuliaKernelArgs
+from .interop import JuliaBufferContext, JuliaKernelArgs, ResolvedJuliaArguments
 from .julia import jl
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
@@ -123,55 +123,72 @@ class FinchJLKernel(AssemblyKernel):
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
-        raw_args, keys, arg_records = self.buffer_context.resolve_arguments(
+        resolved_args = self.buffer_context.resolve_arguments(
             args,
             kernel_args=self.kernel_args,
             producer=self,
         )
-        result = finch_fn(*raw_args)
+        result = finch_fn(*resolved_args.julia_args)
+        self.buffer_context.release_reset_arguments(
+            resolved_args.argument_keys, self.kernel_args.reset_positions
+        )
 
         if self.kernel_args.return_positions is None:
-            if jl.isa(result, jl.NamedTuple):
-                result = jl.values(result)
-            result_items = (
-                (result,) if jl.isa(result, jl.Finch.Tensor) else tuple(result)
-            )
+            return self._dynamic_results(resolved_args, result)
+        return self._static_results(resolved_args)
+
+    def _dynamic_results(self, resolved_args: ResolvedJuliaArguments, result):
+        """Release consumed inputs and convert dynamically returned Julia values."""
+        if jl.isa(result, jl.NamedTuple):
+            result = jl.values(result)
+        if jl.isa(result, jl.Finch.Tensor):
+            result_items = (result,)
         else:
-            result_items = tuple(
-                raw_args[position] for position in self.kernel_args.return_positions
-            )
-            output_records = [
-                self.buffer_context.prepare_result_for_record(arg_records[position])
-                for position in self.kernel_args.return_positions
-            ]
-        self.buffer_context.release_reset_arguments(
-            keys, self.kernel_args.reset_positions
+            result_items = tuple(result)
+        self.buffer_context.release_consumed_result_arguments(
+            resolved_args.argument_keys, resolved_args.julia_args, result_items
         )
-        if self.kernel_args.return_positions is None:
-            self.buffer_context.release_consumed_result_arguments(
-                keys, raw_args, result_items
-            )
-            self.buffer_context.mark_reset_results(
-                raw_args, result_items, self.kernel_args.reset_positions, self
-            )
-            return tuple(
-                self.buffer_context.tensor_to_python(item) for item in result_items
-            )
-        self.buffer_context.release_consumed_result_arguments_static(
-            keys, arg_records, self.kernel_args.return_positions
-        )
-        self.buffer_context.mark_reset_results_static(
-            arg_records,
-            self.kernel_args.return_positions,
+        self.buffer_context.mark_reset_results(
+            resolved_args.julia_args,
+            result_items,
             self.kernel_args.reset_positions,
             self,
         )
         return tuple(
-            self.buffer_context.attach_result(record)
-            if record is not None
-            else self.buffer_context.tensor_to_python(item)
-            for record, item in zip(output_records, result_items, strict=True)
+            self.buffer_context.tensor_to_python(item) for item in result_items
         )
+
+    def _static_results(self, resolved_args: ResolvedJuliaArguments):
+        """Return the buffers at statically known return positions."""
+        return_positions = self.kernel_args.return_positions
+        assert return_positions is not None
+        result_items = tuple(
+            resolved_args.julia_args[position] for position in return_positions
+        )
+        output_records = [
+            self.buffer_context.prepare_result_for_record(
+                resolved_args.argument_records[position]
+            )
+            for position in return_positions
+        ]
+        self.buffer_context.release_consumed_result_arguments_static(
+            resolved_args.argument_keys,
+            resolved_args.argument_records,
+            return_positions,
+        )
+        self.buffer_context.mark_reset_results_static(
+            resolved_args.argument_records,
+            return_positions,
+            self.kernel_args.reset_positions,
+            self,
+        )
+        results = []
+        for record, item in zip(output_records, result_items, strict=True):
+            if record is None:
+                results.append(self.buffer_context.tensor_to_python(item))
+            else:
+                results.append(self.buffer_context.attach_result(record))
+        return tuple(results)
 
 
 class FinchJLLibrary(AssemblyLibrary):
