@@ -46,7 +46,7 @@ def est_spgemm(factory, a, b):
     ).estimate_non_fill_values()
 
 
-def est_spgemm2(factory, a, b):
+def est_spgemm2(factory, a, b, c):
     s_a = factory(a, (Field("i"), Field("l")))
     s_b1 = factory(b, (Field("l"), Field("k")))
     product = factory.mapjoin(ffuncs.mul, s_a, s_b1)
@@ -57,8 +57,8 @@ def est_spgemm2(factory, a, b):
         product,
     )
 
-    s_b2 = factory(b, (Field("k"), Field("j")))
-    product = factory.mapjoin(ffuncs.mul, product, s_b2)
+    s_c = factory(c, (Field("k"), Field("j")))
+    product = factory.mapjoin(ffuncs.mul, product, s_c)
 
     return factory.aggregate(
         ffuncs.add,
@@ -143,7 +143,7 @@ def est_spgemm4(factory, a, b, c, d, e):
     "estimator, count",
     [
         pytest.param(est_spgemm, 2, id="spgemm-1"),
-        pytest.param(est_spgemm2, 2, id="spgemm-2"),
+        pytest.param(est_spgemm2, 3, id="spgemm-2"),
         pytest.param(est_spgemm3, 4, id="spgemm-3"),
         pytest.param(est_spgemm4, 5, id="spgemm-4"),
     ],
