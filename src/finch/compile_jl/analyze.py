@@ -62,6 +62,8 @@ def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
                 if body_result is False:
                     return False
                 return None
+            case ntn.Assign(_, ntn.Dimension()):
+                return None
             case ntn.Unpack():
                 return None
             case ntn.Declare(tns, _, _, _):
@@ -81,32 +83,27 @@ def find_reset_arg_positions(func: ntn.Function) -> frozenset[int]:
 
 
 def find_return_arg_positions(func: ntn.Function) -> tuple[int, ...] | None:
-    """Find a fixed return layout that aliases function arguments."""
+    """Find the position of return arguments in the function header."""
 
     arg_positions = {arg.name: position for position, arg in enumerate(func.args)}
-    layouts = []
+    return_values = []
 
     def rule(node):
         match node:
-            case ntn.Return(ntn.Call(ntn.Literal(op), args)) if op == make_tuple:
-                values = args
+            case ntn.Return(ntn.Call(ntn.Literal(op), values)) if op == make_tuple:
+                return_values.append(values)
             case ntn.Return(ntn.Variable() as value):
-                values = (value,)
+                return_values.append((value,))
             case ntn.Return():
-                layouts.append(None)
-                return
-            case _:
-                return
-        if all(isinstance(value, ntn.Variable) for value in values):
-            layouts.append(tuple(arg_positions.get(value.name) for value in values))
-        else:
-            layouts.append(None)
+                return_values.append(None)
 
     Rewrite(PostWalk(rule))(func.body)
-    if (
-        len(layouts) != 1
-        or layouts[0] is None
-        or any(position is None for position in layouts[0])
+    if len(return_values) != 1:
+        return None
+    values = return_values[0]
+    if values is None or not all(
+        isinstance(value, ntn.Variable) and value.name in arg_positions
+        for value in values
     ):
         return None
-    return tuple(layouts[0])
+    return tuple(arg_positions[value.name] for value in values)
