@@ -10,8 +10,8 @@ import finch as fl
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -63,7 +63,7 @@ def build_grid_uniform(
     nnz_grid_expr = Aggregate(
         Literal(ffuncs.add), Literal(np.float64(0.0)), joined, index_order
     )
-    out = Alias("blocked_uniform_nnz_grid")
+    out = HardAlias("blocked_uniform_nnz_grid")
     prgm = Plan((Query(out, nnz_grid_expr), Produces((out,))))
     (nnz_grid,) = NON_RECURSIVE_SCHEDULER(prgm)
 

@@ -201,6 +201,7 @@ class BFSLoopOrderer(AbstractLoopOrderer):
         for query in prgm.bodies[:-1]:
             match query:
                 case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                    assert isinstance(lhs, Alias)
                     idxs_2 = loop_order_bfs(
                         arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
                     )
@@ -213,6 +214,7 @@ class BFSLoopOrderer(AbstractLoopOrderer):
                 case Query(
                     lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
                 ):
+                    assert isinstance(lhs, Alias)
                     idxs_2 = loop_order_bfs(
                         arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
                     )
@@ -252,9 +254,11 @@ class DFSLoopOrderer(AbstractLoopOrderer):
         for query in prgm.bodies[:-1]:
             match query:
                 case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                    assert isinstance(lhs, Alias)
                     idxs_2 = loop_order_dfs(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )
+                    assert isinstance(lhs, Alias)
                     output_idxs = output_fields.get(lhs, rhs.fields())
                     aggregate_2 = Reorder(
                         Aggregate(op, init, Reorder(arg, idxs_2), idxs),
@@ -264,6 +268,7 @@ class DFSLoopOrderer(AbstractLoopOrderer):
                 case Query(
                     lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
                 ):
+                    assert isinstance(lhs, Alias)
                     idxs_2 = loop_order_dfs(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )
@@ -306,6 +311,7 @@ class BruteForceLoopOrderer(AbstractLoopOrderer):
                     idxs_2 = loop_order_brute_force(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )
+                    assert isinstance(lhs, Alias)
                     output_idxs = output_fields.get(lhs, rhs.fields())
                     aggregate_2 = Reorder(
                         Aggregate(op, init, Reorder(arg, idxs_2), idxs),
@@ -315,6 +321,7 @@ class BruteForceLoopOrderer(AbstractLoopOrderer):
                 case Query(
                     lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
                 ):
+                    assert isinstance(lhs, Alias)
                     idxs_2 = loop_order_brute_force(
                         arg, stats_factory, stats_bindings, rhs.fields()
                     )

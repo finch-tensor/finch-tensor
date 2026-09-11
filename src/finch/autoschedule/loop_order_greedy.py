@@ -120,6 +120,7 @@ def set_greedy_loop_order(
         # sequential or random, so pass it to the cost model.
         match query:
             case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                assert isinstance(lhs, Alias)
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, rhs.fields()
                 )
@@ -130,6 +131,7 @@ def set_greedy_loop_order(
                 )
                 new_queries.append(Query(lhs, aggregate_2))
             case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
+                assert isinstance(lhs, Alias)
                 idxs_2 = greedy_loop_order(
                     arg, stats_factory, stats_bindings, rhs.fields()
                 )

@@ -279,6 +279,7 @@ def merge_queries(plan: Plan) -> Plan:
     alias_to_query: dict[Alias, Query] = {}
     for body in bodies:
         if isinstance(body, Query):
+            assert isinstance(body.lhs, Alias)
             alias_to_query[body.lhs] = body
 
     produced_aliases: tuple[Alias, ...] = produces_stmt.args

@@ -42,6 +42,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicStatement,
@@ -211,7 +212,7 @@ class EffectBlob:
         return EffectBlob(stmt=stmt, blobs=(self,))
 
     def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
-        var = Alias(gensym("A"))
+        var = HardAlias(gensym("A"))
         return var, self.exec(Query(var, ex))
 
     def join(self, *blobs: EffectBlob) -> EffectBlob:
