@@ -345,7 +345,6 @@ class JuliaBufferGroup:
 class _JuliaBufferRecord:
     tensor: Any
     group: JuliaBufferGroup
-    owner: Any = None
     owner_key: tuple[Any, ...] | None = None
     result: FiberTensor | None = None
     result_key: tuple[Any, ...] | None = None
@@ -421,7 +420,7 @@ class JuliaBufferContext:
             is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor) and len(jl.size(obj)) > 0
         )
 
-    def _record(self, obj) -> _JuliaBufferRecord | None:
+    def _get_or_create_record(self, obj) -> _JuliaBufferRecord | None:
         """Get or register the pool record for a reusable Julia tensor."""
         if not self._is_poolable(obj):
             return None
@@ -432,20 +431,19 @@ class JuliaBufferContext:
             self._records_by_julia_id[object_id] = record
         return record
 
-    def _assign_owner(self, key, obj, record: _JuliaBufferRecord) -> None:
-        """Assign a Python argument as the active owner of a buffer record."""
+    def _assign_owner(self, key, record: _JuliaBufferRecord) -> None:
+        """Assign a Python argument key as the active owner of a buffer record."""
         if record.owner_key is not None:
             self._owned_records.pop(record.owner_key, None)
-        record.owner = obj
         record.owner_key = key
         self._owned_records[key] = record
 
-    def _claim_result_record(self, key, obj) -> _JuliaBufferRecord | None:
+    def _claim_result_record(self, key) -> _JuliaBufferRecord | None:
         """Move a returned record into the active-owner pool for an argument."""
         record = self._result_pool.claim(key)
         if record is not None:
             self._remove_result_record(record)
-            self._assign_owner(key, obj, record)
+            self._assign_owner(key, record)
             return record
         return None
 
@@ -459,7 +457,6 @@ class JuliaBufferContext:
         """Remove an active owner mapping without placing its record in a pool."""
         record = self._owned_records.pop(key, None)
         if record is not None:
-            record.owner = None
             record.owner_key = None
         return record
 
@@ -500,19 +497,19 @@ class JuliaBufferContext:
         record = self._owned_records.get(key)
         if record is not None:
             return record.tensor
-        record = self._claim_result_record(key, obj)
+        record = self._claim_result_record(key)
         if record is not None:
             return record.tensor
 
         jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
-        record = self._record(jl_obj)
+        record = self._get_or_create_record(jl_obj)
         if record is not None:
-            self._assign_owner(key, obj, record)
+            self._assign_owner(key, record)
         return jl_obj
 
     def tensor_to_python(self, obj):
         """Return a cached Python wrapper for a Julia tensor, creating one if needed."""
-        record = self._record(obj)
+        record = self._get_or_create_record(obj)
         if record is None:
             return jl_tensor_to_python(obj)
         result = self._result_wrapper(record)
@@ -534,7 +531,7 @@ class JuliaBufferContext:
         for position, (arg, key) in enumerate(zip(args, argument_keys, strict=True)):
             record = self._owned_records.get(key)
             if record is None:
-                record = self._claim_result_record(key, arg)
+                record = self._claim_result_record(key)
             if record is not None:
                 julia_args.append(record.tensor)
                 continue
@@ -548,7 +545,7 @@ class JuliaBufferContext:
                 group = JuliaBufferGroup(arg, type_name)
                 record = self._lease_reset_record(group)
                 if record is not None:
-                    self._assign_owner(key, arg, record)
+                    self._assign_owner(key, record)
                     julia_args.append(record.tensor)
                     continue
 
