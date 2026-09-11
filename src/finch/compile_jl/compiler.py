@@ -104,43 +104,8 @@ _INFIX_OPS = {
 }
 
 
-class CompiledJLKernel:
-    """Pure-data compiled-but-not-evaluated kernel: self-contained Julia
-    source text, with no Python-side values left to inject."""
-
-    def __init__(
-        self,
-        func_name: str,
-        jl_code: str,
-        dynamic_args: tuple[int, ...] = (),
-        reset_arg_positions: frozenset[int] = frozenset(),
-        arg_type_names: tuple[str | None, ...] = (),
-        return_arg_positions: tuple[int, ...] | None = None,
-    ):
-        self.func_name = func_name
-        self.jl_code = jl_code
-        self.dynamic_args = dynamic_args
-        self.reset_arg_positions = reset_arg_positions
-        self.arg_type_names = arg_type_names
-        self.return_arg_positions = return_arg_positions
-
-    def evaluate(self, buffer_context: JuliaBufferContext) -> "FinchJLKernel":
-        """Defines the kernel function in the running Julia session,
-        returning the now-callable kernel."""
-        jl.seval(self.jl_code)
-        return FinchJLKernel(
-            self.func_name,
-            self.jl_code,
-            self.dynamic_args,
-            self.reset_arg_positions,
-            self.arg_type_names,
-            self.return_arg_positions,
-            buffer_context=buffer_context,
-        )
-
-
 class FinchJLKernel(AssemblyKernel):
-    """A kernel already defined (evaluated) in the running Julia session."""
+    """A callable Julia kernel."""
 
     def __init__(
         self,
@@ -461,15 +426,15 @@ class FinchJLCompiler(NotationCompiler):
             kernel = self._kernels.get(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
-                compiled = CompiledJLKernel(
+                kernel = FinchJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
                     dynamic_args=dynamic_args,
                     reset_arg_positions=reset_arg_positions,
                     arg_type_names=arg_type_names,
                     return_arg_positions=return_arg_positions,
+                    buffer_context=self._buffer_context,
                 )
-                kernel = compiled.evaluate(buffer_context=self._buffer_context)
                 self._kernels[key] = kernel
             kernel_dict[func.name.name] = kernel
 
