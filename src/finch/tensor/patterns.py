@@ -557,6 +557,59 @@ class RepeatTensor(PatternTensor):
         return self._k > 0 and j == i // self._k
 
 
+class ChunkMaskTensor(PatternTensor):
+    """Map ``n`` indices to chunks of size ``b``.
+
+    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.
+    """
+
+    def __init__(self, shape, *, b: int, dtype=None):
+        self._b = operator.index(b)
+        if self._b <= 0:
+            raise ValueError("b must be positive")
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            b=self._b,
+        )
+        n, chunks = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if chunks != (n + self._b - 1) // self._b:
+            raise ValueError("shape[1] must equal ceil(shape[0] / b)")
+
+    def contains(self, i, j) -> bool:
+        return j == i // self._b
+
+
+class SplitMaskTensor(PatternTensor):
+    """Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.
+
+    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p <= i < n*(j+1)//p``.
+    """
+
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+        )
+        n, p = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if p <= 0:
+            raise ValueError("shape[1] must be positive")
+
+    def contains(self, i, j) -> bool:
+        n, p = self.shape
+        return n * j // p <= i < n * (j + 1) // p
+
+
 class OddEvenMergeSortPartnerMaskTensor(PatternTensor):
     def __init__(self, shape, *, p: int, k: int, dtype=None):
         self._p = p

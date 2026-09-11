@@ -101,3 +101,37 @@ eval(let
         return v2
     end
 end)
+
+# ChunkMaskTensor
+
+eval(let
+        v0 = Finch.swizzle(Finch.window(Finch.chunkmask(1, 3), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
+        v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
+        v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
+    Finch.@finch_kernel function main(v0,v1,v2)
+        v2 .= 0
+        for v3 = _
+            for v4 = _
+                v2[v4,v3] = (Bool(v0[v4,v3]) + v1[v4,v3])
+            end
+        end
+        return v2
+    end
+end)
+
+# SplitMaskTensor
+
+eval(let
+        v0 = Finch.swizzle(Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
+        v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
+        v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
+    Finch.@finch_kernel function main(v0,v1,v2)
+        v2 .= 0
+        for v3 = _
+            for v4 = _
+                v2[v4,v3] = (Bool(v0[v4,v3]) + v1[v4,v3])
+            end
+        end
+        return v2
+    end
+end)

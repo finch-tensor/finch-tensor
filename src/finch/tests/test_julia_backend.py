@@ -29,6 +29,7 @@ from finch.autoschedule import (
 from finch.autoschedule.tensor_stats import FDStatsFactory
 from finch.compile_jl.julia import julia_available
 from finch.tensor.patterns import (
+    ChunkMaskTensor,
     EyeTensor,
     LowerTriangleTensor,
     OddEvenMergeSortLowerMaskTensor,
@@ -41,6 +42,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SplitMaskTensor,
     UpperTriangleTensor,
 )
 
@@ -71,6 +73,16 @@ def _requires_julia_backend():
         ReverseTensor((3, 5)),
         *(RollTensor((7, 3), k=k) for k in (-4, 0, 5)),
         *(RepeatTensor((7, 3), k=k) for k in (-1, 0, 2)),
+        ChunkMaskTensor((10, 4), b=3),
+        ChunkMaskTensor((6, 3), b=2, dtype=np.int32),
+        ChunkMaskTensor((3, 3), b=1),
+        ChunkMaskTensor((2, 1), b=5),
+        ChunkMaskTensor((0, 0), b=3),
+        SplitMaskTensor((10, 3)),
+        SplitMaskTensor((6, 3), dtype=np.float64),
+        SplitMaskTensor((3, 5)),
+        SplitMaskTensor((3, 1)),
+        SplitMaskTensor((0, 3)),
         *(
             OddEvenMergeSortPartnerMaskTensor((7, 7), p=p, k=k)
             for p, k in ((1, 1), (2, 1), (4, 2))
@@ -153,6 +165,8 @@ def test_compile_julia_pattern_lowering(file_regression):
         RollTensor((7, 3), k=-4),
         OneHotMaskTensor(5, index=2),
         ReshapeMaskTensor((2, 3), (3, 2)),
+        ChunkMaskTensor((10, 4), b=3),
+        SplitMaskTensor((10, 3)),
     ):
         compiler.sources.append(f"# {type(mask).__name__}")
         data = np.full(mask.shape, 2, dtype=np.int64)

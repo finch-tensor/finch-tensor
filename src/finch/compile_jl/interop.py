@@ -22,6 +22,7 @@ from finch.tensor import (
 )
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.patterns import (
+    ChunkMaskTensor,
     EyeTensor,
     FillTensor,
     LowerTriangleTensor,
@@ -36,6 +37,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SplitMaskTensor,
     UpperTriangleTensor,
 )
 
@@ -306,6 +308,10 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
             mask = jl.Finch.rollmask(int(obj.shape[1]), int(obj._k))
         case RepeatTensor():
             mask = jl.Finch.repeatmask(int(obj._k))
+        case ChunkMaskTensor():
+            mask = jl.Finch.chunkmask(int(obj.shape[0]), int(obj._b))
+        case SplitMaskTensor():
+            mask = jl.Finch.splitmask(int(obj.shape[0]), int(obj.shape[1]))
         case OddEvenMergeSortPartnerMaskTensor():
             mask = jl.Finch.oddevenmergesortpartnermask(
                 int(obj.shape[1]), int(obj._p), int(obj._k)

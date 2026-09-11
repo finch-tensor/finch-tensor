@@ -16,6 +16,7 @@ from finch import (
 )
 from finch.tensor import (
     BufferizedNDArray,
+    ChunkMaskTensor,
     DenseLevel,
     ElementLevel,
     EyeTensor,
@@ -36,6 +37,7 @@ from finch.tensor import (
     RollTensor,
     SparseCOOLevel,
     SparseListLevel,
+    SplitMaskTensor,
     UpperTriangleTensor,
 )
 from finch.tensor.traits import (
@@ -336,6 +338,71 @@ def test_matrix_pattern_tensors(make_tensor, expected):
     assert tensor.shape == expected.shape
     assert tensor.fill_value.dtype == expected.dtype
     np.testing.assert_array_equal(actual, expected)
+
+
+@pytest.mark.parametrize(
+    "mask, groups",
+    [
+        (finch.ChunkMaskTensor((10, 4), b=3), [0, 0, 0, 1, 1, 1, 2, 2, 2, 3]),
+        (ChunkMaskTensor((6, 3), b=2, dtype=np.int32), [0, 0, 1, 1, 2, 2]),
+        (ChunkMaskTensor((3, 3), b=1), [0, 1, 2]),
+        (ChunkMaskTensor((2, 1), b=5), [0, 0]),
+        (ChunkMaskTensor((0, 0), b=3), []),
+        (finch.SplitMaskTensor((10, 3)), [0, 0, 0, 1, 1, 1, 2, 2, 2, 2]),
+        (SplitMaskTensor((6, 3), dtype=np.float64), [0, 0, 1, 1, 2, 2]),
+        (SplitMaskTensor((3, 5)), [1, 3, 4]),
+        (SplitMaskTensor((3, 1)), [0, 0, 0]),
+        (SplitMaskTensor((0, 3)), []),
+    ],
+)
+def test_partition_mask_tensors(mask, groups):
+    n, p = mask.shape
+    groups = np.asarray(groups, dtype=np.intp)
+    expected = (groups[:, None] == np.arange(p)[None, :]).astype(mask.fill_value.dtype)
+    reconstructed = mask.ftype.construct(mask.shape)
+    assert reconstructed.ftype == mask.ftype
+    for tensor in (mask, reconstructed):
+        actual = np.array(
+            [tensor[idx].item() for idx in np.ndindex(tensor.shape)],
+            dtype=tensor.fill_value.dtype,
+        ).reshape(tensor.shape)
+        np.testing.assert_array_equal(actual, expected)
+
+    data = np.arange(1, n + 1, dtype=np.int64)[:, None]
+    result = finch.compute(finch.sum(finch.defer(mask) * finch.defer(data), axis=0))
+    np.testing.assert_array_equal(result.to_numpy(), (expected * data).sum(axis=0))
+
+
+@pytest.mark.parametrize("b", [0, -1])
+def test_chunk_mask_requires_positive_chunk_size(b):
+    with pytest.raises(ValueError, match="b must be positive"):
+        ChunkMaskTensor((10, 4), b=b)
+
+
+def test_chunk_mask_requires_integer_chunk_size():
+    with pytest.raises(TypeError):
+        ChunkMaskTensor((10, 4), b=2.5)
+
+
+def test_chunk_mask_requires_matching_shape():
+    with pytest.raises(ValueError, match=r"shape\[1\] must equal"):
+        ChunkMaskTensor((10, 3), b=3)
+
+
+@pytest.mark.parametrize("p", [0, -1])
+def test_split_mask_requires_positive_region_count(p):
+    with pytest.raises(ValueError, match=r"shape\[1\] must be positive"):
+        SplitMaskTensor((10, p))
+
+
+@pytest.mark.parametrize(
+    "make_mask",
+    [lambda: ChunkMaskTensor((-1, 0), b=3), lambda: SplitMaskTensor((-1, 3))],
+    ids=["chunk", "split"],
+)
+def test_partition_masks_require_nonnegative_length(make_mask):
+    with pytest.raises(ValueError, match="n must be nonnegative"):
+        make_mask()
 
 
 def test_lazy_matrix_pattern_tensor_compute():

@@ -16,6 +16,7 @@ from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
 from finch.tensor.level.sparse_list_level import SparseListLevelFType
 from finch.tensor.patterns import (
+    ChunkMaskTensor,
     EyeTensor,
     FillTensorFType,
     LowerTriangleTensor,
@@ -30,6 +31,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SplitMaskTensor,
     UpperTriangleTensor,
 )
 from finch.tensor.scalar import ScalarFType
@@ -327,6 +329,10 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
                     ctor = f"Finch.rollmask({int(obj.shape[1])}, {int(obj._k)})"
                 case RepeatTensor():
                     ctor = f"Finch.repeatmask({int(obj._k)})"
+                case ChunkMaskTensor():
+                    ctor = f"Finch.chunkmask({int(obj.shape[0])}, {int(obj._b)})"
+                case SplitMaskTensor():
+                    ctor = f"Finch.splitmask({int(obj.shape[0])}, {int(obj.shape[1])})"
                 case OddEvenMergeSortPartnerMaskTensor():
                     ctor = (
                         "Finch.oddevenmergesortpartnermask("

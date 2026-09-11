@@ -242,6 +242,7 @@ from .interface import (
 from .tensor import (
     BufferizedNDArray,
     BufferizedNDArrayFType,
+    ChunkMaskTensor,
     ConstantScalar,
     EyeTensor,
     FiberTensor,
@@ -261,6 +262,7 @@ from .tensor import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SplitMaskTensor,
     UpperTriangleTensor,
     fiber_tensor,
 )
@@ -312,6 +314,7 @@ __all__ = [
     "CPUFType",
     "CPUThread",
     "CPUThreadFType",
+    "ChunkMaskTensor",
     "ConstantScalar",
     "DCStats",
     "DenseLevel",
@@ -372,6 +375,7 @@ __all__ = [
     "SparseHashLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
+    "SplitMaskTensor",
     "TaskFType",
     "Tensor",
     "TensorFType",
