@@ -1,5 +1,4 @@
 import itertools
-from functools import reduce
 from typing import overload
 
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence

@@ -180,6 +180,7 @@ class Level(FTyped, ABC):
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
     """
+
     @property
     @abstractmethod
     def shape(self) -> tuple:
@@ -230,8 +231,10 @@ class Level(FTyped, ABC):
     def buffer_type(self):
         return self.ftype.buffer_type
 
+
 class SingleDimensionLevelFType(LevelFType):
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
+
 
 class MultiDimensionLevelFType(LevelFType):
     dimension_type: ftypes.TupleFType

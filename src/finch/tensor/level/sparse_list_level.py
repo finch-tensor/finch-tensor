@@ -6,7 +6,6 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
-    FType,
     ImmutableStructFType,
     ffuncs,
     ftype,
@@ -16,8 +15,9 @@ from finch.algebra import (
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
 from finch.tensor.fiber_tensor import FiberTensorFType
-from .level import Level, LevelFType, SingleDimensionLevelFType
 from finch.tensor.scalar import Scalar, ScalarFType
+
+from .level import Level, LevelFType, SingleDimensionLevelFType
 
 
 @dataclass(unsafe_hash=True)

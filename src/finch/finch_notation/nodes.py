@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from finch.algebra import FType, ftype, return_type, TensorFType
+from finch.algebra import FType, TensorFType, ftype, return_type
 from finch.finch_assembly import AssemblyNode
 from finch.symbolic import (
     CallTerm,
@@ -217,7 +217,7 @@ class Dimension(NotationTree, NotationExpression):
 
     @property
     def result_type(self):
-        assert(isinstance(self.tns.result_type, TensorFType))
+        assert isinstance(self.tns.result_type, TensorFType)
         return self.tns.result_type.shape_type[self.r.val]
 
     @classmethod
@@ -318,7 +318,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
-        assert(isinstance(self.arg.result_type, TensorFType))
+        assert isinstance(self.arg.result_type, TensorFType)
         return self.arg.result_type.element_type
 
 

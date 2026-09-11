@@ -8,7 +8,6 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch.algebra import (
     FType,
-    FTyped,
     Tensor,
     TensorFType,
     fisinstance,
@@ -73,9 +72,7 @@ class TensorViewFType(TensorFType):
 
 
 class TensorView(Tensor):
-    def __init__(
-        self, idxs: tuple[Any, ...], tns: Tensor, op: Any = None
-    ):
+    def __init__(self, idxs: tuple[Any, ...], tns: Tensor, op: Any = None):
         """
         Initialize the TensorView with the specified indices, tensor, and operation.
 
