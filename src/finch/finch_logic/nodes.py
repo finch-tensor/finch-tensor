@@ -303,8 +303,6 @@ class Literal(LogicExpression, LiteralTerm):
         val: The literal value.
     """
 
-    val: Any
-
     def __hash__(self):
         try:
             return hash((type(self.val), self.val))

@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, Self
+from typing import Any, Generic, Self, TypeVar
 
 """
 This module contains definitions for common functions that are useful for symbolic
@@ -45,6 +45,8 @@ Notes:
     your own method to override, and call that from make_term.
 """
 
+T = TypeVar("T")
+
 
 class Term:
     @abstractmethod
@@ -72,12 +74,13 @@ class TermTree(Term, ABC):
         ...
 
 
-class LiteralTerm(Term, ABC):
+@dataclass(eq=True, frozen=True)
+class LiteralTerm(Term, ABC, Generic[T]):
     """
     A leaf term which wraps the constant `val`.
     """
 
-    val: Any
+    val: T
 
 
 class CallTerm(TermTree, ABC):

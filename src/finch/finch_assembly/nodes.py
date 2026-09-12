@@ -83,7 +83,6 @@ class AssemblyStatement(AssemblyNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
 class Literal(AssemblyExpression, LiteralTerm):
     """
     Represents the literal value `val`.
@@ -91,8 +90,6 @@ class Literal(AssemblyExpression, LiteralTerm):
     Attributes:
         val: The literal value.
     """
-
-    val: Any
 
     @property
     def result_type(self):

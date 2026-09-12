@@ -85,8 +85,6 @@ class Literal(NotationExpression, LiteralTerm):
     Notation AST expression for the literal value `val`.
     """
 
-    val: Any
-
     @property
     def result_type(self):
         return ftype(self.val)
