@@ -97,6 +97,7 @@ def level_to_jl(level: Level, pin_fill: bool = False):
                 _plus_one_buffer_to_jl(cast(Buffer, srt)),
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
+            assert isinstance(tbl, tuple)
             return jl.SparseCOOLevel(
                 level_to_jl(lvl, pin_fill),
                 tuple(int(dim) for dim in coo_shape),
@@ -146,7 +147,7 @@ def _jl_array_to_python_no_copy(v):
     return v.to_numpy(copy=False)
 
 
-def _jl_index_buffer_to_python(v) -> Buffer:
+def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
     """
     Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
     to Python's 0-based indexing without copying.

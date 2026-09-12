@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, Self
+from typing import Any, Generic, Self, TypeVar
 
 """
 This module contains definitions for common functions that are useful for symbolic
@@ -44,16 +45,18 @@ Notes:
     your own method to override, and call that from make_term.
 """
 
+T = TypeVar("T")
+
 
 class Term:
     @abstractmethod
-    def head(self) -> Any:
+    def head(self) -> Callable[..., Self]:
         """Return the head type of the S-expression."""
         ...
 
     @classmethod
     @abstractmethod
-    def make_term(cls, head: Any, *children: Term) -> Self:
+    def make_term(cls, head: Callable[..., Self], *children: Term) -> Self:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy
@@ -71,12 +74,13 @@ class TermTree(Term, ABC):
         ...
 
 
-class LiteralTerm(Term, ABC):
+@dataclass(eq=True, frozen=True)
+class LiteralTerm(Term, ABC, Generic[T]):
     """
     A leaf term which wraps the constant `val`.
     """
 
-    val: Any
+    val: T
 
 
 class CallTerm(TermTree, ABC):

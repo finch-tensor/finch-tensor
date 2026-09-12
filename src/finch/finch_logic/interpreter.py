@@ -4,7 +4,8 @@ from itertools import product
 import numpy as np
 
 import finch
-from finch.algebra import fisinstance, fixpoint_type, ftype, return_type
+from finch.algebra import TupleFType, fisinstance, fixpoint_type, ftype, return_type
+from finch.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from finch.algebra.tensor import TensorFType
 from finch.codegen.numba_codegen import to_numpy_type
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -45,11 +46,11 @@ class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
     def __init__(self, *, make_tensor=make_tensor):
         self.make_tensor = make_tensor  # Added make_tensor argument
 
-    def lower(self, node, bindings=None):
+    def lower(self, term, bindings=None):
         if bindings is None:
             bindings = {}
         machine = LogicMachine(make_tensor=self.make_tensor, bindings=bindings)
-        return machine(node)
+        return machine(term)
 
 
 class LogicMachine:
@@ -100,6 +101,7 @@ class LogicMachine:
                             dims[idx] = dim
                 fill_val = op(*[arg.tns.fill_value for arg in args])
                 dtype = return_type(op, *[arg.tns.element_type for arg in args])
+                assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
                 )
@@ -115,10 +117,11 @@ class LogicMachine:
                 arg = self(arg)
                 dtype = fixpoint_type(op, init, arg.tns.element_type)
                 new_shape = tuple(
-                    dim
+                    int(dim)
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
                     if idx not in node.idxs
                 )
+                assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
                 result = self.make_tensor(new_shape, init, dtype=dtype)
                 for crds in product(*[range(dim) for dim in arg.tns.shape]):
                     out_crds = [

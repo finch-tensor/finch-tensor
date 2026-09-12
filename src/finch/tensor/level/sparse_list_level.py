@@ -6,7 +6,6 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
-    FType,
     ImmutableStructFType,
     ffuncs,
     ftype,
@@ -16,14 +15,15 @@ from finch.algebra import (
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
 from finch.tensor.fiber_tensor import FiberTensorFType
-from finch.tensor.level import Level, LevelFType
 from finch.tensor.scalar import Scalar, ScalarFType
+
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 
 @dataclass(unsafe_hash=True)
-class SparseListLevelFType(LevelFType, ImmutableStructFType):
+class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: FType = ftypes.intp
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
     def __post_init__(self):
         self.dimension_type = ftype(self.dimension_type)
@@ -156,16 +156,16 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
     def from_numpy(self, shape, val):
         raise NotImplementedError("sparse list level doesn't support from_numpy")
 
-    def level_lower_dim(self, ctx, lvl, r):
+    def level_lower_dim(self, ctx, obj, r):
         if r == 0:
-            return asm.GetAttr(lvl, asm.Literal("dimension"))
+            return asm.GetAttr(obj, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
@@ -205,13 +205,11 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
             "SparseListLevelFType does not support level_lower_unwrap."
         )
 
-    def level_unfurl(
-        self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
-    ):
-        if not isinstance(fiber.type, FiberTensorFType):
-            raise TypeError(f"Expected FiberTensorFType, got: {fiber.type}")
-        tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
+    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos):
+        if not isinstance(lvl.type, FiberTensorFType):
+            raise TypeError(f"Expected FiberTensorFType, got: {lvl.type}")
+        tns = lvl
+        ft_ftype: FiberTensorFType = lvl.type
         lvl_asm = ctx.fiber_level(tns)
         ptr_s = asm.GetAttr(lvl_asm, asm.Literal("ptr"))
         idx_s = asm.GetAttr(lvl_asm, asm.Literal("idx"))
@@ -326,19 +324,21 @@ class SparseListLevelFType(LevelFType, ImmutableStructFType):
 
 
 def sparse_list(lvl_t, dimension_type=None):
+    if dimension_type is None:
+        dimension_type = lvl_t.dimension_type
     return SparseListLevelFType(lvl_t, dimension_type)
 
 
 @dataclass
-class SparseListLevel(Level):
+class SparseListLevel(SingleDimensionLevel):
     """
     A class representing sparse list level.
     """
 
     lvl: Level
     dimension: np.integer
-    ptr: Any | None = None
-    idx: Any | None = None
+    ptr: Any = None
+    idx: Any = None
 
     @property
     def shape(self) -> tuple:
@@ -358,9 +358,7 @@ class SparseListLevel(Level):
 
     @property
     def ftype(self) -> SparseListLevelFType:
-        # mypy does not understand that dataclasses generate __hash__ and __eq__
-        # https://github.com/python/mypy/issues/19799
-        return SparseListLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
+        return SparseListLevelFType(self.lvl.ftype, ftype(self.dimension))
 
     @property
     def val(self) -> Any:

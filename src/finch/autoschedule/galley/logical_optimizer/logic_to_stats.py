@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
+from typing import TypeVar
+
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -14,14 +17,16 @@ from finch.finch_logic import (
 )
 from finch.tensor import Scalar
 
+TS = TypeVar("TS", bound=TensorStats)
+
 
 def insert_statistics(
-    stats_factory: StatsFactory,
+    stats_factory: StatsFactory[TS],
     node: LogicNode,
-    bindings: dict[Alias, TensorStats],
+    bindings: MutableMapping[Alias, TS],
     replace: bool,
-    cache: dict[object, TensorStats],
-) -> TensorStats:
+    cache: MutableMapping[object, TS],
+) -> TS:
     if node in cache:
         return cache[node]
 

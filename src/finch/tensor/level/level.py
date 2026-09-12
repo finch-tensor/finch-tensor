@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from dataclasses import replace
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Self
 
 import numpy as np
 
@@ -9,15 +11,17 @@ from finch.algebra import (
     AbstractFill,
     FType,
     FTyped,
+    ftypes,
 )
 
 
+@dataclass
 class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
 
-    def with_fill(self, fill_value: Any) -> "LevelFType":
+    def with_fill(self, fill_value: Any) -> LevelFType:
         """Rebuild this level ftype with the leaf fill value replaced."""
         # Level ftypes are dataclasses with a `_lvl_t` child field; non-
         # dataclass levels must override.
@@ -97,21 +101,21 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         """
         Emit code to freeze `pos` previously assembled positions in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         """
         Emit code to thaw `pos` previously assembled positions in the level.
         """
@@ -147,7 +151,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> Level:
         """
         Construct a level instance with the given shape.
         """
@@ -172,7 +176,7 @@ class LevelFType(FType, ABC):
         """
         ...
 
-
+@dataclass
 class Level(FTyped, ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
@@ -205,10 +209,6 @@ class Level(FTyped, ABC):
         dynamic vs static."""
         return self.ftype.fill_value.value
 
-    def with_fill(self, fill_value: AbstractFill) -> "Level":
-        """Rebuild this level with the leaf fill value replaced."""
-        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
-
     @property
     def element_type(self):
         return self.ftype.element_type
@@ -228,3 +228,29 @@ class Level(FTyped, ABC):
     @property
     def buffer_type(self):
         return self.ftype.buffer_type
+
+    @abstractmethod
+    def with_fill(self, fill_value: AbstractFill) -> Self: ...
+
+
+class SingleDimensionLevel(Level):
+    lvl: Level
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+
+class MultiDimensionLevel(Level):
+    lvl: Level
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+class SingleDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
+
+
+class MultiDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.TupleFType

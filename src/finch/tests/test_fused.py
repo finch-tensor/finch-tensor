@@ -258,6 +258,7 @@ def _all_live_names(liveness, cfg):
 
 def _transformed_jit_source(fn):
     transformed_fn = insert_lazy_and_compute(parse_fused_function(fn))
+    assert isinstance(transformed_fn, fzd.Function)
     return ast.unparse(fused_function_to_python_ast(transformed_fn)) + "\n"
 
 

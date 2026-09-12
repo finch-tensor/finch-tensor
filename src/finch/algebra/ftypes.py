@@ -3,9 +3,13 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from finch.algebra.tensor import Tensor, TensorFType
+    from finch.codegen.buffers import NumpyBuffer, NumpyBufferFType
 
 """
 This module defines the FType class and related classes for representing data
@@ -17,10 +21,10 @@ https://data-apis.org/array-api/latest/API_specification/data_types.html
 
 class FType(ABC):
     @abstractmethod
-    def __eq__(self, other): ...
+    def __eq__(self, other) -> builtins.bool: ...
 
     @abstractmethod
-    def __hash__(self): ...
+    def __hash__(self) -> builtins.int: ...
 
     @abstractmethod
     def __call__(self, val: Any) -> Any:
@@ -38,7 +42,7 @@ class FType(ABC):
         """
         ...
 
-    def fisinstance(self, other):
+    def fisinstance(self, other) -> builtins.bool:
         """
         Check if `other` is an instance of this ftype.
         """
@@ -306,7 +310,7 @@ class _FDTypeBuiltinFloat(FDTypeNumericBuiltin, FDTypeFloat, FDTypeReal):
         """
         The finfo object for this float type.
         """
-        return _finfo(self, np.float64.finfo)
+        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
 
     @property
     def type_min(self):
@@ -330,15 +334,15 @@ class _FDTypeBuiltinComplex(FDTypeNumericBuiltin, FDTypeFloat, FDTypeComplex):
 
     @property
     def finfo(self):
-        return _finfo(self, np.float64.finfo)
+        return _finfo(self, np.float64.finfo)  # ty: ignore[unresolved-attribute]
 
     @property
     def type_min(self):
-        return self.type(complex(-np.inf, -np.inf))
+        return self.type(builtins.complex(-np.inf, -np.inf))
 
     @property
     def type_max(self):
-        return self.type(complex(np.inf, np.inf))
+        return self.type(builtins.complex(np.inf, np.inf))
 
 
 complex_ = _FDTypeBuiltinComplex()
@@ -347,7 +351,7 @@ complex_ = _FDTypeBuiltinComplex()
 class FDTypeNumpy(FDType):
     @property
     @abstractmethod
-    def dtype(self):
+    def dtype(self) -> np.dtype:
         """
         The corresponding numpy dtype for this ftype.
         """
@@ -363,7 +367,7 @@ class FDTypeNumpy(FDType):
         """
         Create an instance of this ftype with the given value.
         """
-        return self.dtype(val)
+        return self.dtype.type(val)
 
     def __promote__(self, other):
         if isinstance(other, FDTypeNumpy):
@@ -399,14 +403,14 @@ class FDTypeNumpyInteger(FDTypeInteger, FDTypeNumpy):
         """
         The minimum value for this type.
         """
-        return self.dtype(self.iinfo.min)
+        return self.dtype.type(self.iinfo.min)
 
     @property
     def type_max(self):
         """
         The maximum value for this type.
         """
-        return self.dtype(self.iinfo.max)
+        return self.dtype.type(self.iinfo.max)
 
 
 class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
@@ -430,14 +434,14 @@ class FDTypeNumpyFloat(FDTypeFloat, FDTypeNumpy):
         """
         The minimum value for this type.
         """
-        return self.dtype(-np.inf)
+        return self.dtype.type(-np.inf)
 
     @property
     def type_max(self):
         """
         The maximum value for this type.
         """
-        return self.dtype(np.inf)
+        return self.dtype.type(np.inf)
 
 
 class FDTypeNumpyComplex(FDTypeNumpyFloat, FDTypeComplex):
@@ -463,7 +467,7 @@ class _FDTypeBool(FDTypeBoolean, FDTypeNumpy):
 
     @property
     def dtype(self):
-        return np.bool_
+        return np.dtype(np.bool_)
 
     def __repr__(self):
         return "finch.bool"
@@ -483,7 +487,7 @@ bool = _FDTypeBool()
 class _FDTypeInt8(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.int8
+        return np.dtype(np.int8)
 
     def __repr__(self):
         return "finch.int8"
@@ -495,7 +499,7 @@ int8 = _FDTypeInt8()
 class _FDTypeInt16(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.int16
+        return np.dtype(np.int16)
 
     def __repr__(self):
         return "finch.int16"
@@ -507,7 +511,7 @@ int16 = _FDTypeInt16()
 class _FDTypeInt32(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.int32
+        return np.dtype(np.int32)
 
     def __repr__(self):
         return "finch.int32"
@@ -519,7 +523,7 @@ int32 = _FDTypeInt32()
 class _FDTypeInt64(FDTypeNumpyInteger, FDTypeSignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.int64
+        return np.dtype(np.int64)
 
     def __repr__(self):
         return "finch.int64"
@@ -531,7 +535,7 @@ int64 = _FDTypeInt64()
 class _FDTypeUInt8(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.uint8
+        return np.dtype(np.uint8)
 
     def __repr__(self):
         return "finch.uint8"
@@ -543,7 +547,7 @@ uint8 = _FDTypeUInt8()
 class _FDTypeUInt16(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.uint16
+        return np.dtype(np.uint16)
 
     def __repr__(self):
         return "finch.uint16"
@@ -555,7 +559,7 @@ uint16 = _FDTypeUInt16()
 class _FDTypeUInt32(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.uint32
+        return np.dtype(np.uint32)
 
     def __repr__(self):
         return "finch.uint32"
@@ -567,7 +571,7 @@ uint32 = _FDTypeUInt32()
 class _FDTypeUInt64(FDTypeNumpyInteger, FDTypeUnsignedInteger, FDTypeReal):
     @property
     def dtype(self):
-        return np.uint64
+        return np.dtype(np.uint64)
 
     def __repr__(self):
         return "finch.uint64"
@@ -579,7 +583,7 @@ uint64 = _FDTypeUInt64()
 class _FDTypeFloat32(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
-        return np.float32
+        return np.dtype(np.float32)
 
     def __repr__(self):
         return "finch.float32"
@@ -591,7 +595,7 @@ float32 = _FDTypeFloat32()
 class _FDTypeFloat16(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
-        return np.float16
+        return np.dtype(np.float16)
 
     def __repr__(self):
         return "finch.float16"
@@ -603,7 +607,7 @@ float16 = _FDTypeFloat16()
 class _FDTypeFloat64(FDTypeNumpyFloat, FDTypeReal):
     @property
     def dtype(self):
-        return np.float64
+        return np.dtype(np.float64)
 
     def __repr__(self):
         return "finch.float64"
@@ -615,7 +619,7 @@ float64 = _FDTypeFloat64()
 class _FDTypeComplex64(FDTypeNumpyComplex):
     @property
     def dtype(self):
-        return np.complex64
+        return np.dtype(np.complex64)
 
     def __repr__(self):
         return "finch.complex64"
@@ -627,7 +631,7 @@ complex64 = _FDTypeComplex64()
 class _FDTypeComplex128(FDTypeNumpyComplex):
     @property
     def dtype(self):
-        return np.complex128
+        return np.dtype(np.complex128)
 
     def __repr__(self):
         return "finch.complex128"
@@ -961,7 +965,34 @@ def isdtype(dtype, kind):
     return builtins.bool(dtype == ftype(kind))
 
 
-def ftype(x) -> FType:
+FT = TypeVar("FT", bound=FType)
+
+
+@overload
+def ftype(x: Tensor) -> TensorFType: ...
+
+
+@overload
+def ftype(x: tuple) -> TupleFType: ...
+
+
+@overload
+def ftype(x: NumpyBuffer) -> NumpyBufferFType: ...
+
+
+@overload
+def ftype(x: np.integer) -> FDTypeInteger: ...
+
+
+@overload
+def ftype(x: FT) -> FT: ...
+
+
+@overload
+def ftype(x: Any) -> FType: ...
+
+
+def ftype(x: Any) -> FType:
     """Return the corresponding FType for a given object.  Recognizes numpy,
     Python builtins, and Python tuples.  Sometimes recognizes types.
     Override .ftype to customize the ftype of an object.
@@ -1038,3 +1069,17 @@ def ftype(x) -> FType:
             )
         return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
     raise NotImplementedError
+
+
+def np_dtype(dtype) -> np.dtype:
+    if isinstance(dtype, type) and issubclass(dtype, np.generic):
+        return np.dtype(dtype)
+    if isinstance(dtype, np.dtype):
+        return dtype
+    if isinstance(dtype, FDTypeNumpy):
+        return dtype.dtype
+    if isinstance(dtype, FDTypeBuiltin):
+        return np.dtype(dtype.type)
+    if isinstance(dtype, TupleFType):
+        return np.dtype(dtype)
+    raise TypeError(f"Unsupported NumPy dtype: {dtype!r}")

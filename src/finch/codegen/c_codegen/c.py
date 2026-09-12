@@ -677,6 +677,7 @@ class CContext(Context):
                 c_setattr(obj_t, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
+                assert isinstance(f, asm.Literal)  # TODO: Handle asm.Variable
                 return c_function_call(f.val, self, *args)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
@@ -877,7 +878,7 @@ class CUnpackableFType(ABC):
 def c_getattr(fmt: FType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "c_getattr"):
-            return fmt.c_getattr(ctx, obj, attr)
+            return fmt.c_getattr(ctx, obj, attr)  # ty: ignore[call-non-callable]
         case MutableStructFType():
             return f"{obj}->{attr}"
         case ImmutableStructFType() | TupleFType():
@@ -889,7 +890,7 @@ def c_getattr(fmt: FType, ctx, obj, attr):
 def c_setattr(fmt: FType, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "c_setattr"):
-            return fmt.c_setattr(ctx, obj, attr, val)
+            return fmt.c_setattr(ctx, obj, attr, val)  # ty: ignore[call-non-callable]
         case MutableStructFType():
             return struct_mutable_setattr(fmt, ctx, obj, attr, val)
         case _:

@@ -13,7 +13,16 @@ import scipy.sparse as sps
 
 import finch
 import finch.finch_assembly as asm
-from finch import dense, element, ffuncs, fiber_tensor, ftype, sparse_list
+from finch import (
+    DenseLevelFType,
+    FiberTensorFType,
+    dense,
+    element,
+    ffuncs,
+    fiber_tensor,
+    ftype,
+    sparse_list,
+)
 from finch.algebra import ftypes
 from finch.codegen import (
     CCompiler,
@@ -1227,6 +1236,9 @@ def test_sparse_matmul_mlir_regression(file_regression, caplog):
         )
     )
 
+    assert isinstance(fmt, FiberTensorFType)
+    assert isinstance(fmt.lvl_t, DenseLevelFType)
+
     sparse_mat = []
     for arr in (a, b):
         csr = sps.csr_array(arr)
@@ -1289,6 +1301,9 @@ def test_sddmm_mlir_regression(file_regression, caplog):
             )
         )
     )
+
+    assert isinstance(sparse_fmt, FiberTensorFType)
+    assert isinstance(sparse_fmt.lvl_t, DenseLevelFType)
 
     csr = sps.csr_array(s)
     sparse_s = sparse_fmt.from_fields(

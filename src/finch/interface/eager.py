@@ -11,7 +11,7 @@ import scipy.fft as scipy_fft
 import scipy.linalg as scipy_linalg
 import scipy.sparse.linalg as scipy_sparse_linalg
 
-from finch.algebra import FinchOperator, to_numpy, to_scipy
+from finch.algebra import FinchOperator, np_dtype, to_numpy, to_scipy
 
 from . import lazy
 from .fuse import compute
@@ -863,7 +863,7 @@ def fftfreq(n, /, *, d=1.0, dtype=None, device=None):
     except NotImplementedError:
         result = np.fft.fftfreq(n, d=d)
     if dtype is not None:
-        result = result.astype(lazy._np_dtype(dtype))
+        result = result.astype(np_dtype(dtype))
     return lazy.asarray(result, device=device)
 
 
@@ -873,7 +873,7 @@ def rfftfreq(n, /, *, d=1.0, dtype=None, device=None):
     except NotImplementedError:
         result = np.fft.rfftfreq(n, d=d)
     if dtype is not None:
-        result = result.astype(lazy._np_dtype(dtype))
+        result = result.astype(np_dtype(dtype))
     return lazy.asarray(result, device=device)
 
 

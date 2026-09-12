@@ -1,3 +1,7 @@
+import itertools
+from collections.abc import Mapping, Sequence
+from typing import Generic, TypeVar
+
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -8,7 +12,6 @@ from finch.finch_logic import (
     Reorder,
     StatsFactory,
     Table,
-    TensorStats,
 )
 
 from .galley.logical_optimizer import insert_statistics
@@ -19,20 +22,25 @@ from .loop_order_cost import (
     get_reformat_set,
 )
 from .loop_ordering import AbstractLoopOrderer
+from .tensor_stats import TensorStats
+from .tensor_stats.numeric_stats import NumericStats
+
+TS = TypeVar("TS", bound=TensorStats)
+NS = TypeVar("NS", bound=NumericStats)
 
 
 def connected_loop_candidates(
     prefix: tuple[Field, ...],
-    remaining: list[Field],
-    conjunct_stats: list[TensorStats],
-    disjunct_stats: list[TensorStats],
+    remaining: Sequence[Field],
+    conjunct_stats: Sequence[TensorStats],
+    disjunct_stats: Sequence[TensorStats],
 ) -> list[Field]:
     """All fields still available for the next loop index."""
     return list(remaining)
 
 
 def transpose_penalty(
-    input_stats: list[TensorStats],
+    input_stats: Sequence[TensorStats],
     prefix: tuple[Field, ...],
     charged: frozenset[int],
 ) -> float:
@@ -53,7 +61,7 @@ def transpose_penalty(
 def greedy_loop_order(
     expr: LogicExpression,
     stats_factory: StatsFactory,
-    stats_bindings: dict[Alias, TensorStats],
+    stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
 ) -> tuple[Field, ...]:
     """Build a loop order one index at a time, appending the cheapest candidate.
@@ -67,15 +75,15 @@ def greedy_loop_order(
     if not all_vars:
         return ()
 
-    stats_bindings_2 = stats_bindings.copy()
-    cache: dict[object, TensorStats] = {}
+    stats_bindings_2 = dict(stats_bindings)
+    cache: dict[object, NS] = {}
     conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
         expr, stats_factory, stats_bindings_2, cache
     )
 
     # Deduplicated by identity, matching how loop_order_cost charges reformats.
-    input_stats: list[TensorStats] = []
-    for stat in conjunct_stats + disjunct_stats:
+    input_stats: list[NS] = []
+    for stat in itertools.chain(conjunct_stats, disjunct_stats):
         if not any(stat is seen for seen in input_stats):
             input_stats.append(stat)
 
@@ -104,15 +112,15 @@ def greedy_loop_order(
 
 def set_greedy_loop_order(
     plan: Plan,
-    stats_factory: StatsFactory,
-    stats: dict[Alias, TensorStats],
+    stats_factory: StatsFactory[NS],
+    stats: dict[Alias, NS],
     *,
     output_fields: dict[Alias, tuple[Field, ...]] | None = None,
 ) -> Plan:
     if output_fields is None:
         output_fields = {}
     stats_bindings = dict(stats)
-    cache: dict[object, TensorStats] = {}
+    cache: dict[object, NS] = {}
 
     new_queries = []
     for query in plan.bodies[:-1]:
@@ -151,12 +159,12 @@ def set_greedy_loop_order(
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class GreedyLoopOrderer(AbstractLoopOrderer):
+class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
     def set_loop_orders(
         self,
         prgm: Plan,
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
+        stats: dict[Alias, NS],
+        stats_factory: StatsFactory[NS],
         *,
         output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:

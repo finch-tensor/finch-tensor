@@ -58,7 +58,7 @@ def compute_shape_vars(
     prgm: ein.EinsumStatement,
     bindings: dict[ein.Alias, TensorFType],
 ) -> dict[ein.Alias, tuple[ein.Index | None, ...]]:
-    groups: dict[ein.Index, set[ein.Index]] = {}
+    groups: dict[ein.Index, set[ein.Index | None]] = {}
     dim_bindings: dict[ein.Alias, tuple[ein.Index | None, ...]] = {}
     for var, tns in bindings.items():
         idxs = [ein.Index(f"{var.name}_i_{i}") for i in range(tns.ndim)]
@@ -79,6 +79,7 @@ def compute_shape_vars(
             dim1, dim2 = dim2, dim1
         groups[dim1].update(groups[dim2])
         for idx in groups[dim2]:
+            assert idx is not None
             groups[idx] = groups[dim1]
         return dim1
 

@@ -625,8 +625,8 @@ class AssemblyContext(Context):
                 self.exec(
                     asm.Function(
                         asm.Variable(func_n, ret_t),
-                        [ctx(arg) for arg in args],
-                        asm.Block([*blk.emit(), asm.Return(ctx.func_state.return_var)]),
+                        tuple(ctx(arg) for arg in args),
+                        asm.Block((*blk.emit(), asm.Return(ctx.func_state.return_var))),
                     )
                 )
                 return None

@@ -279,7 +279,7 @@ def numba_jitclass_type(t: FType) -> Any:
     """
     match t:
         case _ if hasattr(t, "numba_jitclass_type"):
-            return t.numba_jitclass_type()
+            return t.numba_jitclass_type()  # ty: ignore[call-non-callable]
         case algebra.ftypes.FDTypeNumpy():
             return numba.from_dtype(t.dtype)
         case algebra.int_:
@@ -888,7 +888,7 @@ def struct_numba_getattr(fmt: StructFType, ctx, obj, attr):
 def numba_getattr(fmt: StructFType, ctx, obj, attr):
     match fmt:
         case _ if hasattr(fmt, "numba_getattr"):
-            return fmt.numba_getattr(ctx, obj, attr)
+            return fmt.numba_getattr(ctx, obj, attr)  # ty: ignore[call-non-callable]
         case TupleFType() | ImmutableStructFType():
             return immutable_struct_numba_getattr(fmt, ctx, obj, attr)
         case StructFType():
@@ -910,7 +910,7 @@ def struct_numba_setattr(fmt: StructFType, ctx, obj, attr, val):
 def numba_setattr(fmt: StructFType, ctx, obj, attr, val):
     match fmt:
         case _ if hasattr(fmt, "numba_setattr"):
-            return fmt.numba_setattr(ctx, obj, attr, val)
+            return fmt.numba_setattr(ctx, obj, attr, val)  # ty: ignore[call-non-callable]
         case MutableStructFType():
             return struct_numba_setattr(fmt, ctx, obj, attr, val)
         case _:

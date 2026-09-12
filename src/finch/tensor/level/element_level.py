@@ -63,7 +63,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
-            self.position_type = np.intp
+            self.position_type = ftype(np.intp)
         self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
         fill = as_fill(self.fill_value)
@@ -143,12 +143,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         fmt = self if fill is None else self.with_fill(fill)
         return ElementLevel(_format=fmt, _val=val)
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
-        buf = asm.GetAttr(lvl, asm.Literal("val"))
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        buf = asm.GetAttr(tns, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
         init_e: asm.AssemblyExpression = (
             # The init value arrives at bind time through the fill field.
-            asm.GetAttr(lvl, asm.Literal("fill"))
+            asm.GetAttr(tns, asm.Literal("fill"))
             if is_dynamic(getattr(init, "val", None))
             else asm.Literal(init.val)
         )
@@ -186,7 +186,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
     def from_numpy(self, shape, val):
