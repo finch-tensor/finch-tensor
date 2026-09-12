@@ -12,7 +12,7 @@ from finch.algebra import (
     ftypes,
 )
 
-from .level import Level, LevelFType, MultiDimensionLevelFType, MultiDimensionLevel
+from .level import Level, LevelFType, MultiDimensionLevel, MultiDimensionLevelFType
 
 
 class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):

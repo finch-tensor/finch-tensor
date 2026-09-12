@@ -14,7 +14,7 @@ from finch.compile.lower import SymbolicExtent
 from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
-from .level import Level, LevelFType, SingleDimensionLevelFType, SingleDimensionLevel
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 
 @dataclass(unsafe_hash=True)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from typing import Any, Self
@@ -20,7 +21,7 @@ class LevelFType(FType, ABC):
     An abstract base class representing the ftype of levels.
     """
 
-    def with_fill(self, fill_value: Any) -> "LevelFType":
+    def with_fill(self, fill_value: Any) -> LevelFType:
         """Rebuild this level ftype with the leaf fill value replaced."""
         # Level ftypes are dataclasses with a `_lvl_t` child field; non-
         # dataclass levels must override.
@@ -150,7 +151,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> Level:
         """
         Construct a level instance with the given shape.
         """
@@ -230,8 +231,7 @@ class Level(FTyped, ABC):
         return self.ftype.buffer_type
 
     @abstractmethod
-    def with_fill(self, fill_value: AbstractFill) -> Self:
-        ...
+    def with_fill(self, fill_value: AbstractFill) -> Self: ...
 
 
 class SingleDimensionLevel(Level):
@@ -241,8 +241,7 @@ class SingleDimensionLevel(Level):
 
     @property
     @abstractmethod
-    def lvl(self) -> Level:
-        ...
+    def lvl(self) -> Level: ...
 
 
 class MultiDimensionLevel(Level):
@@ -252,8 +251,8 @@ class MultiDimensionLevel(Level):
 
     @property
     @abstractmethod
-    def lvl(self) -> Level:
-        ...
+    def lvl(self) -> Level: ...
+
 
 class SingleDimensionLevelFType(LevelFType):
     dimension_type: ftypes.FDTypeInteger = ftypes.intp

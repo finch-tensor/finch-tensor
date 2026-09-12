@@ -449,9 +449,7 @@ class Table(LogicTree, LogicExpression):
         """Returns fields of the node."""
         return self.idxs
 
-    def dimmap(
-        self, op: Callable, dim_bindings: dict[Alias, TBind]
-    ) -> TBind:
+    def dimmap(self, op: Callable, dim_bindings: dict[Alias, TBind]) -> TBind:
         if isinstance(self.tns, Alias):
             if self.tns not in dim_bindings:
                 raise NotImplementedError(
