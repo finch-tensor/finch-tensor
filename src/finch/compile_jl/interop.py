@@ -97,6 +97,7 @@ def level_to_jl(level: Level, pin_fill: bool = False):
                 _plus_one_buffer_to_jl(cast(Buffer, srt)),
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
+            assert isinstance(tbl, tuple)
             return jl.SparseCOOLevel(
                 level_to_jl(lvl, pin_fill),
                 tuple(int(dim) for dim in coo_shape),
