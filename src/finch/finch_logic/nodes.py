@@ -169,6 +169,7 @@ class LogicTree(LogicNode, TermTree, ABC):
 
 
 T = TypeVar("T", bound=LogicNode)
+TBind = TypeVar("TBind")
 
 
 class LogicExpression(LogicNode):
@@ -188,7 +189,7 @@ class LogicExpression(LogicNode):
     def dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[T | None, ...]],
+        dim_bindings: dict[Alias, TBind],
     ) -> tuple[T | None, ...]:
         """Compute per-dimension values, combining using `op`. When dimensions
         are expanded, None is used. When dimensions are contracted, the value
@@ -200,7 +201,7 @@ class LogicExpression(LogicNode):
         self,
         f: Callable,
         g: Callable,
-        bindings: dict[Alias, Tm],
+        bindings: dict[Alias, TBind],
     ) -> T:
         """Compute per-tensor values. `f(op, args)` is used to combine values in
         mapjoin, and `g(op, init, arg)` is used to combine values in
@@ -209,7 +210,7 @@ class LogicExpression(LogicNode):
 
     def shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[FType | None, ...]],
+        dim_bindings: dict[Alias, TBind],
     ) -> tuple[FType | None, ...]:
         """Returns the shape type of the node."""
         return self.dimmap(merge_dim_type, dim_bindings)
@@ -221,11 +222,11 @@ class LogicExpression(LogicNode):
         """Returns the shape of the node."""
         return self.dimmap(merge_dim, dim_bindings)
 
-    def element_type(self, bindings: dict[Alias, FType]) -> FType:
+    def element_type(self, bindings: dict[Alias, TBind]) -> FType:
         """Returns element type of the node."""
         return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
 
-    def fill_value(self, bindings: dict[Alias, AbstractFill]) -> AbstractFill:
+    def fill_value(self, bindings: dict[Alias, TBind]) -> AbstractFill:
         """Returns fill value of the node."""
         return self.valmap(merge_fill_value, reduce_fill_value, bindings)
 
@@ -244,7 +245,7 @@ class LogicStatement(LogicNode):
     def infer_dimmap(
         self,
         op: Callable,
-        dim_bindings: dict[Alias, tuple[Tm | None, ...]],
+        dim_bindings: dict[Alias, TBind],
     ) -> dict[Alias, tuple[Tm | None, ...]]:
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
@@ -255,7 +256,7 @@ class LogicStatement(LogicNode):
         self,
         f: Callable,
         g: Callable,
-        bindings: dict[Alias, T],
+        bindings: dict[Alias, TBind],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
@@ -263,7 +264,7 @@ class LogicStatement(LogicNode):
 
     def infer_shape_type(
         self,
-        dim_bindings: dict[Alias, tuple[FType | None, ...]],
+        dim_bindings: dict[Alias, TBind],
     ) -> dict[Alias, tuple[FType | None, ...]]:
         """Infers shape_type for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
@@ -277,13 +278,13 @@ class LogicStatement(LogicNode):
         will be stored in the dictionary passed to the method."""
         return self.infer_dimmap(merge_dim, dim_bindings)
 
-    def infer_element_type(self, bindings: dict[Alias, FType]) -> dict[Alias, FType]:
+    def infer_element_type(self, bindings: dict[Alias, TBind]) -> dict[Alias, FType]:
         """Infers element types for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
 
     def infer_fill_value(
-        self, bindings: dict[Alias, AbstractFill]
+        self, bindings: dict[Alias, TBind]
     ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
@@ -449,15 +450,15 @@ class Table(LogicTree, LogicExpression):
         return self.idxs
 
     def dimmap(
-        self, op: Callable, dim_bindings: dict[Alias, tuple[Tm | None, ...]]
-    ) -> tuple[Tm | None, ...]:
+        self, op: Callable, dim_bindings: dict[Alias, TBind]
+    ) -> TBind:
         if isinstance(self.tns, Alias):
             if self.tns not in dim_bindings:
                 raise NotImplementedError(
                     f"Cannot resolve dims of Alias {self.tns.name}"
                 )
             return dim_bindings[self.tns]
-        raise NotImplementedError("Cannot resolve dims of Tables")
+        raise NotImplementedError(f"Cannot resolve dims of {type(self.tns).__name__}")
 
     def valmap(
         self,
