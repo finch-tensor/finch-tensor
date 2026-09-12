@@ -176,7 +176,6 @@ class LevelFType(FType, ABC):
         """
         ...
 
-
 @dataclass
 class Level(FTyped, ABC):
     """
@@ -235,24 +234,19 @@ class Level(FTyped, ABC):
 
 
 class SingleDimensionLevel(Level):
+    lvl: Level
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
-
-    @property
-    @abstractmethod
-    def lvl(self) -> Level: ...
 
 
 class MultiDimensionLevel(Level):
+    lvl: Level
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
-
-    @property
-    @abstractmethod
-    def lvl(self) -> Level: ...
-
 
 class SingleDimensionLevelFType(LevelFType):
     dimension_type: ftypes.FDTypeInteger = ftypes.intp

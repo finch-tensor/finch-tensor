@@ -238,7 +238,6 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
                 arg_i = args[i]
                 arg_ip1 = args[i + 1]
                 assert isinstance(arg_i, Token)
-                assert isinstance(arg_ip1, Token)
                 arg = _parse_einop_expr(arg_ip1)
                 op = ein.Literal(nary_ops[arg_i.value])
                 expr = ein.Call(op, (expr, arg))
