@@ -5,8 +5,6 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import TYPE_CHECKING, TypeVar
 
-import numpy as np
-
 from finch import finch_logic as lgc
 from finch.algebra import (
     AbstractFill,
@@ -15,8 +13,8 @@ from finch.algebra import (
     ffuncs,
     ftype,
     ftypes,
+    np_dtype,
 )
-from finch.algebra.ftypes import np_dtype
 from finch.finch_logic import LogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
 from finch.tensor import dense, element, fiber_tensor, sparse_hash
@@ -105,8 +103,8 @@ def optimize_format(
 def total_tree_cost(
     lvl, fields, stats, stats_factory, num_pos, level, candidates, leaf_cost_fn
 ):
-    val_size = np.dtype(ftype(lvl.fill_value).dtype).itemsize
-    pos_size = np.dtype(ftype(lvl.position_type).dtype).itemsize
+    val_size = np_dtype(ftype(lvl.fill_value)).itemsize
+    pos_size = np_dtype(ftype(lvl.position_type)).itemsize
 
     if level == len(fields):
         return leaf_cost_fn(num_pos, val_size, pos_size)

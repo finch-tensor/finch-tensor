@@ -3,8 +3,6 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
 
-import numpy as np
-
 import numba
 
 from finch import algebra
@@ -227,19 +225,6 @@ class NumbaArgumentFType(FType, ABC):
         Construct and return an object from Numba returned value.
         """
         ...
-
-
-def to_numpy_type(t: FType) -> np.dtype:
-    """Return a NumPy dtype for a Finch scalar/data type."""
-    if isinstance(t, TupleFType):
-        return np.dtype(
-            [(name, to_numpy_type(field_t)) for name, field_t in t.struct_fields]
-        )
-    if isinstance(t, algebra.ftypes.FDTypeNumpy):
-        return np.dtype(t.dtype)
-    if isinstance(t, algebra.ftypes.FDTypeBuiltin):
-        return np.dtype(t.type)
-    raise NotImplementedError(f"No NumPy dtype mapping for {t}")
 
 
 def numba_type(t: FType) -> Any:

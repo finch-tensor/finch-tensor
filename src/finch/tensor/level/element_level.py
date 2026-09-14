@@ -14,6 +14,7 @@ from finch.algebra import (
     as_fill,
     ftype,
     is_dynamic,
+    np_dtype,
 )
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
@@ -46,8 +47,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         # no inner level
         # cost = num_pos * bytes per value
-        elem_type = getattr(self.element_type, "dtype", np.float64)
-        val_size = np.dtype(elem_type).itemsize
+        assert self.element_type is not None
+        val_size = np_dtype(self.element_type).itemsize
         return num_pos * val_size
 
     def __post_init__(self):

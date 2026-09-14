@@ -507,15 +507,7 @@ def asarray(
             np_arr = np.asarray(obj)
             if np_arr.dtype != object:
                 if dtype is not None:
-                    ft = ftype(dtype)
-                    np_dtype = (
-                        ft.dtype
-                        if hasattr(ft, "dtype")
-                        else ft.type
-                        if hasattr(ft, "type")
-                        else dtype
-                    )
-                    np_arr = np_arr.astype(np_dtype)
+                    np_arr = np_arr.astype(np_dtype(ftype(dtype)))
                 elif copy is True:
                     np_arr = np_arr.copy()
                 return BufferizedNDArray.from_numpy(np_arr, device=device)

@@ -100,8 +100,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         return self._lvl_t
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
-        pos_type = getattr(self.position_type, "dtype", np.intp)
-        pos_size = np.dtype(pos_type).itemsize
+        pos_size = ftypes.np_dtype(self.position_type).itemsize
         size_ptr = (num_pos + 1) * pos_size
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:

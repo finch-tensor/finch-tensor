@@ -55,6 +55,12 @@ class FType(ABC):
 
 
 class FDType(FType):
+    @property
+    @abstractmethod
+    def dtype(self) -> np.dtype:
+        """The NumPy dtype used to store values of this data type."""
+        ...
+
     def __promote__(self, other):
         """
         Return the result of promoting this type with another type.
@@ -181,6 +187,10 @@ def _iinfo(dtype: FDTypeInteger, info) -> IInfo:
 
 
 class FDTypeBuiltin(FDType):
+    @property
+    def dtype(self) -> np.dtype:
+        return np.dtype(self.type)
+
     @property
     @abstractmethod
     def type(self):
@@ -351,14 +361,6 @@ complex_ = _FDTypeBuiltinComplex()
 
 
 class FDTypeNumpy(FDType):
-    @property
-    @abstractmethod
-    def dtype(self) -> np.dtype:
-        """
-        The corresponding numpy dtype for this ftype.
-        """
-        ...
-
     def __eq__(self, other):
         return isinstance(other, FDTypeNumpy) and self.dtype == other.dtype
 
@@ -800,6 +802,12 @@ class TupleFType(ImmutableStructFType, FDType):
     def __init__(self, struct_types):
         self._struct_types = struct_types
 
+    @property
+    def dtype(self) -> np.dtype:
+        return np.dtype(
+            [(name, np_dtype(field_type)) for name, field_type in self.struct_fields]
+        )
+
     def __repr__(self):
         return f"TupleFType(({', '.join(map(repr, self._struct_types))},))"
 
@@ -1074,10 +1082,6 @@ def ftype(x: Any) -> FType:
 
 
 def np_dtype(dtype: FType) -> np.dtype:
-    if isinstance(dtype, FDTypeNumpy):
+    if isinstance(dtype, FDType):
         return dtype.dtype
-    if isinstance(dtype, FDTypeBuiltin):
-        return np.dtype(dtype.type)
-    if isinstance(dtype, TupleFType):
-        return np.dtype(dtype)
     raise TypeError(f"Unsupported NumPy dtype: {dtype!r}")

@@ -11,6 +11,7 @@ from finch.algebra import (
     ftype,
     ftypes,
     is_dynamic,
+    np_dtype,
 )
 from finch.compile import looplets as lplt
 from finch.finch_assembly import parse_assembly
@@ -98,7 +99,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         return self.buffer_factory(self.dimension_type)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
-        pos_size = np.dtype(self.position_type.dtype).itemsize
+        pos_size = np_dtype(self.position_type).itemsize
         size_ptr = (num_pos + 1) * pos_size
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:

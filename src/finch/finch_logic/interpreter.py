@@ -4,10 +4,16 @@ from itertools import product
 import numpy as np
 
 import finch
-from finch.algebra import TupleFType, fisinstance, fixpoint_type, ftype, return_type
+from finch.algebra import (
+    TupleFType,
+    fisinstance,
+    fixpoint_type,
+    ftype,
+    np_dtype,
+    return_type,
+)
 from finch.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from finch.algebra.tensor import TensorFType
-from finch.codegen.numba_codegen import to_numpy_type
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
 from finch.tensor.scalar import Scalar
@@ -37,7 +43,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 def make_tensor(shape, fill_value, *, dtype=None):
     dtype = ftype(fill_value) if dtype is None else ftype(dtype)
-    arr = np.empty(shape, dtype=np.dtype(to_numpy_type(dtype)))
+    arr = np.empty(shape, dtype=np_dtype(dtype))
     arr[...] = fill_value
     return finch.asarray(arr)
 

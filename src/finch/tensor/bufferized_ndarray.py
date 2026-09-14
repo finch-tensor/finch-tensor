@@ -20,9 +20,9 @@ from finch.algebra import (
     ftype,
     is_dynamic,
     normalize_device,
+    np_dtype,
 )
 from finch.codegen import NumpyBuffer, NumpyBufferFType
-from finch.codegen.numba_codegen import to_numpy_type
 from finch.compile import looplets as lplt
 from finch.compile.lower import AssemblyContext, FinchTensorFType
 
@@ -343,7 +343,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         fill_value: Any = None,
     ) -> BufferizedNDArray:
         fill = self.fill_value if fill_value is None else as_fill(fill_value)
-        arr = np.empty(shape, dtype=to_numpy_type(self.element_type))
+        arr = np.empty(shape, dtype=np_dtype(self.element_type))
         arr[...] = fill.value
         return self.from_numpy(arr, fill_value=fill)
 
