@@ -5415,9 +5415,9 @@
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inline_constant_scalars</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Replace each reference to a bound `ConstantScalar` with its value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">constants</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">produced</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
@@ -5436,7 +5436,7 @@
         <span class="k">return</span> <span class="n">prgm</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">constant_ref</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Alias</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The constant `node` refers to, if it is exactly such a reference.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The constant `node` refers to, if it is exactly such a reference."""</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span> <span class="p">(</span>
                 <span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">tns</span><span class="p">,</span> <span class="p">())</span>
@@ -5560,9 +5560,9 @@
 <span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_names</span><span class="p">(</span>
     <span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicNode</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Normalizes names of aliases and fields in the logic program to avoid conflicts.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">bindings</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">spc</span> <span class="o">=</span> <span class="n">Namespace</span><span class="p">()</span>
@@ -5573,13 +5573,13 @@
             <span class="k">case</span> <span class="n">Alias</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
-                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
+                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)</span>
                 <span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_name</span>
                 <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
-                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">)</span>
+                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i"</span><span class="p">)</span>
                 <span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_name</span>
                 <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>

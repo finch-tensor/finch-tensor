@@ -4741,17 +4741,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#finch.tensor.level.level.Level.with_fill" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        with_fill
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -4980,6 +4969,62 @@
         
           <li class="md-nav__item">
   <a href="#finch.tensor.level.level.LevelFType.with_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.MultiDimensionLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiDimensionLevel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MultiDimensionLevel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.MultiDimensionLevel.with_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.SingleDimensionLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SingleDimensionLevel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SingleDimensionLevel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.SingleDimensionLevel.with_fill" class="md-nav__link">
     <span class="md-ellipsis">
       
         with_fill
@@ -5550,17 +5595,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#finch.tensor.level.level.Level.with_fill" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        with_fill
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -5803,6 +5837,62 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.MultiDimensionLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MultiDimensionLevel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="MultiDimensionLevel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.MultiDimensionLevel.with_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.SingleDimensionLevel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SingleDimensionLevel
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SingleDimensionLevel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.tensor.level.level.SingleDimensionLevel.with_fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5859,6 +5949,10 @@
             <code>Level</code>
 
 
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
 </h2>
 
 
@@ -5880,11 +5974,7 @@ a tensor.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
@@ -5934,18 +6024,23 @@ a tensor.</p>
 <span class="normal">227</span>
 <span class="normal">228</span>
 <span class="normal">229</span>
-<span class="normal">230</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Level</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Level</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An abstract base class representing a fiber allocator that manages fibers in</span>
 <span class="sd">    a tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Shape of the fibers in the structure.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
@@ -5962,13 +6057,9 @@ a tensor.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill value itself; see `self.ftype.fill_value` for</span>
-<span class="sd">        dynamic vs static.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The fill value itself; see `self.ftype.fill_value` for</span>
+<span class="sd">        dynamic vs static."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Level&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rebuild this level with the leaf fill value replaced.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5989,6 +6080,9 @@ a tensor.</p>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">buffer_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">buffer_type</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span> <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6051,33 +6145,6 @@ dynamic vs static.</p>
 
 
 
-<div class="doc doc-object doc-function">
-
-
-<h3 id="finch.tensor.level.level.Level.with_fill" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Rebuild this level with the leaf fill value replaced.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Level&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rebuild this level with the leaf fill value replaced.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
 
 
   </div>
@@ -6093,6 +6160,10 @@ dynamic vs static.</p>
 <h2 id="finch.tensor.level.level.LevelFType" class="doc doc-heading">
             <code>LevelFType</code>
 
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
 
 </h2>
 
@@ -6114,10 +6185,7 @@ dynamic vs static.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 15</span>
-<span class="normal"> 16</span>
-<span class="normal"> 17</span>
-<span class="normal"> 18</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 18</span>
 <span class="normal"> 19</span>
 <span class="normal"> 20</span>
 <span class="normal"> 21</span>
@@ -6272,69 +6340,74 @@ dynamic vs static.</p>
 <span class="normal">170</span>
 <span class="normal">171</span>
 <span class="normal">172</span>
-<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LevelFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An abstract base class representing the ftype of levels.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;LevelFType&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rebuild this level ftype with the leaf fill value replaced.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LevelFType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Rebuild this level ftype with the leaf fill value replaced."""</span>
         <span class="c1"># Level ftypes are dataclasses with a `_lvl_t` child field; non-</span>
         <span class="c1"># dataclass levels must override.</span>
         <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_lvl_t</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl_expr</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Assembly expression reading the runtime fill from the leaf level&#39;s</span>
-<span class="sd">        fill field, descending from this level&#39;s struct expression.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_expr</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)))</span>
+<span class="w">        </span><span class="sd">"""Assembly expression reading the runtime fill from the leaf level's</span>
+<span class="sd">        fill field, descending from this level's struct expression."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_expr</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)))</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Number of dimensions of the fibers in the structure.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Fill value of the fibers, and whether kernels may specialize on it.</span>
 <span class="sd">        Use `.value` for the value itself.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Type of elements stored in the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Tuple of types of the dimensions in the shape.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">position_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Type of positions within the levels.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">buffer_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Function to create default buffers for the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
@@ -6344,92 +6417,92 @@ dynamic vs static.</p>
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lvl_t</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the nested level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Defines cost for a level</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to unfurl the fiber at position `pos` in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to freeze `pos` previously assembled positions in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to thaw `pos` previously assembled positions in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to return the unwrapped scalar at position `pos` in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to increment position `pos` in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to lower a declare of `pos` previously assembled positions in</span>
 <span class="sd">        the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Emit code to return the size of dimension `r` of the subtensors in the level.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Level&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Level</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Construct a level instance with the given shape.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Construct level from numpy array</span>
 <span class="sd">        (TODO not strictly safe, only works for dense, replace later)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_format_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the format properties contributed by this level type and children.</span>
 
 <span class="sd">        ``n`` is the outer dimension index represented by this level. Nested</span>
 <span class="sd">        levels use increasing indices, so the returned properties can describe how</span>
 <span class="sd">        this dimension constrains dimensions further inside the fiber tree.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6629,16 +6702,16 @@ Use <code>.value</code> for the value itself.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Level&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Level</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct a level instance with the given shape.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6667,18 +6740,18 @@ Use <code>.value</code> for the value itself.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
 <span class="normal">161</span>
-<span class="normal">162</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct level from numpy array</span>
 <span class="sd">    (TODO not strictly safe, only works for dense, replace later)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6706,16 +6779,16 @@ Use <code>.value</code> for the value itself.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Defines cost for a level</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6746,24 +6819,24 @@ this dimension constrains dimensions further inside the fiber tree.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
 <span class="normal">171</span>
 <span class="normal">172</span>
-<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_format_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the format properties contributed by this level type and children.</span>
 
 <span class="sd">    ``n`` is the outer dimension index represented by this level. Nested</span>
 <span class="sd">    levels use increasing indices, so the returned properties can describe how</span>
 <span class="sd">    this dimension constrains dimensions further inside the fiber tree.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6792,18 +6865,18 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
 <span class="normal">139</span>
-<span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to lower a declare of `pos` previously assembled positions in</span>
 <span class="sd">    the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6831,16 +6904,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to return the size of dimension `r` of the subtensors in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6852,7 +6925,7 @@ the level.</p>
 
 
 <h3 id="finch.tensor.level.level.LevelFType.level_lower_freeze" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">level_lower_freeze</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">level_lower_freeze</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -6868,16 +6941,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to freeze `pos` previously assembled positions in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6905,16 +6978,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to increment position `pos` in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6926,7 +6999,7 @@ the level.</p>
 
 
 <h3 id="finch.tensor.level.level.LevelFType.level_lower_thaw" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">level_lower_thaw</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">level_lower_thaw</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -6942,16 +7015,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to thaw `pos` previously assembled positions in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6979,16 +7052,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to return the unwrapped scalar at position `pos` in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7000,7 +7073,7 @@ the level.</p>
 
 
 <h3 id="finch.tensor.level.level.LevelFType.level_unfurl" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">level_unfurl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">level_unfurl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -7016,16 +7089,16 @@ the level.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Emit code to unfurl the fiber at position `pos` in the level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7050,13 +7123,13 @@ fill field, descending from this level's struct expression.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl_expr</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Assembly expression reading the runtime fill from the leaf level&#39;s</span>
-<span class="sd">    fill field, descending from this level&#39;s struct expression.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_expr</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)))</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl_expr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Assembly expression reading the runtime fill from the leaf level's</span>
+<span class="sd">    fill field, descending from this level's struct expression."""</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_expr</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)))</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7079,15 +7152,209 @@ fill field, descending from this level's struct expression.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;LevelFType&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rebuild this level ftype with the leaf fill value replaced.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LevelFType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Rebuild this level ftype with the leaf fill value replaced."""</span>
     <span class="c1"># Level ftypes are dataclasses with a `_lvl_t` child field; non-</span>
     <span class="c1"># dataclass levels must override.</span>
     <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_lvl_t</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.tensor.level.level.MultiDimensionLevel" class="doc doc-heading">
+            <code>MultiDimensionLevel</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Level
+
+
+  
+      dataclass
+   (finch.tensor.level.level.Level)" href="#finch.tensor.level.level.Level">Level</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MultiDimensionLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
+    <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Rebuild this level with the leaf fill value replaced."""</span>
+        <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.tensor.level.level.MultiDimensionLevel.with_fill" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rebuild this level with the leaf fill value replaced.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Rebuild this level with the leaf fill value replaced."""</span>
+    <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.tensor.level.level.SingleDimensionLevel" class="doc doc-heading">
+            <code>SingleDimensionLevel</code>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Level
+
+
+  
+      dataclass
+   (finch.tensor.level.level.Level)" href="#finch.tensor.level.level.Level">Level</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingleDimensionLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
+    <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Rebuild this level with the leaf fill value replaced."""</span>
+        <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.tensor.level.level.SingleDimensionLevel.with_fill" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Rebuild this level with the leaf fill value replaced.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Rebuild this level with the leaf fill value replaced."""</span>
+    <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>  <span class="c1"># type: ignore[type-var, attr-defined]</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

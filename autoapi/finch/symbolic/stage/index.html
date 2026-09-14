@@ -5360,12 +5360,12 @@ validate their inputs.</p>
 <span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Form</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A Form represents the invariants that must hold for the inputs to be valid</span>
 <span class="sd">    for a given stage. It will typically be a combination of a grammar and a</span>
 <span class="sd">    set of constraints on the inputs. Stages should inherit from a Form to</span>
 <span class="sd">    validate their inputs.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">):</span> <span class="o">...</span>
@@ -5429,15 +5429,13 @@ This is essentially a to-do for validation and should be replaced.</p>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnvalidatedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnvalidatedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    UnvalidatedForm does not perform any validation on the input logic.</span>
 <span class="sd">    This is essentially a to-do for validation and should be replaced.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">inputs</span><span class="p">):</span>
         <span class="k">return</span>
 </code></pre></div></td></tr></table></div>
               </details>

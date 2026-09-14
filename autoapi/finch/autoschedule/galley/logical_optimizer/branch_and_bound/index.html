@@ -5551,7 +5551,7 @@ Removed general cache. Both alias_hash and cost_cache</p>
     <span class="n">k</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
     <span class="n">max_subquery_costs</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Branch-and-bound search for optimal reduction order within a component.</span>
 
 <span class="sd">    Returns ``((order, queries, aq, cost), optimal_subquery_costs)``.</span>
@@ -5560,7 +5560,7 @@ Removed general cache. Both alias_hash and cost_cache</p>
 <span class="sd">    ------</span>
 <span class="sd">    RuntimeError</span>
 <span class="sd">        If no complete elimination order exists for ``component``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># --- Initialize ---</span>
     <span class="c1"># optimal_orders[vars_key] = (order, queries, aq, cost) for each state.</span>
     <span class="c1"># vars_key = frozenset of indices already reduced. Start with empty set.</span>
@@ -5589,18 +5589,18 @@ Removed general cache. Both alias_hash and cost_cache</p>
                 <span class="c1"># --- Pruning bound: if we have a cheaper cost for a superset</span>
                 <span class="c1"># (vars2 &gt;= new_vars), that gives an upper bound; we can prune</span>
                 <span class="c1"># if our total_cost exceeds it.</span>
-                <span class="n">bound</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+                <span class="n">bound</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">vars2</span> <span class="ow">in</span> <span class="n">max_subquery_costs</span><span class="p">:</span>
                     <span class="k">if</span> <span class="n">vars2</span> <span class="o">&gt;=</span> <span class="n">new_vars</span><span class="p">:</span>
                         <span class="n">bound</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">bound</span><span class="p">,</span> <span class="n">max_subquery_costs</span><span class="p">[</span><span class="n">vars2</span><span class="p">])</span>
 
                 <span class="c1"># cheapest_cost = best known cost to reach new_vars (from any path)</span>
                 <span class="n">best_val</span> <span class="o">=</span> <span class="n">best_idx_ext</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-                    <span class="n">new_vars</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span>
+                    <span class="n">new_vars</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">))</span>
                 <span class="p">)</span>
                 <span class="n">cheapest_cost</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>
                     <span class="n">best_val</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>
-                    <span class="n">optimal_orders</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new_vars</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)))[</span><span class="mi">3</span><span class="p">],</span>
+                    <span class="n">optimal_orders</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new_vars</span><span class="p">,</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)))[</span><span class="mi">3</span><span class="p">],</span>
                     <span class="n">bound</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="c1"># Keep this candidate only if it is at least as good as cheapest</span>
@@ -5617,7 +5617,7 @@ Removed general cache. Both alias_hash and cost_cache</p>
             <span class="k">break</span>
 
         <span class="c1"># --- Keep only top-k by cost (greedy k=1 keeps single best per state) ---</span>
-        <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">):</span>
             <span class="n">num_to_keep</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">best_idx_ext</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">num_to_keep</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">best_idx_ext</span><span class="p">)))</span>
@@ -5648,9 +5648,9 @@ Removed general cache. Both alias_hash and cost_cache</p>
     <span class="n">component_set</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">component</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">component_set</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">optimal_orders</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">&quot;branch_and_bound: no complete reduction order for component &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">component</span><span class="si">!r}</span><span class="s2">; reducible idxs on input: &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">input_aq</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="s2">"branch_and_bound: no complete reduction order for component "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">component</span><span class="si">!r}</span><span class="s2">; reducible idxs on input: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">input_aq</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">optimal_orders</span><span class="p">[</span><span class="n">component_set</span><span class="p">],</span> <span class="n">optimal_subquery_costs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5764,7 +5764,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
     <span class="n">input_aq</span><span class="p">:</span> <span class="n">AnnotatedQuery</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Exact branch-and-bound via iterative DFS (cheapest child expanded first).</span>
 
 <span class="sd">    Returns ``((order, queries, aq, cost), optimal_subquery_costs)`` where the</span>
@@ -5774,10 +5774,10 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
 <span class="sd">    ------</span>
 <span class="sd">    RuntimeError</span>
 <span class="sd">        If no complete elimination order exists for ``component``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">component_set</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">component</span><span class="p">)</span>
     <span class="n">memo</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="nb">frozenset</span><span class="p">():</span> <span class="mf">0.0</span><span class="p">}</span>
-    <span class="n">best_complete</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+    <span class="n">best_complete</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
     <span class="n">best_state</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="n">AnnotatedQuery</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="n">stack</span><span class="p">:</span> <span class="n">deque</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="nb">list</span><span class="p">,</span> <span class="n">AnnotatedQuery</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
@@ -5786,7 +5786,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
     <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
         <span class="n">vars_key</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">queries</span><span class="p">,</span> <span class="n">aq</span><span class="p">,</span> <span class="n">cost</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="n">cost</span> <span class="o">&gt;</span> <span class="n">memo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">vars_key</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">cost</span> <span class="o">&gt;</span> <span class="n">memo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">vars_key</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)):</span>
             <span class="k">continue</span>
 
         <span class="k">if</span> <span class="n">vars_key</span> <span class="o">==</span> <span class="n">component_set</span><span class="p">:</span>
@@ -5807,16 +5807,16 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
             <span class="n">new_vars</span> <span class="o">=</span> <span class="n">vars_key</span> <span class="o">|</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">reduced_vars</span><span class="p">)</span>
 
             <span class="c1"># Getting all supersets and getting min cost</span>
-            <span class="n">sup_best</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+            <span class="n">sup_best</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
             <span class="c1"># for v, c in max_subquery_costs.items():</span>
             <span class="c1">#    if v &gt;= new_vars:</span>
             <span class="c1">#        sup_best = min(sup_best, c)</span>
             <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">memo</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="k">if</span> <span class="n">v</span> <span class="o">&gt;=</span> <span class="n">new_vars</span><span class="p">:</span>
                     <span class="n">sup_best</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sup_best</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">best_complete</span> <span class="o">&lt;</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">best_complete</span> <span class="o">&lt;</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">):</span>
                 <span class="n">sup_best</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sup_best</span><span class="p">,</span> <span class="n">best_complete</span><span class="p">)</span>
-            <span class="n">prev_best</span> <span class="o">=</span> <span class="n">memo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new_vars</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span>
+            <span class="n">prev_best</span> <span class="o">=</span> <span class="n">memo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">new_vars</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">))</span>
 
             <span class="k">if</span> <span class="n">new_cost</span> <span class="o">&gt;</span> <span class="n">sup_best</span><span class="p">:</span>
                 <span class="k">continue</span>
@@ -5836,9 +5836,9 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
 
     <span class="k">if</span> <span class="n">best_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-            <span class="s2">&quot;branch_and_bound_dfs: no complete reduction order for component &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">component</span><span class="si">!r}</span><span class="s2">; reducible idxs on input: &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">input_aq</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="s2">"branch_and_bound_dfs: no complete reduction order for component "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">component</span><span class="si">!r}</span><span class="s2">; reducible idxs on input: "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">input_aq</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">best_state</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">())</span>
 </code></pre></div></td></tr></table></div>
@@ -5851,7 +5851,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
 
 
 <h2 id="finch.autoschedule.galley.logical_optimizer.branch_and_bound.pruned_query_to_plan" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">pruned_query_to_plan</span><span class="p">(</span><span class="n">input_aq</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">&#39;dfs&#39;</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">pruned_query_to_plan</span><span class="p">(</span><span class="n">input_aq</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">'dfs'</span><span class="p">)</span></code>
 
 </h2>
 
@@ -5936,18 +5936,18 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
     <span class="n">input_aq</span><span class="p">:</span> <span class="n">AnnotatedQuery</span><span class="p">,</span>
     <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">&quot;dfs&quot;</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"dfs"</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Query</span><span class="p">],</span> <span class="nb">float</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Pruned Galley optimizer.</span>
 
-<span class="sd">    * ``&quot;greedy&quot;`` — ``k=1` (also used</span>
+<span class="sd">    * ``"greedy"`` — ``k=1` (also used</span>
 <span class="sd">      automatically when ``len(component) &gt; 12``).</span>
-<span class="sd">    * ``&quot;bfs&quot;`` — greedy ``k=1`` for bounds, then BFS BnB.</span>
-<span class="sd">    * ``&quot;dfs&quot;`` — DFS BnB.</span>
+<span class="sd">    * ``"bfs"`` — greedy ``k=1`` for bounds, then BFS BnB.</span>
+<span class="sd">    * ``"dfs"`` — DFS BnB.</span>
 
 <span class="sd">    Returns ``(queries, total_cost)``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">total_cost</span> <span class="o">=</span> <span class="mf">0.0</span>
     <span class="n">elimination_order</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">queries</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Query</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -5964,7 +5964,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
                 <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cur_aq</span><span class="o">.</span><span class="n">connected_components</span><span class="p">))</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">component</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">12</span><span class="p">)</span> <span class="ow">or</span> <span class="n">optimizer</span> <span class="o">==</span> <span class="s2">&quot;greedy&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">component</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">12</span><span class="p">)</span> <span class="ow">or</span> <span class="n">optimizer</span> <span class="o">==</span> <span class="s2">"greedy"</span><span class="p">:</span>
             <span class="p">(</span>
                 <span class="p">(</span><span class="n">greedy_order</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">greedy_cost</span><span class="p">),</span>
                 <span class="n">_</span><span class="p">,</span>
@@ -5976,7 +5976,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
             <span class="n">total_cost</span> <span class="o">+=</span> <span class="n">greedy_cost</span>
             <span class="k">continue</span>
 
-        <span class="k">if</span> <span class="n">optimizer</span> <span class="o">==</span> <span class="s2">&quot;dfs&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">optimizer</span> <span class="o">==</span> <span class="s2">"dfs"</span><span class="p">:</span>
             <span class="p">(</span><span class="n">exact_order</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">exact_cost</span><span class="p">),</span> <span class="n">_</span> <span class="o">=</span> <span class="n">branch_and_bound_dfs</span><span class="p">(</span><span class="n">cur_aq</span><span class="p">,</span> <span class="n">component</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="p">(</span>
@@ -5984,7 +5984,7 @@ second element is an empty <code>OrderedDict</code> (greedy bounds use layered B
                 <span class="n">greedy_subquery_costs</span><span class="p">,</span>
             <span class="p">)</span> <span class="o">=</span> <span class="n">branch_and_bound</span><span class="p">(</span><span class="n">cur_aq</span><span class="p">,</span> <span class="n">component</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">())</span>
             <span class="p">(</span><span class="n">exact_order</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">exact_cost</span><span class="p">),</span> <span class="n">_</span> <span class="o">=</span> <span class="n">branch_and_bound</span><span class="p">(</span>
-                <span class="n">cur_aq</span><span class="p">,</span> <span class="n">component</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),</span> <span class="n">greedy_subquery_costs</span>
+                <span class="n">cur_aq</span><span class="p">,</span> <span class="n">component</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">),</span> <span class="n">greedy_subquery_costs</span>
             <span class="p">)</span>
         <span class="n">elimination_order</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">exact_order</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">exact_order</span><span class="p">:</span>

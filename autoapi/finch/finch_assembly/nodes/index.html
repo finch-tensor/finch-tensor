@@ -6914,16 +6914,16 @@
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyExpression</span><span class="p">(</span><span class="n">AssemblyNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Assembly AST expression base class.</span>
 
 <span class="sd">    An assembly expression is a program node which evaluates to a value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7037,35 +7037,35 @@ linear memory regions called "buffers", and explicit memory management.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyNode</span><span class="p">(</span><span class="n">Term</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    AssemblyNode</span>
 
 <span class="sd">    Represents a FinchAssembly IR node. FinchAssembly is the final intermediate</span>
 <span class="sd">    representation before code generation (translation to the output language).</span>
 <span class="sd">    It is a low-level imperative description of the program, with control flow,</span>
-<span class="sd">    linear memory regions called &quot;buffers&quot;, and explicit memory management.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    linear memory regions called "buffers", and explicit memory management.</span>
+<span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the head of the node."""</span>
         <span class="k">return</span> <span class="bp">cls</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">make_term</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">head</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
         <span class="k">return</span> <span class="n">head</span><span class="o">.</span><span class="n">from_children</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates a term from the given children. This is used to create terms</span>
 <span class="sd">        from the children of a node.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns a string representation of the node."""</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">AssemblyPrinterContext</span><span class="p">()</span>
         <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -7106,7 +7106,7 @@ linear memory regions called "buffers", and explicit memory management.</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns a string representation of the node."""</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">AssemblyPrinterContext</span><span class="p">()</span>
     <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -7145,10 +7145,10 @@ from the children of a node.</p>
 <span class="normal">46</span>
 <span class="normal">47</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates a term from the given children. This is used to create terms</span>
 <span class="sd">    from the children of a node.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7181,7 +7181,7 @@ from the children of a node.</p>
 <span class="normal">33</span>
 <span class="normal">34</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns the head of the node."""</span>
     <span class="k">return</span> <span class="bp">cls</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7214,7 +7214,7 @@ from the children of a node.</p>
 <span class="normal">38</span>
 <span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_term</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">head</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
     <span class="k">return</span> <span class="n">head</span><span class="o">.</span><span class="n">from_children</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7267,12 +7267,12 @@ not produce a value, but may modify the state of the machine.</p>
 <span class="normal">81</span>
 <span class="normal">82</span>
 <span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyStatement</span><span class="p">(</span><span class="n">AssemblyNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Assembly AST statement base class.</span>
 
 <span class="sd">    An assembly statement is a program node nested inside a function which does</span>
 <span class="sd">    not produce a value, but may modify the state of the machine.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7339,8 +7339,8 @@ not produce a value, but may modify the state of the machine.</p>
 <span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyTree</span><span class="p">(</span><span class="n">AssemblyNode</span><span class="p">,</span> <span class="n">TermTree</span><span class="p">):</span>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
-        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;`children` isn&#39;t supported for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">"`children` isn't supported for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7467,19 +7467,19 @@ Used in the dataflow analysis to assert conditions in conditionals and loops.</p
 <span class="normal">472</span>
 <span class="normal">473</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Assert</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents an assert node which asserts that expression is true.</span>
 <span class="sd">    Used in the dataflow analysis to assert conditions in conditionals and loops.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        exp: Expression which is being asserted.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">exp</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">exp</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7606,7 +7606,10 @@ to <code>lhs</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">202</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
 <span class="normal">203</span>
 <span class="normal">204</span>
 <span class="normal">205</span>
@@ -7620,26 +7623,23 @@ to <code>lhs</code>.</p>
 <span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Assign</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that evaluates `rhs`, binding the result</span>
 <span class="sd">    to `lhs`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        lhs: The left-hand side of the binding.</span>
 <span class="sd">        rhs: The right-hand side to evaluate.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7729,7 +7729,7 @@ to <code>lhs</code>.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Block.bodies">bodies</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="AssemblyStatement (finch.finch_assembly.nodes.AssemblyStatement)" href="#finch.finch_assembly.nodes.AssemblyStatement">AssemblyStatement</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="AssemblyStatement (finch.finch_assembly.nodes.AssemblyStatement)" href="#finch.finch_assembly.nodes.AssemblyStatement">AssemblyStatement</a> | <a class="autorefs autorefs-internal" title="AssemblyExpression (finch.finch_assembly.nodes.AssemblyExpression)" href="#finch.finch_assembly.nodes.AssemblyExpression">AssemblyExpression</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7769,18 +7769,18 @@ to <code>lhs</code>.</p>
 <span class="normal">575</span>
 <span class="normal">576</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Block</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a statement that executes a sequence of statements `bodies...`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        bodies: The sequence of statements to execute.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">bodies</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AssemblyStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
+    <span class="n">bodies</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AssemblyStatement</span> <span class="o">|</span> <span class="n">AssemblyExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -7880,13 +7880,13 @@ to <code>lhs</code>.</p>
 <span class="normal">554</span>
 <span class="normal">555</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Break</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a break statement that exits the current loop.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8043,14 +8043,14 @@ to <code>lhs</code>.</p>
 <span class="normal">416</span>
 <span class="normal">417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">BufferLoop</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a loop that iterates over the elements of a buffer.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        buffer: The buffer to iterate over.</span>
 <span class="sd">        var: The loop variable for each element in the buffer.</span>
 <span class="sd">        body: The body of the loop to execute for each element.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">buffer</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">var</span><span class="p">:</span> <span class="n">Variable</span>
@@ -8058,7 +8058,7 @@ to <code>lhs</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">var</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8158,7 +8158,12 @@ to <code>lhs</code>.</p>
 
   
       dataclass
-   (finch.finch_assembly.nodes.Literal)" href="#finch.finch_assembly.nodes.Literal">Literal</a></code>
+   (finch.finch_assembly.nodes.Literal)" href="#finch.finch_assembly.nodes.Literal">Literal</a> | <a class="autorefs autorefs-internal" title="Variable
+
+
+  
+      dataclass
+   (finch.finch_assembly.nodes.Variable)" href="#finch.finch_assembly.nodes.Variable">Variable</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8169,7 +8174,7 @@ to <code>lhs</code>.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Call.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="AssemblyExpression (finch.finch_assembly.nodes.AssemblyExpression)" href="#finch.finch_assembly.nodes.AssemblyExpression">AssemblyExpression</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="AssemblyExpression (finch.finch_assembly.nodes.AssemblyExpression)" href="#finch.finch_assembly.nodes.AssemblyExpression">AssemblyExpression</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -8189,7 +8194,9 @@ to <code>lhs</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">265</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
 <span class="normal">266</span>
 <span class="normal">267</span>
 <span class="normal">268</span>
@@ -8214,23 +8221,22 @@ to <code>lhs</code>.</p>
 <span class="normal">287</span>
 <span class="normal">288</span>
 <span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Call</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">CallTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents an expression for calling the function `op` on `args...`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        op: The function to call.</span>
 <span class="sd">        args: The arguments to call on the function.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
+    <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span> <span class="o">|</span> <span class="n">Variable</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -8239,8 +8245,9 @@ to <code>lhs</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="n">arg_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg</span><span class="o">.</span><span class="n">result_type</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="n">Literal</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">return_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">,</span> <span class="o">*</span><span class="n">arg_types</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8432,7 +8439,7 @@ to <code>lhs</code>.</p>
 <span class="normal">395</span>
 <span class="normal">396</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ForLoop</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a for loop that iterates over a range of values.</span>
 
 <span class="sd">    Attributes:</span>
@@ -8440,7 +8447,7 @@ to <code>lhs</code>.</p>
 <span class="sd">        start: The starting value of the range.</span>
 <span class="sd">        end: The ending value of the range.</span>
 <span class="sd">        body: The body of the loop to execute.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">var</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">start</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
@@ -8449,7 +8456,7 @@ to <code>lhs</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">var</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8557,7 +8564,7 @@ return type of this function.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Function.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Variable
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Variable
 
 
   
@@ -8623,7 +8630,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="normal">524</span>
 <span class="normal">525</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Function</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that defines a function `fun` on the</span>
 <span class="sd">    arguments `args...`.</span>
 
@@ -8633,7 +8640,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="sd">        args: The arguments to the function.</span>
 <span class="sd">        body: The body of the function. If it does not contain a return statement,</span>
 <span class="sd">            the function returns the value of `body`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Variable</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -8641,12 +8648,12 @@ the function returns the value of <code>body</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
         <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">arg_nodes</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">children</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_nodes</span><span class="p">),</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -8713,7 +8720,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="normal">524</span>
 <span class="normal">525</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
     <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">arg_nodes</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">children</span>
     <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg_nodes</span><span class="p">),</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -8770,7 +8777,10 @@ Attributes:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">222</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
@@ -8788,28 +8798,27 @@ Attributes:
 <span class="normal">237</span>
 <span class="normal">238</span>
 <span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">240</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">GetAttr</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">AssemblyTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a getter for an attribute `attr` of an object `obj`.</span>
 <span class="sd">    Attributes:</span>
 <span class="sd">        obj: The object to get the attribute from.</span>
 <span class="sd">        attr: The name of the attribute to get.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">obj</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">attr</span><span class="p">:</span> <span class="n">Literal</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">StructFType</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)[</span><span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="o">.</span><span class="n">val</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8970,20 +8979,20 @@ Attributes:
 <span class="normal">454</span>
 <span class="normal">455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">If</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents an if statement that executes the body if the condition is true.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        condition: The condition to evaluate for the if to execute the body.</span>
 <span class="sd">        body: The body of the if statement to execute.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">condition</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">AssemblyStatement</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9137,7 +9146,7 @@ is true, otherwise executes else_body.</p>
 <span class="normal">494</span>
 <span class="normal">495</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">IfElse</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents an if-else statement that executes the body if the condition</span>
 <span class="sd">    is true, otherwise executes else_body.</span>
 
@@ -9145,7 +9154,7 @@ is true, otherwise executes else_body.</p>
 <span class="sd">        condition: The condition to evaluate for the if to execute the body.</span>
 <span class="sd">        body: The body of the if statement to execute.</span>
 <span class="sd">        else_body: An alternative body to execute if the condition is false.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">condition</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">AssemblyStatement</span>
@@ -9153,7 +9162,7 @@ is true, otherwise executes else_body.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">else_body</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9283,12 +9292,12 @@ is true, otherwise executes else_body.</p>
 <span class="normal">372</span>
 <span class="normal">373</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Length</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">AssemblyTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents getting the length of a buffer.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        buffer: The buffer whose length is queried.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">buffer</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
 
@@ -9298,7 +9307,7 @@ is true, otherwise executes else_body.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="k">return</span> <span class="n">length_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="o">.</span><span class="n">result_type</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9363,7 +9372,12 @@ is true, otherwise executes else_body.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="AssemblyExpression (finch.finch_assembly.nodes.AssemblyExpression)" href="#finch.finch_assembly.nodes.AssemblyExpression">AssemblyExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm (finch.symbolic.LiteralTerm)" href="../../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="AssemblyExpression (finch.finch_assembly.nodes.AssemblyExpression)" href="#finch.finch_assembly.nodes.AssemblyExpression">AssemblyExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm
+
+
+  
+      dataclass
+   (finch.symbolic.LiteralTerm)" href="../../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
 
 
 
@@ -9383,7 +9397,7 @@ is true, otherwise executes else_body.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Literal.val">val</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+                  <code><span title="finch.symbolic.term.T">T</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9417,27 +9431,21 @@ is true, otherwise executes else_body.</p>
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">LiteralTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">LiteralTerm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents the literal value `val`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        val: The literal value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">val</span><span class="p">:</span> <span class="n">Any</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;val&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"val"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -9557,7 +9565,8 @@ is true, otherwise executes else_body.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">294</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
+<span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
@@ -9579,13 +9588,13 @@ is true, otherwise executes else_body.</p>
 <span class="normal">313</span>
 <span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Load</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">AssemblyTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents loading a value from a buffer at a given index.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        buffer: The buffer to load from.</span>
 <span class="sd">        index: The index to load at.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">buffer</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">index</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
@@ -9595,8 +9604,9 @@ is true, otherwise executes else_body.</p>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">BufferFType</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">element_type</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9687,7 +9697,7 @@ FinchAssembly.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Module.funcs">funcs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Function
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Function
 
 
   
@@ -9733,19 +9743,19 @@ FinchAssembly.</p>
 <span class="normal">597</span>
 <span class="normal">598</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Module</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a group of functions. This is the toplevel translation unit for</span>
 <span class="sd">    FinchAssembly.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        funcs: The functions defined in the module.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">funcs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Function</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">funcs</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -9859,7 +9869,10 @@ object. The original object may now be accessed and modified.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
@@ -9871,24 +9884,21 @@ object. The original object may now be accessed and modified.</p>
 <span class="normal">193</span>
 <span class="normal">194</span>
 <span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Repack</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Registers updates from a symbolic object `val` with the original</span>
 <span class="sd">    object. The original object may now be accessed and modified.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        slot: The symbolic object to read from.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">val</span><span class="p">:</span> <span class="n">Slot</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10026,13 +10036,13 @@ object. The original object may now be accessed and modified.</p>
 <span class="normal">351</span>
 <span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Resize</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents resizing a buffer to a new size.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        buffer: The buffer to resize.</span>
 <span class="sd">        new_size: The new size for the buffer.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">buffer</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">new_size</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
@@ -10144,19 +10154,19 @@ Halts execution of the function body.</p>
 <span class="normal">542</span>
 <span class="normal">543</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Return</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a return statement that returns `arg` from the current function.</span>
 <span class="sd">    Halts execution of the function body.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        arg: The argument to return.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">arg</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10245,7 +10255,9 @@ Attributes:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">245</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
@@ -10260,17 +10272,15 @@ Attributes:
 <span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SetAttr</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a setter for an attribute `attr` of an object `obj`.</span>
 <span class="sd">    Attributes:</span>
 <span class="sd">        obj: The object to set the attribute on.</span>
 <span class="sd">        attr: The name of the attribute to set.</span>
 <span class="sd">        value: The value to set the attribute to.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">obj</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">attr</span><span class="p">:</span> <span class="n">Literal</span>
@@ -10278,7 +10288,7 @@ Attributes:
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10364,7 +10374,7 @@ expression creates a copy of the object.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Slot.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10395,7 +10405,10 @@ expression creates a copy of the object.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
@@ -10416,26 +10429,23 @@ expression creates a copy of the object.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Slot</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a register to a symbolic object. Using a register in an</span>
 <span class="sd">    expression creates a copy of the object.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the symbolic object to register.</span>
 <span class="sd">        type: The type of the symbolic object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="nb">type</span><span class="p">:</span> <span class="n">Any</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -10593,14 +10603,14 @@ expression creates a copy of the object.</p>
 <span class="normal">333</span>
 <span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Store</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents storing a value into a buffer at a given index.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        buffer: The buffer to store into.</span>
 <span class="sd">        index: The index to store at.</span>
 <span class="sd">        value: The value to store.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">buffer</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">index</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
@@ -10713,7 +10723,10 @@ corresponding <code>Repack</code> node is reached.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
@@ -10728,12 +10741,9 @@ corresponding <code>Repack</code> node is reached.</p>
 <span class="normal">175</span>
 <span class="normal">176</span>
 <span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Unpack</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Attempts to convert `rhs` into a symbolic, which can be registerd with</span>
 <span class="sd">    `lhs`. The original object must not be accessed or modified until the</span>
 <span class="sd">    corresponding `Repack` node is reached.</span>
@@ -10741,14 +10751,14 @@ corresponding <code>Repack</code> node is reached.</p>
 <span class="sd">    Attributes:</span>
 <span class="sd">        lhs: The symbolic object to write to.</span>
 <span class="sd">        rhs: The original object to read from.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Slot</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -10834,7 +10844,7 @@ will hold a value of type <code>type</code>.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.nodes.Variable.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10865,7 +10875,10 @@ will hold a value of type <code>type</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">109</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
 <span class="normal">110</span>
 <span class="normal">111</span>
 <span class="normal">112</span>
@@ -10886,30 +10899,27 @@ will hold a value of type <code>type</code>.</p>
 <span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Variable</span><span class="p">(</span><span class="n">AssemblyExpression</span><span class="p">,</span> <span class="n">NamedTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for a variable named `name`, which</span>
 <span class="sd">    will hold a value of type `type`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the variable.</span>
 <span class="sd">        type: The type of the variable.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="nb">type</span><span class="p">:</span> <span class="n">FType</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">})</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">symbol</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -11051,20 +11061,20 @@ will hold a value of type <code>type</code>.</p>
 <span class="normal">435</span>
 <span class="normal">436</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">WhileLoop</span><span class="p">(</span><span class="n">AssemblyTree</span><span class="p">,</span> <span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a while loop that executes as long as the condition is true.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        condition: The condition to evaluate for the loop to continue.</span>
 <span class="sd">        body: The body of the loop to execute.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">condition</span><span class="p">:</span> <span class="n">AssemblyExpression</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">AssemblyStatement</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">condition</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>

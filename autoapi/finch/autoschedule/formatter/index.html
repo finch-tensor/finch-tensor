@@ -5373,10 +5373,10 @@
 <span class="normal">104</span>
 <span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFormatter</span><span class="p">(</span><span class="n">MonoLogicFormatter</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the FType of the output tensor produced within the</span>
 <span class="sd">        autoscheduler.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">fill_ftype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span>
             <span class="n">fill_value</span><span class="o">.</span><span class="n">dtype</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="n">fill_value</span>
         <span class="p">)</span>
@@ -5433,10 +5433,10 @@ autoscheduler.</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the FType of the output tensor produced within the</span>
 <span class="sd">    autoscheduler.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">fill_ftype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span>
         <span class="n">fill_value</span><span class="o">.</span><span class="n">dtype</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="n">fill_value</span>
     <span class="p">)</span>

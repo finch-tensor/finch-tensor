@@ -5841,7 +5841,7 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Aggregate.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
 
 
   
@@ -5866,8 +5866,7 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">530</span>
-<span class="normal">531</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">531</span>
 <span class="normal">532</span>
 <span class="normal">533</span>
 <span class="normal">534</span>
@@ -5914,9 +5913,10 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
 <span class="normal">575</span>
 <span class="normal">576</span>
 <span class="normal">577</span>
-<span class="normal">578</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">578</span>
+<span class="normal">579</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Aggregate</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that reduces `arg` using `op`, starting</span>
 <span class="sd">    with `init`. `idxs` are the dimensions to reduce. May happen in any order.</span>
 
@@ -5925,7 +5925,7 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
 <span class="sd">        init: The initial value for the reduction.</span>
 <span class="sd">        arg: The argument to reduce.</span>
 <span class="sd">        idxs: The dimensions to reduce.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
     <span class="n">init</span><span class="p">:</span> <span class="n">Literal</span>
@@ -5934,11 +5934,11 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">init</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">field</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="k">if</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -6017,10 +6017,10 @@ with <code>init</code>. <code>idxs</code> are the dimensions to reduce. May happ
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">553</span>
-<span class="normal">554</span>
-<span class="normal">555</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">field</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="k">if</span> <span class="n">field</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6079,7 +6079,7 @@ refer to tables in the program.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Alias.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6099,8 +6099,7 @@ refer to tables in the program.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">380</span>
-<span class="normal">381</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">381</span>
 <span class="normal">382</span>
 <span class="normal">383</span>
 <span class="normal">384</span>
@@ -6138,15 +6137,16 @@ refer to tables in the program.</p>
 <span class="normal">416</span>
 <span class="normal">417</span>
 <span class="normal">418</span>
-<span class="normal">419</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">419</span>
+<span class="normal">420</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Alias</span><span class="p">(</span><span class="n">LogicNode</span><span class="p">,</span> <span class="n">NamedTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for an alias named `name`. Aliases are used to</span>
 <span class="sd">    refer to tables in the program.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the alias.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
@@ -6155,9 +6155,9 @@ refer to tables in the program.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;Aliases do not have fields because they are tensors not tables!&quot;</span>
+            <span class="s2">"Aliases do not have fields because they are tensors not tables!"</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -6166,7 +6166,7 @@ refer to tables in the program.</p>
         <span class="n">dim_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
         <span class="k">if</span> <span class="n">dim_bindings</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dim_bindings</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot resolve dims of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve dims of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">dim_bindings</span><span class="p">[</span><span class="bp">self</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">valmap</span><span class="p">(</span>
@@ -6176,7 +6176,7 @@ refer to tables in the program.</p>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">T</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="bp">self</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot resolve value of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve value of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6210,14 +6210,14 @@ refer to tables in the program.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">396</span>
-<span class="normal">397</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">397</span>
 <span class="normal">398</span>
 <span class="normal">399</span>
-<span class="normal">400</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="normal">400</span>
+<span class="normal">401</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="s2">&quot;Aliases do not have fields because they are tensors not tables!&quot;</span>
+        <span class="s2">"Aliases do not have fields because they are tensors not tables!"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6275,10 +6275,10 @@ refer to tables in the program.</p>
 <span class="normal">104</span>
 <span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFormatter</span><span class="p">(</span><span class="n">MonoLogicFormatter</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the FType of the output tensor produced within the</span>
 <span class="sd">        autoscheduler.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">fill_ftype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span>
             <span class="n">fill_value</span><span class="o">.</span><span class="n">dtype</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="n">fill_value</span>
         <span class="p">)</span>
@@ -6335,10 +6335,10 @@ autoscheduler.</p>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the FType of the output tensor produced within the</span>
 <span class="sd">    autoscheduler.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">fill_ftype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span>
         <span class="n">fill_value</span><span class="o">.</span><span class="n">dtype</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="k">else</span> <span class="n">fill_value</span>
     <span class="p">)</span>
@@ -6406,7 +6406,7 @@ tensor is referred to as a "table".</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Field.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6426,8 +6426,7 @@ tensor is referred to as a "table".</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">362</span>
-<span class="normal">363</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">363</span>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
@@ -6441,16 +6440,17 @@ tensor is referred to as a "table".</p>
 <span class="normal">374</span>
 <span class="normal">375</span>
 <span class="normal">376</span>
-<span class="normal">377</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">377</span>
+<span class="normal">378</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Field</span><span class="p">(</span><span class="n">LogicNode</span><span class="p">,</span> <span class="n">NamedTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for a field named `name`.</span>
 <span class="sd">    Fields are used to name the dimensions of a tensor. The named</span>
-<span class="sd">    tensor is referred to as a &quot;table&quot;.</span>
+<span class="sd">    tensor is referred to as a "table".</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the field.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
@@ -6503,7 +6503,12 @@ tensor is referred to as a "table".</p>
 
   
       dataclass
-   (finch.finch_logic.nodes.LogicExpression)" href="../finch_logic/nodes/#finch.finch_logic.nodes.LogicExpression">LogicExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm (finch.symbolic.LiteralTerm)" href="../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
+   (finch.finch_logic.nodes.LogicExpression)" href="../finch_logic/nodes/#finch.finch_logic.nodes.LogicExpression">LogicExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm
+
+
+  
+      dataclass
+   (finch.symbolic.LiteralTerm)" href="../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
 
 
 
@@ -6525,7 +6530,7 @@ element type and fill value are those of <code>val</code> itself.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Literal.val">val</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+                  <code><span title="finch.symbolic.term.T">T</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6545,10 +6550,7 @@ element type and fill value are those of <code>val</code> itself.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
@@ -6599,9 +6601,10 @@ element type and fill value are those of <code>val</code> itself.</p>
 <span class="normal">341</span>
 <span class="normal">342</span>
 <span class="normal">343</span>
-<span class="normal">344</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">344</span>
+<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">LogicExpression</span><span class="p">,</span> <span class="n">LiteralTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for the literal value `val`.</span>
 
 <span class="sd">    A literal behaves as a zero-dimensional tensor: it has no fields, and its</span>
@@ -6609,9 +6612,7 @@ element type and fill value are those of <code>val</code> itself.</p>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        val: The literal value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">val</span><span class="p">:</span> <span class="n">Any</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -6634,10 +6635,10 @@ element type and fill value are those of <code>val</code> itself.</p>
             <span class="k">return</span> <span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span> <span class="o">==</span> <span class="nb">id</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;val&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"val"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">return</span> <span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -6686,10 +6687,10 @@ element type and fill value are those of <code>val</code> itself.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">return</span> <span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6752,10 +6753,10 @@ element type and fill value are those of <code>val</code> itself.</p>
         <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Einsum Notation from the given logic and input types.  Also</span>
 <span class="sd">        return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6812,10 +6813,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Einsum Notation from the given logic and input types.  Also</span>
 <span class="sd">    return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6877,10 +6878,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
         <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Notation from the given logic and input types.  Also</span>
 <span class="sd">        return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6937,10 +6938,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Notation from the given logic and input types.  Also</span>
 <span class="sd">    return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7021,7 +7022,7 @@ present must match.  The order of fields in the mapjoin is
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.MapJoin.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="LogicExpression
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="LogicExpression
 
 
   
@@ -7046,8 +7047,7 @@ present must match.  The order of fields in the mapjoin is
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">475</span>
-<span class="normal">476</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">476</span>
 <span class="normal">477</span>
 <span class="normal">478</span>
 <span class="normal">479</span>
@@ -7098,9 +7098,10 @@ present must match.  The order of fields in the mapjoin is
 <span class="normal">524</span>
 <span class="normal">525</span>
 <span class="normal">526</span>
-<span class="normal">527</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">527</span>
+<span class="normal">528</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">MapJoin</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">CallTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for mapping the function `op` across `args...`.</span>
 <span class="sd">    Dimensions which are not present are broadcasted. Dimensions which are</span>
 <span class="sd">    present must match.  The order of fields in the mapjoin is</span>
@@ -7109,18 +7110,18 @@ present must match.  The order of fields in the mapjoin is
 <span class="sd">    Attributes:</span>
 <span class="sd">        op: The function to map.</span>
 <span class="sd">        args: The arguments to map the function across.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="n">args_fields</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">([</span><span class="n">f</span> <span class="k">for</span> <span class="n">fs</span> <span class="ow">in</span> <span class="n">args_fields</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fs</span><span class="p">]))</span>
 
@@ -7205,11 +7206,11 @@ present must match.  The order of fields in the mapjoin is
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">496</span>
-<span class="normal">497</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">497</span>
 <span class="normal">498</span>
-<span class="normal">499</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="normal">499</span>
+<span class="normal">500</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="n">args_fields</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">([</span><span class="n">f</span> <span class="k">for</span> <span class="n">fs</span> <span class="ow">in</span> <span class="n">args_fields</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">fs</span><span class="p">]))</span>
 </code></pre></div></td></tr></table></div>
@@ -7269,7 +7270,7 @@ present must match.  The order of fields in the mapjoin is
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Plan.bodies">bodies</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="LogicStatement
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="LogicStatement
 
 
   
@@ -7294,8 +7295,7 @@ present must match.  The order of fields in the mapjoin is
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">768</span>
-<span class="normal">769</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">769</span>
 <span class="normal">770</span>
 <span class="normal">771</span>
 <span class="normal">772</span>
@@ -7336,15 +7336,16 @@ present must match.  The order of fields in the mapjoin is
 <span class="normal">807</span>
 <span class="normal">808</span>
 <span class="normal">809</span>
-<span class="normal">810</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">810</span>
+<span class="normal">811</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Plan</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that executes a sequence of statements</span>
 <span class="sd">    `bodies...`. Returns the last statement.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        bodies: The sequence of statements to execute.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">bodies</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -7353,8 +7354,8 @@ present must match.  The order of fields in the mapjoin is
         <span class="n">op</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">dim_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers dimmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers dimmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
             <span class="n">body</span><span class="o">.</span><span class="n">infer_dimmap</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">dim_bindings</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">dim_bindings</span>
@@ -7365,15 +7366,15 @@ present must match.  The order of fields in the mapjoin is
         <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
             <span class="n">body</span><span class="o">.</span><span class="n">infer_valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">bindings</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -7434,8 +7435,7 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">780</span>
-<span class="normal">781</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">781</span>
 <span class="normal">782</span>
 <span class="normal">783</span>
 <span class="normal">784</span>
@@ -7443,13 +7443,14 @@ will be stored in the dictionary passed to the method.</p>
 <span class="normal">786</span>
 <span class="normal">787</span>
 <span class="normal">788</span>
-<span class="normal">789</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_dimmap</span><span class="p">(</span>
+<span class="normal">789</span>
+<span class="normal">790</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_dimmap</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">dim_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infers dimmaps for all aliases defined in the statement. The results</span>
-<span class="sd">    will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Infers dimmaps for all aliases defined in the statement. The results</span>
+<span class="sd">    will be stored in the dictionary passed to the method."""</span>
     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
         <span class="n">body</span><span class="o">.</span><span class="n">infer_dimmap</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">dim_bindings</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">dim_bindings</span>
@@ -7476,8 +7477,7 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">791</span>
-<span class="normal">792</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">792</span>
 <span class="normal">793</span>
 <span class="normal">794</span>
 <span class="normal">795</span>
@@ -7486,14 +7486,15 @@ will be stored in the dictionary passed to the method.</p>
 <span class="normal">798</span>
 <span class="normal">799</span>
 <span class="normal">800</span>
-<span class="normal">801</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
+<span class="normal">801</span>
+<span class="normal">802</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">    will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">    will be stored in the dictionary passed to the method."""</span>
     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
         <span class="n">body</span><span class="o">.</span><span class="n">infer_valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">bindings</span>
@@ -7564,9 +7565,7 @@ returns <code>nothing</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/rewriters.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 86</span>
 <span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
@@ -7587,15 +7586,18 @@ returns <code>nothing</code>.</p>
 <span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
-<span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PostWalk</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PostWalk</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A rewriter which recursively rewrites the arguments of each node using</span>
 <span class="sd">    `rw`, then rewrites the resulting node. If all rewriters return `nothing`,</span>
 <span class="sd">    returns `nothing`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        rw (RwCallable): The rewriter function to apply.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rw</span><span class="p">:</span> <span class="n">RwCallable</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rw</span> <span class="o">=</span> <span class="n">rw</span>
@@ -7609,7 +7611,8 @@ returns <code>nothing</code>.</p>
             <span class="n">y</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">make_term</span><span class="p">(</span>
                 <span class="n">x</span><span class="o">.</span><span class="n">head</span><span class="p">(),</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">:</span> <span class="n">default_rewrite</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">),</span> <span class="n">new_args</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
             <span class="p">)</span>
-            <span class="k">return</span> <span class="n">default_rewrite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rw</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">y</span><span class="p">)</span>  <span class="c1"># type: ignore[return-value]</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">default_rewrite</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rw</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="n">y</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">rw</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7718,15 +7721,17 @@ returns <code>nothing</code>.</p>
 <span class="normal">78</span>
 <span class="normal">79</span>
 <span class="normal">80</span>
-<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PreWalk</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PreWalk</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A rewriter which recursively rewrites each node using `rw`, then rewrites</span>
 <span class="sd">    the arguments of the resulting node. If all rewriters return `nothing`,</span>
 <span class="sd">    returns `nothing`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        rw (RwCallable): The rewriter function to apply.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rw</span><span class="p">:</span> <span class="n">RwCallable</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">rw</span> <span class="o">=</span> <span class="n">rw</span>
@@ -7736,7 +7741,7 @@ returns <code>nothing</code>.</p>
         <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">TermTree</span><span class="p">):</span>
                 <span class="n">args</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">children</span>
-                <span class="k">return</span> <span class="n">y</span><span class="o">.</span><span class="n">make_term</span><span class="p">(</span>  <span class="c1"># type: ignore[return-value]</span>
+                <span class="k">return</span> <span class="n">y</span><span class="o">.</span><span class="n">make_term</span><span class="p">(</span>
                     <span class="n">y</span><span class="o">.</span><span class="n">head</span><span class="p">(),</span> <span class="o">*</span><span class="p">[</span><span class="n">default_rewrite</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">arg</span><span class="p">),</span> <span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">y</span>
@@ -7744,10 +7749,12 @@ returns <code>nothing</code>.</p>
             <span class="n">args</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">children</span>
             <span class="n">new_args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">))</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">arg</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">new_args</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">x</span><span class="o">.</span><span class="n">make_term</span><span class="p">(</span>  <span class="c1"># type: ignore[return-value]</span>
+                <span class="n">ret</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">make_term</span><span class="p">(</span>
                     <span class="n">x</span><span class="o">.</span><span class="n">head</span><span class="p">(),</span>
                     <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">:</span> <span class="n">default_rewrite</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">),</span> <span class="n">new_args</span><span class="p">,</span> <span class="n">args</span><span class="p">),</span>
                 <span class="p">)</span>
+                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ret</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">ret</span>
         <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7816,12 +7823,17 @@ Halts execution of the program.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Produces.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Alias
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Alias
 
 
   
       dataclass
-   (finch.finch_logic.nodes.Alias)" href="../finch_logic/nodes/#finch.finch_logic.nodes.Alias">Alias</a>, ...]</code>
+   (finch.finch_logic.nodes.Alias)" href="../finch_logic/nodes/#finch.finch_logic.nodes.Alias">Alias</a> | <a class="autorefs autorefs-internal" title="LogicExpression
+
+
+  
+      dataclass
+   (finch.finch_logic.nodes.LogicExpression)" href="../finch_logic/nodes/#finch.finch_logic.nodes.LogicExpression">LogicExpression</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7841,8 +7853,7 @@ Halts execution of the program.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">727</span>
-<span class="normal">728</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">728</span>
 <span class="normal">729</span>
 <span class="normal">730</span>
 <span class="normal">731</span>
@@ -7879,21 +7890,22 @@ Halts execution of the program.</p>
 <span class="normal">762</span>
 <span class="normal">763</span>
 <span class="normal">764</span>
-<span class="normal">765</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">765</span>
+<span class="normal">766</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Produces</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that returns `args...` from the current plan.</span>
 <span class="sd">    Halts execution of the program.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        args: The arguments to return.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Alias</span> <span class="o">|</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -7905,8 +7917,8 @@ Halts execution of the program.</p>
         <span class="n">op</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">dim_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers dimmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers dimmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">return</span> <span class="n">dim_bindings</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
@@ -7915,8 +7927,8 @@ Halts execution of the program.</p>
         <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">return</span> <span class="n">bindings</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7973,20 +7985,20 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">748</span>
-<span class="normal">749</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">749</span>
 <span class="normal">750</span>
 <span class="normal">751</span>
 <span class="normal">752</span>
 <span class="normal">753</span>
 <span class="normal">754</span>
-<span class="normal">755</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_dimmap</span><span class="p">(</span>
+<span class="normal">755</span>
+<span class="normal">756</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_dimmap</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">dim_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">T</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infers dimmaps for all aliases defined in the statement. The results</span>
-<span class="sd">    will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Infers dimmaps for all aliases defined in the statement. The results</span>
+<span class="sd">    will be stored in the dictionary passed to the method."""</span>
     <span class="k">return</span> <span class="n">dim_bindings</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8011,22 +8023,22 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">757</span>
-<span class="normal">758</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">758</span>
 <span class="normal">759</span>
 <span class="normal">760</span>
 <span class="normal">761</span>
 <span class="normal">762</span>
 <span class="normal">763</span>
 <span class="normal">764</span>
-<span class="normal">765</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
+<span class="normal">765</span>
+<span class="normal">766</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">    will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">    will be stored in the dictionary passed to the method."""</span>
     <span class="k">return</span> <span class="n">bindings</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8126,8 +8138,7 @@ will be stored in the dictionary passed to the method.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">671</span>
-<span class="normal">672</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">672</span>
 <span class="normal">673</span>
 <span class="normal">674</span>
 <span class="normal">675</span>
@@ -8179,23 +8190,24 @@ will be stored in the dictionary passed to the method.</p>
 <span class="normal">721</span>
 <span class="normal">722</span>
 <span class="normal">723</span>
-<span class="normal">724</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">724</span>
+<span class="normal">725</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Query</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that evaluates `rhs`, binding the result to</span>
 <span class="sd">    `lhs`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        lhs: The left-hand side of the binding.</span>
 <span class="sd">        rhs: The right-hand side to evaluate.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Alias</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">LogicExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_dimmap</span><span class="p">(</span>
@@ -8210,8 +8222,8 @@ will be stored in the dictionary passed to the method.</p>
                 <span class="n">op</span><span class="p">(</span><span class="n">dim1</span><span class="p">,</span> <span class="n">dim2</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">dim_bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">dimmap</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">dim_bindings</span><span class="p">)</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers dimmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers dimmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">return</span> <span class="n">dim_bindings</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
@@ -8220,15 +8232,15 @@ will be stored in the dictionary passed to the method.</p>
         <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">        will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">        will be stored in the dictionary passed to the method."""</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lhs</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
             <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
             <span class="n">prev</span> <span class="o">=</span> <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span>
             <span class="c1"># A dynamic value is compatible with any value of its dtype.</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">is_dynamic</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="ow">or</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">prev</span><span class="p">))</span> <span class="ow">and</span> <span class="n">val</span> <span class="o">!=</span> <span class="n">prev</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Cannot rebind alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="si">}</span><span class="s2"> to a different values&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Cannot rebind alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="si">}</span><span class="s2"> to a different values"</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
@@ -8288,8 +8300,7 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">706</span>
-<span class="normal">707</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">707</span>
 <span class="normal">708</span>
 <span class="normal">709</span>
 <span class="normal">710</span>
@@ -8306,21 +8317,22 @@ will be stored in the dictionary passed to the method.</p>
 <span class="normal">721</span>
 <span class="normal">722</span>
 <span class="normal">723</span>
-<span class="normal">724</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
+<span class="normal">724</span>
+<span class="normal">725</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">infer_valmap</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">g</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Infers valmaps for all aliases defined in the statement. The results</span>
-<span class="sd">    will be stored in the dictionary passed to the method.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Infers valmaps for all aliases defined in the statement. The results</span>
+<span class="sd">    will be stored in the dictionary passed to the method."""</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">lhs</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
         <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
         <span class="n">prev</span> <span class="o">=</span> <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span>
         <span class="c1"># A dynamic value is compatible with any value of its dtype.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">is_dynamic</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="ow">or</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">prev</span><span class="p">))</span> <span class="ow">and</span> <span class="n">val</span> <span class="o">!=</span> <span class="n">prev</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Cannot rebind alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="si">}</span><span class="s2"> to a different values&quot;</span>
+                <span class="sa">f</span><span class="s2">"Cannot rebind alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="si">}</span><span class="s2"> to a different values"</span>
             <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="o">.</span><span class="n">valmap</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
@@ -8398,7 +8410,7 @@ will be stored in the dictionary passed to the method.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Relabel.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
 
 
   
@@ -8423,8 +8435,7 @@ will be stored in the dictionary passed to the method.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">630</span>
-<span class="normal">631</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">631</span>
 <span class="normal">632</span>
 <span class="normal">633</span>
 <span class="normal">634</span>
@@ -8461,22 +8472,23 @@ will be stored in the dictionary passed to the method.</p>
 <span class="normal">665</span>
 <span class="normal">666</span>
 <span class="normal">667</span>
-<span class="normal">668</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">668</span>
+<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Relabel</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that relabels the dimensions of `arg` to be</span>
 <span class="sd">    `idxs...`. Number of fields of `arg` and `idxs` must match.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        arg: The argument to relabel.</span>
 <span class="sd">        idxs: The new labels for dimensions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">arg</span><span class="p">:</span> <span class="n">LogicExpression</span>
     <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -8494,7 +8506,7 @@ will be stored in the dictionary passed to the method.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -8554,10 +8566,10 @@ will be stored in the dictionary passed to the method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">644</span>
-<span class="normal">645</span>
-<span class="normal">646</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8633,7 +8645,7 @@ exist in <code>arg</code> may be added.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Reorder.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
 
 
   
@@ -8658,8 +8670,7 @@ exist in <code>arg</code> may be added.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">581</span>
-<span class="normal">582</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">582</span>
 <span class="normal">583</span>
 <span class="normal">584</span>
 <span class="normal">585</span>
@@ -8704,9 +8715,10 @@ exist in <code>arg</code> may be added.</p>
 <span class="normal">624</span>
 <span class="normal">625</span>
 <span class="normal">626</span>
-<span class="normal">627</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">627</span>
+<span class="normal">628</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Reorder</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that reorders the dimensions of `arg` to be</span>
 <span class="sd">    `idxs...`. Dimensions known to be length 1 may be dropped. Dimensions that do not</span>
 <span class="sd">    exist in `arg` may be added.</span>
@@ -8714,18 +8726,18 @@ exist in <code>arg</code> may be added.</p>
 <span class="sd">    Attributes:</span>
 <span class="sd">        arg: The argument to reorder.</span>
 <span class="sd">        idxs: The new order of dimensions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">arg</span><span class="p">:</span> <span class="n">LogicExpression</span>
     <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -8805,10 +8817,10 @@ exist in <code>arg</code> may be added.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">601</span>
-<span class="normal">602</span>
-<span class="normal">603</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8872,12 +8884,7 @@ exist in <code>arg</code> may be added.</p>
 
   
       dataclass
-   (finch.finch_logic.nodes.Literal)" href="../finch_logic/nodes/#finch.finch_logic.nodes.Literal">Literal</a> | <a class="autorefs autorefs-internal" title="Value
-
-
-  
-      dataclass
-   (finch.finch_logic.nodes.Value)" href="../finch_logic/nodes/#finch.finch_logic.nodes.Value">Value</a> | <a class="autorefs autorefs-internal" title="Alias
+   (finch.finch_logic.nodes.Literal)" href="../finch_logic/nodes/#finch.finch_logic.nodes.Literal">Literal</a> | <a class="autorefs autorefs-internal" title="Alias
 
 
   
@@ -8893,7 +8900,7 @@ exist in <code>arg</code> may be added.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.autoschedule.Table.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Field
 
 
   
@@ -8918,8 +8925,7 @@ exist in <code>arg</code> may be added.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">422</span>
-<span class="normal">423</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">423</span>
 <span class="normal">424</span>
 <span class="normal">425</span>
 <span class="normal">426</span>
@@ -8968,27 +8974,28 @@ exist in <code>arg</code> may be added.</p>
 <span class="normal">469</span>
 <span class="normal">470</span>
 <span class="normal">471</span>
-<span class="normal">472</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">472</span>
+<span class="normal">473</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Table</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for a tensor object `tns`, indexed by fields</span>
 <span class="sd">    `idxs...`. A table is a tensor with named dimensions.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        tns: The tensor object.</span>
 <span class="sd">        idxs: The fields indexing the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">tns</span><span class="p">:</span> <span class="n">Literal</span> <span class="o">|</span> <span class="n">Value</span> <span class="o">|</span> <span class="n">Alias</span>
+    <span class="n">tns</span><span class="p">:</span> <span class="n">Literal</span> <span class="o">|</span> <span class="n">Alias</span>
     <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns fields of the node."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">dimmap</span><span class="p">(</span>
@@ -8997,10 +9004,10 @@ exist in <code>arg</code> may be added.</p>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="n">Alias</span><span class="p">):</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dim_bindings</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Cannot resolve dims of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Cannot resolve dims of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">dim_bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">]</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Cannot resolve dims of Tables&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve dims of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">valmap</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -9011,10 +9018,10 @@ exist in <code>arg</code> may be added.</p>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="n">Alias</span><span class="p">):</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Cannot resolve value of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Cannot resolve value of Alias </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">bindings</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">]</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Cannot resolve value of Tables&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Cannot resolve value of Tables"</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="o">*</span><span class="n">idxs</span><span class="p">):</span>
@@ -9073,10 +9080,10 @@ exist in <code>arg</code> may be added.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns fields of the node.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fields</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Returns fields of the node."""</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9166,8 +9173,7 @@ yet to be evaluated.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_logic/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">347</span>
-<span class="normal">348</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">348</span>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
@@ -9178,16 +9184,17 @@ yet to be evaluated.</p>
 <span class="normal">356</span>
 <span class="normal">357</span>
 <span class="normal">358</span>
-<span class="normal">359</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">359</span>
+<span class="normal">360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Value</span><span class="p">(</span><span class="n">LogicNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST expression for an expression `ex` of type `type`,</span>
 <span class="sd">    yet to be evaluated.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        ex: The expression to be evaluated.</span>
 <span class="sd">        type_: The type of the expression.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">ex</span><span class="p">:</span> <span class="n">Any</span>
     <span class="n">type_</span><span class="p">:</span> <span class="n">Any</span>
@@ -9277,9 +9284,9 @@ yet to be evaluated.</p>
 <span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_names</span><span class="p">(</span>
     <span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicNode</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Normalizes names of aliases and fields in the logic program to avoid conflicts.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">bindings</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">spc</span> <span class="o">=</span> <span class="n">Namespace</span><span class="p">()</span>
@@ -9290,13 +9297,13 @@ yet to be evaluated.</p>
             <span class="k">case</span> <span class="n">Alias</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
-                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">)</span>
+                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)</span>
                 <span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_name</span>
                 <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
-                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">)</span>
+                <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i"</span><span class="p">)</span>
                 <span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_name</span>
                 <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>

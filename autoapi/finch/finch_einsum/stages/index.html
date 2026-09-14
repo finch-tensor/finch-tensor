@@ -5485,9 +5485,9 @@
         <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumNode</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>  <span class="c1"># TODO eventually Any-&gt;Tensor</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Evaluate the given logic.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5538,9 +5538,9 @@
     <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumNode</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>  <span class="c1"># TODO eventually Any-&gt;Tensor</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Evaluate the given logic.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5591,11 +5591,11 @@
 <span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">        single method called `main` which implements the logic. Also return a</span>
 <span class="sd">        dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5642,11 +5642,11 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">28</span>
 <span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">    single method called `main` which implements the logic. Also return a</span>
 <span class="sd">    dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5699,9 +5699,9 @@ dictionary including additional tables needed to run the kernel.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Transform the given logic term into another logic term.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5748,9 +5748,9 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Transform the given logic term into another logic term.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

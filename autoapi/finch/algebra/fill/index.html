@@ -5543,22 +5543,22 @@ that value:</p>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AbstractFill</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A tensor&#39;s fill value, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A tensor's fill value, and whether kernels may specialize on it."""</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The dtype of the fill value, always known.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The dtype of the fill value, always known."""</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill value itself, always known.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The fill value itself, always known."""</span>
         <span class="o">...</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""This fill, marked so that kernels will not specialize on its value."""</span>
         <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5641,7 +5641,7 @@ that value:</p>
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""This fill, marked so that kernels will not specialize on its value."""</span>
     <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5732,13 +5732,13 @@ different <code>.value</code>'s.</p>
 <span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A fill value which kernels must not specialize on. The value is known and is</span>
 <span class="sd">    bound to the kernel at call time.</span>
 
 <span class="sd">    Equality and hashing are by dtype *only*, i.e. two equal `DynamicFill`s may have</span>
-<span class="sd">    different `.value`&#39;s.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    different `.value`'s.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
@@ -5774,7 +5774,7 @@ different <code>.value</code>'s.</p>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;DynamicFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"DynamicFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="si">!r}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5812,7 +5812,7 @@ different <code>.value</code>'s.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#Exception">Exception</a></code></p>
+              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/exceptions.html#Exception">Exception</a></code></p>
 
 
 
@@ -5835,11 +5835,11 @@ compilation.</p>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFillError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Raised when a fill value must be specialized on at compile time but the fill</span>
 <span class="sd">    is Dynamic. Callers may catch this to fall back to value-specialized</span>
 <span class="sd">    compilation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5925,11 +5925,11 @@ distinct kernels.</p>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StaticFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A fill value which kernels may specialize on. Equality and hashing are by</span>
 <span class="sd">    value, so ftypes carrying different static fills are distinct and get</span>
 <span class="sd">    distinct kernels.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
@@ -5948,7 +5948,7 @@ distinct kernels.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="c1"># Values are compared with `same` rather than `==` because of NaN.</span>
         <span class="c1"># ftypes filled with NaN must compare equal or they get separate</span>
-        <span class="c1"># kernels and fail each other&#39;s type checks. Imported lazily: `ffuncs`</span>
+        <span class="c1"># kernels and fail each other's type checks. Imported lazily: `ffuncs`</span>
         <span class="c1"># depends on this module.</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">.ffuncs</span><span class="w"> </span><span class="kn">import</span> <span class="n">same</span>
 
@@ -5971,7 +5971,7 @@ distinct kernels.</p>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;StaticFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"StaticFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6043,7 +6043,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compute the fill value of mapping `op` over tensors with fills `fills`.</span>
 
 <span class="sd">    A fill stays static only while its value is one the algebra can act on.</span>
@@ -6051,7 +6051,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="sd">    walks a fill through 1, 2, 3, ... -- and a static fill is compared by</span>
 <span class="sd">    value, so keeping those static would key a kernel per distinct value and</span>
 <span class="sd">    make a loop cost a compilation per iteration.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Imported lazily: `algebra` depends on this module.</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">.algebra</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_specializable_value</span>
 
@@ -6094,7 +6094,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_fill</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">fill</span>
     <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>

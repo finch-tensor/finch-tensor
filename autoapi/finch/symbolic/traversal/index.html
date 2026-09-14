@@ -5341,9 +5341,9 @@
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">intree</span><span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return True iff `n1` occurs in the subtree rooted at `n2`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">node</span> <span class="o">==</span> <span class="n">n1</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">n2</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5374,9 +5374,9 @@
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">isdescendant</span><span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    True iff `n1` is a strict descendant of `n2`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">n1</span> <span class="o">==</span> <span class="n">n2</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
     <span class="k">return</span> <span class="n">intree</span><span class="p">(</span><span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">)</span>

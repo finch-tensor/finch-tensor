@@ -5378,10 +5378,10 @@ tensors.</p>
 <span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
     <span class="n">f</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Ensures all left-hand sides (LHS) of queries are unique by inserting new</span>
 <span class="sd">    tensors.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">spc</span> <span class="o">=</span> <span class="n">Namespace</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
@@ -5424,7 +5424,7 @@ tensors.</p>
                     <span class="n">writes</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">v_post_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span>
                 <span class="p">):</span>
                     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
-                        <span class="n">Field</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">bindings</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
+                        <span class="n">Field</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">bindings</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
                     <span class="p">)</span>
                     <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">v_post</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
 

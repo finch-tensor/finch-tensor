@@ -5537,10 +5537,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 83</span>
-<span class="normal"> 84</span>
-<span class="normal"> 85</span>
-<span class="normal"> 86</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 86</span>
 <span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
@@ -5554,15 +5551,18 @@
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
-<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_add_with</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_add_with</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Distribute max/min over add.</span>
 
 <span class="sd">    ```</span>
 <span class="sd">    call(+, ~a..., call(max/min, ~b...), ~c...) =&gt;</span>
 <span class="sd">        call(max/min, map(x -&gt; call(+, a..., x, c...), b)...))</span>
 <span class="sd">    ```</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span> <span class="ow">and</span> <span class="p">(</span><span class="n">found</span> <span class="o">:=</span> <span class="n">_find_first_call</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">func</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -5594,10 +5594,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
 <span class="normal">30</span>
@@ -5605,8 +5602,11 @@
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
-<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_all_literals</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;All args are literals.&quot;&quot;&quot;</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_all_literals</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""All args are literals."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">):</span>
             <span class="n">lit_args</span> <span class="o">=</span> <span class="p">[]</span>
@@ -5639,15 +5639,15 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_associative_flatten</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flatten nested associative ops.&quot;&quot;&quot;</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_associative_flatten</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Flatten nested associative ops."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">is_associative</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">found</span> <span class="o">:=</span> <span class="n">_find_first_call</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">op</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -5676,12 +5676,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
@@ -5699,8 +5694,13 @@
 <span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
-<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_flat_pair</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle two mins/maxes in max/min.&quot;&quot;&quot;</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_flat_pair</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Handle two mins/maxes in max/min."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">op</span> <span class="o">==</span> <span class="n">func1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">found</span> <span class="o">:=</span> <span class="n">_find_first_call</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">func2</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -5745,21 +5745,21 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
-<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_flat_single</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_flat_single</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Remove min/max from max/min when disjoint.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">op</span> <span class="o">==</span> <span class="n">func1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">found</span> <span class="o">:=</span> <span class="n">_find_first_call</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">func2</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -5790,10 +5790,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">110</span>
 <span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
@@ -5817,8 +5814,13 @@
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_nested</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle nested max/min in min/max.&quot;&quot;&quot;</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_disjoint_nested</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">func1</span><span class="p">,</span> <span class="n">func2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Handle nested max/min in min/max."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">op</span> <span class="o">==</span> <span class="n">func1</span> <span class="ow">and</span> <span class="p">(</span><span class="n">found</span> <span class="o">:=</span> <span class="n">_find_first_call</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">func2</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -5837,7 +5839,9 @@
                                 <span class="n">L</span><span class="p">(</span><span class="n">func2</span><span class="p">),</span>
                                 <span class="p">(</span>
                                     <span class="o">*</span><span class="n">before2</span><span class="p">,</span>
-                                    <span class="o">*</span><span class="n">setdiff</span><span class="p">(</span><span class="n">call_args2</span><span class="p">,</span> <span class="n">before</span> <span class="o">+</span> <span class="n">after</span><span class="p">),</span>
+                                    <span class="o">*</span><span class="n">setdiff</span><span class="p">(</span>
+                                        <span class="n">call_args2</span><span class="p">,</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">before</span><span class="p">,</span> <span class="n">after</span><span class="p">)</span>
+                                    <span class="p">),</span>
                                     <span class="o">*</span><span class="n">after2</span><span class="p">,</span>
                                 <span class="p">),</span>
                             <span class="p">),</span>
@@ -5867,12 +5871,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_equal_same</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Match eq(a, a) =&gt; True.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_equal_same</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">L</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Match eq(a, a) =&gt; True."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))</span> <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">eq</span> <span class="ow">and</span> <span class="n">a</span> <span class="o">==</span> <span class="n">b</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">L</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
@@ -5898,12 +5902,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_ge</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transform ge(a, b) =&gt; eq(a, max(a, b)).&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_ge</span><span class="p">(</span><span class="n">ex</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Call</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Transform ge(a, b) =&gt; eq(a, max(a, b))."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))</span> <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">ge</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">eq</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))))</span>
@@ -5929,12 +5933,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_idempotent_unique</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove duplicates from idempotent op.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_idempotent_unique</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Remove duplicates from idempotent op."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_idempotent</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">all_unique</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">args</span><span class="p">)))</span>
@@ -5960,12 +5964,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_le</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transform le(a, b) =&gt; eq(max(a, b), b).&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_le</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Transform le(a, b) =&gt; eq(max(a, b), b)."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))</span> <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">le</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">eq</span><span class="p">),</span> <span class="p">(</span><span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)),</span> <span class="n">b</span><span class="p">))</span>
@@ -5991,12 +5995,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/proves.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_single_arg</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collapse single-arg calls.&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">rule_single_arg</span><span class="p">(</span><span class="n">ex</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Collapse single-arg calls."""</span>
     <span class="k">match</span> <span class="n">ex</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Call</span><span class="p">(</span><span class="n">L</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="p">(</span><span class="n">arg</span><span class="p">,))</span> <span class="k">if</span> <span class="n">op</span> <span class="ow">in</span> <span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">min</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">arg</span>

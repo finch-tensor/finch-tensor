@@ -5450,46 +5450,46 @@
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base class for tensor statistics.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">|</span> <span class="n">BaseTensorStats</span><span class="p">,</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">BaseTensorStats</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;dim_sizes must be omitted when constructing from BaseTensorStats&quot;</span>
+                    <span class="s2">"dim_sizes must be omitted when constructing from BaseTensorStats"</span>
                 <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span>
                 <span class="n">index_order</span><span class="o">.</span><span class="n">index_order</span><span class="p">,</span> <span class="n">index_order</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">,</span> <span class="n">index_order</span><span class="o">.</span><span class="n">fill_value</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;dim_sizes are required when constructing from fields&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"dim_sizes are required when constructing from fields"</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_init_from_fields</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_index_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index_order</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">dim_sizes</span><span class="p">)</span>
         <span class="c1"># Stats always carry an AbstractFill: propagation must be able to say</span>
-        <span class="c1"># &quot;this fill exists but must not be specialized on&quot;.</span>
+        <span class="c1"># "this fill exists but must not be specialized on".</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
@@ -5500,11 +5500,11 @@
         <span class="k">return</span> <span class="n">new</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span>
 
     <span class="nd">@dim_sizes</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_dim_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -5524,7 +5524,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The fill, and whether kernels may specialize on it."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
 
     <span class="nd">@fill_value</span><span class="o">.</span><span class="n">setter</span>
@@ -5536,7 +5536,7 @@
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">:</span>
             <span class="n">prod</span> <span class="o">*=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
             <span class="k">if</span> <span class="n">prod</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">prod</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">:</span>
-                <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">prod</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>

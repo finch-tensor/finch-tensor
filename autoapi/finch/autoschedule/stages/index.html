@@ -5703,11 +5703,11 @@ are wrapping Aliases.</p>
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AliasedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    AliasedForm requires that all aliases in the input are defined</span>
 <span class="sd">    in the bindings or in previous queries and that all Tables</span>
 <span class="sd">    are wrapping Aliases.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span>
@@ -5725,10 +5725,10 @@ are wrapping Aliases.</p>
                     <span class="n">defined_aliases</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
                 <span class="k">case</span> <span class="n">Alias</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                     <span class="k">if</span> <span class="n">node</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">defined_aliases</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alias </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not defined in bindings.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Alias </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not defined in bindings."</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">Alias</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Table nodes must wrap an Alias.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table nodes must wrap an Alias."</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">node</span>
 
         <span class="n">Rewrite</span><span class="p">(</span><span class="n">PreWalk</span><span class="p">(</span><span class="n">validate</span><span class="p">))(</span><span class="n">term</span><span class="p">)</span>
@@ -5861,7 +5861,7 @@ output orders set. There are three valid forms for a query in FormattedForm:
 <span class="normal">300</span>
 <span class="normal">301</span>
 <span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormattedForm</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    FormattedForm requires that the input query has had its tensor formats and</span>
 <span class="sd">    output orders set. There are three valid forms for a query in FormattedForm:</span>
 <span class="sd">        1) transpose queries Query(_, Reorder(Table(), _))</span>
@@ -5871,7 +5871,7 @@ output orders set. There are three valid forms for a query in FormattedForm:
 <span class="sd">        3) in-place queries Query(lhs, Reorder(MapJoin(_, (</span>
 <span class="sd">                Table(lhs, lhs_idxs),</span>
 <span class="sd">                Aggregate(_,_, Reorder(agg_arg, loop_order), _))), lhs_idxs)))</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span>
@@ -5908,8 +5908,8 @@ output orders set. There are three valid forms for a query in FormattedForm:
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">agg_arg</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;All aggregates must be wrapped in a Reorder node specifying</span><span class="se">\</span>
-<span class="s2">                              the output order.&quot;</span>
+                        <span class="s2">"All aggregates must be wrapped in a Reorder node specifying</span><span class="se">\</span>
+<span class="s2">                              the output order."</span>
                     <span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">MapJoin</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
@@ -5917,15 +5917,15 @@ output orders set. There are three valid forms for a query in FormattedForm:
                 <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
                     <span class="k">if</span> <span class="n">tns</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Alias </span><span class="si">{</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not defined in bindings. All aliase</span><span class="se">\</span>
-<span class="s2">                                 must have TensorFTypes specified at this stage.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Alias </span><span class="si">{</span><span class="n">tns</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> is not defined in bindings. All aliase</span><span class="se">\</span>
+<span class="s2">                                 must have TensorFTypes specified at this stage."</span>
                         <span class="p">)</span>
                 <span class="k">case</span> <span class="n">Literal</span><span class="p">():</span>
                     <span class="k">return</span> <span class="kc">None</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
                     <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">validate</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
@@ -6000,10 +6000,10 @@ output orders set. There are three valid forms for a query in FormattedForm:
         <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Einsum Notation from the given logic and input types.  Also</span>
 <span class="sd">        return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6060,10 +6060,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Einsum Notation from the given logic and input types.  Also</span>
 <span class="sd">    return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6134,9 +6134,9 @@ return a dictionary including additional tables needed to run the kernel.</p>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Optimize the tensor formats and output orders for each query.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6201,9 +6201,9 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Optimize the tensor formats and output orders for each query.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6275,10 +6275,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Optimize the aggregate structure of the given logic statement and</span>
 <span class="sd">        make decisions about materialization.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6345,10 +6345,10 @@ make decisions about materialization.</p>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Optimize the aggregate structure of the given logic statement and</span>
 <span class="sd">    make decisions about materialization.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6420,10 +6420,10 @@ make decisions about materialization.</p>
         <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Optimize the loop order of each query and add transposes where</span>
 <span class="sd">        necessary.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6490,10 +6490,10 @@ necessary.</p>
     <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Optimize the loop order of each query and add transposes where</span>
 <span class="sd">    necessary.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6555,10 +6555,10 @@ necessary.</p>
         <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Notation from the given logic and input types.  Also</span>
 <span class="sd">        return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6615,10 +6615,10 @@ return a dictionary including additional tables needed to run the kernel.</p>
     <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Notation from the given logic and input types.  Also</span>
 <span class="sd">    return a dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6763,7 +6763,7 @@ There are four valid forms for a query in LoopOrderedForm:
 <span class="normal">229</span>
 <span class="normal">230</span>
 <span class="normal">231</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LoopOrderedForm</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LoopOrderedForm assumes that the input query has had its loop order set.</span>
 <span class="sd">    There are four valid forms for a query in LoopOrderedForm:</span>
 <span class="sd">        1) transpose queries</span>
@@ -6778,7 +6778,7 @@ There are four valid forms for a query in LoopOrderedForm:
 <span class="sd">                                            Aggregate(_,_,</span>
 <span class="sd">                                                Reorder(agg_arg, loop_order), _))),</span>
 <span class="sd">                                lhs_idxs)))</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_check_loop_order</span><span class="p">(</span><span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
@@ -6808,8 +6808,8 @@ There are four valid forms for a query in LoopOrderedForm:
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;All aggregates must wrap a Reorder node specifying</span><span class="se">\</span>
-<span class="s2">                             the loop order.&quot;</span>
+                        <span class="s2">"All aggregates must wrap a Reorder node specifying</span><span class="se">\</span>
+<span class="s2">                             the loop order."</span>
                     <span class="p">)</span>
                 <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
                     <span class="n">Alias</span><span class="p">(),</span>
@@ -6825,29 +6825,29 @@ There are four valid forms for a query in LoopOrderedForm:
                     <span class="p">),</span>
                 <span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Table index order does not match loop order.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">agg_arg</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">)</span>
                 <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
                     <span class="n">Alias</span><span class="p">(),</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">MapJoin</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">))),</span> <span class="n">_</span><span class="p">)</span>
                 <span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;In-place queries must have an interior loop order!&quot;</span>
+                        <span class="s2">"In-place queries must have an interior loop order!"</span>
                     <span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">MapJoin</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
                         <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Table index order does not match loop order.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">&quot;Reorder nodes should only appear in transposes, </span><span class="se">\</span>
-<span class="s2">                            output orders, and loop orders!&quot;</span>
+                        <span class="s2">"Reorder nodes should only appear in transposes, </span><span class="se">\</span>
+<span class="s2">                            output orders, and loop orders!"</span>
                     <span class="p">)</span>
                 <span class="k">case</span> <span class="n">Literal</span><span class="p">():</span>
                     <span class="k">return</span> <span class="kc">None</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">validate</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
@@ -6998,7 +6998,7 @@ Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),
 <span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingleAggregateForm</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    SingleAggregateForm assumes that the fusion strategy has</span>
 <span class="sd">    already been optimized for this query. In particular, they allow four</span>
 <span class="sd">    valid kinds of input query:</span>
@@ -7012,7 +7012,7 @@ Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),
 <span class="sd">    Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),</span>
 <span class="sd">            Aggregate(op2, _, arg, _)), _), output_order)</span>
 <span class="sd">    (Here, op2 can be ffunc.overwrite or it can be equal to op1).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span>
@@ -7029,7 +7029,7 @@ Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),
                 <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bodies</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">Produces</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">&quot;The last body of a plan must be a Produces node.&quot;</span>
+                            <span class="s2">"The last body of a plan must be a Produces node."</span>
                         <span class="p">)</span>
                     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
                         <span class="n">validate</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
@@ -7050,22 +7050,22 @@ Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),
                 <span class="p">):</span>
                     <span class="k">if</span> <span class="n">lhs1</span> <span class="o">!=</span> <span class="n">lhs2</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">&quot;In-place queries must have the same alias on the </span><span class="se">\</span>
-<span class="s2">                                left-hand side and inside the MapJoin.&quot;</span>
+                            <span class="s2">"In-place queries must have the same alias on the </span><span class="se">\</span>
+<span class="s2">                                left-hand side and inside the MapJoin."</span>
                         <span class="p">)</span>
                     <span class="k">if</span> <span class="n">output_order1</span> <span class="o">!=</span> <span class="n">output_order2</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">&quot;In-place queries must read and write in the same order.&quot;</span>
+                            <span class="s2">"In-place queries must read and write in the same order."</span>
                         <span class="p">)</span>
                     <span class="k">if</span> <span class="n">op2</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">op1</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">&quot;The aggregate operator in an in-place query must be</span><span class="se">\</span>
-<span class="s2">                            either ffunc.overwrite or the same as the MapJoin operator.&quot;</span>
+                            <span class="s2">"The aggregate operator in an in-place query must be</span><span class="se">\</span>
+<span class="s2">                            either ffunc.overwrite or the same as the MapJoin operator."</span>
                         <span class="p">)</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">agg_allowed</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Nested aggregates are not supported.&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Nested aggregates are not supported."</span><span class="p">)</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">agg_allowed</span><span class="p">)</span>
@@ -7076,7 +7076,7 @@ Query(lhs, Reorder(MapJoin(op1, (Table(lhs, output_order),
                 <span class="k">case</span> <span class="n">Literal</span><span class="p">()</span> <span class="o">|</span> <span class="n">Alias</span><span class="p">()</span> <span class="o">|</span> <span class="n">Table</span><span class="p">():</span>
                     <span class="k">return</span> <span class="kc">None</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported query type: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="n">validate</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>

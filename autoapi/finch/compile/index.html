@@ -5654,11 +5654,12 @@ compilation process.</p>
 <span class="normal">641</span>
 <span class="normal">642</span>
 <span class="normal">643</span>
-<span class="normal">644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">644</span>
+<span class="normal">645</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compiles Finch Notation to Finch Assembly. Holds the state of the</span>
 <span class="sd">    compilation process.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -5669,7 +5670,7 @@ compilation process.</p>
         <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">access_modes</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">types</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">func_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">func_state</span><span class="p">:</span> <span class="n">HaltState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span> <span class="n">preamble</span><span class="o">=</span><span class="n">preamble</span><span class="p">,</span> <span class="n">epilogue</span><span class="o">=</span><span class="n">epilogue</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -5690,11 +5691,11 @@ compilation process.</p>
         <span class="k">def</span><span class="w"> </span><span class="nf">descend</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">cursor</span><span class="p">):</span>
             <span class="k">match</span> <span class="n">cursor</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Root</span><span class="p">():</span>
-                    <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">))</span>
+                    <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">))</span>
                 <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
                     <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">descend</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">parent</span><span class="p">),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">attr</span><span class="p">))</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized fiber cursor: </span><span class="si">{</span><span class="n">cursor</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized fiber cursor: </span><span class="si">{</span><span class="n">cursor</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">descend</span><span class="p">(</span><span class="n">fiber</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">fiber</span><span class="o">.</span><span class="n">lvl</span><span class="p">)</span>
 
@@ -5704,28 +5705,28 @@ compilation process.</p>
             <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">root</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized slot state: </span><span class="si">{</span><span class="n">slot</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized slot state: </span><span class="si">{</span><span class="n">slot</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_slot_cursor</span><span class="p">(</span><span class="n">slot</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
         <span class="n">fields</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">type_</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)</span>
-        <span class="k">if</span> <span class="s2">&quot;pos&quot;</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
-            <span class="n">pos_t</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;pos&quot;</span><span class="p">]</span>
-        <span class="k">elif</span> <span class="s2">&quot;val&quot;</span> <span class="ow">in</span> <span class="n">fields</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">],</span> <span class="s2">&quot;length_type&quot;</span><span class="p">):</span>
-            <span class="n">pos_t</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="s2">&quot;val&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">length_type</span>
-        <span class="k">elif</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="s2">&quot;shape_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="p">():</span>
+        <span class="k">if</span> <span class="s2">"pos"</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">:</span>
+            <span class="n">pos_t</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"pos"</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="s2">"val"</span> <span class="ow">in</span> <span class="n">fields</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="s2">"val"</span><span class="p">],</span> <span class="s2">"length_type"</span><span class="p">):</span>
+            <span class="n">pos_t</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="s2">"val"</span><span class="p">]</span><span class="o">.</span><span class="n">length_type</span>
+        <span class="k">elif</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="s2">"shape_type"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="p">():</span>
             <span class="c1"># 0-d tensors store their value directly rather than in a</span>
             <span class="c1"># positioned buffer; the cursor position is unused.</span>
             <span class="n">pos_t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">intp</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot create an assembly cursor for </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot create an assembly cursor for </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span><span class="n">slot</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Root</span><span class="p">(),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">pos_t</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="n">type_</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">block</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a new block. Preambles and epilogues will stay within this block.</span>
 <span class="sd">        This is used to create a new context for compiling a block of code.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">blk</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">block</span><span class="p">()</span>
         <span class="n">blk</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span>
         <span class="n">blk</span><span class="o">.</span><span class="n">slots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span>
@@ -5735,9 +5736,9 @@ compilation process.</p>
         <span class="k">return</span> <span class="n">blk</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a new scoped context that inherits from this one.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">blk</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">()</span>
         <span class="n">blk</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
         <span class="n">blk</span><span class="o">.</span><span class="n">slots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
@@ -5746,10 +5747,11 @@ compilation process.</p>
         <span class="k">return</span> <span class="n">blk</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Check if the current function should halt.</span>
 <span class="sd">        This is used to determine if the function has returned.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">has_returned</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5762,19 +5764,19 @@ compilation process.</p>
                     <span class="n">view</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">if</span> <span class="n">view</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is declared as type </span><span class="si">{</span><span class="n">view</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2">, &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is declared as type </span><span class="si">{</span><span class="n">view</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2">, "</span>
+                            <span class="sa">f</span><span class="s2">"but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">view</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">):</span>
                         <span class="k">return</span> <span class="n">view</span>
-                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized slot state: </span><span class="si">{</span><span class="n">view</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized slot state: </span><span class="si">{</span><span class="n">view</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context"</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">node</span>
             <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">node</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected Slot, Fiber, or Value, got: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected Slot, Fiber, or Value, got: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_freeze_tensor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tns_var</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">op</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -5814,11 +5816,11 @@ compilation process.</p>
         <span class="k">pass</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Lower Finch Notation to Finch Assembly. First we check for early</span>
 <span class="sd">        simplifications, then we call the normal lowering for the outermost</span>
 <span class="sd">        node.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
@@ -5838,26 +5840,26 @@ compilation process.</p>
                     <span class="n">def_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">if</span> <span class="n">def_t</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, "</span>
+                            <span class="sa">f</span><span class="s2">"but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">:</span>
                     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_slot_expr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">])</span>
-                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is not defined in the current context.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is not defined in the current context."</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">root</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">),</span> <span class="n">val</span><span class="p">):</span>
                 <span class="n">val_code</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Type mismatch: </span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Type mismatch: </span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> already exists in context, cannot unpack&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> already exists in context, cannot unpack"</span>
                     <span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is already defined in the current&quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot; context, cannot overwrite with slot.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is already defined in the current"</span>
+                        <span class="sa">f</span><span class="s2">" context, cannot overwrite with slot."</span>
                     <span class="p">)</span>
                 <span class="n">slot</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">slot</span><span class="p">,</span> <span class="n">val_code</span><span class="p">))</span>
@@ -5867,9 +5869,9 @@ compilation process.</p>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span> <span class="ow">or</span> <span class="n">var_n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context, cannot repack&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context, cannot repack"</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_t</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]:</span>
-                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Type mismatch: </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Type mismatch: </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_rm_tensor_from_accesses</span><span class="p">(</span><span class="n">var_n</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">)))</span>
                 <span class="k">return</span> <span class="kc">None</span>
@@ -5935,21 +5937,21 @@ compilation process.</p>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
                 <span class="n">ctx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
                 <span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span> <span class="o">=</span> <span class="n">HaltState</span><span class="p">(</span>
-                    <span class="n">return_var</span><span class="o">=</span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">_return&quot;</span><span class="p">),</span> <span class="n">ret_t</span><span class="p">)</span>
+                    <span class="n">return_var</span><span class="o">=</span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">_return"</span><span class="p">),</span> <span class="n">ret_t</span><span class="p">)</span>
                 <span class="p">)</span>
                 <span class="n">blk</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
                 <span class="n">blk</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
                         <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span>
-                        <span class="p">[</span><span class="n">ctx</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">],</span>
-                        <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">([</span><span class="o">*</span><span class="n">blk</span><span class="o">.</span><span class="n">emit</span><span class="p">(),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">)]),</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">),</span>
+                        <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">blk</span><span class="o">.</span><span class="n">emit</span><span class="p">(),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">))),</span>
                     <span class="p">)</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Return statement outside of function.&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Return statement outside of function."</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">,</span> <span class="bp">self</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span><span class="n">funcs</span><span class="p">):</span>
@@ -5958,7 +5960,7 @@ compilation process.</p>
                     <span class="n">ctx</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">())</span>
             <span class="k">case</span> <span class="n">other</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized."</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6002,8 +6004,7 @@ node.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">499</span>
-<span class="normal">500</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
 <span class="normal">501</span>
 <span class="normal">502</span>
 <span class="normal">503</span>
@@ -6147,12 +6148,13 @@ node.</p>
 <span class="normal">641</span>
 <span class="normal">642</span>
 <span class="normal">643</span>
-<span class="normal">644</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">644</span>
+<span class="normal">645</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower Finch Notation to Finch Assembly. First we check for early</span>
 <span class="sd">    simplifications, then we call the normal lowering for the outermost</span>
 <span class="sd">    node.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
@@ -6172,26 +6174,26 @@ node.</p>
                 <span class="n">def_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                 <span class="k">if</span> <span class="n">def_t</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, "</span>
+                        <span class="sa">f</span><span class="s2">"but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">."</span>
                     <span class="p">)</span>
             <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">:</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_slot_expr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">])</span>
-            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is not defined in the current context.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is not defined in the current context."</span><span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">root</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">),</span> <span class="n">val</span><span class="p">):</span>
             <span class="n">val_code</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Type mismatch: </span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Type mismatch: </span><span class="si">{</span><span class="n">val</span><span class="o">.</span><span class="n">result_type</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> already exists in context, cannot unpack&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> already exists in context, cannot unpack"</span>
                 <span class="p">)</span>
             <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is already defined in the current&quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot; context, cannot overwrite with slot.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is already defined in the current"</span>
+                    <span class="sa">f</span><span class="s2">" context, cannot overwrite with slot."</span>
                 <span class="p">)</span>
             <span class="n">slot</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">slot</span><span class="p">,</span> <span class="n">val_code</span><span class="p">))</span>
@@ -6201,9 +6203,9 @@ node.</p>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">var_n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span> <span class="ow">or</span> <span class="n">var_n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context, cannot repack&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot </span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2"> not found in context, cannot repack"</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">var_t</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Type mismatch: </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Type mismatch: </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_rm_tensor_from_accesses</span><span class="p">(</span><span class="n">var_n</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Repack</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">)))</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -6269,21 +6271,21 @@ node.</p>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
             <span class="n">ctx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
             <span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span> <span class="o">=</span> <span class="n">HaltState</span><span class="p">(</span>
-                <span class="n">return_var</span><span class="o">=</span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">_return&quot;</span><span class="p">),</span> <span class="n">ret_t</span><span class="p">)</span>
+                <span class="n">return_var</span><span class="o">=</span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">_return"</span><span class="p">),</span> <span class="n">ret_t</span><span class="p">)</span>
             <span class="p">)</span>
             <span class="n">blk</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
             <span class="n">blk</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
                 <span class="n">asm</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span>
-                    <span class="p">[</span><span class="n">ctx</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">],</span>
-                    <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">([</span><span class="o">*</span><span class="n">blk</span><span class="o">.</span><span class="n">emit</span><span class="p">(),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">)]),</span>
+                    <span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">),</span>
+                    <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">blk</span><span class="o">.</span><span class="n">emit</span><span class="p">(),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">))),</span>
                 <span class="p">)</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Return statement outside of function.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Return statement outside of function."</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">return_var</span><span class="p">,</span> <span class="bp">self</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span><span class="n">funcs</span><span class="p">):</span>
@@ -6292,7 +6294,7 @@ node.</p>
                 <span class="n">ctx</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Module</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">())</span>
         <span class="k">case</span> <span class="n">other</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized."</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6328,10 +6330,10 @@ This is used to create a new context for compiling a block of code.</p>
 <span class="normal">416</span>
 <span class="normal">417</span>
 <span class="normal">418</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">block</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Create a new block. Preambles and epilogues will stay within this block.</span>
 <span class="sd">    This is used to create a new context for compiling a block of code.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">blk</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">block</span><span class="p">()</span>
     <span class="n">blk</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span>
     <span class="n">blk</span><span class="o">.</span><span class="n">slots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span>
@@ -6371,9 +6373,9 @@ This is used to create a new context for compiling a block of code.</p>
 <span class="normal">427</span>
 <span class="normal">428</span>
 <span class="normal">429</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Create a new scoped context that inherits from this one.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">blk</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">()</span>
     <span class="n">blk</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
     <span class="n">blk</span><span class="o">.</span><span class="n">slots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
@@ -6408,11 +6410,13 @@ This is used to determine if the function has returned.</p>
 <span class="normal">433</span>
 <span class="normal">434</span>
 <span class="normal">435</span>
-<span class="normal">436</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">436</span>
+<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Check if the current function should halt.</span>
 <span class="sd">    This is used to determine if the function has returned.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
+    <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func_state</span><span class="o">.</span><span class="n">has_returned</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6489,13 +6493,13 @@ will take on values from start to end-1.</p>
 <span class="normal">112</span>
 <span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Extent</span><span class="p">(</span><span class="n">FTyped</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent the extent of a loop variable. This is used to define</span>
 <span class="sd">    the start and end values of a loop.</span>
 
 <span class="sd">    The extent is start-inclusive and end-exclusive, meaning that the loop variable</span>
 <span class="sd">    will take on values from start to end-1.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">start</span><span class="p">:</span> <span class="n">Any</span>
     <span class="n">end</span><span class="p">:</span> <span class="n">Any</span>
@@ -6632,33 +6636,33 @@ will take on values from start to end-1.</p>
     <span class="n">end_t</span><span class="p">:</span> <span class="n">FType</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;ExtentFType(start=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">start_t</span><span class="si">}</span><span class="s2">, end=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">end_t</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"ExtentFType(start=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">start_t</span><span class="si">}</span><span class="s2">, end=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">end_t</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;Extent&quot;</span>
+        <span class="k">return</span> <span class="s2">"Extent"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">[(</span><span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_t</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;end&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_t</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="s2">"start"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">start_t</span><span class="p">),</span> <span class="p">(</span><span class="s2">"end"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">end_t</span><span class="p">)]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Extent&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"Extent"</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">Extent</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2"> is not callable&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2"> is not callable"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_loop</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">ctx</span><span class="p">:</span> <span class="s2">&quot;AssemblyContext&quot;</span><span class="p">,</span>
+        <span class="n">ctx</span><span class="p">:</span> <span class="s2">"AssemblyContext"</span><span class="p">,</span>
         <span class="n">idx</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">,</span>
         <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span>
         <span class="n">body</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Lower a loop with the given index and body.</span>
 <span class="sd">        This is used to compile the loop into assembly.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">lower_looplets</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
         <span class="k">return</span>
 
@@ -6668,7 +6672,7 @@ will take on values from start to end-1.</p>
                 <span class="k">case</span><span class="w"> </span><span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span><span class="p">)):</span>
                     <span class="k">if</span> <span class="n">j</span> <span class="o">==</span> <span class="n">idx</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="n">FinchCompileError</span><span class="p">(</span>
-                            <span class="n">node</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Access with </span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2"> should have been lowered already&quot;</span>
+                            <span class="n">node</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Access with </span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2"> should have been lowered already"</span>
                         <span class="p">)</span>
             <span class="k">return</span>
 
@@ -6734,15 +6738,15 @@ This is used to compile the loop into assembly.</p>
 <span class="normal">261</span>
 <span class="normal">262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_loop</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">ctx</span><span class="p">:</span> <span class="s2">&quot;AssemblyContext&quot;</span><span class="p">,</span>
+    <span class="n">ctx</span><span class="p">:</span> <span class="s2">"AssemblyContext"</span><span class="p">,</span>
     <span class="n">idx</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">,</span>
     <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower a loop with the given index and body.</span>
 <span class="sd">    This is used to compile the loop into assembly.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">lower_looplets</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
     <span class="k">return</span>
 </code></pre></div></td></tr></table></div>

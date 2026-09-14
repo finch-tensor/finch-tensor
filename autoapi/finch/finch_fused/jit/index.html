@@ -5388,14 +5388,14 @@ def opt_my_function(A, B, C):
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">jit</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A decorator that marks a function for just-in-time compilation. This allows the</span>
 <span class="sd">    function to be compiled and optimized for performance when called.</span>
 
 <span class="sd">    Parameters:</span>
 <span class="sd">    - f: The function to be marked for JIT compilation. This function can use</span>
 <span class="sd">        basic python control flow and operations (e.g. while, for, if). However,</span>
-<span class="sd">        it shouldn&#39;t use more complex features like generators, classes, or recursion.</span>
+<span class="sd">        it shouldn't use more complex features like generators, classes, or recursion.</span>
 <span class="sd">    - ctx: The scheduler to use for computation. Defaults to the result of</span>
 <span class="sd">        `get_default_scheduler()`.</span>
 
@@ -5424,7 +5424,7 @@ def opt_my_function(A, B, C):
 <span class="sd">            D = compute(D)</span>
 <span class="sd">        D = compute(D)</span>
 <span class="sd">        return D</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
     <span class="n">fused_fn</span> <span class="o">=</span> <span class="n">parse_fused_function</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>

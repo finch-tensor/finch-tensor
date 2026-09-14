@@ -5338,7 +5338,7 @@ for loops, if/if-else statements, array accesses, and arithmetic/logical operati
                 <code>code</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5355,7 +5355,7 @@ followed by assembly statements. Comments (C/C++ style) are supported.</p>
                 <code>vars</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>, <a class="autorefs autorefs-internal" title="Variable
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#dict">dict</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a>, <a class="autorefs autorefs-internal" title="Variable
 
 
   
@@ -5377,7 +5377,7 @@ Used to resolve variable references in the assembly code.</p>
                 <code>position_type</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#type">type</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#type">type</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5427,7 +5427,7 @@ of parsed integer constants. (default: np.intp)</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#Exception">Exception</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/exceptions.html#Exception">Exception</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5550,7 +5550,7 @@ stmt = parse_assembly(code, vars)</p>
 <span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">parse_assembly</span><span class="p">(</span>
     <span class="n">code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">vars</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">],</span> <span class="n">position_type</span><span class="p">:</span> <span class="nb">type</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">intp</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyStatement</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Parse Finch Assembly code and convert it to assembly node objects.</span>
 
 <span class="sd">    Takes a string containing Finch Assembly code and transforms it into a structured</span>
@@ -5558,7 +5558,7 @@ stmt = parse_assembly(code, vars)</p>
 <span class="sd">    for loops, if/if-else statements, array accesses, and arithmetic/logical operations.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        code: The Finch Assembly code to parse. Should start with &quot;finch&quot; or &quot;finch-asm&quot;</span>
+<span class="sd">        code: The Finch Assembly code to parse. Should start with "finch" or "finch-asm"</span>
 <span class="sd">            followed by assembly statements. Comments (C/C++ style) are supported.</span>
 <span class="sd">        vars: Dictionary mapping variable names (as strings) to Variable objects.</span>
 <span class="sd">            Used to resolve variable references in the assembly code.</span>
@@ -5573,56 +5573,56 @@ stmt = parse_assembly(code, vars)</p>
 
 <span class="sd">    Example:</span>
 <span class="sd">        &gt;&gt;&gt; from finch.finch_assembly import nodes as asm</span>
-<span class="sd">        &gt;&gt;&gt; vars = {&quot;i&quot;: asm.Variable(&quot;i&quot;, int), &quot;arr&quot;: asm.Variable(&quot;arr&quot;, np.ndarray)}</span>
-<span class="sd">        &gt;&gt;&gt; code = &#39;&#39;&#39;finch</span>
+<span class="sd">        &gt;&gt;&gt; vars = {"i": asm.Variable("i", int), "arr": asm.Variable("arr", np.ndarray)}</span>
+<span class="sd">        &gt;&gt;&gt; code = '''finch</span>
 <span class="sd">        ... arr[i] = 42</span>
-<span class="sd">        ... &#39;&#39;&#39;</span>
+<span class="sd">        ... '''</span>
 <span class="sd">        &gt;&gt;&gt; stmt = parse_assembly(code, vars)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">tree</span> <span class="o">=</span> <span class="n">assembly_parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">ctx</span><span class="p">(</span><span class="n">tree</span><span class="p">:</span> <span class="n">Tree</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">tree</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">&quot;CNAME&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">"CNAME"</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
                 <span class="k">return</span> <span class="nb">vars</span><span class="p">[</span><span class="n">val</span><span class="p">]</span>
-            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">&quot;OP&quot;</span> <span class="o">|</span> <span class="s2">&quot;INFIX_OP&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">"OP"</span> <span class="o">|</span> <span class="s2">"INFIX_OP"</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">_OPS</span><span class="p">[</span><span class="n">val</span><span class="p">]</span>
-            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">&quot;INT&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">"INT"</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">position_type</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">&quot;DECIMAL&quot;</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">Token</span><span class="p">(</span><span class="s2">"DECIMAL"</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;start&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;block&quot;</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"start"</span><span class="p">,</span> <span class="p">[</span><span class="n">Tree</span><span class="p">(</span><span class="s2">"block"</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;for_loop&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;block&quot;</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"for_loop"</span><span class="p">,</span> <span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">stop</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"block"</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">ForLoop</span><span class="p">(</span>
                     <span class="n">ctx</span><span class="p">(</span><span class="n">i</span><span class="p">),</span>
                     <span class="n">ctx</span><span class="p">(</span><span class="n">start</span><span class="p">),</span>
                     <span class="n">ctx</span><span class="p">(</span><span class="n">stop</span><span class="p">),</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">)),</span>
                 <span class="p">)</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;if&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">cond</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;block&quot;</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"if"</span><span class="p">,</span> <span class="p">[</span><span class="n">cond</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"block"</span><span class="p">,</span> <span class="n">bodies</span><span class="p">)]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">If</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">cond</span><span class="p">),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">)))</span>
             <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span>
-                <span class="s2">&quot;if_else&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">cond</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;block&quot;</span><span class="p">,</span> <span class="n">bodies</span><span class="p">),</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;block&quot;</span><span class="p">,</span> <span class="n">else_bodies</span><span class="p">)]</span>
+                <span class="s2">"if_else"</span><span class="p">,</span> <span class="p">[</span><span class="n">cond</span><span class="p">,</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"block"</span><span class="p">,</span> <span class="n">bodies</span><span class="p">),</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"block"</span><span class="p">,</span> <span class="n">else_bodies</span><span class="p">)]</span>
             <span class="p">):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">IfElse</span><span class="p">(</span>
                     <span class="n">ctx</span><span class="p">(</span><span class="n">cond</span><span class="p">),</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">)),</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">else_bodies</span><span class="p">)),</span>
                 <span class="p">)</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;resize&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">arr</span><span class="p">,</span> <span class="n">size</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"resize"</span><span class="p">,</span> <span class="p">[</span><span class="n">arr</span><span class="p">,</span> <span class="n">size</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">resize</span><span class="p">),</span> <span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">size</span><span class="p">)))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;scansearch&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">arr</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"scansearch"</span><span class="p">,</span> <span class="p">[</span><span class="n">arr</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">lo</span><span class="p">,</span> <span class="n">hi</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">scansearch</span><span class="p">),</span> <span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">lo</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">hi</span><span class="p">))</span>
                 <span class="p">)</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;bin_op&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">op</span><span class="p">,</span> <span class="n">expr1</span><span class="p">,</span> <span class="n">expr2</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"bin_op"</span><span class="p">,</span> <span class="p">[</span><span class="n">op</span><span class="p">,</span> <span class="n">expr1</span><span class="p">,</span> <span class="n">expr2</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">op</span><span class="p">)),</span> <span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">expr1</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">expr2</span><span class="p">)))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;assign&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">lhs</span><span class="p">,</span> <span class="n">expr</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"assign"</span><span class="p">,</span> <span class="p">[</span><span class="n">lhs</span><span class="p">,</span> <span class="n">expr</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">lhs</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;access&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">tns</span><span class="p">,</span> <span class="n">access_expr</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"access"</span><span class="p">,</span> <span class="p">[</span><span class="n">tns</span><span class="p">,</span> <span class="n">access_expr</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Load</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">tns</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">access_expr</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;increment&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;access&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">tns</span><span class="p">,</span> <span class="n">access_expr</span><span class="p">]),</span> <span class="n">op</span><span class="p">,</span> <span class="n">expr</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"increment"</span><span class="p">,</span> <span class="p">[</span><span class="n">Tree</span><span class="p">(</span><span class="s2">"access"</span><span class="p">,</span> <span class="p">[</span><span class="n">tns</span><span class="p">,</span> <span class="n">access_expr</span><span class="p">]),</span> <span class="n">op</span><span class="p">,</span> <span class="n">expr</span><span class="p">]):</span>
                 <span class="n">expr_e</span><span class="p">:</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyExpression</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">access_expr</span><span class="p">)</span>
                 <span class="n">tns_e</span><span class="p">:</span> <span class="n">asm</span><span class="o">.</span><span class="n">Slot</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Store</span><span class="p">(</span>
@@ -5632,10 +5632,10 @@ stmt = parse_assembly(code, vars)</p>
                         <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">op</span><span class="p">)),</span> <span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Load</span><span class="p">(</span><span class="n">tns_e</span><span class="p">,</span> <span class="n">expr_e</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
                     <span class="p">),</span>
                 <span class="p">)</span>
-            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">&quot;expr&quot;</span> <span class="o">|</span> <span class="s2">&quot;access_expr&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">expr1</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">expr2</span><span class="p">]):</span>
+            <span class="k">case</span> <span class="n">Tree</span><span class="p">(</span><span class="s2">"expr"</span> <span class="o">|</span> <span class="s2">"access_expr"</span><span class="p">,</span> <span class="p">[</span><span class="n">expr1</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">expr2</span><span class="p">]):</span>
                 <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">op</span><span class="p">)),</span> <span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">expr1</span><span class="p">),</span> <span class="n">ctx</span><span class="p">(</span><span class="n">expr2</span><span class="p">)))</span>
             <span class="k">case</span> <span class="n">other</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">other</span><span class="si">}</span><span class="s2"> not recognized."</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">ctx</span><span class="p">(</span><span class="n">tree</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>

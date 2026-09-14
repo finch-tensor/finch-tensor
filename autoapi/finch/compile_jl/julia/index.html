@@ -5342,7 +5342,7 @@
 <span class="normal">74</span>
 <span class="normal">75</span>
 <span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">init_julia</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starts Julia and loads required packages, exactly once per process.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Starts Julia and loads required packages, exactly once per process."""</span>
     <span class="k">global</span> <span class="n">_jc</span><span class="p">,</span> <span class="n">_jl</span>
     <span class="k">if</span> <span class="n">_jl</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">JULIA_AVAILABLE</span><span class="p">:</span>
         <span class="n">_jc</span><span class="p">,</span> <span class="n">_jl</span> <span class="o">=</span> <span class="n">_start_julia</span><span class="p">()</span>
@@ -5380,13 +5380,13 @@
 <span class="normal">20</span>
 <span class="normal">21</span>
 <span class="normal">22</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">julia_available</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Whether the Julia backend can be used, i.e. whether both Python packages</span>
 <span class="sd">    `init_julia` needs are installed. They are optional dependencies; see the</span>
 <span class="sd">    `julia` extra in `pyproject.toml`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">all</span><span class="p">(</span>
-        <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;juliapkg&quot;</span><span class="p">,</span> <span class="s2">&quot;juliacall&quot;</span><span class="p">)</span>
+        <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"juliapkg"</span><span class="p">,</span> <span class="s2">"juliacall"</span><span class="p">)</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>

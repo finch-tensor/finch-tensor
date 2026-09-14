@@ -5594,7 +5594,7 @@
 <span class="normal">384</span>
 <span class="normal">385</span>
 <span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyCFGBuilder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Incrementally builds control-flow graph for Finch Assembly IR.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Incrementally builds control-flow graph for Finch Assembly IR."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Namespace</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="p">:</span> <span class="n">ControlFlowGraph</span> <span class="o">=</span> <span class="n">ControlFlowGraph</span><span class="p">()</span>
@@ -5602,7 +5602,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">namespace</span> <span class="o">=</span> <span class="n">namespace</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a statement to the current block.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Add a statement to the current block."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_block</span><span class="o">.</span><span class="n">add_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
@@ -5684,12 +5684,12 @@
                 <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">Function</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Unrecognized function type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">func</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Unrecognized function type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">func</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                         <span class="p">)</span>
 
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">Variable</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Unrecognized function name type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Unrecognized function name type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                         <span class="p">)</span>
                     <span class="n">func_name</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">name</span>
 
@@ -5700,7 +5700,7 @@
                     <span class="n">func_entry_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">new_block</span><span class="p">()</span>
                     <span class="n">func_exit_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">new_block</span><span class="p">()</span>
 
-                    <span class="c1"># connect CFG entry block to the function&#39;s entry block</span>
+                    <span class="c1"># connect CFG entry block to the function's entry block</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">entry_block</span><span class="o">.</span><span class="n">add_successor</span><span class="p">(</span><span class="n">func_entry_block</span><span class="p">)</span>
 
                     <span class="c1"># dive into the body of the function</span>
@@ -5717,7 +5717,7 @@
                 <span class="c1"># unnumbered temporary variables for loops</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">node</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="s2">&quot;AssemblyCFGBuilder&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="s2">"AssemblyCFGBuilder"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span>
 </code></pre></div></td></tr></table></div>
@@ -5755,7 +5755,7 @@
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">268</span>
 <span class="normal">269</span>
 <span class="normal">270</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add a statement to the current block.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Add a statement to the current block."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">current_block</span><span class="o">.</span><span class="n">add_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5820,7 +5820,7 @@ for easier tracking in the CFG.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_assembly.cfg_builder.NumberedStatement.sid">sid</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5861,20 +5861,20 @@ for easier tracking in the CFG.</p>
 <span class="normal">60</span>
 <span class="normal">61</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">NumberedStatement</span><span class="p">(</span><span class="n">AssemblyStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Wrapper for AssemblyStatement that assigns a unique id to each statement</span>
 <span class="sd">    for easier tracking in the CFG.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        stmt: The original AssemblyStatement being wrapped.</span>
 <span class="sd">        sid: A unique integer identifier for the statement.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">stmt</span><span class="p">:</span> <span class="n">AssemblyStatement</span>
     <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">sid</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"[</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">sid</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5948,7 +5948,7 @@ Returns:
 <span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_build_cfg</span><span class="p">(</span>
     <span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Namespace</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build control-flow graph for a FinchAssembly node.</span>
 <span class="sd">    Args:</span>
 <span class="sd">        node: Root FinchAssembly node to build CFG for.</span>
@@ -5957,7 +5957,7 @@ Returns:
 <span class="sd">        namespace: Namespace for variable name management.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        ControlFlowGraph: The constructed control-flow graph.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="c1"># desugar the input name and number additional statements for CFG construction</span>
     <span class="n">desugared_node</span> <span class="o">=</span> <span class="n">assembly_desugar</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="n">node</span><span class="p">,</span> <span class="n">sid</span><span class="o">=</span><span class="n">sid</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">)</span>
@@ -6009,14 +6009,14 @@ Returns:
 <span class="normal">255</span>
 <span class="normal">256</span>
 <span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_postprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AssemblyNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Postprocess a FinchAssembly node after</span>
 <span class="sd">    dataflow analysis (remove numbering).</span>
 <span class="sd">    Args:</span>
 <span class="sd">        node: Root FinchAssembly node to postprocess.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        AssemblyNode: The postprocessed FinchAssembly node.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rw</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">x</span><span class="p">:</span>
@@ -6085,14 +6085,14 @@ Returns:
 <span class="normal">235</span>
 <span class="normal">236</span>
 <span class="normal">237</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_preprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AssemblyNode</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Preprocess a FinchAssembly node for dataflow analysis (number statements).</span>
 <span class="sd">    Args:</span>
 <span class="sd">        node: Root FinchAssembly node to preprocess.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        AssemblyNode: The preprocessed FinchAssembly node.</span>
 <span class="sd">        sid: first unused statement id after preprocessing.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">sid</span> <span class="o">=</span> <span class="mi">0</span>
 
@@ -6267,7 +6267,7 @@ Returns:
 <span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_desugar</span><span class="p">(</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Namespace</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AssemblyNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower surface syntax to a core AST shape before CFG construction.</span>
 
 <span class="sd">    - `If(cond, body)` -&gt; `IfElse(cond, body, Block())`</span>
@@ -6276,21 +6276,21 @@ Returns:
 <span class="sd">    - `WhileLoop(cond, body)` gets `Assert(cond)` prepended to its body</span>
 <span class="sd">    - `Block(..., WhileLoop(cond, ...), ...)` gets `Assert(not cond)` inserted</span>
 <span class="sd">      immediately after each `WhileLoop` statement</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_as_not_expr</span><span class="p">(</span><span class="n">cond</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to make an expression representing the &#39;not&#39; of a condition.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Helper to make an expression representing the 'not' of a condition."""</span>
         <span class="k">return</span> <span class="n">Call</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">not_</span><span class="p">),</span> <span class="p">(</span><span class="n">cond</span><span class="p">,))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_number_stmt</span><span class="p">(</span><span class="n">stmt</span><span class="p">:</span> <span class="n">AssemblyStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NumberedStatement</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to wrap a statement in a NumberedStatement with a unique id.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Helper to wrap a statement in a NumberedStatement with a unique id."""</span>
         <span class="k">nonlocal</span> <span class="n">sid</span>
         <span class="n">s</span> <span class="o">=</span> <span class="n">NumberedStatement</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">sid</span><span class="p">)</span>
         <span class="n">sid</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">return</span> <span class="n">s</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">go</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively desugar the AST.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Recursively desugar the AST."""</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Module</span><span class="p">(</span><span class="n">funcs</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">Module</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">go</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">))</span>
@@ -6332,7 +6332,7 @@ Returns:
                     <span class="p">)</span>
                 <span class="p">)</span>
             <span class="k">case</span> <span class="n">ForLoop</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-                <span class="n">fic_var_name</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;j&quot;</span><span class="p">)</span>
+                <span class="n">fic_var_name</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"j"</span><span class="p">)</span>
                 <span class="n">fic_var</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span><span class="n">fic_var_name</span><span class="p">,</span> <span class="n">int64</span><span class="p">)</span>
 
                 <span class="n">init</span> <span class="o">=</span> <span class="n">Assign</span><span class="p">(</span><span class="n">fic_var</span><span class="p">,</span> <span class="n">start</span><span class="p">)</span>
@@ -6355,7 +6355,7 @@ Returns:
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="n">go</span><span class="p">(</span><span class="n">Block</span><span class="p">((</span><span class="n">init</span><span class="p">,</span> <span class="n">WhileLoop</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">loop_body</span><span class="p">))))</span>
             <span class="k">case</span> <span class="n">BufferLoop</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">var</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-                <span class="n">fic_var_name</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;j&quot;</span><span class="p">)</span>
+                <span class="n">fic_var_name</span> <span class="o">=</span> <span class="n">namespace</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"j"</span><span class="p">)</span>
                 <span class="n">fic_var</span> <span class="o">=</span> <span class="n">Variable</span><span class="p">(</span><span class="n">fic_var_name</span><span class="p">,</span> <span class="n">int64</span><span class="p">)</span>
 
                 <span class="n">init</span> <span class="o">=</span> <span class="n">Assign</span><span class="p">(</span><span class="n">fic_var</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">(</span><span class="mi">0</span><span class="p">)))</span>

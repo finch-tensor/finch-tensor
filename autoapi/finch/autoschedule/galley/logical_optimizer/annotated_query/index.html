@@ -6119,6 +6119,8 @@
 
 
     <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="typing.Generic" href="https://docs.python.org/3/library/typing.html#typing.Generic">Generic</a>[<span title="finch.autoschedule.galley.logical_optimizer.annotated_query.TS">TS</span>]</code></p>
 
 
 
@@ -6131,9 +6133,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 44</span>
-<span class="normal"> 45</span>
-<span class="normal"> 46</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 46</span>
 <span class="normal"> 47</span>
 <span class="normal"> 48</span>
 <span class="normal"> 49</span>
@@ -6983,9 +6983,11 @@
 <span class="normal">893</span>
 <span class="normal">894</span>
 <span class="normal">895</span>
-<span class="normal">896</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">AnnotatedQuery</span><span class="p">:</span>
-    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span>
+<span class="normal">896</span>
+<span class="normal">897</span>
+<span class="normal">898</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">AnnotatedQuery</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">TS</span><span class="p">]):</span>
+    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">]</span>
     <span class="n">output_name</span><span class="p">:</span> <span class="n">Alias</span>
     <span class="n">reduce_idxs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
     <span class="n">point_expr</span><span class="p">:</span> <span class="n">LogicExpression</span>
@@ -6996,16 +6998,16 @@
     <span class="n">original_idx</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Field</span><span class="p">]</span>
     <span class="n">connected_components</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]</span>
     <span class="n">connected_idxs</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="n">Field</span><span class="p">]]</span>
-    <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span>
+    <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span>
     <span class="n">output_order</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
+        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span>
         <span class="n">q</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
-        <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Build an `AnnotatedQuery` from a logical `Query`, extracting reduction</span>
 <span class="sd">        structure and precomputing tensor statistics.</span>
 
@@ -7018,16 +7020,16 @@
 <span class="sd">            `Aggregate` nodes.</span>
 <span class="sd">        bindings : OrderedDict[Alias, TensorStats], optional</span>
 <span class="sd">            Existing alias→stats environment to seed the analysis.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">Query</span><span class="p">),</span> <span class="p">(</span>
-            <span class="s2">&quot;Annotated Queries can only be built from queries of the form: &quot;</span>
-            <span class="s2">&quot;Query(lhs, rhs)&quot;</span>
+            <span class="s2">"Annotated Queries can only be built from queries of the form: "</span>
+            <span class="s2">"Query(lhs, rhs)"</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span> <span class="o">=</span> <span class="n">stats_factory</span>
         <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">bindings</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span>
-        <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">insert_statistics</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span><span class="p">,</span>
             <span class="n">q</span><span class="p">,</span>
@@ -7054,9 +7056,9 @@
         <span class="k">def</span><span class="w"> </span><span class="nf">strip_aggregates</span><span class="p">(</span>
             <span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span>
         <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicNode</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">LogicNode</span><span class="p">]]]:</span>
-<span class="w">            </span><span class="sd">&quot;&quot;&quot;Remove Aggregate nodes bottom-up, recording each reduction index</span>
-<span class="sd">            together with the path of the aggregate&#39;s argument in the stripped</span>
-<span class="sd">            tree.&quot;&quot;&quot;</span>
+<span class="w">            </span><span class="sd">"""Remove Aggregate nodes bottom-up, recording each reduction index</span>
+<span class="sd">            together with the path of the aggregate's argument in the stripped</span>
+<span class="sd">            tree."""</span>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">Literal</span><span class="p">()</span> <span class="k">as</span> <span class="n">op</span><span class="p">,</span> <span class="n">Literal</span><span class="p">()</span> <span class="k">as</span> <span class="n">init</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
                     <span class="n">new_arg</span><span class="p">,</span> <span class="n">records</span> <span class="o">=</span> <span class="n">strip_aggregates</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
@@ -7099,7 +7101,7 @@
 
             <span class="n">starting_reduce_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
 
-        <span class="n">cache_point</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cache_point</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">insert_statistics</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span><span class="p">,</span>
             <span class="n">point_expr</span><span class="p">,</span>
@@ -7134,7 +7136,7 @@
                 <span class="n">reduce_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">new_idxs</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="n">Field</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">Field</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lowest_paths</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
                 <span class="p">]</span>
                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lowest_paths</span><span class="p">):</span>
@@ -7159,7 +7161,7 @@
                 <span class="n">idx2_op</span> <span class="o">=</span> <span class="n">idx_op</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
                 <span class="n">idx2_top</span> <span class="o">=</span> <span class="n">idx_starting_path</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
                 <span class="n">idx2_bottom</span> <span class="o">=</span> <span class="n">idx_lowest_path</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
-                <span class="c1"># idx2&#39;s lowest root lies within idx1&#39;s lowest root subtree.</span>
+                <span class="c1"># idx2's lowest root lies within idx1's lowest root subtree.</span>
                 <span class="k">if</span> <span class="n">idx2_bottom</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)]</span> <span class="o">==</span> <span class="n">idx1_bottom</span><span class="p">:</span>
                     <span class="n">connected_idxs</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">idx2</span><span class="p">)</span>
                 <span class="n">mergeable_agg_op</span> <span class="o">=</span> <span class="p">(</span>
@@ -7167,9 +7169,9 @@
                     <span class="ow">and</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">idx1_op</span><span class="p">)</span>
                     <span class="ow">and</span> <span class="n">is_commutative</span><span class="p">(</span><span class="n">idx1_op</span><span class="p">)</span>
                 <span class="p">)</span>
-                <span class="c1"># If idx1 isn&#39;t a parent of idx2, then idx2 can&#39;t restrict the</span>
+                <span class="c1"># If idx1 isn't a parent of idx2, then idx2 can't restrict the</span>
                 <span class="c1"># summation of idx1. idx2 is a parent when its starting root</span>
-                <span class="c1"># lies strictly within idx1&#39;s lowest root subtree.</span>
+                <span class="c1"># lies strictly within idx1's lowest root subtree.</span>
                 <span class="k">if</span> <span class="p">(</span>
                     <span class="nb">len</span><span class="p">(</span><span class="n">idx2_top</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)</span>
                     <span class="ow">and</span> <span class="n">idx2_top</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)]</span> <span class="o">==</span> <span class="n">idx1_bottom</span>
@@ -7196,10 +7198,10 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">connected_idxs</span> <span class="o">=</span> <span class="n">connected_idxs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_order</span> <span class="o">=</span> <span class="n">output_order</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;AnnotatedQuery&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"AnnotatedQuery"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Make a structured copy of an AnnotatedQuery.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">new</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="n">AnnotatedQuery</span><span class="p">)</span>
         <span class="n">new</span><span class="o">.</span><span class="n">stats_factory</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span>
         <span class="n">new</span><span class="o">.</span><span class="n">output_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_name</span>
@@ -7225,7 +7227,7 @@
         <span class="k">return</span> <span class="n">new</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Indices eligible to be reduced immediately (no parents).</span>
 
 <span class="sd">        Parameters</span>
@@ -7237,13 +7239,13 @@
 <span class="sd">        -------</span>
 <span class="sd">        list[Field]</span>
 <span class="sd">            Field objects in `aq.reduce_idxs` with zero parents.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="p">[</span>
             <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_idxs</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_idxs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">0</span>
         <span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs_for_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Indices in this component that have no parents (reducible now).</span>
 
 <span class="sd">        Parameters</span>
@@ -7255,7 +7257,7 @@
 <span class="sd">        -------</span>
 <span class="sd">        list[Field]</span>
 <span class="sd">            Field objects in the component that are reducible (zero parents).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span>
             <span class="nb">set</span><span class="p">(</span><span class="n">component</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()),</span>
             <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">field</span><span class="p">:</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
@@ -7266,7 +7268,7 @@
         <span class="n">parent_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
         <span class="n">connected_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Compute connected components of indices (Field objects) and order those</span>
 <span class="sd">        components by parent/child constraints.</span>
 
@@ -7276,7 +7278,7 @@
 <span class="sd">            Mapping from an index to the iterable of its parent indices.</span>
 <span class="sd">        connected_idxs : Dict[Field, Iterable[Field]]</span>
 <span class="sd">            Mapping from an index to the iterable of indices considered</span>
-<span class="sd">            &quot;connected&quot; to it (undirected neighbors). Only connections between</span>
+<span class="sd">            "connected" to it (undirected neighbors). Only connections between</span>
 <span class="sd">            non-parent pairs are used to form components.</span>
 
 <span class="sd">        Returns</span>
@@ -7285,7 +7287,7 @@
 <span class="sd">            A list of components, each a list of Field objects. Components are</span>
 <span class="sd">            ordered so that any component containing a parent appears before any</span>
 <span class="sd">            component containing its child.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">parent_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="n">Field</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">k</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">parent_idxs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
         <span class="p">}</span>
@@ -7357,9 +7359,9 @@
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">node_at</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the node at `path`, a sequence of child indices from `root`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">node</span> <span class="o">=</span> <span class="n">root</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
             <span class="n">node</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
@@ -7370,7 +7372,7 @@
         <span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span>
         <span class="n">transforms</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">LogicNode</span><span class="p">],</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Rebuild `root`, applying each transform to the node at its path.</span>
 
 <span class="sd">        Parameters</span>
@@ -7390,13 +7392,13 @@
 
 <span class="sd">        Notes</span>
 <span class="sd">        -----</span>
-<span class="sd">        Children are rebuilt before a node&#39;s own transform runs, so nested</span>
+<span class="sd">        Children are rebuilt before a node's own transform runs, so nested</span>
 <span class="sd">        transform paths compose (an outer transform receives the node with</span>
 <span class="sd">        inner transforms already applied), and the single traversal never</span>
 <span class="sd">        descends into subtrees a transform inserted -- an inserted node can</span>
 <span class="sd">        never itself be matched, which is what makes wrapping a node in an</span>
 <span class="sd">        expression that contains it safe.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">rebuild</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">LogicTree</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
@@ -7409,8 +7411,8 @@
                     <span class="k">if</span> <span class="n">new_child</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">MapJoin</span><span class="p">):</span>
                             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                                <span class="s2">&quot;Only MapJoin arguments can be removed, not &quot;</span>
-                                <span class="sa">f</span><span class="s2">&quot;children of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+                                <span class="s2">"Only MapJoin arguments can be removed, not "</span>
+                                <span class="sa">f</span><span class="s2">"children of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
                             <span class="p">)</span>
                         <span class="k">continue</span>
                     <span class="n">new_children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_child</span><span class="p">)</span>
@@ -7423,21 +7425,21 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">rebuild</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="p">())</span>
         <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot remove the root of an expression.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot remove the root of an expression."</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">splice_paths</span><span class="p">(</span>
         <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Remap `path` through a splice: the node at `replace_path` was replaced</span>
 <span class="sd">        and the MapJoin arguments at `removal_paths` (siblings of</span>
 <span class="sd">        `replace_path`) were removed, shifting the positions of the arguments</span>
 <span class="sd">        after them. Paths inside the replaced or removed subtrees map to the</span>
-<span class="sd">        replacement&#39;s position, since the kernel they addressed now lives</span>
+<span class="sd">        replacement's position, since the kernel they addressed now lives</span>
 <span class="sd">        behind it.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">removal_paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">removal_paths</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">path</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">replace_path</span><span class="p">)]</span> <span class="o">==</span> <span class="n">replace_path</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
             <span class="n">path</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="p">)]</span> <span class="o">==</span> <span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">removal_paths</span>
@@ -7456,7 +7458,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">find_lowest_roots</span><span class="p">(</span>
         <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">base</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="p">()</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Compute the lowest MapJoin / leaf positions that a reduction over `idx`</span>
 <span class="sd">        can be safely pushed down to in a logical expression.</span>
 
@@ -7481,7 +7483,7 @@
 <span class="sd">            reduction over `idx` with operator `op` can be safely pushed down.</span>
 <span class="sd">            Paths address occurrences, so structurally equal subexpressions at</span>
 <span class="sd">            different positions are reported separately.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">match</span> <span class="n">root</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">FinchOperator</span><span class="p">()</span> <span class="k">as</span> <span class="n">mj_op</span><span class="p">),</span> <span class="n">args</span><span class="p">):</span>
                 <span class="n">with_idx</span> <span class="o">=</span> <span class="p">[</span>
@@ -7513,14 +7515,14 @@
                 <span class="k">return</span> <span class="p">[</span><span class="n">base</span><span class="p">]</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;There shouldn&#39;t be nodes of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> &quot;</span>
-                    <span class="s2">&quot;during root pushdown.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"There shouldn't be nodes of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> "</span>
+                    <span class="s2">"during root pushdown."</span>
                 <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_reduce_query</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Extract the maximal kernel that depends on `reduce_idx` into a standalone</span>
 <span class="sd">        reduction query, and return the information needed to splice the result</span>
 <span class="sd">        back into the main expression.</span>
@@ -7543,7 +7545,7 @@
 <span class="sd">            become redundant after the replacement.</span>
 <span class="sd">        reduced_idxs : list[Field]</span>
 <span class="sd">            The list of indices actually reduced in `query`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">original_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_idx</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
         <span class="n">reduce_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_op</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
         <span class="n">root_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_lowest_path</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
@@ -7562,7 +7564,7 @@
             <span class="k">case</span> <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">FinchOperator</span><span class="p">()</span> <span class="k">as</span> <span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_distributive</span><span class="p">(</span>
                 <span class="n">op</span><span class="p">,</span> <span class="n">reduce_op</span>
             <span class="p">):</span>
-                <span class="c1"># If you&#39;re already reducing one index, then it may</span>
+                <span class="c1"># If you're already reducing one index, then it may</span>
                 <span class="c1"># make sense to reduce others as well.</span>
                 <span class="c1"># E.g. when you reduce one vertex of a triangle, you should</span>
                 <span class="c1"># do the other two as well.</span>
@@ -7665,11 +7667,11 @@
             <span class="n">stats_cache</span><span class="p">[</span><span class="n">query_expr</span><span class="o">.</span><span class="n">arg</span><span class="p">],</span>
         <span class="p">)</span>
 
-        <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">)),</span> <span class="n">query_expr</span><span class="p">)</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Perform a single reduction rewrite over `reduce_idx`, restructuring `aq`</span>
 <span class="sd">        so that the portion of the expression dependent on `reduce_idx` becomes</span>
 <span class="sd">        a standalone subquery.</span>
@@ -7696,7 +7698,7 @@
 <span class="sd">        Query</span>
 <span class="sd">            The newly created `Query` whose RHS computes the reduced kernel; its</span>
 <span class="sd">            alias is used in the updated `aq.point_expr`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reduce_query</span><span class="p">(</span>
             <span class="n">reduce_idx</span>
         <span class="p">)</span>
@@ -7774,11 +7776,11 @@
         <span class="k">return</span> <span class="n">query</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_remaining_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Build a final `Query` from the remaining pointwise expression in `aq`.</span>
 
 <span class="sd">        Always returns a `Query` binding ``self.output_name``.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_expr</span>
         <span class="n">output_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_order</span> <span class="ow">or</span> <span class="n">expr</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Table</span><span class="p">):</span>
@@ -7798,7 +7800,7 @@
         <span class="k">return</span> <span class="n">Query</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_name</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_cost_of_reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the estimated cost of reducing `reduce_idx` in the current `aq`.</span>
 
 <span class="sd">        Parameters</span>
@@ -7811,7 +7813,7 @@
 <span class="sd">        float</span>
 <span class="sd">            The estimated cost of performing the reduction over `reduce_idx`</span>
 <span class="sd">            in the current state of `aq`.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">query</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reduce_query</span><span class="p">(</span><span class="n">reduce_idx</span><span class="p">)</span>
         <span class="n">stats_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_point</span>
         <span class="n">insert_statistics</span><span class="p">(</span>
@@ -7832,9 +7834,9 @@
                         <span class="mi">10</span> <span class="o">*</span> <span class="n">mat_stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
                         <span class="o">+</span> <span class="n">comp_stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
                     <span class="p">)</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Stats Class must be inherit from NumericStats&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Stats Class must be inherit from NumericStats"</span><span class="p">)</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="s2">&quot;The root of the reduction query should always be an Aggregate node.&quot;</span>
+            <span class="s2">"The root of the reduction query should always be an Aggregate node."</span>
         <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7877,9 +7879,7 @@ bindings : OrderedDict[Alias, TensorStats], optional
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
@@ -8072,13 +8072,15 @@ bindings : OrderedDict[Alias, TensorStats], optional
 <span class="normal">252</span>
 <span class="normal">253</span>
 <span class="normal">254</span>
-<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
+    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span>
     <span class="n">q</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
-    <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build an `AnnotatedQuery` from a logical `Query`, extracting reduction</span>
 <span class="sd">    structure and precomputing tensor statistics.</span>
 
@@ -8091,16 +8093,16 @@ bindings : OrderedDict[Alias, TensorStats], optional
 <span class="sd">        `Aggregate` nodes.</span>
 <span class="sd">    bindings : OrderedDict[Alias, TensorStats], optional</span>
 <span class="sd">        Existing alias→stats environment to seed the analysis.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">Query</span><span class="p">),</span> <span class="p">(</span>
-        <span class="s2">&quot;Annotated Queries can only be built from queries of the form: &quot;</span>
-        <span class="s2">&quot;Query(lhs, rhs)&quot;</span>
+        <span class="s2">"Annotated Queries can only be built from queries of the form: "</span>
+        <span class="s2">"Query(lhs, rhs)"</span>
     <span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span> <span class="o">=</span> <span class="n">stats_factory</span>
     <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">bindings</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span>
-    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">insert_statistics</span><span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span><span class="p">,</span>
         <span class="n">q</span><span class="p">,</span>
@@ -8127,9 +8129,9 @@ bindings : OrderedDict[Alias, TensorStats], optional
     <span class="k">def</span><span class="w"> </span><span class="nf">strip_aggregates</span><span class="p">(</span>
         <span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicNode</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">LogicNode</span><span class="p">]]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove Aggregate nodes bottom-up, recording each reduction index</span>
-<span class="sd">        together with the path of the aggregate&#39;s argument in the stripped</span>
-<span class="sd">        tree.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Remove Aggregate nodes bottom-up, recording each reduction index</span>
+<span class="sd">        together with the path of the aggregate's argument in the stripped</span>
+<span class="sd">        tree."""</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">Literal</span><span class="p">()</span> <span class="k">as</span> <span class="n">op</span><span class="p">,</span> <span class="n">Literal</span><span class="p">()</span> <span class="k">as</span> <span class="n">init</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
                 <span class="n">new_arg</span><span class="p">,</span> <span class="n">records</span> <span class="o">=</span> <span class="n">strip_aggregates</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
@@ -8172,7 +8174,7 @@ bindings : OrderedDict[Alias, TensorStats], optional
 
         <span class="n">starting_reduce_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
 
-    <span class="n">cache_point</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">cache_point</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">insert_statistics</span><span class="p">(</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span><span class="p">,</span>
         <span class="n">point_expr</span><span class="p">,</span>
@@ -8207,7 +8209,7 @@ bindings : OrderedDict[Alias, TensorStats], optional
             <span class="n">reduce_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">new_idxs</span> <span class="o">=</span> <span class="p">[</span>
-                <span class="n">Field</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">Field</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lowest_paths</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
             <span class="p">]</span>
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lowest_paths</span><span class="p">):</span>
@@ -8232,7 +8234,7 @@ bindings : OrderedDict[Alias, TensorStats], optional
             <span class="n">idx2_op</span> <span class="o">=</span> <span class="n">idx_op</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
             <span class="n">idx2_top</span> <span class="o">=</span> <span class="n">idx_starting_path</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
             <span class="n">idx2_bottom</span> <span class="o">=</span> <span class="n">idx_lowest_path</span><span class="p">[</span><span class="n">idx2</span><span class="p">]</span>
-            <span class="c1"># idx2&#39;s lowest root lies within idx1&#39;s lowest root subtree.</span>
+            <span class="c1"># idx2's lowest root lies within idx1's lowest root subtree.</span>
             <span class="k">if</span> <span class="n">idx2_bottom</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)]</span> <span class="o">==</span> <span class="n">idx1_bottom</span><span class="p">:</span>
                 <span class="n">connected_idxs</span><span class="p">[</span><span class="n">idx1</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">idx2</span><span class="p">)</span>
             <span class="n">mergeable_agg_op</span> <span class="o">=</span> <span class="p">(</span>
@@ -8240,9 +8242,9 @@ bindings : OrderedDict[Alias, TensorStats], optional
                 <span class="ow">and</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">idx1_op</span><span class="p">)</span>
                 <span class="ow">and</span> <span class="n">is_commutative</span><span class="p">(</span><span class="n">idx1_op</span><span class="p">)</span>
             <span class="p">)</span>
-            <span class="c1"># If idx1 isn&#39;t a parent of idx2, then idx2 can&#39;t restrict the</span>
+            <span class="c1"># If idx1 isn't a parent of idx2, then idx2 can't restrict the</span>
             <span class="c1"># summation of idx1. idx2 is a parent when its starting root</span>
-            <span class="c1"># lies strictly within idx1&#39;s lowest root subtree.</span>
+            <span class="c1"># lies strictly within idx1's lowest root subtree.</span>
             <span class="k">if</span> <span class="p">(</span>
                 <span class="nb">len</span><span class="p">(</span><span class="n">idx2_top</span><span class="p">)</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)</span>
                 <span class="ow">and</span> <span class="n">idx2_top</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx1_bottom</span><span class="p">)]</span> <span class="o">==</span> <span class="n">idx1_bottom</span>
@@ -8290,9 +8292,7 @@ bindings : OrderedDict[Alias, TensorStats], optional
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">259</span>
 <span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
@@ -8316,10 +8316,12 @@ bindings : OrderedDict[Alias, TensorStats], optional
 <span class="normal">280</span>
 <span class="normal">281</span>
 <span class="normal">282</span>
-<span class="normal">283</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;AnnotatedQuery&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"AnnotatedQuery"</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Make a structured copy of an AnnotatedQuery.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">new</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="n">AnnotatedQuery</span><span class="p">)</span>
     <span class="n">new</span><span class="o">.</span><span class="n">stats_factory</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">stats_factory</span>
     <span class="n">new</span><span class="o">.</span><span class="n">output_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_name</span>
@@ -8388,9 +8390,7 @@ base : Path
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">515</span>
 <span class="normal">516</span>
 <span class="normal">517</span>
 <span class="normal">518</span>
@@ -8451,11 +8451,13 @@ base : Path
 <span class="normal">573</span>
 <span class="normal">574</span>
 <span class="normal">575</span>
-<span class="normal">576</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">find_lowest_roots</span><span class="p">(</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">base</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="p">()</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compute the lowest MapJoin / leaf positions that a reduction over `idx`</span>
 <span class="sd">    can be safely pushed down to in a logical expression.</span>
 
@@ -8480,7 +8482,7 @@ base : Path
 <span class="sd">        reduction over `idx` with operator `op` can be safely pushed down.</span>
 <span class="sd">        Paths address occurrences, so structurally equal subexpressions at</span>
 <span class="sd">        different positions are reported separately.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">root</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">FinchOperator</span><span class="p">()</span> <span class="k">as</span> <span class="n">mj_op</span><span class="p">),</span> <span class="n">args</span><span class="p">):</span>
             <span class="n">with_idx</span> <span class="o">=</span> <span class="p">[</span>
@@ -8512,8 +8514,8 @@ base : Path
             <span class="k">return</span> <span class="p">[</span><span class="n">base</span><span class="p">]</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;There shouldn&#39;t be nodes of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> &quot;</span>
-                <span class="s2">&quot;during root pushdown.&quot;</span>
+                <span class="sa">f</span><span class="s2">"There shouldn't be nodes of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">root</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> "</span>
+                <span class="s2">"during root pushdown."</span>
             <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8544,9 +8546,7 @@ base : Path
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">858</span>
-<span class="normal">859</span>
-<span class="normal">860</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">860</span>
 <span class="normal">861</span>
 <span class="normal">862</span>
 <span class="normal">863</span>
@@ -8582,8 +8582,10 @@ base : Path
 <span class="normal">893</span>
 <span class="normal">894</span>
 <span class="normal">895</span>
-<span class="normal">896</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_cost_of_reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">896</span>
+<span class="normal">897</span>
+<span class="normal">898</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_cost_of_reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Get the estimated cost of reducing `reduce_idx` in the current `aq`.</span>
 
 <span class="sd">    Parameters</span>
@@ -8596,7 +8598,7 @@ base : Path
 <span class="sd">    float</span>
 <span class="sd">        The estimated cost of performing the reduction over `reduce_idx`</span>
 <span class="sd">        in the current state of `aq`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">query</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reduce_query</span><span class="p">(</span><span class="n">reduce_idx</span><span class="p">)</span>
     <span class="n">stats_cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache_point</span>
     <span class="n">insert_statistics</span><span class="p">(</span>
@@ -8617,9 +8619,9 @@ base : Path
                     <span class="mi">10</span> <span class="o">*</span> <span class="n">mat_stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
                     <span class="o">+</span> <span class="n">comp_stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
                 <span class="p">)</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Stats Class must be inherit from NumericStats&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Stats Class must be inherit from NumericStats"</span><span class="p">)</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-        <span class="s2">&quot;The root of the reduction query should always be an Aggregate node.&quot;</span>
+        <span class="s2">"The root of the reduction query should always be an Aggregate node."</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8660,9 +8662,7 @@ connected_idxs : Dict[Field, Iterable[Field]]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
 <span class="normal">325</span>
 <span class="normal">326</span>
 <span class="normal">327</span>
@@ -8752,12 +8752,14 @@ connected_idxs : Dict[Field, Iterable[Field]]
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
-<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_idx_connected_components</span><span class="p">(</span>
     <span class="n">parent_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
     <span class="n">connected_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compute connected components of indices (Field objects) and order those</span>
 <span class="sd">    components by parent/child constraints.</span>
 
@@ -8767,7 +8769,7 @@ connected_idxs : Dict[Field, Iterable[Field]]
 <span class="sd">        Mapping from an index to the iterable of its parent indices.</span>
 <span class="sd">    connected_idxs : Dict[Field, Iterable[Field]]</span>
 <span class="sd">        Mapping from an index to the iterable of indices considered</span>
-<span class="sd">        &quot;connected&quot; to it (undirected neighbors). Only connections between</span>
+<span class="sd">        "connected" to it (undirected neighbors). Only connections between</span>
 <span class="sd">        non-parent pairs are used to form components.</span>
 
 <span class="sd">    Returns</span>
@@ -8776,7 +8778,7 @@ connected_idxs : Dict[Field, Iterable[Field]]
 <span class="sd">        A list of components, each a list of Field objects. Components are</span>
 <span class="sd">        ordered so that any component containing a parent appears before any</span>
 <span class="sd">        component containing its child.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">parent_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="n">Field</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="n">k</span><span class="p">:</span> <span class="nb">set</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">parent_idxs</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
     <span class="p">}</span>
@@ -8884,9 +8886,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">578</span>
-<span class="normal">579</span>
-<span class="normal">580</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">580</span>
 <span class="normal">581</span>
 <span class="normal">582</span>
 <span class="normal">583</span>
@@ -9033,10 +9033,12 @@ reduced_idxs : list[Field]
 <span class="normal">724</span>
 <span class="normal">725</span>
 <span class="normal">726</span>
-<span class="normal">727</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reduce_query</span><span class="p">(</span>
+<span class="normal">727</span>
+<span class="normal">728</span>
+<span class="normal">729</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reduce_query</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Extract the maximal kernel that depends on `reduce_idx` into a standalone</span>
 <span class="sd">    reduction query, and return the information needed to splice the result</span>
 <span class="sd">    back into the main expression.</span>
@@ -9059,7 +9061,7 @@ reduced_idxs : list[Field]
 <span class="sd">        become redundant after the replacement.</span>
 <span class="sd">    reduced_idxs : list[Field]</span>
 <span class="sd">        The list of indices actually reduced in `query`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">original_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">original_idx</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
     <span class="n">reduce_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_op</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
     <span class="n">root_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_lowest_path</span><span class="p">[</span><span class="n">reduce_idx</span><span class="p">]</span>
@@ -9078,7 +9080,7 @@ reduced_idxs : list[Field]
         <span class="k">case</span> <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">FinchOperator</span><span class="p">()</span> <span class="k">as</span> <span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_distributive</span><span class="p">(</span>
             <span class="n">op</span><span class="p">,</span> <span class="n">reduce_op</span>
         <span class="p">):</span>
-            <span class="c1"># If you&#39;re already reducing one index, then it may</span>
+            <span class="c1"># If you're already reducing one index, then it may</span>
             <span class="c1"># make sense to reduce others as well.</span>
             <span class="c1"># E.g. when you reduce one vertex of a triangle, you should</span>
             <span class="c1"># do the other two as well.</span>
@@ -9181,7 +9183,7 @@ reduced_idxs : list[Field]
         <span class="n">stats_cache</span><span class="p">[</span><span class="n">query_expr</span><span class="o">.</span><span class="n">arg</span><span class="p">],</span>
     <span class="p">)</span>
 
-    <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">)),</span> <span class="n">query_expr</span><span class="p">)</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9211,9 +9213,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">287</span>
 <span class="normal">288</span>
 <span class="normal">289</span>
 <span class="normal">290</span>
@@ -9227,8 +9227,10 @@ reduced_idxs : list[Field]
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
-<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Indices eligible to be reduced immediately (no parents).</span>
 
 <span class="sd">    Parameters</span>
@@ -9240,7 +9242,7 @@ reduced_idxs : list[Field]
 <span class="sd">    -------</span>
 <span class="sd">    list[Field]</span>
 <span class="sd">        Field objects in `aq.reduce_idxs` with zero parents.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="p">[</span>
         <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reduce_idxs</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">parent_idxs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="p">[]))</span> <span class="o">==</span> <span class="mi">0</span>
     <span class="p">]</span>
@@ -9272,9 +9274,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
 <span class="normal">308</span>
@@ -9289,8 +9289,10 @@ reduced_idxs : list[Field]
 <span class="normal">317</span>
 <span class="normal">318</span>
 <span class="normal">319</span>
-<span class="normal">320</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs_for_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs_for_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Indices in this component that have no parents (reducible now).</span>
 
 <span class="sd">    Parameters</span>
@@ -9302,7 +9304,7 @@ reduced_idxs : list[Field]
 <span class="sd">    -------</span>
 <span class="sd">    list[Field]</span>
 <span class="sd">        Field objects in the component that are reducible (zero parents).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span>
         <span class="nb">set</span><span class="p">(</span><span class="n">component</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_reducible_idxs</span><span class="p">()),</span>
         <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">field</span><span class="p">:</span> <span class="n">field</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
@@ -9330,9 +9332,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">834</span>
-<span class="normal">835</span>
-<span class="normal">836</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">836</span>
 <span class="normal">837</span>
 <span class="normal">838</span>
 <span class="normal">839</span>
@@ -9352,12 +9352,14 @@ reduced_idxs : list[Field]
 <span class="normal">853</span>
 <span class="normal">854</span>
 <span class="normal">855</span>
-<span class="normal">856</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_remaining_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">856</span>
+<span class="normal">857</span>
+<span class="normal">858</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_remaining_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build a final `Query` from the remaining pointwise expression in `aq`.</span>
 
 <span class="sd">    Always returns a `Query` binding ``self.output_name``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">expr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_expr</span>
     <span class="n">output_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_order</span> <span class="ow">or</span> <span class="n">expr</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Table</span><span class="p">):</span>
@@ -9401,19 +9403,19 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">418</span>
 <span class="normal">419</span>
 <span class="normal">420</span>
 <span class="normal">421</span>
 <span class="normal">422</span>
 <span class="normal">423</span>
-<span class="normal">424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">node_at</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the node at `path`, a sequence of child indices from `root`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">node</span> <span class="o">=</span> <span class="n">root</span>
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
         <span class="n">node</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">LogicTree</span><span class="p">,</span> <span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
@@ -9460,9 +9462,7 @@ do_condense : bool.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">729</span>
-<span class="normal">730</span>
-<span class="normal">731</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">731</span>
 <span class="normal">732</span>
 <span class="normal">733</span>
 <span class="normal">734</span>
@@ -9563,8 +9563,10 @@ do_condense : bool.</p>
 <span class="normal">829</span>
 <span class="normal">830</span>
 <span class="normal">831</span>
-<span class="normal">832</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Perform a single reduction rewrite over `reduce_idx`, restructuring `aq`</span>
 <span class="sd">    so that the portion of the expression dependent on `reduce_idx` becomes</span>
 <span class="sd">    a standalone subquery.</span>
@@ -9591,7 +9593,7 @@ do_condense : bool.</p>
 <span class="sd">    Query</span>
 <span class="sd">        The newly created `Query` whose RHS computes the reduced kernel; its</span>
 <span class="sd">        alias is used in the updated `aq.point_expr`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reduce_query</span><span class="p">(</span>
         <span class="n">reduce_idx</span>
     <span class="p">)</span>
@@ -9711,9 +9713,7 @@ expression that contains it safe.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">428</span>
 <span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
@@ -9770,12 +9770,14 @@ expression that contains it safe.</p>
 <span class="normal">482</span>
 <span class="normal">483</span>
 <span class="normal">484</span>
-<span class="normal">485</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_at</span><span class="p">(</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span>
     <span class="n">transforms</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">LogicNode</span><span class="p">],</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Rebuild `root`, applying each transform to the node at its path.</span>
 
 <span class="sd">    Parameters</span>
@@ -9795,13 +9797,13 @@ expression that contains it safe.</p>
 
 <span class="sd">    Notes</span>
 <span class="sd">    -----</span>
-<span class="sd">    Children are rebuilt before a node&#39;s own transform runs, so nested</span>
+<span class="sd">    Children are rebuilt before a node's own transform runs, so nested</span>
 <span class="sd">    transform paths compose (an outer transform receives the node with</span>
 <span class="sd">    inner transforms already applied), and the single traversal never</span>
 <span class="sd">    descends into subtrees a transform inserted -- an inserted node can</span>
 <span class="sd">    never itself be matched, which is what makes wrapping a node in an</span>
 <span class="sd">    expression that contains it safe.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rebuild</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">LogicTree</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span>
@@ -9814,8 +9816,8 @@ expression that contains it safe.</p>
                 <span class="k">if</span> <span class="n">new_child</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">MapJoin</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">&quot;Only MapJoin arguments can be removed, not &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;children of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="s2">"Only MapJoin arguments can be removed, not "</span>
+                            <span class="sa">f</span><span class="s2">"children of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                     <span class="k">continue</span>
                 <span class="n">new_children</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_child</span><span class="p">)</span>
@@ -9828,7 +9830,7 @@ expression that contains it safe.</p>
 
     <span class="n">result</span> <span class="o">=</span> <span class="n">rebuild</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="p">())</span>
     <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot remove the root of an expression.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot remove the root of an expression."</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">result</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9861,9 +9863,7 @@ behind it.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">489</span>
 <span class="normal">490</span>
 <span class="normal">491</span>
 <span class="normal">492</span>
@@ -9885,18 +9885,20 @@ behind it.</p>
 <span class="normal">508</span>
 <span class="normal">509</span>
 <span class="normal">510</span>
-<span class="normal">511</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">splice_paths</span><span class="p">(</span>
     <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Remap `path` through a splice: the node at `replace_path` was replaced</span>
 <span class="sd">    and the MapJoin arguments at `removal_paths` (siblings of</span>
 <span class="sd">    `replace_path`) were removed, shifting the positions of the arguments</span>
 <span class="sd">    after them. Paths inside the replaced or removed subtrees map to the</span>
-<span class="sd">    replacement&#39;s position, since the kernel they addressed now lives</span>
+<span class="sd">    replacement's position, since the kernel they addressed now lives</span>
 <span class="sd">    behind it.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">removal_paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">removal_paths</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">path</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">replace_path</span><span class="p">)]</span> <span class="o">==</span> <span class="n">replace_path</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span>
         <span class="n">path</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="p">)]</span> <span class="o">==</span> <span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">removal_paths</span>

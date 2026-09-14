@@ -5862,7 +5862,7 @@
 <span class="normal">1240</span>
 <span class="normal">1241</span>
 <span class="normal">1242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">broadcast_arrays</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Broadcasts one or more arrays against one another.</span>
 
 <span class="sd">    Parameters</span>
@@ -5875,7 +5875,7 @@
 <span class="sd">    out: List[array]</span>
 <span class="sd">        a list of broadcasted arrays. Each array has the same shape.</span>
 <span class="sd">        Element types are preserved.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">builtins</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">broadcast_arrays</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
     <span class="c1"># compute can take in a list of LazyTensors</span>
@@ -5930,7 +5930,7 @@ shape: Sequence[int]
 <span class="normal">1219</span>
 <span class="normal">1220</span>
 <span class="normal">1221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">broadcast_to</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Broadcasts an array to a new shape.</span>
 
 <span class="sd">    Parameters</span>
@@ -5944,7 +5944,7 @@ shape: Sequence[int]
 <span class="sd">    -------</span>
 <span class="sd">    out: array</span>
 <span class="sd">        A tensor with the same data as `x`, but with the specified shape.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># Ensure shape is a tuple for consistency</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">broadcast_to</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">)</span>
@@ -5987,7 +5987,7 @@ that supports various operations beyond traditional Einstein summation notation.
                 <code>prgm</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6059,11 +6059,11 @@ should match the tensor names used in the program string.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">A</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">B</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">integers</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Matrix addition with transpose</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">C</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">&quot;C[i,j] = A[i,j] + B[j,i]&quot;</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">C</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">"C[i,j] = A[i,j] + B[j,i]"</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Matrix multiplication</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">D</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">&quot;D[i,j] += A[i,k] * B[k,j]&quot;</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">D</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">"D[i,j] += A[i,k] * B[k,j]"</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Min-Plus multiplication with shift</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">E</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">&quot;E[i] min= A[k,i] + D[k,j] &lt;&lt; 1&quot;</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="n">D</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">E</span> <span class="o">=</span> <span class="n">einop</span><span class="p">(</span><span class="s2">"E[i] min= A[k,i] + D[k,j] &lt;&lt; 1"</span><span class="p">,</span> <span class="n">A</span><span class="o">=</span><span class="n">A</span><span class="p">,</span> <span class="n">D</span><span class="o">=</span><span class="n">D</span><span class="p">)</span>
 </code></pre></div>
 
 
@@ -6109,7 +6109,7 @@ should match the tensor names used in the program string.</p>
 <span class="normal">1610</span>
 <span class="normal">1611</span>
 <span class="normal">1612</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">einop</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute an einsum expression using the specified array framework.</span>
+<span class="w">    </span><span class="sd">"""Execute an einsum expression using the specified array framework.</span>
 
 <span class="sd">    This function parses and executes einsum-like expressions with extended syntax</span>
 <span class="sd">    that supports various operations beyond traditional Einstein summation notation.</span>
@@ -6117,9 +6117,9 @@ should match the tensor names used in the program string.</p>
 <span class="sd">    Args:</span>
 <span class="sd">        prgm (str): Einsum program string specifying the computation. The syntax</span>
 <span class="sd">            supports:</span>
-<span class="sd">            - Assignment: &quot;C[i,j] = A[i,j] + B[j,i]&quot;</span>
-<span class="sd">            - Increment: &quot;C[i,j] += A[i,k] * B[k,j]&quot;</span>
-<span class="sd">            - Reductions: &quot;C[i] += A[i,j]&quot;, &quot;C[i] max= A[i,j]&quot;, &quot;C[i] &amp;= A[i,j]&quot;</span>
+<span class="sd">            - Assignment: "C[i,j] = A[i,j] + B[j,i]"</span>
+<span class="sd">            - Increment: "C[i,j] += A[i,k] * B[k,j]"</span>
+<span class="sd">            - Reductions: "C[i] += A[i,j]", "C[i] max= A[i,j]", "C[i] &amp;= A[i,j]"</span>
 <span class="sd">            - Arithmetic operations: +, -, *, /, //, %, **</span>
 <span class="sd">            - Comparison operations: ==, !=, &lt;, &lt;=, &gt;, &gt;=</span>
 <span class="sd">            - Logical operations: and, or, not</span>
@@ -6139,12 +6139,12 @@ should match the tensor names used in the program string.</p>
 <span class="sd">        &gt;&gt;&gt; A = rng.integers(0, 10, size=(3, 4))</span>
 <span class="sd">        &gt;&gt;&gt; B = rng.integers(0, 10, size=(4, 3))</span>
 <span class="sd">        &gt;&gt;&gt; # Matrix addition with transpose</span>
-<span class="sd">        &gt;&gt;&gt; C = einop(&quot;C[i,j] = A[i,j] + B[j,i]&quot;, A=A, B=B)</span>
+<span class="sd">        &gt;&gt;&gt; C = einop("C[i,j] = A[i,j] + B[j,i]", A=A, B=B)</span>
 <span class="sd">        &gt;&gt;&gt; # Matrix multiplication</span>
-<span class="sd">        &gt;&gt;&gt; D = einop(&quot;D[i,j] += A[i,k] * B[k,j]&quot;, A=A, B=B)</span>
+<span class="sd">        &gt;&gt;&gt; D = einop("D[i,j] += A[i,k] * B[k,j]", A=A, B=B)</span>
 <span class="sd">        &gt;&gt;&gt; # Min-Plus multiplication with shift</span>
-<span class="sd">        &gt;&gt;&gt; E = einop(&quot;E[i] min= A[k,i] + D[k,j] &lt;&lt; 1&quot;, A=A, D=D)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">        &gt;&gt;&gt; E = einop("E[i] min= A[k,i] + D[k,j] &lt;&lt; 1", A=A, D=D)</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">builtins</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">einop</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">einop</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span>
@@ -6701,7 +6701,7 @@ array([[10, 28, 46, 64],
 <span class="normal">1865</span>
 <span class="normal">1866</span>
 <span class="normal">1867</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">einsum</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    einsum(subscripts, *operands)</span>
 
 <span class="sd">    Evaluates the Einstein summation convention on the operands.</span>
@@ -6722,7 +6722,7 @@ array([[10, 28, 46, 64],
 <span class="sd">    subscripts : str</span>
 <span class="sd">        Specifies the subscripts for summation as comma separated list of</span>
 <span class="sd">        subscript labels. An implicit (classical Einstein summation)</span>
-<span class="sd">        calculation is performed unless the explicit indicator &#39;-&gt;&#39; is</span>
+<span class="sd">        calculation is performed unless the explicit indicator '-&gt;' is</span>
 <span class="sd">        included as well as subscript labels of the precise output form.</span>
 <span class="sd">    operands : list of array_like</span>
 <span class="sd">        These are the arrays for the operation.</span>
@@ -6757,46 +6757,46 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    The subscripts string is a comma-separated list of subscript labels,</span>
 <span class="sd">    where each label refers to a dimension of the corresponding operand.</span>
-<span class="sd">    Whenever a label is repeated it is summed, so ``np.einsum(&#39;i,i&#39;, a, b)``</span>
+<span class="sd">    Whenever a label is repeated it is summed, so ``np.einsum('i,i', a, b)``</span>
 <span class="sd">    is equivalent to :py:func:`np.inner(a,b) &lt;numpy.inner&gt;`. If a label</span>
-<span class="sd">    appears only once, it is not summed, so ``np.einsum(&#39;i&#39;, a)``</span>
+<span class="sd">    appears only once, it is not summed, so ``np.einsum('i', a)``</span>
 <span class="sd">    produces a view of ``a`` with no changes. A further example</span>
-<span class="sd">    ``np.einsum(&#39;ij,jk&#39;, a, b)`` describes traditional matrix multiplication</span>
+<span class="sd">    ``np.einsum('ij,jk', a, b)`` describes traditional matrix multiplication</span>
 <span class="sd">    and is equivalent to :py:func:`np.matmul(a,b) &lt;numpy.matmul&gt;`.</span>
 <span class="sd">    Repeated subscript labels in one operand take the diagonal.</span>
-<span class="sd">    For example, ``np.einsum(&#39;ii&#39;, a)`` is equivalent to</span>
+<span class="sd">    For example, ``np.einsum('ii', a)`` is equivalent to</span>
 <span class="sd">    :py:func:`np.trace(a) &lt;numpy.trace&gt;`.</span>
 
 <span class="sd">    In *implicit mode*, the chosen subscripts are important</span>
 <span class="sd">    since the axes of the output are reordered alphabetically.  This</span>
-<span class="sd">    means that ``np.einsum(&#39;ij&#39;, a)`` doesn&#39;t affect a 2D array, while</span>
-<span class="sd">    ``np.einsum(&#39;ji&#39;, a)`` takes its transpose. Additionally,</span>
-<span class="sd">    ``np.einsum(&#39;ij,jk&#39;, a, b)`` returns a matrix multiplication, while,</span>
-<span class="sd">    ``np.einsum(&#39;ij,jh&#39;, a, b)`` returns the transpose of the</span>
-<span class="sd">    multiplication since subscript &#39;h&#39; precedes subscript &#39;i&#39;.</span>
+<span class="sd">    means that ``np.einsum('ij', a)`` doesn't affect a 2D array, while</span>
+<span class="sd">    ``np.einsum('ji', a)`` takes its transpose. Additionally,</span>
+<span class="sd">    ``np.einsum('ij,jk', a, b)`` returns a matrix multiplication, while,</span>
+<span class="sd">    ``np.einsum('ij,jh', a, b)`` returns the transpose of the</span>
+<span class="sd">    multiplication since subscript 'h' precedes subscript 'i'.</span>
 
 <span class="sd">    In *explicit mode* the output can be directly controlled by</span>
 <span class="sd">    specifying output subscript labels.  This requires the</span>
-<span class="sd">    identifier &#39;-&gt;&#39; as well as the list of output subscript labels.</span>
+<span class="sd">    identifier '-&gt;' as well as the list of output subscript labels.</span>
 <span class="sd">    This feature increases the flexibility of the function since</span>
 <span class="sd">    summing can be disabled or forced when required. The call</span>
-<span class="sd">    ``np.einsum(&#39;i-&gt;&#39;, a)`` is like :py:func:`np.sum(a) &lt;numpy.sum&gt;`</span>
-<span class="sd">    if ``a`` is a 1-D array, and ``np.einsum(&#39;ii-&gt;i&#39;, a)``</span>
+<span class="sd">    ``np.einsum('i-&gt;', a)`` is like :py:func:`np.sum(a) &lt;numpy.sum&gt;`</span>
+<span class="sd">    if ``a`` is a 1-D array, and ``np.einsum('ii-&gt;i', a)``</span>
 <span class="sd">    is like :py:func:`np.diag(a) &lt;numpy.diag&gt;` if ``a`` is a square 2-D array.</span>
 <span class="sd">    The difference is that `einsum` does not allow broadcasting by default.</span>
-<span class="sd">    Additionally ``np.einsum(&#39;ij,jh-&gt;ih&#39;, a, b)`` directly specifies the</span>
+<span class="sd">    Additionally ``np.einsum('ij,jh-&gt;ih', a, b)`` directly specifies the</span>
 <span class="sd">    order of the output subscript labels and therefore returns matrix</span>
 <span class="sd">    multiplication, unlike the example above in implicit mode.</span>
 
 <span class="sd">    To enable and control broadcasting, use an ellipsis.  Default</span>
 <span class="sd">    NumPy-style broadcasting is done by adding an ellipsis</span>
-<span class="sd">    to the left of each term, like ``np.einsum(&#39;...ii-&gt;...i&#39;, a)``.</span>
-<span class="sd">    ``np.einsum(&#39;...i-&gt;...&#39;, a)`` is like</span>
+<span class="sd">    to the left of each term, like ``np.einsum('...ii-&gt;...i', a)``.</span>
+<span class="sd">    ``np.einsum('...i-&gt;...', a)`` is like</span>
 <span class="sd">    :py:func:`np.sum(a, axis=-1) &lt;numpy.sum&gt;` for array ``a`` of any shape.</span>
 <span class="sd">    To take the trace along the first and last axes,</span>
-<span class="sd">    you can do ``np.einsum(&#39;i...i&#39;, a)``, or to do a matrix-matrix</span>
+<span class="sd">    you can do ``np.einsum('i...i', a)``, or to do a matrix-matrix</span>
 <span class="sd">    product with the left-most indices instead of rightmost, one can do</span>
-<span class="sd">    ``np.einsum(&#39;ij...,jk...-&gt;ik...&#39;, a, b)``.</span>
+<span class="sd">    ``np.einsum('ij...,jk...-&gt;ik...', a, b)``.</span>
 
 <span class="sd">    `einsum` also provides an alternative way to provide the subscripts and</span>
 <span class="sd">    operands as ``einsum(op0, sublist0, op1, sublist1, ..., [sublistout])``.</span>
@@ -6813,7 +6813,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Trace of a matrix:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ii&quot;, a)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ii", a)</span>
 <span class="sd">    np.int64(60)</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(a, [0, 0])</span>
 <span class="sd">    np.int64(60)</span>
@@ -6822,7 +6822,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Extract the diagonal (requires explicit form):</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ii-&gt;i&quot;, a)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ii-&gt;i", a)</span>
 <span class="sd">    array([ 0,  6, 12, 18, 24])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(a, [0, 0], [0])</span>
 <span class="sd">    array([ 0,  6, 12, 18, 24])</span>
@@ -6831,7 +6831,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Sum over an axis (requires explicit form):</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ij-&gt;i&quot;, a)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ij-&gt;i", a)</span>
 <span class="sd">    array([ 10,  35,  60,  85, 110])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(a, [0, 1], [0])</span>
 <span class="sd">    array([ 10,  35,  60,  85, 110])</span>
@@ -6841,18 +6841,18 @@ array([[10, 28, 46, 64],
 <span class="sd">    For higher dimensional arrays summing a single axis can be done</span>
 <span class="sd">    with ellipsis:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;...j-&gt;...&quot;, a)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("...j-&gt;...", a)</span>
 <span class="sd">    array([ 10,  35,  60,  85, 110])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(a, [Ellipsis, 1], [Ellipsis])</span>
 <span class="sd">    array([ 10,  35,  60,  85, 110])</span>
 
 <span class="sd">    Compute a matrix transpose, or reorder any number of axes:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ji&quot;, c)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ji", c)</span>
 <span class="sd">    array([[0, 3],</span>
 <span class="sd">           [1, 4],</span>
 <span class="sd">           [2, 5]])</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ij-&gt;ji&quot;, c)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ij-&gt;ji", c)</span>
 <span class="sd">    array([[0, 3],</span>
 <span class="sd">           [1, 4],</span>
 <span class="sd">           [2, 5]])</span>
@@ -6867,7 +6867,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Vector inner products:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;i,i&quot;, b, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("i,i", b, b)</span>
 <span class="sd">    np.int64(30)</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(b, [0], b, [0])</span>
 <span class="sd">    np.int64(30)</span>
@@ -6876,21 +6876,21 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Matrix vector multiplication:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ij,j&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ij,j", a, b)</span>
 <span class="sd">    array([ 30,  80, 130, 180, 230])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(a, [0, 1], b, [1])</span>
 <span class="sd">    array([ 30,  80, 130, 180, 230])</span>
 <span class="sd">    &gt;&gt;&gt; np.dot(a, b)</span>
 <span class="sd">    array([ 30,  80, 130, 180, 230])</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;...j,j&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("...j,j", a, b)</span>
 <span class="sd">    array([ 30,  80, 130, 180, 230])</span>
 
 <span class="sd">    Broadcasting and scalar multiplication:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;..., ...&quot;, 3, c)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("..., ...", 3, c)</span>
 <span class="sd">    array([[ 0,  3,  6],</span>
 <span class="sd">           [ 9, 12, 15]])</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;,ij&quot;, 3, c)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum(",ij", 3, c)</span>
 <span class="sd">    array([[ 0,  3,  6],</span>
 <span class="sd">           [ 9, 12, 15]])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(3, [Ellipsis], c, [Ellipsis])</span>
@@ -6902,7 +6902,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    Vector outer product:</span>
 
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;i,j&quot;, np.arange(2) + 1, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("i,j", np.arange(2) + 1, b)</span>
 <span class="sd">    array([[0, 1, 2, 3, 4],</span>
 <span class="sd">           [0, 2, 4, 6, 8]])</span>
 <span class="sd">    &gt;&gt;&gt; np.einsum(np.arange(2) + 1, [0], b, [1])</span>
@@ -6916,7 +6916,7 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    &gt;&gt;&gt; a = np.arange(60.0).reshape(3, 4, 5)</span>
 <span class="sd">    &gt;&gt;&gt; b = np.arange(24.0).reshape(4, 3, 2)</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ijk,jil-&gt;kl&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ijk,jil-&gt;kl", a, b)</span>
 <span class="sd">    array([[4400., 4730.],</span>
 <span class="sd">           [4532., 4874.],</span>
 <span class="sd">           [4664., 5018.],</span>
@@ -6939,16 +6939,16 @@ array([[10, 28, 46, 64],
 
 <span class="sd">    &gt;&gt;&gt; a = np.arange(6).reshape((3, 2))</span>
 <span class="sd">    &gt;&gt;&gt; b = np.arange(12).reshape((4, 3))</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ki,jk-&gt;ij&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ki,jk-&gt;ij", a, b)</span>
 <span class="sd">    array([[10, 28, 46, 64],</span>
 <span class="sd">           [13, 40, 67, 94]])</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;ki,...k-&gt;i...&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("ki,...k-&gt;i...", a, b)</span>
 <span class="sd">    array([[10, 28, 46, 64],</span>
 <span class="sd">           [13, 40, 67, 94]])</span>
-<span class="sd">    &gt;&gt;&gt; np.einsum(&quot;k...,jk&quot;, a, b)</span>
+<span class="sd">    &gt;&gt;&gt; np.einsum("k...,jk", a, b)</span>
 <span class="sd">    array([[10, 28, 46, 64],</span>
 <span class="sd">           [13, 40, 67, 94]])</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">if</span> <span class="n">builtins</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -6988,12 +6988,12 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">439</span>
 <span class="normal">440</span>
 <span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the matrix product.</span>
 
 <span class="sd">    Returns a LazyTensor if either x1 or x2 is a LazyTensor.</span>
 <span class="sd">    Otherwise, computes the result eagerly.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span>
     <span class="n">c</span> <span class="o">=</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span>
@@ -7035,9 +7035,9 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">892</span>
 <span class="normal">893</span>
 <span class="normal">894</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matrix_power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the power of a matrix.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matrix_power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
@@ -7078,9 +7078,9 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">448</span>
 <span class="normal">449</span>
 <span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the transpose of a matrix or stack of matrices.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
@@ -7137,7 +7137,7 @@ positions for each respective source axis index.</li>
 <span class="normal">1267</span>
 <span class="normal">1268</span>
 <span class="normal">1269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">moveaxis</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">destination</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Moves array axes (dimensions) to new positions,</span>
 <span class="sd">    while leaving other axes in their original positions.</span>
 
@@ -7151,7 +7151,7 @@ positions for each respective source axis index.</li>
 <span class="sd">    Returns</span>
 <span class="sd">    --------</span>
 <span class="sd">    - out (array) - an array containing reordered axes.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">destination</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">moveaxis</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">destination</span><span class="p">))</span>
@@ -7189,12 +7189,12 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the tensordot operation.</span>
 
 <span class="sd">    Returns a LazyTensor if either x1 or x2 is a LazyTensor.</span>
 <span class="sd">    Otherwise, computes the result eagerly.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="n">axes</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="n">axes</span><span class="p">))</span>
@@ -7251,7 +7251,7 @@ axis: int, optional
 <span class="normal">1024</span>
 <span class="normal">1025</span>
 <span class="normal">1026</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the (vector) dot product of two arrays.</span>
 
 <span class="sd">    Parameters</span>
@@ -7267,7 +7267,7 @@ axis: int, optional
 <span class="sd">    -------</span>
 <span class="sd">    out: array</span>
 <span class="sd">        A tensor containing the dot product of `x1` and `x2` along the specified axis.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">))</span>

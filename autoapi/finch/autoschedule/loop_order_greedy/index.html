@@ -5358,20 +5358,20 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/loop_order_greedy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">connected_loop_candidates</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">connected_loop_candidates</span><span class="p">(</span>
     <span class="n">prefix</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
-    <span class="n">remaining</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
-    <span class="n">conjunct_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
-    <span class="n">disjunct_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
+    <span class="n">remaining</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
+    <span class="n">conjunct_stats</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
+    <span class="n">disjunct_stats</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;All fields still available for the next loop index.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""All fields still available for the next loop index."""</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">remaining</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5399,15 +5399,7 @@ the new index forces -- so the summed score of the returned order equals its
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/loop_order_greedy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 53</span>
-<span class="normal"> 54</span>
-<span class="normal"> 55</span>
-<span class="normal"> 56</span>
-<span class="normal"> 57</span>
-<span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
@@ -5448,32 +5440,40 @@ the new index forces -- so the summed score of the returned order equals its
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
-<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">greedy_loop_order</span><span class="p">(</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">greedy_loop_order</span><span class="p">(</span>
     <span class="n">expr</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
-    <span class="n">stats_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
+    <span class="n">stats_bindings</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">NS</span><span class="p">],</span>
     <span class="n">output_vars</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a loop order one index at a time, appending the cheapest candidate.</span>
+<span class="w">    </span><span class="sd">"""Build a loop order one index at a time, appending the cheapest candidate.</span>
 
 <span class="sd">    Each step is scored with the same terms ``loop_order_cost`` charges for that</span>
 <span class="sd">    prefix -- ``get_prefix_cost`` for the reads and writes, plus the reformats</span>
 <span class="sd">    the new index forces -- so the summed score of the returned order equals its</span>
 <span class="sd">    ``loop_order_cost``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">all_vars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">fields</span><span class="p">()))</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">all_vars</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">()</span>
 
-    <span class="n">stats_bindings_2</span> <span class="o">=</span> <span class="n">stats_bindings</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">stats_bindings_2</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">stats_bindings</span><span class="p">)</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">NS</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">conjunct_stats</span><span class="p">,</span> <span class="n">disjunct_stats</span> <span class="o">=</span> <span class="n">get_conjunctive_and_disjunctive_inputs</span><span class="p">(</span>
         <span class="n">expr</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings_2</span><span class="p">,</span> <span class="n">cache</span>
     <span class="p">)</span>
 
     <span class="c1"># Deduplicated by identity, matching how loop_order_cost charges reformats.</span>
-    <span class="n">input_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">for</span> <span class="n">stat</span> <span class="ow">in</span> <span class="n">conjunct_stats</span> <span class="o">+</span> <span class="n">disjunct_stats</span><span class="p">:</span>
+    <span class="n">input_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">NS</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">stat</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">conjunct_stats</span><span class="p">,</span> <span class="n">disjunct_stats</span><span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">stat</span> <span class="ow">is</span> <span class="n">seen</span> <span class="k">for</span> <span class="n">seen</span> <span class="ow">in</span> <span class="n">input_stats</span><span class="p">):</span>
             <span class="n">input_stats</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
 
@@ -5525,15 +5525,7 @@ and the total over a full order matches <code>loop_order_cost</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/loop_order_greedy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
@@ -5541,19 +5533,27 @@ and the total over a full order matches <code>loop_order_cost</code>.</p>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
-<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transpose_penalty</span><span class="p">(</span>
-    <span class="n">input_stats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transpose_penalty</span><span class="p">(</span>
+    <span class="n">input_stats</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">prefix</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">charged</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Cost of the reformats that ``prefix`` newly forces.</span>
+<span class="w">    </span><span class="sd">"""Cost of the reformats that ``prefix`` newly forces.</span>
 
 <span class="sd">    ``needs_reformat`` is monotone in the prefix: an index placed before one</span>
-<span class="sd">    that precedes it in a tensor&#39;s storage order already forces that tensor to</span>
+<span class="sd">    that precedes it in a tensor's storage order already forces that tensor to</span>
 <span class="sd">    be reformatted, and extending the prefix cannot undo it. So each tensor is</span>
 <span class="sd">    charged exactly once, at the step where its reformat becomes unavoidable,</span>
 <span class="sd">    and the total over a full order matches ``loop_order_cost``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
         <span class="n">cost_of_reformat</span><span class="p">(</span><span class="n">input_stats</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">get_reformat_set</span><span class="p">(</span><span class="n">input_stats</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span> <span class="o">-</span> <span class="n">charged</span>

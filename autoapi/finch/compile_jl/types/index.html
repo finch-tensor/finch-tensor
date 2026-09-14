@@ -5468,16 +5468,16 @@
 <span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the Julia type used for elements with this ftype.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Convert a Python value with this ftype into a Julia element value.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">julia_vector</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
@@ -5529,9 +5529,9 @@
 <span class="normal">51</span>
 <span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the Julia type used for elements with this ftype.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5566,9 +5566,9 @@
 <span class="normal">58</span>
 <span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a Python value with this ftype into a Julia element value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5629,31 +5629,31 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">289</span>
 <span class="normal">290</span>
 <span class="normal">291</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Julia source text constructing a minimal instance of `ftype`, for</span>
-<span class="sd">    embedding directly in generated kernel source (see compiler.py).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Julia source text constructing a minimal instance of `ftype`, for</span>
+<span class="sd">    embedding directly in generated kernel source (see compiler.py)."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">_julia_literal</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Finch.Tensor(Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[]))&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[]))"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">FiberTensorFType</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Finch.Tensor(</span><span class="si">{</span><span class="n">_level_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">_level_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">BufferizedNDArrayFType</span><span class="p">):</span>
-        <span class="c1"># Matches interop.py&#39;s _ndarray_to_jl_tensor: a plain dense buffer</span>
+        <span class="c1"># Matches interop.py's _ndarray_to_jl_tensor: a plain dense buffer</span>
         <span class="c1"># wrapped in `ndim` nested DenseLevels, each with plain Int64 shape</span>
-        <span class="c1"># (regardless of the ftype&#39;s own dimension_type).</span>
+        <span class="c1"># (regardless of the ftype's own dimension_type).</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">_julia_literal</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-        <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[])&quot;</span>
+        <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[])"</span>
         <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span><span class="p">):</span>
-            <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)&quot;</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">FillTensorFType</span><span class="p">):</span>
-        <span class="n">ctor</span> <span class="o">=</span> <span class="s2">&quot;Finch.PatternLevel()&quot;</span>
+        <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.PatternLevel()"</span>
         <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span><span class="p">):</span>
-            <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)&quot;</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)"</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;ftype_to_jl_constructor_str: unsupported ftype kind </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">"ftype_to_jl_constructor_str: unsupported ftype kind </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5687,7 +5687,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">304</span>
 <span class="normal">305</span>
 <span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Julia type as source text (e.g. for a cache key). Cached per ftype.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Julia type as source text (e.g. for a cache key). Cached per ftype."""</span>
     <span class="n">cached</span> <span class="o">=</span> <span class="n">_TYPE_STR_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">cached</span>
@@ -5732,8 +5732,8 @@ type, or finch FType into the corresponding finch FType.</p>
 <span class="normal">112</span>
 <span class="normal">113</span>
 <span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_fl_dtype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a Julia DataType, numpy dtype/scalar type, Python builtin</span>
-<span class="sd">    type, or finch FType into the corresponding finch FType.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Normalize a Julia DataType, numpy dtype/scalar type, Python builtin</span>
+<span class="sd">    type, or finch FType into the corresponding finch FType."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">FType</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">x</span>
     <span class="k">try</span><span class="p">:</span>
@@ -5743,7 +5743,7 @@ type, or finch FType into the corresponding finch FType.</p>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_jl_dtype_to_fl</span><span class="p">()[</span><span class="n">x</span><span class="p">]</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot convert </span><span class="si">{</span><span class="n">x</span><span class="si">!r}</span><span class="s2"> to a Finch dtype&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot convert </span><span class="si">{</span><span class="n">x</span><span class="si">!r}</span><span class="s2"> to a Finch dtype"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

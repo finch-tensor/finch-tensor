@@ -5491,7 +5491,7 @@
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Access.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Index
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Index
 
 
   
@@ -5551,7 +5551,7 @@
 <span class="normal">140</span>
 <span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Access</span><span class="p">(</span><span class="n">EinsumExpression</span><span class="p">,</span> <span class="n">EinsumTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Access</span>
 
 <span class="sd">    Tensor access like a[i, j].</span>
@@ -5559,17 +5559,17 @@
 <span class="sd">    Attributes:</span>
 <span class="sd">        tensor: The tensor to access.</span>
 <span class="sd">        idxs: The indices at which to access the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">Alias</span>
-    <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># (Field(&#39;i&#39;), Field(&#39;j&#39;))</span>
+    <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># (Field('i'), Field('j'))</span>
     <span class="c1"># Children: None (leaf)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="c1"># First child is tns, rest are indices</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Access expects at least 1 child&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Access expects at least 1 child"</span><span class="p">)</span>
         <span class="n">tns</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Alias</span><span class="p">,</span> <span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">idxs</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idxs</span><span class="p">))</span>
@@ -5578,7 +5578,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="n">idxs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">:</span>
             <span class="n">idxs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">idx</span><span class="o">.</span><span class="n">get_idxs</span><span class="p">())</span>
@@ -5644,7 +5644,7 @@
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Alias.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5678,16 +5678,16 @@
 <span class="normal">104</span>
 <span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Alias</span><span class="p">(</span><span class="n">EinsumExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a  AST expression for an index named `name`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the index.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5770,7 +5770,7 @@ Must be a callable.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Call.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="EinsumExpression (finch.finch_einsum.nodes.EinsumExpression)" href="nodes/#finch.finch_einsum.nodes.EinsumExpression">EinsumExpression</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="EinsumExpression (finch.finch_einsum.nodes.EinsumExpression)" href="nodes/#finch.finch_einsum.nodes.EinsumExpression">EinsumExpression</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5829,7 +5829,7 @@ Must be a callable.</p>
 <span class="normal">180</span>
 <span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Call</span><span class="p">(</span><span class="n">EinsumExpression</span><span class="p">,</span> <span class="n">EinsumTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Call</span>
 
 <span class="sd">    Represents an operation like + or * on pointwise expressions for multiple operands.</span>
@@ -5840,7 +5840,7 @@ Must be a callable.</p>
 <span class="sd">            ffunc.add, ffunc.mul, ffunc.subtract, ffunc.div, etc...</span>
 <span class="sd">            Must be a callable.</span>
 <span class="sd">        args: The arguments to the operation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>  <span class="c1"># the function to apply e.g., ffunc.add</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EinsumExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>  <span class="c1"># Subtrees</span>
@@ -5851,7 +5851,7 @@ Must be a callable.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="c1"># First child is op, rest are args</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Call expects at least 2 children (op + 1 arg)&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Call expects at least 2 children (op + 1 arg)"</span><span class="p">)</span>
         <span class="n">op</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Literal</span><span class="p">,</span> <span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">args</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="nb">tuple</span><span class="p">[</span><span class="n">EinsumExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">args</span><span class="p">))</span>
@@ -5860,7 +5860,7 @@ Must be a callable.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="n">idxs</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">:</span>
             <span class="n">idxs</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">get_idxs</span><span class="p">())</span>
@@ -5944,7 +5944,7 @@ Must be a callable.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Einsum.idxs">idxs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Index
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Index
 
 
   
@@ -6020,7 +6020,7 @@ Must be a callable.</p>
 <span class="normal">219</span>
 <span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Einsum</span><span class="p">(</span><span class="n">EinsumTree</span><span class="p">,</span> <span class="n">EinsumStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Einsum</span>
 
 <span class="sd">    A einsum operation that maps pointwise expressions and aggregates them.</span>
@@ -6034,7 +6034,7 @@ Must be a callable.</p>
 
 <span class="sd">        arg: The pointwise expression that</span>
 <span class="sd">                    is mapped and aggregated.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
     <span class="n">tns</span><span class="p">:</span> <span class="n">Alias</span>
@@ -6045,7 +6045,7 @@ Must be a callable.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="c1"># Expecting exactly 4 children</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">4</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Einsum expects 4 children, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Einsum expects 4 children, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">op</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Literal</span><span class="p">,</span> <span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">tns</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Alias</span><span class="p">,</span> <span class="n">children</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
         <span class="n">idxs</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Index</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">children</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
@@ -6121,9 +6121,9 @@ Must be a callable.</p>
         <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumNode</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>  <span class="c1"># TODO eventually Any-&gt;Tensor</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Evaluate the given logic.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6174,9 +6174,9 @@ Must be a callable.</p>
     <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumNode</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>  <span class="c1"># TODO eventually Any-&gt;Tensor</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Evaluate the given logic.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6230,14 +6230,14 @@ Must be a callable.</p>
 <span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumExpression</span><span class="p">(</span><span class="n">EinsumNode</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Einsum AST expression base class.</span>
 
 <span class="sd">    Represents a pointwise expression in the Einsum IR, which evaluates to a scalar.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="k">pass</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6299,11 +6299,11 @@ Must be a callable.</p>
 <span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">        single method called `main` which implements the logic. Also return a</span>
 <span class="sd">        dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6350,11 +6350,11 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">28</span>
 <span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">    single method called `main` which implements the logic. Also return a</span>
 <span class="sd">    dictionary including additional tables needed to run the kernel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6416,7 +6416,7 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumNode</span><span class="p">(</span><span class="n">Term</span><span class="p">):</span>
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the head of the node."""</span>
         <span class="k">return</span> <span class="bp">cls</span>
 
     <span class="nd">@classmethod</span>
@@ -6428,7 +6428,7 @@ dictionary including additional tables needed to run the kernel.</p>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns a string representation of the node."""</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">EinsumPrinterContext</span><span class="p">()</span>
         <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -6469,7 +6469,7 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns a string representation of the node."""</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">EinsumPrinterContext</span><span class="p">()</span>
     <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -6504,7 +6504,7 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">13</span>
 <span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns the head of the node."""</span>
     <span class="k">return</span> <span class="bp">cls</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6559,13 +6559,13 @@ statements evaluate to a tuple of tensor values.</p>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumStatement</span><span class="p">(</span><span class="n">EinsumNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Einsum AST statement base class.</span>
 
 <span class="sd">    Represents a statement in the Einsum IR. An Einsum statement may modify</span>
 <span class="sd">    the state of the machine by assigning tensor values to variables. Einsum</span>
 <span class="sd">    statements evaluate to a tuple of tensor values.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6627,7 +6627,7 @@ statements evaluate to a tuple of tensor values.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Index.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6661,16 +6661,16 @@ statements evaluate to a tuple of tensor values.</p>
 <span class="normal">89</span>
 <span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Index</span><span class="p">(</span><span class="n">EinsumExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a  AST expression for an index named `name`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the index.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="k">return</span> <span class="p">{</span><span class="bp">self</span><span class="p">}</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6745,9 +6745,9 @@ statements evaluate to a tuple of tensor values.</p>
 <span class="normal">74</span>
 <span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">EinsumExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Literal</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">val</span><span class="p">:</span> <span class="n">Any</span>
 
@@ -6757,7 +6757,7 @@ statements evaluate to a tuple of tensor values.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Literal</span><span class="p">)</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">val</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">&quot;Index&quot;</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="s2">"Index"</span><span class="p">]:</span>
         <span class="k">return</span> <span class="nb">set</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6843,12 +6843,12 @@ Basically a list of einsums and some return values.</p>
 <span class="normal">246</span>
 <span class="normal">247</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Plan</span><span class="p">(</span><span class="n">EinsumTree</span><span class="p">,</span> <span class="n">EinsumStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Plan</span>
 
 <span class="sd">    A plan that contains einsum operations.</span>
 <span class="sd">    Basically a list of einsums and some return values.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">bodies</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -6856,7 +6856,7 @@ Basically a list of einsums and some return values.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="c1"># The last child is the returnValues tuple, all others are bodies</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Plan expects at least 1 child&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Plan expects at least 1 child"</span><span class="p">)</span>
         <span class="n">bodies</span> <span class="o">=</span> <span class="n">children</span>
 
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
@@ -6928,7 +6928,7 @@ Halts execution of the program.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_einsum.Produces.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Alias
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Alias
 
 
   
@@ -6974,19 +6974,19 @@ Halts execution of the program.</p>
 <span class="normal">268</span>
 <span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Produces</span><span class="p">(</span><span class="n">EinsumTree</span><span class="p">,</span> <span class="n">EinsumStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that returns `args...` from the current plan.</span>
 <span class="sd">    Halts execution of the program.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        args: The arguments to return.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>

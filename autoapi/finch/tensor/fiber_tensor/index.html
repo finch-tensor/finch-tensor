@@ -5490,7 +5490,12 @@
           <tr class="doc-section-item">
             <td><code><span title="finch.tensor.fiber_tensor.FiberTensor.lvl">lvl</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="Level (finch.tensor.level.level.Level)" href="../level/level/#finch.tensor.level.level.Level">Level</a></code>
+                  <code><a class="autorefs autorefs-internal" title="Level
+
+
+  
+      dataclass
+   (finch.tensor.level.level.Level)" href="../level/level/#finch.tensor.level.level.Level">Level</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5760,12 +5765,12 @@
 <span class="normal">279</span>
 <span class="normal">280</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">FiberTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing a tensor with fiber structure.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        lvl: a fiber allocator that manages the fibers in the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
     <span class="n">pos</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -5776,13 +5781,13 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;FiberTensor(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"FiberTensor(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the ftype of the fiber tensor, which is a FiberTensorFType.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
@@ -5822,7 +5827,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">stream</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;stream argument is not supported; got </span><span class="si">{</span><span class="n">stream</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"stream argument is not supported; got </span><span class="si">{</span><span class="n">stream</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span>
@@ -5849,10 +5854,10 @@
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SciPy sparse arrays must be two-dimensional.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"SciPy sparse arrays must be two-dimensional."</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SciPy CSR conversion requires a zero fill value.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"SciPy CSR conversion requires a zero fill value."</span><span class="p">)</span>
 
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">pos</span> <span class="o">==</span> <span class="mi">0</span>
 
@@ -5882,12 +5887,12 @@
 
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Finch format </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="si">}</span><span class="s2"> is not supported by SciPy conversion.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Finch format </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="si">}</span><span class="s2"> is not supported by SciPy conversion."</span>
                 <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot convert non-scalar tensor to Python scalar.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot convert non-scalar tensor to Python scalar."</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 
     <span class="nd">@classmethod</span>
@@ -5920,7 +5925,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">obj</span><span class="o">.</span><span class="n">has_canonical_format</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">copy</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Unable to avoid copy while creating an array as requested.&quot;</span>
+                    <span class="s2">"Unable to avoid copy while creating an array as requested."</span>
                 <span class="p">)</span>
             <span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">sum_duplicates</span><span class="p">()</span>
@@ -5980,7 +5985,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">obj</span><span class="o">.</span><span class="n">has_canonical_format</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">copy</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;Unable to avoid copy while creating an array as requested.&quot;</span>
+                    <span class="s2">"Unable to avoid copy while creating an array as requested."</span>
                 <span class="p">)</span>
             <span class="n">obj</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">sum_duplicates</span><span class="p">()</span>
@@ -6090,7 +6095,12 @@
           <tr class="doc-section-item">
             <td><code><span title="finch.tensor.fiber_tensor.FiberTensorFType.lvl_t">lvl_t</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="LevelFType (finch.tensor.level.level.LevelFType)" href="../level/level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>
+                  <code><a class="autorefs autorefs-internal" title="LevelFType
+
+
+  
+      dataclass
+   (finch.tensor.level.level.LevelFType)" href="../level/level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6262,12 +6272,12 @@
 <span class="normal">432</span>
 <span class="normal">433</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">FiberTensorFType</span><span class="p">(</span><span class="n">FinchTensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An abstract base class representing the ftype of a fiber tensor.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        lvl_t: The level ftype to be used for the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
     <span class="n">_device</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
@@ -6278,19 +6288,19 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># TODO: include dt = np.dtype(self.buf_t.element_type)</span>
-        <span class="k">return</span> <span class="s2">&quot;FiberTensorFType&quot;</span>
+        <span class="k">return</span> <span class="s2">"FiberTensorFType"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span>
-            <span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;shape&quot;</span><span class="p">,</span> <span class="n">TupleFType</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">)),</span>
-            <span class="p">(</span><span class="s2">&quot;pos&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;dirty_bit&quot;</span><span class="p">,</span> <span class="n">bool_</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"lvl"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"shape"</span><span class="p">,</span> <span class="n">TupleFType</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">)),</span>
+            <span class="p">(</span><span class="s2">"pos"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"dirty_bit"</span><span class="p">,</span> <span class="n">bool_</span><span class="p">),</span>
         <span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensorFType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rebuild this ftype with the leaf fill value replaced.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Rebuild this ftype with the leaf fill value replaced."""</span>
         <span class="k">return</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -6301,9 +6311,9 @@
         <span class="k">return</span> <span class="n">other_t</span> <span class="o">==</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates an instance of a FiberTensor with the given arguments.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">fmt</span> <span class="o">=</span> <span class="bp">self</span>
         <span class="k">if</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">fill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
@@ -6315,7 +6325,7 @@
             <span class="p">)</span>
         <span class="k">elif</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="k">raise</span> <span class="n">DynamicFillError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;cannot construct </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2"> without a resolved fill value&quot;</span>
+                <span class="sa">f</span><span class="s2">"cannot construct </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2"> without a resolved fill value"</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="n">FiberTensor</span><span class="p">(</span>
             <span class="n">fmt</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
@@ -6324,20 +6334,20 @@
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Convert a tensor to this fiber tensor type.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            val: A tensor to convert to this type.</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            A FiberTensor instance of this type.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Tensor conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Tensor conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;FiberTensorFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"FiberTensorFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -6385,19 +6395,19 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_thaw</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">tns</span><span class="p">),</span> <span class="n">op</span><span class="p">,</span> <span class="n">tns</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_unwrap</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">tns</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_unwrap</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_increment</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">tns</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_increment</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">pos</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span>
             <span class="n">ctx</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">tns</span><span class="p">),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">tns</span><span class="o">.</span><span class="n">pos</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_dim</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span> <span class="n">r</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_dim</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span> <span class="n">i</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
         <span class="n">lvl</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">,</span> <span class="n">dirty_bit</span> <span class="o">=</span> <span class="n">args</span>
@@ -6488,16 +6498,16 @@
 <span class="normal">355</span>
 <span class="normal">356</span>
 <span class="normal">357</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a tensor to this fiber tensor type.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        val: A tensor to convert to this type.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A FiberTensor instance of this type.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;Tensor conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">"Tensor conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6543,9 +6553,9 @@
 <span class="normal">342</span>
 <span class="normal">343</span>
 <span class="normal">344</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of a FiberTensor with the given arguments.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">fmt</span> <span class="o">=</span> <span class="bp">self</span>
     <span class="k">if</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
@@ -6557,7 +6567,7 @@
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
         <span class="k">raise</span> <span class="n">DynamicFillError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;cannot construct </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2"> without a resolved fill value&quot;</span>
+            <span class="sa">f</span><span class="s2">"cannot construct </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2"> without a resolved fill value"</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="n">FiberTensor</span><span class="p">(</span>
         <span class="n">fmt</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
@@ -6589,7 +6599,7 @@
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">312</span>
 <span class="normal">313</span>
 <span class="normal">314</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensorFType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rebuild this ftype with the leaf fill value replaced.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Rebuild this ftype with the leaf fill value replaced."""</span>
     <span class="k">return</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6636,7 +6646,12 @@
                 <code>lvl</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="LevelFType (finch.tensor.level.level.LevelFType)" href="../level/level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>
+                  <code><a class="autorefs autorefs-internal" title="LevelFType
+
+
+  
+      dataclass
+   (finch.tensor.level.level.LevelFType)" href="../level/level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6664,20 +6679,16 @@
 <span class="normal">442</span>
 <span class="normal">443</span>
 <span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fiber_tensor</span><span class="p">(</span><span class="n">lvl</span><span class="p">:</span> <span class="n">LevelFType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">445</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fiber_tensor</span><span class="p">(</span><span class="n">lvl</span><span class="p">:</span> <span class="n">LevelFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensorFType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates a FiberTensorFType with the given level ftype and position type.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        lvl: The level ftype to be used for the tensor.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        An instance of a fiber tensor format.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># mypy does not understand that dataclasses generate __hash__ and __eq__</span>
-    <span class="c1"># https://github.com/python/mypy/issues/19799</span>
-    <span class="k">return</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>  <span class="c1"># type: ignore[abstract]</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

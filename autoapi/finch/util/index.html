@@ -5274,7 +5274,7 @@
                 <code>ext</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5290,7 +5290,7 @@
                 <code>domain</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5330,8 +5330,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/util/cache.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
-<span class="normal">15</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">15</span>
 <span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
@@ -5368,8 +5367,9 @@
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
-<span class="normal">52</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">file_cache</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">domain</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Caches the result of a function to a file.</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">file_cache</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">domain</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Caches the result of a function to a file.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        ext: The file extension for the cache file.</span>
@@ -5377,18 +5377,18 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A wrapper function that caches the result of the original function.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">FunctionType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FunctionType</span><span class="p">:</span>
         <span class="k">nonlocal</span> <span class="n">domain</span>
         <span class="k">nonlocal</span> <span class="n">ext</span>
-        <span class="n">ext</span> <span class="o">=</span> <span class="n">ext</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cache_enable&quot;</span><span class="p">):</span>
-            <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data_path&quot;</span><span class="p">))</span> <span class="o">/</span> <span class="s2">&quot;cache&quot;</span> <span class="o">/</span> <span class="n">get_version</span><span class="p">()</span> <span class="o">/</span> <span class="n">domain</span>
+        <span class="n">ext</span> <span class="o">=</span> <span class="n">ext</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cache_enable"</span><span class="p">):</span>
+            <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"data_path"</span><span class="p">))</span> <span class="o">/</span> <span class="s2">"cache"</span> <span class="o">/</span> <span class="n">get_version</span><span class="p">()</span> <span class="o">/</span> <span class="n">domain</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span>
                 <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span>
-                    <span class="n">prefix</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data_path&quot;</span><span class="p">))</span> <span class="o">/</span> <span class="s2">&quot;tmp&quot;</span> <span class="o">/</span> <span class="n">domain</span><span class="p">)</span>
+                    <span class="n">prefix</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"data_path"</span><span class="p">))</span> <span class="o">/</span> <span class="s2">"tmp"</span> <span class="o">/</span> <span class="n">domain</span><span class="p">)</span>
                 <span class="p">)</span>
             <span class="p">)</span>
             <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
@@ -5399,8 +5399,8 @@
 
         <span class="k">def</span><span class="w"> </span><span class="nf">inner</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
             <span class="nb">id</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid5</span><span class="p">(</span><span class="n">finch_uuid</span><span class="p">,</span> <span class="nb">str</span><span class="p">((</span><span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="n">args</span><span class="p">)))</span>
-            <span class="n">filename</span> <span class="o">=</span> <span class="n">cache_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cache_enable&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">filename</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="n">cache_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">f</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">"</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"cache_enable"</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">filename</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
                 <span class="n">f</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">filename</span><span class="p">),</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">filename</span>
 
@@ -5435,11 +5435,11 @@
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_version</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Get the version of finch.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="k">return</span> <span class="n">version</span><span class="p">(</span><span class="s2">&quot;finch-tensor&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">version</span><span class="p">(</span><span class="s2">"finch-tensor"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

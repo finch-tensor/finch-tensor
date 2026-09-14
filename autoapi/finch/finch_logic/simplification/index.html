@@ -5383,7 +5383,7 @@
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicSimplify</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simplify a logic program before it is lowered.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Simplify a logic program before it is lowered."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">LogicLoader</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
@@ -5452,14 +5452,14 @@ dimension.</p>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simplify_logic</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">simplify_logic</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Algebraically simplify a logic program.</span>
 
 <span class="sd">    `annihilate` is deliberately left out. An operand of a MapJoin carries the</span>
 <span class="sd">    fields that give the result its extent, so discarding one discards a</span>
 <span class="sd">    dimension.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">rules</span> <span class="o">=</span> <span class="p">[</span><span class="n">rule</span> <span class="k">for</span> <span class="n">rule</span> <span class="ow">in</span> <span class="n">simplify_rules</span><span class="p">()</span> <span class="k">if</span> <span class="n">rule</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">annihilate</span><span class="p">]</span>
     <span class="c1"># `unwrap_literal` belongs in the chain, not before it: `PostWalk` visits</span>
     <span class="c1"># children first, so an operand is unwrapped in time for the algebraic</span>
@@ -5504,13 +5504,13 @@ leaves every literal operand wrapped, so <code>LiteralTerm</code> never matches.
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap_literal</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    `Reorder(Literal(v), ())` =&gt; `Literal(v)`, and likewise for `Relabel`.</span>
 
 <span class="sd">    A literal is zero-dimensional, so reordering or relabelling it by no fields</span>
 <span class="sd">    is the identity. Without this the algebraic rules see nothing: `optimize`</span>
 <span class="sd">    leaves every literal operand wrapped, so `LiteralTerm` never matches.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="k">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">lit</span><span class="p">,</span> <span class="p">())</span> <span class="o">|</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Relabel</span><span class="p">(</span>
             <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">lit</span><span class="p">,</span> <span class="p">()</span>

@@ -5579,14 +5579,14 @@
 <span class="normal">262</span>
 <span class="normal">263</span>
 <span class="normal">264</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FusedCFGBuilder</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Incrementally builds control-flow graph for Finch Fused IR.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Incrementally builds control-flow graph for Finch Fused IR."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="p">:</span> <span class="n">ControlFlowGraph</span> <span class="o">=</span> <span class="n">ControlFlowGraph</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_block</span><span class="p">:</span> <span class="n">BasicBlock</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">entry_block</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Add a statement to the current block.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Add a statement to the current block."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">current_block</span><span class="o">.</span><span class="n">add_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
@@ -5694,7 +5694,7 @@
                 <span class="n">func_entry_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">new_block</span><span class="p">()</span>
                 <span class="n">func_exit_block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">new_block</span><span class="p">()</span>
 
-                <span class="c1"># connect CFG entry block to the function&#39;s entry block</span>
+                <span class="c1"># connect CFG entry block to the function's entry block</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">entry_block</span><span class="o">.</span><span class="n">add_successor</span><span class="p">(</span><span class="n">func_entry_block</span><span class="p">)</span>
 
                 <span class="c1"># dive into the body of the function</span>
@@ -5709,7 +5709,7 @@
                 <span class="n">func_exit_block</span><span class="o">.</span><span class="n">add_successor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">exit_block</span><span class="p">)</span>
 
             <span class="k">case</span> <span class="n">node</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="s2">&quot;FusedCFGBuilder&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="s2">"FusedCFGBuilder"</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span>
 </code></pre></div></td></tr></table></div>
@@ -5747,7 +5747,7 @@
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">emit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add a statement to the current block.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Add a statement to the current block."""</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">current_block</span><span class="o">.</span><span class="n">add_statement</span><span class="p">(</span><span class="n">stmt</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -5812,7 +5812,7 @@ for easier tracking in the CFG.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_fused.cfg_builder.NumberedStatement.sid">sid</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -5853,14 +5853,14 @@ for easier tracking in the CFG.</p>
 <span class="normal">40</span>
 <span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">NumberedStatement</span><span class="p">(</span><span class="n">FusedTree</span><span class="p">,</span> <span class="n">FusedStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Wrapper for AssemblyStatement that assigns a unique id to each statement</span>
 <span class="sd">    for easier tracking in the CFG.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        stmt: The original FusedStatement being wrapped.</span>
 <span class="sd">        sid: A unique integer identifier for the statement.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">stmt</span><span class="p">:</span> <span class="n">FusedStatement</span>
     <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span>
@@ -5926,13 +5926,13 @@ Returns:
 <span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fused_build_cfg</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build control-flow graph for a FinchAssembly node.</span>
 <span class="sd">    Args:</span>
 <span class="sd">        node: Root FinchAssembly node to build CFG for.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        ControlFlowGraph: The constructed control-flow graph.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">FusedCFGBuilder</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">ctx</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6001,17 +6001,17 @@ Returns:
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fused_desugar</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FusedNode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower surface syntax to a core AST shape before CFG construction.</span>
 
 <span class="sd">    - make function parameters explicit in the function body so they get statement ids</span>
 <span class="sd">         and can be referenced in the CFG (e.g. desugar `def f(x): return x + 1` to</span>
 <span class="sd">        `def f(x): x_1 = x; return x_1 + 1` so that the parameter `x` gets a statement</span>
 <span class="sd">        id and can be referenced in the CFG)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">go</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FusedNode</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Recursively desugar the AST.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Recursively desugar the AST."""</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Module</span><span class="p">(</span><span class="n">funcs</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">Module</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Function</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">go</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">)))</span>
@@ -6091,7 +6091,7 @@ Returns:
                 <code>sid</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6127,7 +6127,7 @@ Returns:
           </tr>
           <tr class="doc-section-item">
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/functions.html#int">int</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6186,7 +6186,7 @@ Returns:
 <span class="normal">86</span>
 <span class="normal">87</span>
 <span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">number_statements</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FusedNode</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Recursively traverse the AST and wrap each statement in a NumberedStatement</span>
 <span class="sd">      with a unique id.</span>
 
@@ -6197,7 +6197,7 @@ Returns:
 <span class="sd">    Returns:</span>
 <span class="sd">        A tuple containing the new AST with numbered statements and the next</span>
 <span class="sd">        available statement id.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">go</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">FusedNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FusedNode</span><span class="p">:</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>

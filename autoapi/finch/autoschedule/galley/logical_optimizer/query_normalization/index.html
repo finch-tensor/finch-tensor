@@ -5492,7 +5492,7 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">alpha_rename_expr</span><span class="p">(</span>
     <span class="n">expr</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Field</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicExpression</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Apply a simple alpha-renaming to expr, replacing any Field that appears</span>
 <span class="sd">    in mapping with its mapped value.</span>
 
@@ -5501,7 +5501,7 @@ definition to match the index variables at a particular call site.</p>
 
 <span class="sd">    The goal is to rewrite the dimension variables of an alias</span>
 <span class="sd">    definition to match the index variables at a particular call site.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">match</span> <span class="n">expr</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
@@ -5610,8 +5610,9 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">303</span>
 <span class="normal">304</span>
 <span class="normal">305</span>
-<span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">merge_queries</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">306</span>
+<span class="normal">307</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">merge_queries</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Merge per-alias queries into larger queries, one per produced tensor.</span>
 
 <span class="sd">    - Builds a mapping from Alias to its defining Query in the original plan.</span>
@@ -5620,7 +5621,7 @@ definition to match the index variables at a particular call site.</p>
 <span class="sd">      Table(Alias, ...) references using _inline_tables_in_expr.</span>
 <span class="sd">    - Ensures that we never drop a Query whose lhs alias appears in a</span>
 <span class="sd">      Produces statement</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">plan</span>
 
@@ -5644,7 +5645,8 @@ definition to match the index variables at a particular call site.</p>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Query</span><span class="p">):</span>
             <span class="n">alias_to_query</span><span class="p">[</span><span class="n">body</span><span class="o">.</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">body</span>
 
-    <span class="n">produced_aliases</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">produces_stmt</span><span class="o">.</span><span class="n">args</span>
+    <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">Alias</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">produces_stmt</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">produced_aliases</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">produces_stmt</span><span class="o">.</span><span class="n">args</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
     <span class="n">produced_alias_set</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">produced_aliases</span><span class="p">)</span>
 
     <span class="n">new_queries</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Query</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -5652,7 +5654,7 @@ definition to match the index variables at a particular call site.</p>
         <span class="n">defining_query</span> <span class="o">=</span> <span class="n">alias_to_query</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">defining_query</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">continue</span>
-        <span class="c1"># Don&#39;t inline other produced aliases, resue them</span>
+        <span class="c1"># Don't inline other produced aliases, resue them</span>
         <span class="n">other_produced</span> <span class="o">=</span> <span class="n">produced_alias_set</span> <span class="o">-</span> <span class="p">{</span><span class="n">alias</span><span class="p">}</span>
         <span class="n">merged_rhs</span> <span class="o">=</span> <span class="n">_inline_tables_in_expr</span><span class="p">(</span>
             <span class="n">defining_query</span><span class="o">.</span><span class="n">rhs</span><span class="p">,</span> <span class="n">alias_to_query</span><span class="p">,</span> <span class="n">other_produced</span>
@@ -5661,7 +5663,7 @@ definition to match the index variables at a particular call site.</p>
 
     <span class="c1"># Rebuild the plan as: [merged queries..., original Produces]</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">new_queries</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Plan should not be empty after merging queries&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Plan should not be empty after merging queries"</span><span class="p">)</span>
 
     <span class="n">new_bodies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">new_bodies</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">new_queries</span><span class="p">)</span>
@@ -5689,8 +5691,7 @@ definition to match the index variables at a particular call site.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/query_normalization.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">345</span>
-<span class="normal">346</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">346</span>
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
@@ -5701,8 +5702,9 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">354</span>
 <span class="normal">355</span>
 <span class="normal">356</span>
-<span class="normal">357</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_reorders_in_plan</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply `normalize_reorders_in_query` to each Query body in the plan.&quot;&quot;&quot;</span>
+<span class="normal">357</span>
+<span class="normal">358</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_reorders_in_plan</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Apply `normalize_reorders_in_query` to each Query body in the plan."""</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">plan</span>
 
@@ -5741,8 +5743,7 @@ definition to match the index variables at a particular call site.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/query_normalization.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">309</span>
-<span class="normal">310</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">310</span>
 <span class="normal">311</span>
 <span class="normal">312</span>
 <span class="normal">313</span>
@@ -5774,8 +5775,9 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
-<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_reorders_in_query</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">342</span>
+<span class="normal">343</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_reorders_in_query</span><span class="p">(</span><span class="n">query</span><span class="p">:</span> <span class="n">Query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Normalize Reorder usage in a single query.</span>
 
 <span class="sd">    For a given Query(lhs, rhs):</span>
@@ -5783,7 +5785,7 @@ definition to match the index variables at a particular call site.</p>
 <span class="sd">      2. Strip all interior Reorder nodes from rhs.</span>
 <span class="sd">      3. Remove any aggregates that references idxs created by reorders</span>
 <span class="sd">      4. Wrap the result in a single outer Reorder(inner_rhs, *out_fields).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">rhs</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">rhs</span>
     <span class="n">out_fields</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span>
 
@@ -5837,8 +5839,7 @@ definition to match the index variables at a particular call site.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/query_normalization.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">408</span>
-<span class="normal">409</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">409</span>
 <span class="normal">410</span>
 <span class="normal">411</span>
 <span class="normal">412</span>
@@ -5854,8 +5855,9 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">422</span>
 <span class="normal">423</span>
 <span class="normal">424</span>
-<span class="normal">425</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">postprocess_plan_after_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">425</span>
+<span class="normal">426</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">postprocess_plan_after_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Postprocessing used after running Galley greedy optimization.</span>
 
 <span class="sd">    - Rebuilds the plan so that, for each alias mentioned in the final</span>
@@ -5863,7 +5865,7 @@ definition to match the index variables at a particular call site.</p>
 <span class="sd">      because the greedy optimizer may produce multiple queries with the same</span>
 <span class="sd">      lhs alias as it reduces different indices, but downstream components</span>
 <span class="sd">      expect at most one query per alias.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">new_bodies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Query</span><span class="p">):</span>
@@ -5902,8 +5904,7 @@ definition to match the index variables at a particular call site.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/galley/logical_optimizer/query_normalization.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">374</span>
-<span class="normal">375</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">375</span>
 <span class="normal">376</span>
 <span class="normal">377</span>
 <span class="normal">378</span>
@@ -5924,8 +5925,9 @@ definition to match the index variables at a particular call site.</p>
 <span class="normal">393</span>
 <span class="normal">394</span>
 <span class="normal">395</span>
-<span class="normal">396</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">preprocess_plan_for_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">396</span>
+<span class="normal">397</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">preprocess_plan_for_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">:</span> <span class="n">Plan</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Plan</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    End-to-end preprocessing used before running Galley greedy optimization.</span>
 
 <span class="sd">    - First merges alias-based queries to produce roughly one query per</span>
@@ -5934,7 +5936,7 @@ definition to match the index variables at a particular call site.</p>
 <span class="sd">      indices are not parent-related (enables cost-optimal reduction order).</span>
 <span class="sd">    - Then normalizes Reorder usage so that each query RHS has a single</span>
 <span class="sd">      outer Reorder and no interior Reorder nodes.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">merged</span> <span class="o">=</span> <span class="n">merge_queries</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span>
     <span class="n">merged</span> <span class="o">=</span> <span class="n">normalize_reorders_in_plan</span><span class="p">(</span><span class="n">merged</span><span class="p">)</span>
     <span class="n">new_bodies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -5988,10 +5990,10 @@ Produces an expression where reduction indices are not parent-related</p>
 <span class="normal">172</span>
 <span class="normal">173</span>
 <span class="normal">174</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">push_aggregates_up</span><span class="p">(</span><span class="n">expr</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicExpression</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Apply push-aggregate and merge-aggregate rewrites to fixpoint.</span>
 <span class="sd">    Produces an expression where reduction indices are not parent-related</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rule</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">LogicExpression</span><span class="p">):</span>

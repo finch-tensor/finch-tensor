@@ -5577,7 +5577,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Executes a fused operation represented by LazyTensors. This function evaluates the</span>
 <span class="sd">    entire operation in an optimized manner using the provided scheduler.</span>
 
@@ -5589,7 +5589,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
 
 <span class="sd">    Returns:</span>
 <span class="sd">    - A tensor or a list of tensors computed by the fused operation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
 
@@ -5605,7 +5605,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
             <span class="n">lazy_arg_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">lazy_args</span><span class="p">:</span>
-        <span class="nb">vars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">)</span>
+        <span class="nb">vars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">)</span>
         <span class="n">ctx_2</span> <span class="o">=</span> <span class="n">lazy_args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">ctx</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
         <span class="n">bodies</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
             <span class="nb">map</span><span class="p">(</span>
@@ -5613,7 +5613,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
                     <span class="n">var</span><span class="p">,</span>
                     <span class="n">Table</span><span class="p">(</span>
                         <span class="n">arg</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
-                        <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">&quot;i&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">shape</span><span class="p">))),</span>
+                        <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"i"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">shape</span><span class="p">))),</span>
                     <span class="p">),</span>
                 <span class="p">),</span>
                 <span class="n">lazy_args</span><span class="p">,</span>
@@ -5766,7 +5766,7 @@ tuple of tensor results.</p>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fuse</span><span class="p">(</span><span class="n">f</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Fuses multiple array operations into a single kernel. This function allows for</span>
 <span class="sd">    composing operations and executing them efficiently.</span>
 
@@ -5779,7 +5779,7 @@ tuple of tensor results.</p>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The result of the fused operation, a tensor or tuple of tensors.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
 
@@ -5836,7 +5836,7 @@ the <code>fuse</code> function for automatic fusion of operations.</li>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fused</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    - fused(f):</span>
 <span class="sd">    A decorator that marks a function as fused. This allows the function to be used with</span>
 <span class="sd">    the `fuse` function for automatic fusion of operations.</span>
@@ -5846,7 +5846,7 @@ the <code>fuse</code> function for automatic fusion of operations.</li>
 
 <span class="sd">    Returns:</span>
 <span class="sd">    - A wrapper function that applies the fusion mechanism to the original function.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">ctx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">get_default_scheduler</span><span class="p">()</span>
 

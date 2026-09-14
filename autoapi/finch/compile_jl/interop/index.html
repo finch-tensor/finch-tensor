@@ -5367,8 +5367,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">312</span>
-<span class="normal">313</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
 <span class="normal">314</span>
 <span class="normal">315</span>
 <span class="normal">316</span>
@@ -5405,8 +5404,9 @@
 <span class="normal">347</span>
 <span class="normal">348</span>
 <span class="normal">349</span>
-<span class="normal">350</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Keep Julia-owned tensor buffers alive across kernel invocations.&quot;&quot;&quot;</span>
+<span class="normal">350</span>
+<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Keep Julia-owned tensor buffers alive across kernel invocations."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tensors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -5417,14 +5417,14 @@
         <span class="c1"># allocation, so wrapper identity alone would miss reuse.</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">BufferizedNDArray</span><span class="p">):</span>
             <span class="n">arr</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
-            <span class="n">pointer</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">pointer</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">)</span>
+            <span class="n">pointer</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">"data"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="p">(</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">pointer</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">NumPyWrapper</span><span class="p">):</span>
             <span class="n">arr</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">_data</span>
-            <span class="n">pointer</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">pointer</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">)</span>
+            <span class="n">pointer</span> <span class="o">=</span> <span class="n">arr</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">"data"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="p">(</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">pointer</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">)</span>
         <span class="c1"># FiberTensors reuse their ids so we restrict cache keys to id.</span>
-        <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;object&quot;</span><span class="p">,</span> <span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">(</span><span class="s2">"object"</span><span class="p">,</span> <span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
         <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache_key</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
@@ -5567,10 +5567,11 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
 <span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span>
-<span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a level to its Julia counterpart. With `pin_fill`, the leaf</span>
+<span class="normal">141</span>
+<span class="normal">142</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert a level to its Julia counterpart. With `pin_fill`, the leaf</span>
 <span class="sd">    fill is forced to a zero of its dtype -- see `zero_dynamic_fills` in</span>
-<span class="sd">    `compile_jl.compiler` for why this backend does that.&quot;&quot;&quot;</span>
+<span class="sd">    `compile_jl.compiler` for why this backend does that."""</span>
     <span class="k">match</span> <span class="n">level</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">ElementLevel</span><span class="p">():</span>
             <span class="n">fill</span> <span class="o">=</span> <span class="n">level</span><span class="o">.</span><span class="n">fill_value</span>
@@ -5584,7 +5585,7 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">DenseLevel</span><span class="p">(</span><span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span> <span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">))</span>
         <span class="k">case</span> <span class="n">SparseListLevel</span><span class="p">(</span><span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="n">dimension</span><span class="p">,</span> <span class="n">ptr</span><span class="o">=</span><span class="n">ptr</span><span class="p">,</span> <span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">ptr</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;SparseListLevel must have ptr and idx buffers&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"SparseListLevel must have ptr and idx buffers"</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseListLevel</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
                 <span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span>
@@ -5596,7 +5597,7 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
         <span class="p">):</span>
             <span class="k">if</span> <span class="n">ptr</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">tbl</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">srt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;SparseByteMapLevel must have ptr, tbl, and srt buffers&quot;</span>
+                    <span class="s2">"SparseByteMapLevel must have ptr, tbl, and srt buffers"</span>
                 <span class="p">)</span>
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseByteMapLevel</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
@@ -5606,6 +5607,7 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
                 <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">srt</span><span class="p">)),</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">SparseCOOLevel</span><span class="p">(</span><span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span> <span class="n">coo_shape</span><span class="o">=</span><span class="n">coo_shape</span><span class="p">,</span> <span class="n">ptr</span><span class="o">=</span><span class="n">ptr</span><span class="p">,</span> <span class="n">tbl</span><span class="o">=</span><span class="n">tbl</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tbl</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseCOOLevel</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
                 <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">coo_shape</span><span class="p">),</span>
@@ -5631,8 +5633,8 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
                 <span class="ow">or</span> <span class="n">perm</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">&quot;SparseHashLevel must have ptr, tbl_ctrl, tbl, pool, and perm &quot;</span>
-                    <span class="s2">&quot;buffers&quot;</span>
+                    <span class="s2">"SparseHashLevel must have ptr, tbl_ctrl, tbl, pool, and perm "</span>
+                    <span class="s2">"buffers"</span>
                 <span class="p">)</span>
             <span class="n">dimension</span> <span class="o">=</span> <span class="n">_as_julia_scalar</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
             <span class="n">constructor</span> <span class="o">=</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseHashLevel</span><span class="p">[(</span><span class="n">jl</span><span class="o">.</span><span class="n">typeof</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span> <span class="n">single_writer</span><span class="p">)]</span>
@@ -5647,7 +5649,7 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
                 <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">perm</span><span class="p">)),</span>
             <span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported Finch level type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported Finch level type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5672,8 +5674,7 @@ kernel compiled under <code>zero_dynamic_fills</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">269</span>
-<span class="normal">270</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">270</span>
 <span class="normal">271</span>
 <span class="normal">272</span>
 <span class="normal">273</span>
@@ -5700,15 +5701,16 @@ kernel compiled under <code>zero_dynamic_fills</code>.</p>
 <span class="normal">294</span>
 <span class="normal">295</span>
 <span class="normal">296</span>
-<span class="normal">297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a tensor to its Julia counterpart. With `pin_fill`, fills are</span>
+<span class="normal">297</span>
+<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert a tensor to its Julia counterpart. With `pin_fill`, fills are</span>
 <span class="sd">    forced to a zero of their dtype so the argument types line up with a</span>
-<span class="sd">    kernel compiled under `zero_dynamic_fills`.&quot;&quot;&quot;</span>
+<span class="sd">    kernel compiled under `zero_dynamic_fills`."""</span>
     <span class="k">if</span> <span class="n">is_julia_obj</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">and</span> <span class="n">jl</span><span class="o">.</span><span class="n">isa</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">jl</span><span class="o">.</span><span class="n">Finch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">obj</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">FiberTensor</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">pos</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Only root-position FiberTensor objects can use Julia&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Only root-position FiberTensor objects can use Julia"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">Tensor</span><span class="p">(</span><span class="n">level_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">))</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">BufferizedNDArray</span><span class="p">):</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)(</span><span class="mi">0</span><span class="p">)</span> <span class="k">if</span> <span class="n">pin_fill</span> <span class="k">else</span> <span class="n">obj</span><span class="o">.</span><span class="n">fill_value</span>
@@ -5728,7 +5730,7 @@ kernel compiled under <code>zero_dynamic_fills</code>.</p>
         <span class="k">return</span> <span class="n">_ndarray_to_jl_tensor</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">fill</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isscalar</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">scalar_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="o">=</span><span class="n">pin_fill</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported Julia backend argument type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported Julia backend argument type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

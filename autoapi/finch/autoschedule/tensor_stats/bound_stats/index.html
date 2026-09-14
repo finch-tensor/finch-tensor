@@ -5536,14 +5536,14 @@ scan and all propagation (in :class:<code>BoundStatsFactory</code>) are shared.<
 <span class="normal">91</span>
 <span class="normal">92</span>
 <span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BoundStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base for degree-constraint upper-bound statistics: a guaranteed bound on the</span>
 <span class="sd">    number of non-fill values, built from ``ell_p``-norms of degree sequences.</span>
 
 <span class="sd">    Subclasses differ only in which ``p`` values they keep (``ps``) and how they</span>
 <span class="sd">    turn the constraints into an estimate (:meth:`estimate_non_fill_values`); the</span>
 <span class="sd">    scan and all propagation (in :class:`BoundStatsFactory`) are shared.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -5771,11 +5771,11 @@ per-subclass knob is <code>ps</code>.</p>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BoundStatsFactory</span><span class="p">(</span><span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">Generic</span><span class="p">[</span><span class="n">TS</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Shared statistics propagation for :class:`BoundStats` subclasses, combining</span>
 <span class="sd">    degree constraints keyed by ``(from_indices, to_indices, p)``. The only</span>
 <span class="sd">    per-subclass knob is ``ps``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">ps</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">stats_cls</span><span class="p">)</span>
@@ -5983,12 +5983,12 @@ the distinct count; intermediate <code>p</code> capture skew between the two.</p
 <span class="normal">48</span>
 <span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DC</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A degree constraint: ``value`` bounds ``||deg(to_indices | from_indices)||_p``.</span>
 
 <span class="sd">    ``p = inf`` (the default) is the classic max-degree constraint; ``p = 1`` is</span>
 <span class="sd">    the distinct count; intermediate ``p`` capture skew between the two.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">from_indices</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
     <span class="n">to_indices</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
@@ -6093,17 +6093,17 @@ clamped by the tensor's dense capacity.</p>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStats</span><span class="p">(</span><span class="n">BoundStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Classic degree constraints -- max degrees (``p = inf``) and distinct counts.</span>
 <span class="sd">    Estimates size with a best-first product search over the constraints,</span>
-<span class="sd">    clamped by the tensor&#39;s dense capacity.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    clamped by the tensor's dense capacity.</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Smallest degree-constraint product covering all indices, clamped by</span>
-<span class="sd">        dense capacity.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Smallest degree-constraint product covering all indices, clamped by</span>
+<span class="sd">        dense capacity."""</span>
         <span class="n">idx</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="mf">1.0</span>
@@ -6206,8 +6206,8 @@ dense capacity.</p>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Smallest degree-constraint product covering all indices, clamped by</span>
-<span class="sd">    dense capacity.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Smallest degree-constraint product covering all indices, clamped by</span>
+<span class="sd">    dense capacity."""</span>
     <span class="n">idx</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">1.0</span>
@@ -6287,8 +6287,8 @@ dense capacity.</p>
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
-<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">&quot;DCStats&quot;</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for :class:`DCStats` -- keeps only max-degree (``p = inf``).&quot;&quot;&quot;</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">"DCStats"</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">"""Factory for :class:`DCStats` -- keeps only max-degree (``p = inf``)."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">DCStats</span><span class="p">,</span> <span class="n">ps</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">))</span>
@@ -6375,11 +6375,11 @@ configurable set of <code>p</code> (not just max degree), and bounds size via th
 <span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStats</span><span class="p">(</span><span class="n">BoundStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LpBound statistics: keeps ``ell_p``-norms of degree sequences for a</span>
 <span class="sd">    configurable set of ``p`` (not just max degree), and bounds size via the</span>
 <span class="sd">    ``LPflow`` network-flow LP (:func:`_flow_bound`).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="n">DEFAULT_PS</span>
 
@@ -6459,8 +6459,8 @@ configurable set of <code>p</code> (not just max degree), and bounds size via th
 <span class="normal">473</span>
 <span class="normal">474</span>
 <span class="normal">475</span>
-<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">&quot;LPStats&quot;</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for :class:`LPStats` with a configurable set of ``p`` norms.&quot;&quot;&quot;</span>
+<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">"LPStats"</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">"""Factory for :class:`LPStats` with a configurable set of ``p`` norms."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ps</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">LPStats</span><span class="p">,</span> <span class="n">ps</span><span class="p">)</span>

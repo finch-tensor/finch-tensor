@@ -5936,20 +5936,20 @@ These programs can't break, but calling return sets a special return value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">281</span>
 <span class="normal">282</span>
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">HaltState</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent the halt state of a notation program.</span>
-<span class="sd">    These programs can&#39;t break, but calling return sets a special return value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    These programs can't break, but calling return sets a special return value.</span>
+<span class="sd">    """</span>
 
     <span class="n">has_returned</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">return_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
@@ -6005,10 +6005,7 @@ These programs can't break, but calling return sets a special return value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
@@ -6269,18 +6266,22 @@ These programs can't break, but calling return sets a special return value.</p>
 <span class="normal">550</span>
 <span class="normal">551</span>
 <span class="normal">552</span>
-<span class="normal">553</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An interpreter for FinchNotation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">bindings</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">types</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">loop_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">function_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="n">ScopedDict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">slots</span><span class="p">:</span> <span class="n">ScopedDict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">types</span><span class="p">:</span> <span class="n">ScopedDict</span><span class="p">[</span><span class="n">FType</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">loop_state</span><span class="p">:</span> <span class="n">HaltState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">function_state</span><span class="p">:</span> <span class="n">HaltState</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">bindings</span> <span class="o">=</span> <span class="n">ScopedDict</span><span class="p">()</span>
@@ -6302,10 +6303,10 @@ These programs can't break, but calling return sets a special return value.</p>
         <span class="n">loop_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="n">function_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a new scope for the interpreter.</span>
 <span class="sd">        This allows for nested scopes and variable shadowing.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">slots</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -6324,8 +6325,8 @@ These programs can't break, but calling return sets a special return value.</p>
             <span class="n">function_state</span><span class="o">=</span><span class="n">function_state</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dispatch</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dispatch</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
 
     <span class="nd">@overload</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NotationInterpreterLibrary</span><span class="p">:</span> <span class="o">...</span>
@@ -6334,9 +6335,9 @@ These programs can't break, but calling return sets a special return value.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span> <span class="o">...</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Run the program.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
             <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dispatch</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
@@ -6349,8 +6350,8 @@ These programs can't break, but calling return sets a special return value.</p>
                 <span class="n">val_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">ftype</span><span class="p">(</span><span class="n">val_e</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">val_t</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Value &#39;</span><span class="si">{</span><span class="n">val_e</span><span class="si">}</span><span class="s2">&#39; is expected to be of ftype </span><span class="si">{</span><span class="n">val_t</span><span class="si">}</span><span class="s2">, &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;but is a type </span><span class="si">{</span><span class="n">ftype</span><span class="p">(</span><span class="n">val_e</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Value '</span><span class="si">{</span><span class="n">val_e</span><span class="si">}</span><span class="s2">' is expected to be of ftype </span><span class="si">{</span><span class="n">val_t</span><span class="si">}</span><span class="s2">, "</span>
+                        <span class="sa">f</span><span class="s2">"but is a type </span><span class="si">{</span><span class="n">ftype</span><span class="p">(</span><span class="n">val_e</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
                     <span class="p">)</span>
                 <span class="k">return</span> <span class="n">val_e</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">):</span>
@@ -6358,13 +6359,13 @@ These programs can't break, but calling return sets a special return value.</p>
                     <span class="n">def_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">if</span> <span class="n">def_t</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, "</span>
+                            <span class="sa">f</span><span class="s2">"but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">:</span>
                     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                 <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is not defined in the current context.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is not defined in the current context."</span>
                 <span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
                 <span class="n">f_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
@@ -6380,28 +6381,28 @@ These programs can't break, but calling return sets a special return value.</p>
                     <span class="n">var_n</span> <span class="o">=</span> <span class="n">var</span><span class="o">.</span><span class="n">name</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_e</span>
                     <span class="k">return</span> <span class="kc">None</span>
-                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized assignment target: </span><span class="si">{</span><span class="n">var</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized assignment target: </span><span class="si">{</span><span class="n">var</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">:</span>
                     <span class="n">def_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">if</span> <span class="n">def_t</span> <span class="o">!=</span> <span class="n">var_t</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is declared as type </span><span class="si">{</span><span class="n">def_t</span><span class="si">}</span><span class="s2">, "</span>
+                            <span class="sa">f</span><span class="s2">"but used as type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                 <span class="k">if</span> <span class="n">var_n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">:</span>
                     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
-                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Slot &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is not defined in the current context.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Slot '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is not defined in the current context."</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unpack</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">(</span><span class="n">var_n</span><span class="p">,</span> <span class="n">var_t</span><span class="p">),</span> <span class="n">val</span><span class="p">):</span>
                 <span class="n">val_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">fisinstance</span><span class="p">(</span><span class="n">val_e</span><span class="p">,</span> <span class="n">var_t</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Assigned value </span><span class="si">{</span><span class="n">val_e</span><span class="si">}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> for &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Assigned value </span><span class="si">{</span><span class="n">val_e</span><span class="si">}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">var_t</span><span class="si">}</span><span class="s2"> for "</span>
+                        <span class="sa">f</span><span class="s2">"variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">'."</span>
                     <span class="p">)</span>
                 <span class="k">assert</span> <span class="n">var_n</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">,</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Variable &#39;</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">&#39; is already defined in the current&quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot; context, cannot overwrite with slot.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Variable '</span><span class="si">{</span><span class="n">var_n</span><span class="si">}</span><span class="s2">' is already defined in the current"</span>
+                    <span class="sa">f</span><span class="s2">" context, cannot overwrite with slot."</span>
                 <span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">var_t</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">val_e</span>
@@ -6413,7 +6414,7 @@ These programs can't break, but calling return sets a special return value.</p>
                     <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var_n</span><span class="p">]</span>
                     <span class="k">return</span> <span class="kc">None</span>
-                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized repack obj target: </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized repack obj target: </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
                 <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">)</span>
                 <span class="n">tns_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
@@ -6425,7 +6426,7 @@ These programs can't break, but calling return sets a special return value.</p>
                         <span class="n">op_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
                         <span class="k">return</span> <span class="n">access</span><span class="p">(</span><span class="n">tns_e</span><span class="p">,</span> <span class="n">idxs_e</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">op_e</span><span class="p">)</span>
                     <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized access mode: </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized access mode: </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Dimension</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
                 <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">)</span>
@@ -6484,8 +6485,8 @@ These programs can't break, but calling return sets a special return value.</p>
                     <span class="n">ctx_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">function_state</span><span class="o">=</span><span class="n">HaltState</span><span class="p">())</span>
                     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args_e</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Function &#39;</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">&#39; expects </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;but got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args_e</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Function '</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">' expects </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments, "</span>
+                            <span class="sa">f</span><span class="s2">"but got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">args_e</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
                         <span class="p">)</span>
                     <span class="k">for</span> <span class="n">arg</span><span class="p">,</span> <span class="n">arg_e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">args_e</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
                         <span class="k">match</span> <span class="n">arg</span><span class="p">:</span>
@@ -6493,25 +6494,26 @@ These programs can't break, but calling return sets a special return value.</p>
                                 <span class="n">ctx_2</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">arg_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg_e</span>
                             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                                    <span class="sa">f</span><span class="s2">&quot;Unrecognized argument type: </span><span class="si">{</span><span class="n">arg</span><span class="si">}</span><span class="s2">&quot;</span>
+                                    <span class="sa">f</span><span class="s2">"Unrecognized argument type: </span><span class="si">{</span><span class="n">arg</span><span class="si">}</span><span class="s2">"</span>
                                 <span class="p">)</span>
                     <span class="n">ctx_2</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
                     <span class="k">if</span> <span class="n">ctx_2</span><span class="o">.</span><span class="n">function_state</span><span class="o">.</span><span class="n">has_returned</span><span class="p">:</span>
                         <span class="n">ret_e</span> <span class="o">=</span> <span class="n">ctx_2</span><span class="o">.</span><span class="n">function_state</span><span class="o">.</span><span class="n">return_value</span>
                         <span class="k">if</span> <span class="ow">not</span> <span class="n">fisinstance</span><span class="p">(</span><span class="n">ret_e</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">):</span>
                             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                                <span class="sa">f</span><span class="s2">&quot;Return value </span><span class="si">{</span><span class="n">ret_e</span><span class="si">}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">ret_t</span><span class="si">}</span><span class="s2"> &quot;</span>
-                                <span class="sa">f</span><span class="s2">&quot;for function &#39;</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">&#39;. have type </span><span class="si">{</span><span class="n">ftype</span><span class="p">(</span><span class="n">ret_e</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                                <span class="sa">f</span><span class="s2">"Return value </span><span class="si">{</span><span class="n">ret_e</span><span class="si">}</span><span class="s2"> is not of type </span><span class="si">{</span><span class="n">ret_t</span><span class="si">}</span><span class="s2"> "</span>
+                                <span class="sa">f</span><span class="s2">"for function '</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">'. have type </span><span class="si">{</span><span class="n">ftype</span><span class="p">(</span><span class="n">ret_e</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                             <span class="p">)</span>
                         <span class="k">return</span> <span class="n">ret_e</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="sa">f</span><span class="s2">&quot;Function &#39;</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">&#39; did not return a value, &quot;</span>
-                        <span class="sa">f</span><span class="s2">&quot;but expected type </span><span class="si">{</span><span class="n">ret_t</span><span class="si">}</span><span class="s2">.&quot;</span>
+                        <span class="sa">f</span><span class="s2">"Function '</span><span class="si">{</span><span class="n">func_n</span><span class="si">}</span><span class="s2">' did not return a value, "</span>
+                        <span class="sa">f</span><span class="s2">"but expected type </span><span class="si">{</span><span class="n">ret_t</span><span class="si">}</span><span class="s2">."</span>
                     <span class="p">)</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">my_func</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span><span class="o">.</span><span class="n">has_returned</span> <span class="o">=</span> <span class="kc">True</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span><span class="o">.</span><span class="n">return_value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
@@ -6527,12 +6529,12 @@ These programs can't break, but calling return sets a special return value.</p>
                             <span class="n">kernels</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span>
                         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                                <span class="sa">f</span><span class="s2">&quot;Unrecognized function definition: </span><span class="si">{</span><span class="n">func</span><span class="si">}</span><span class="s2">&quot;</span>
+                                <span class="sa">f</span><span class="s2">"Unrecognized function definition: </span><span class="si">{</span><span class="n">func</span><span class="si">}</span><span class="s2">"</span>
                             <span class="p">)</span>
                 <span class="k">return</span> <span class="n">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">ctx_2</span><span class="p">,</span> <span class="n">kernels</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Unrecognized notation node type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Unrecognized notation node type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                 <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6570,16 +6572,16 @@ These programs can't break, but calling return sets a special return value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
 <span class="normal">357</span>
 <span class="normal">358</span>
-<span class="normal">359</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Run the program.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dispatch</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
@@ -6606,10 +6608,7 @@ This allows for nested scopes and variable shadowing.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">317</span>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
@@ -6634,7 +6633,10 @@ This allows for nested scopes and variable shadowing.</p>
 <span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
-<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">bindings</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -6642,10 +6644,10 @@ This allows for nested scopes and variable shadowing.</p>
     <span class="n">loop_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">function_state</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Create a new scope for the interpreter.</span>
 <span class="sd">    This allows for nested scopes and variable shadowing.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">bindings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">bindings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">slots</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -6706,10 +6708,7 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
 <span class="normal">251</span>
@@ -6718,11 +6717,14 @@ This is a simple interpreter that executes the assembly code.</p>
 <span class="normal">254</span>
 <span class="normal">255</span>
 <span class="normal">256</span>
-<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A kernel for interpreting FinchNotation code.</span>
 <span class="sd">    This is a simple interpreter that executes the assembly code.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
@@ -6783,10 +6785,7 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">263</span>
 <span class="normal">264</span>
 <span class="normal">265</span>
 <span class="normal">266</span>
@@ -6798,10 +6797,13 @@ This is a simple interpreter that executes the assembly code.</p>
 <span class="normal">272</span>
 <span class="normal">273</span>
 <span class="normal">274</span>
-<span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent an interpreted module of FinchNotation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">kernels</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
@@ -6812,7 +6814,7 @@ This is a simple interpreter that executes the assembly code.</p>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernels</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernels</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
         <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">!r}</span><span class="s2"> object has no attribute </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">!r}</span><span class="s2"> object has no attribute </span><span class="si">{</span><span class="n">name</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6864,8 +6866,7 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 73</span>
-<span class="normal"> 74</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
 <span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
@@ -6959,101 +6960,106 @@ This is a simple interpreter that executes the assembly code.</p>
 <span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
-<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorView</span><span class="p">(</span><span class="n">Tensor</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorView</span><span class="p">(</span><span class="n">Tensor</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Initialize the TensorView with the specified indices, tensor, and operation.</span>
 
 <span class="sd">        :param idxs: Tuple of index types for the tensor view.</span>
 <span class="sd">        :param tns: The underlying tensor node.</span>
 <span class="sd">        :param op: The operation applied to the tensor view, if any.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">=</span> <span class="n">idxs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="o">=</span> <span class="n">tns</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">=</span> <span class="n">op</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the ftype of the tensor view.</span>
 <span class="sd">        This is the ftype of the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">TensorViewFType</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">TensorViewFType</span><span class="p">(</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span>
+        <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the shape of the tensor view.</span>
 <span class="sd">        This is the shape of the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">)</span> <span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the number of dimensions of the tensor view.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the element type of the tensor view.</span>
 <span class="sd">        This is the type of the elements in the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the fill value of the tensor view.</span>
 <span class="sd">        This is the value used to fill the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the shape type of the tensor view.</span>
 <span class="sd">        This is the shape type of the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">)</span> <span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Unfurl the tensor view along a specific index.</span>
 <span class="sd">        This creates a new tensor view with the specified index unfurled.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">TensorView</span><span class="p">(</span><span class="n">idxs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">+</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">tns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot convert non-scalar tensor to Python scalar.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot convert non-scalar tensor to Python scalar."</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unwrap</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())[</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> does not support to_scipy.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> does not support to_scipy."</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Unwrap the tensor view to get a scalar.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
+<span class="sd">        """</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>  <span class="c1"># ty: ignore[not-subscriptable]</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span>
         <span class="k">return</span> <span class="n">val</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Increment the value in the tensor view.</span>
 <span class="sd">        This updates the tensor at the specified index with the operation and value.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">lhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
+<span class="sd">        """</span>
+        <span class="n">lhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>  <span class="c1"># ty: ignore[not-subscriptable]</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">lhs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span>
         <span class="n">lhs</span> <span class="o">=</span> <span class="n">lhs</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
         <span class="k">return</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7227,8 +7233,7 @@ This is the shape type of the tensor at the specified indices.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">74</span>
-<span class="normal">75</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">75</span>
 <span class="normal">76</span>
 <span class="normal">77</span>
 <span class="normal">78</span>
@@ -7237,14 +7242,15 @@ This is the shape type of the tensor at the specified indices.</p>
 <span class="normal">81</span>
 <span class="normal">82</span>
 <span class="normal">83</span>
-<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">84</span>
+<span class="normal">85</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Initialize the TensorView with the specified indices, tensor, and operation.</span>
 
 <span class="sd">    :param idxs: Tuple of index types for the tensor view.</span>
 <span class="sd">    :param tns: The underlying tensor node.</span>
 <span class="sd">    :param op: The operation applied to the tensor view, if any.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">=</span> <span class="n">idxs</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="o">=</span> <span class="n">tns</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">=</span> <span class="n">op</span>
@@ -7271,16 +7277,16 @@ This creates a new tensor view with the specified index unfurled.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
 <span class="normal">137</span>
-<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unfurl the tensor view along a specific index.</span>
 <span class="sd">    This creates a new tensor view with the specified index unfurled.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">TensorView</span><span class="p">(</span><span class="n">idxs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">+</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">tns</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7305,24 +7311,24 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
-<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Increment the value in the tensor view.</span>
 <span class="sd">    This updates the tensor at the specified index with the operation and value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">lhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
+<span class="sd">    """</span>
+    <span class="n">lhs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>  <span class="c1"># ty: ignore[not-subscriptable]</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">lhs</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span>
     <span class="n">lhs</span> <span class="o">=</span> <span class="n">lhs</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">val</span><span class="p">)</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
     <span class="k">return</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7346,17 +7352,17 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unwrap the tensor view to get a scalar.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>
+<span class="sd">    """</span>
+    <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">]</span>  <span class="c1"># ty: ignore[not-subscriptable]</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="ow">and</span> <span class="n">val</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">0</span>
     <span class="k">return</span> <span class="n">val</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
@@ -7403,8 +7409,7 @@ It is a subclass of ntn.FType to allow for custom formatting.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
-<span class="normal">22</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
 <span class="normal">25</span>
@@ -7452,22 +7457,23 @@ It is a subclass of ntn.FType to allow for custom formatting.</p>
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span>
-<span class="normal">70</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorViewFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">70</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorViewFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A ftype for tensor views.</span>
 <span class="sd">    This is used to represent the ftype of a tensor at specific indices.</span>
 <span class="sd">    It is a subclass of ntn.FType to allow for custom formatting.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Initialize the TensorViewFType with the specified indices, tensor, and</span>
 <span class="sd">        operation.</span>
 
 <span class="sd">        :param idxs: Tuple of index types for the tensor view.</span>
 <span class="sd">        :param tns: The underlying tensor ftype.</span>
 <span class="sd">        :param op: The operation applied to the tensor view, if any.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">=</span> <span class="n">idxs</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="o">=</span> <span class="n">tns</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">=</span> <span class="n">op</span>
@@ -7489,18 +7495,18 @@ It is a subclass of ntn.FType to allow for custom formatting.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the fill value of the tensor view.</span>
 <span class="sd">        This is the value used to fill the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">fill_value</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the shape type of the tensor view.</span>
 <span class="sd">        This is the shape type of the tensor at the specified indices.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">idxs</span><span class="p">)</span> <span class="p">:</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7584,8 +7590,7 @@ operation.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
@@ -7595,15 +7600,16 @@ operation.</p>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">39</span>
+<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">tns</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Initialize the TensorViewFType with the specified indices, tensor, and</span>
 <span class="sd">    operation.</span>
 
 <span class="sd">    :param idxs: Tuple of index types for the tensor view.</span>
 <span class="sd">    :param tns: The underlying tensor ftype.</span>
 <span class="sd">    :param op: The operation applied to the tensor view, if any.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span> <span class="o">=</span> <span class="n">idxs</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">tns</span> <span class="o">=</span> <span class="n">tns</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">op</span> <span class="o">=</span> <span class="n">op</span>
@@ -7639,19 +7645,19 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
 <span class="normal">175</span>
 <span class="normal">176</span>
 <span class="normal">177</span>
-<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unfurl a tensor along an index.</span>
 <span class="sd">    This is used to create a tensor view for a specific slice of the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;access&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"access"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">TensorView</span><span class="p">(</span><span class="n">idxs</span><span class="o">=</span><span class="n">idxs</span><span class="p">,</span> <span class="n">tns</span><span class="o">=</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -7676,27 +7682,27 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
 <span class="normal">207</span>
 <span class="normal">208</span>
 <span class="normal">209</span>
 <span class="normal">210</span>
-<span class="normal">211</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Declare a tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;declare&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"declare"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
     <span class="k">match</span> <span class="n">tns</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">():</span>
             <span class="k">return</span> <span class="n">np_declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no declare&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no declare"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7719,17 +7725,17 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
 <span class="normal">231</span>
 <span class="normal">232</span>
-<span class="normal">233</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Freeze a tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;freeze&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"freeze"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">tns</span>
 </code></pre></div></td></tr></table></div>
@@ -7755,21 +7761,21 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
 <span class="normal">197</span>
-<span class="normal">198</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Increment a tensor view with an operation and value.</span>
 <span class="sd">    This updates the tensor at the specified index with the operation and value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;increment&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"increment"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">increment</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no increment&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no increment"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7792,17 +7798,17 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Thaw a tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;thaw&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"thaw"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">thaw</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">tns</span>
 </code></pre></div></td></tr></table></div>
@@ -7828,21 +7834,21 @@ This is used to get the original tensor from a tensor view.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
-<span class="normal">188</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unwrap a tensor view to get the underlying tensor.</span>
 <span class="sd">    This is used to get the original tensor from a tensor view.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">&quot;unwrap&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="s2">"unwrap"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">tns</span><span class="o">.</span><span class="n">unwrap</span><span class="p">()</span>
-    <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no unwrap&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> has no unwrap"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

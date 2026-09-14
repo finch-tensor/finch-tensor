@@ -5347,7 +5347,7 @@ flat, count-sorted profile on exit.</p>
 <span class="k">def</span><span class="w"> </span><span class="nf">profile_julia_calls</span><span class="p">(</span>
     <span class="o">*</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="o">**</span><span class="mi">7</span><span class="p">,</span> <span class="n">delay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0005</span><span class="p">,</span> <span class="n">mincount</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="kc">None</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Profiles Julia-side execution during the wrapped block, including calls</span>
 <span class="sd">    made into Julia from Python (e.g. `FinchJLKernel.__call__`). Prints a</span>
 <span class="sd">    flat, count-sorted profile on exit.</span>
@@ -5355,16 +5355,16 @@ flat, count-sorted profile on exit.</p>
 <span class="sd">    Example:</span>
 <span class="sd">        with profile_julia_calls():</span>
 <span class="sd">            ft.compute(expr)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">&quot;using Profile&quot;</span><span class="p">)</span>
-    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">&quot;Profile.clear()&quot;</span><span class="p">)</span>
-    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Profile.init(n=</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">, delay=</span><span class="si">{</span><span class="n">delay</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
-    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">&quot;ccall(:jl_profile_start_timer, Cint, ())&quot;</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">"using Profile"</span><span class="p">)</span>
+    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">"Profile.clear()"</span><span class="p">)</span>
+    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Profile.init(n=</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">, delay=</span><span class="si">{</span><span class="n">delay</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+    <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">"ccall(:jl_profile_start_timer, Cint, ())"</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">yield</span>
     <span class="k">finally</span><span class="p">:</span>
-        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">&quot;ccall(:jl_profile_stop_timer, Cvoid, ())&quot;</span><span class="p">)</span>
-        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">&quot;Profile.print(format=:tree)&quot;</span><span class="p">)</span>
+        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">"ccall(:jl_profile_stop_timer, Cvoid, ())"</span><span class="p">)</span>
+        <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="s2">"Profile.print(format=:tree)"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

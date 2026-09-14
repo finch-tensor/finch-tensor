@@ -5425,9 +5425,9 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Evaluate the given logic.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5474,9 +5474,9 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Evaluate the given logic.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5541,7 +5541,7 @@
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
+        <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
@@ -5551,13 +5551,13 @@
         <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">        single method called `main` which implements the logic. Also return a</span>
 <span class="sd">        dictionary including additional tables needed to run the kernel, and</span>
 <span class="sd">        the final program as lowered, for bind-time inference (e.g. resolving</span>
 <span class="sd">        dynamic output fills against actual argument fills).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5578,7 +5578,7 @@
 
 
 <h3 id="finch.finch_logic.stages.LogicLoader.lower" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">lower</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">lower</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -5620,7 +5620,7 @@ dynamic output fills against actual argument fills).</p>
 <span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
+    <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
@@ -5630,13 +5630,13 @@ dynamic output fills against actual argument fills).</p>
     <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
     <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
 <span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">    single method called `main` which implements the logic. Also return a</span>
 <span class="sd">    dictionary including additional tables needed to run the kernel, and</span>
 <span class="sd">    the final program as lowered, for bind-time inference (e.g. resolving</span>
 <span class="sd">    dynamic output fills against actual argument fills).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

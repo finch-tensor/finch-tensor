@@ -5482,7 +5482,12 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="Level (finch.tensor.level.Level)" href="../#finch.tensor.level.Level">Level</a></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="SingleDimensionLevel
+
+
+  
+      dataclass
+   (finch.tensor.level.level.SingleDimensionLevel)" href="../level/#finch.tensor.level.level.SingleDimensionLevel">SingleDimensionLevel</a></code></p>
 
 
 
@@ -5497,8 +5502,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">332</span>
-<span class="normal">333</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">333</span>
 <span class="normal">334</span>
 <span class="normal">335</span>
 <span class="normal">336</span>
@@ -5534,17 +5538,16 @@
 <span class="normal">366</span>
 <span class="normal">367</span>
 <span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing sparse list level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
     <span class="n">dimension</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span>
-    <span class="n">ptr</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">idx</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">ptr</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">idx</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
@@ -5564,16 +5567,14 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SparseListLevelFType</span><span class="p">:</span>
-        <span class="c1"># mypy does not understand that dataclasses generate __hash__ and __eq__</span>
-        <span class="c1"># https://github.com/python/mypy/issues/19799</span>
-        <span class="k">return</span> <span class="n">SparseListLevelFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">))</span>  <span class="c1"># type: ignore[abstract]</span>
+        <span class="k">return</span> <span class="n">SparseListLevelFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">val</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">val</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;SparseListLevel(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">, dim=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"SparseListLevel(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">, dim=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5615,7 +5616,7 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="LevelFType (finch.tensor.level.LevelFType)" href="../#finch.tensor.level.LevelFType">LevelFType</a></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
+              Bases: <code><span title="finch.tensor.level.level.SingleDimensionLevelFType">SingleDimensionLevelFType</span></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
 
 
 
@@ -5628,8 +5629,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 23</span>
-<span class="normal"> 24</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 24</span>
 <span class="normal"> 25</span>
 <span class="normal"> 26</span>
 <span class="normal"> 27</span>
@@ -5929,18 +5929,17 @@
 <span class="normal">321</span>
 <span class="normal">322</span>
 <span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+<span class="normal">324</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
-    <span class="n">dimension_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
+    <span class="n">dimension_type</span><span class="p">:</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeInteger</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;SparseListLevelFType&quot;</span>
+        <span class="k">return</span> <span class="s2">"SparseListLevelFType"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">p_t</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5949,15 +5948,15 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span>
-            <span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;dimension&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;stride&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;ptr&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ptr_type</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;idx&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"lvl"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"dimension"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"stride"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"ptr"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ptr_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"idx"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">idx_type</span><span class="p">),</span>
         <span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;SparseListLevelFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"SparseListLevelFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5969,23 +5968,23 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of elements stored in the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of the shape of the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">shape_type</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">position_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of positions within the levels.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">position_type</span>
 
     <span class="nd">@property</span>
@@ -5994,9 +5993,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">buffer_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the ftype of the buffer used for the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">buffer_factory</span>
 
     <span class="nd">@property</span>
@@ -6008,7 +6007,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_factory</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-        <span class="n">pos_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span><span class="o">.</span><span class="n">itemsize</span>
+        <span class="n">pos_size</span> <span class="o">=</span> <span class="n">np_dtype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span><span class="o">.</span><span class="n">itemsize</span>
         <span class="n">size_ptr</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_pos</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">pos_size</span>
         <span class="n">reduce_fields</span> <span class="o">=</span> <span class="n">fields</span><span class="p">[</span><span class="n">lvl</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
         <span class="k">if</span> <span class="n">reduce_fields</span><span class="p">:</span>
@@ -6026,15 +6025,15 @@
             <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_cost</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">nnz_prefix</span><span class="p">,</span> <span class="n">lvl</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SparseListLevel&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SparseListLevel"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates an instance of SparseListLevel.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            shape: The shape to be used for the level. (mandatory)</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            An instance of DenseLevel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">pos</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">SparseListLevel</span><span class="p">(</span>
             <span class="n">lvl</span><span class="p">,</span>
@@ -6043,17 +6042,17 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">idx_type</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SparseListLevel&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SparseListLevel"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Convert a level to this sparse list level type.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            val: A value to convert to this type.</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            A SparseListLevel instance of this type.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
@@ -6064,77 +6063,75 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_format_properties</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;sparse list level doesn&#39;t support from_numpy&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"sparse list level doesn't support from_numpy"</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;dimension&quot;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_dim</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">r</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">r</span> <span class="o">-</span> <span class="mi">1</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_thaw</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="n">p_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
-        <span class="n">lvl_ptr</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;ptr&quot;</span><span class="p">))</span>
-        <span class="n">lvl_idx</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;idx&quot;</span><span class="p">))</span>
-        <span class="n">pos_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;pos_stop&quot;</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
-        <span class="n">qos_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;qos_stop&quot;</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
-        <span class="n">p</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">&quot;p&quot;</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
+        <span class="n">lvl_ptr</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"ptr"</span><span class="p">))</span>
+        <span class="n">lvl_idx</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"idx"</span><span class="p">))</span>
+        <span class="n">pos_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"pos_stop"</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
+        <span class="n">qos_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"qos_stop"</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"p"</span><span class="p">,</span> <span class="n">p_t</span><span class="p">)</span>
 
-        <span class="n">expr</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;finch</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="s2">"""finch</span>
 <span class="s2">        resize(lvl_ptr, pos_stop + 1)</span>
 <span class="s2">        for (p in 0:pos_stop)</span>
 <span class="s2">            lvl_ptr[p + 1] += lvl_ptr[p]</span>
 <span class="s2">        end</span>
 <span class="s2">        qos_stop = lvl_ptr[pos_stop] - 1</span>
 <span class="s2">        resize(lvl_idx, qos_stop)</span>
-<span class="s2">        &quot;&quot;&quot;</span>
+<span class="s2">        """</span>
 
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">locals</span><span class="p">(),</span> <span class="n">position_type</span><span class="o">=</span><span class="n">p_t</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_freeze</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;SparseListLevelFType does not support level_lower_increment.&quot;</span>
+            <span class="s2">"SparseListLevelFType does not support level_lower_increment."</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;SparseListLevelFType does not support level_lower_unwrap.&quot;</span>
+            <span class="s2">"SparseListLevelFType does not support level_lower_unwrap."</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">fiber</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">AccessMode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span>
-    <span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fiber</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">FiberTensorFType</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected FiberTensorFType, got: </span><span class="si">{</span><span class="n">fiber</span><span class="o">.</span><span class="n">type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">tns</span> <span class="o">=</span> <span class="n">fiber</span>
-        <span class="n">ft_ftype</span><span class="p">:</span> <span class="n">FiberTensorFType</span> <span class="o">=</span> <span class="n">fiber</span><span class="o">.</span><span class="n">type</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">AccessMode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">lvl</span><span class="o">.</span><span class="n">type</span><span class="p">,</span> <span class="n">FiberTensorFType</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected FiberTensorFType, got: </span><span class="si">{</span><span class="n">lvl</span><span class="o">.</span><span class="n">type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">tns</span> <span class="o">=</span> <span class="n">lvl</span>
+        <span class="n">ft_ftype</span><span class="p">:</span> <span class="n">FiberTensorFType</span> <span class="o">=</span> <span class="n">lvl</span><span class="o">.</span><span class="n">type</span>
         <span class="n">lvl_asm</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
-        <span class="n">ptr_s</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;ptr&quot;</span><span class="p">))</span>
-        <span class="n">idx_s</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;idx&quot;</span><span class="p">))</span>
+        <span class="n">ptr_s</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"ptr"</span><span class="p">))</span>
+        <span class="n">idx_s</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"idx"</span><span class="p">))</span>
 
-        <span class="n">q</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;q&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
-        <span class="n">q_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;q_stop&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
-        <span class="n">i_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;i_stop&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
-        <span class="n">i_last</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;i_last&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"q"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
+        <span class="n">q_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"q_stop"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
+        <span class="n">i_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i_stop"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
+        <span class="n">i_last</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i_last"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
         <span class="n">pos</span> <span class="o">=</span> <span class="n">tns</span><span class="o">.</span><span class="n">pos</span>
         <span class="n">scalar</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Value</span> <span class="o">|</span> <span class="n">Scalar</span>
         <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="c1"># The fill arrives at bind time: gap reads load it from the leaf</span>
-            <span class="c1"># level&#39;s fill field rather than baking a literal.</span>
+            <span class="c1"># level's fill field rather than baking a literal.</span>
             <span class="n">scalar</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">),</span>
                 <span class="n">ScalarFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">),</span>
@@ -6145,7 +6142,7 @@
         <span class="n">tmp_locals</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">thunk_preamble</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-            <span class="n">expr</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;finch</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="s2">"""finch</span>
 <span class="s2">            q = ptr_s[pos]</span>
 <span class="s2">            q_stop = ptr_s[pos + 1]</span>
 <span class="s2">            if (q &lt; q_stop)</span>
@@ -6155,17 +6152,17 @@
 <span class="s2">                i_stop = 1</span>
 <span class="s2">                i_last = 0</span>
 <span class="s2">            end</span>
-<span class="s2">            &quot;&quot;&quot;</span>
+<span class="s2">            """</span>
             <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">tmp_locals</span><span class="p">,</span> <span class="n">position_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">seek_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ext</span><span class="p">):</span>
             <span class="n">start</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">())</span>
 
-            <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;finch</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""finch</span>
 <span class="s2">            if (idx_s[q] &lt; </span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">)</span>
 <span class="s2">              q = scansearch(idx_s, </span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">, q, q_stop - 1)</span>
 <span class="s2">            end</span>
-<span class="s2">            &quot;&quot;&quot;</span>
+<span class="s2">            """</span>
 
             <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span>
                 <span class="n">code</span><span class="p">,</span>
@@ -6175,7 +6172,7 @@
 
         <span class="k">def</span><span class="w"> </span><span class="nf">chunk_tail_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
             <span class="n">pos_2</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
-                <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_pos_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
+                <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"_pos_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
             <span class="p">)</span>
             <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">pos_2</span><span class="p">,</span> <span class="n">q</span><span class="p">))</span>
             <span class="n">child_type</span> <span class="o">=</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="n">ft_ftype</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">)</span>  <span class="c1"># type: ignore[abstract]</span>
@@ -6200,7 +6197,7 @@
                             <span class="p">(</span>
                                 <span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span>
                                     <span class="n">i_stop</span><span class="p">,</span>
-                                    <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;dimension&quot;</span><span class="p">)),</span>
+                                    <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl_asm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">)),</span>
                                 <span class="p">),</span>
                             <span class="p">)</span>
                         <span class="p">),</span>
@@ -6231,7 +6228,7 @@
             <span class="p">),</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">ptr</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SparseListLevel&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">ptr</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SparseListLevel"</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">SparseListLevel</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">ptr</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6386,8 +6383,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
-<span class="normal">137</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
 <span class="normal">140</span>
@@ -6397,17 +6393,18 @@
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SparseListLevel&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">147</span>
+<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SparseListLevel"</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this sparse list level type.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        val: A value to convert to this type.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A SparseListLevel instance of this type.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">"Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6445,7 +6442,7 @@
                 <code>shape</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6464,8 +6461,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">119</span>
-<span class="normal">120</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
@@ -6479,15 +6475,16 @@
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SparseListLevel&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"SparseListLevel"</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of SparseListLevel.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        shape: The shape to be used for the level. (mandatory)</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        An instance of DenseLevel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">pos</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">SparseListLevel</span><span class="p">(</span>
         <span class="n">lvl</span><span class="p">,</span>

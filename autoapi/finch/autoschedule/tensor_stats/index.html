@@ -5518,46 +5518,46 @@
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base class for tensor statistics.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">|</span> <span class="n">BaseTensorStats</span><span class="p">,</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">BaseTensorStats</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;dim_sizes must be omitted when constructing from BaseTensorStats&quot;</span>
+                    <span class="s2">"dim_sizes must be omitted when constructing from BaseTensorStats"</span>
                 <span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span>
                 <span class="n">index_order</span><span class="o">.</span><span class="n">index_order</span><span class="p">,</span> <span class="n">index_order</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">,</span> <span class="n">index_order</span><span class="o">.</span><span class="n">fill_value</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;dim_sizes are required when constructing from fields&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"dim_sizes are required when constructing from fields"</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_init_from_fields</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_index_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index_order</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">dim_sizes</span><span class="p">)</span>
         <span class="c1"># Stats always carry an AbstractFill: propagation must be able to say</span>
-        <span class="c1"># &quot;this fill exists but must not be specialized on&quot;.</span>
+        <span class="c1"># "this fill exists but must not be specialized on".</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
-        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
+        <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
         <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
@@ -5568,11 +5568,11 @@
         <span class="k">return</span> <span class="n">new</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span>
 
     <span class="nd">@dim_sizes</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_dim_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -5592,7 +5592,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The fill, and whether kernels may specialize on it."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
 
     <span class="nd">@fill_value</span><span class="o">.</span><span class="n">setter</span>
@@ -5604,7 +5604,7 @@
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx</span><span class="p">:</span>
             <span class="n">prod</span> <span class="o">*=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
             <span class="k">if</span> <span class="n">prod</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">prod</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">:</span>
-                <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">prod</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5724,14 +5724,14 @@ scan and all propagation (in :class:<code>BoundStatsFactory</code>) are shared.<
 <span class="normal">91</span>
 <span class="normal">92</span>
 <span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BoundStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base for degree-constraint upper-bound statistics: a guaranteed bound on the</span>
 <span class="sd">    number of non-fill values, built from ``ell_p``-norms of degree sequences.</span>
 
 <span class="sd">    Subclasses differ only in which ``p`` values they keep (``ps``) and how they</span>
 <span class="sd">    turn the constraints into an estimate (:meth:`estimate_non_fill_values`); the</span>
 <span class="sd">    scan and all propagation (in :class:`BoundStatsFactory`) are shared.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -5959,11 +5959,11 @@ per-subclass knob is <code>ps</code>.</p>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BoundStatsFactory</span><span class="p">(</span><span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">Generic</span><span class="p">[</span><span class="n">TS</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Shared statistics propagation for :class:`BoundStats` subclasses, combining</span>
 <span class="sd">    degree constraints keyed by ``(from_indices, to_indices, p)``. The only</span>
 <span class="sd">    per-subclass knob is ``ps``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span> <span class="n">ps</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">stats_cls</span><span class="p">)</span>
@@ -6171,12 +6171,12 @@ the distinct count; intermediate <code>p</code> capture skew between the two.</p
 <span class="normal">48</span>
 <span class="normal">49</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DC</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A degree constraint: ``value`` bounds ``||deg(to_indices | from_indices)||_p``.</span>
 
 <span class="sd">    ``p = inf`` (the default) is the classic max-degree constraint; ``p = 1`` is</span>
 <span class="sd">    the distinct count; intermediate ``p`` capture skew between the two.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">from_indices</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
     <span class="n">to_indices</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span>
@@ -6281,17 +6281,17 @@ clamped by the tensor's dense capacity.</p>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStats</span><span class="p">(</span><span class="n">BoundStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Classic degree constraints -- max degrees (``p = inf``) and distinct counts.</span>
 <span class="sd">    Estimates size with a best-first product search over the constraints,</span>
-<span class="sd">    clamped by the tensor&#39;s dense capacity.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    clamped by the tensor's dense capacity.</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Smallest degree-constraint product covering all indices, clamped by</span>
-<span class="sd">        dense capacity.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Smallest degree-constraint product covering all indices, clamped by</span>
+<span class="sd">        dense capacity."""</span>
         <span class="n">idx</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="mf">1.0</span>
@@ -6394,8 +6394,8 @@ dense capacity.</p>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Smallest degree-constraint product covering all indices, clamped by</span>
-<span class="sd">    dense capacity.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Smallest degree-constraint product covering all indices, clamped by</span>
+<span class="sd">    dense capacity."""</span>
     <span class="n">idx</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">1.0</span>
@@ -6475,8 +6475,8 @@ dense capacity.</p>
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
-<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">&quot;DCStats&quot;</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for :class:`DCStats` -- keeps only max-degree (``p = inf``).&quot;&quot;&quot;</span>
+<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DCStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">"DCStats"</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">"""Factory for :class:`DCStats` -- keeps only max-degree (``p = inf``)."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">DCStats</span><span class="p">,</span> <span class="n">ps</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">))</span>
@@ -6563,11 +6563,11 @@ configurable set of <code>p</code> (not just max degree), and bounds size via th
 <span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStats</span><span class="p">(</span><span class="n">BoundStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LpBound statistics: keeps ``ell_p``-norms of degree sequences for a</span>
 <span class="sd">    configurable set of ``p`` (not just max degree), and bounds size via the</span>
 <span class="sd">    ``LPflow`` network-flow LP (:func:`_flow_bound`).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">default_ps</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="n">DEFAULT_PS</span>
 
@@ -6647,8 +6647,8 @@ configurable set of <code>p</code> (not just max degree), and bounds size via th
 <span class="normal">473</span>
 <span class="normal">474</span>
 <span class="normal">475</span>
-<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">&quot;LPStats&quot;</span><span class="p">]):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for :class:`LPStats` with a configurable set of ``p`` norms.&quot;&quot;&quot;</span>
+<span class="normal">476</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LPStatsFactory</span><span class="p">(</span><span class="n">BoundStatsFactory</span><span class="p">[</span><span class="s2">"LPStats"</span><span class="p">]):</span>
+<span class="w">    </span><span class="sd">"""Factory for :class:`LPStats` with a configurable set of ``p`` norms."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ps</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">LPStats</span><span class="p">,</span> <span class="n">ps</span><span class="p">)</span>
@@ -6706,10 +6706,7 @@ sample_prob : Bernoulli sample prob</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">502</span>
 <span class="normal">503</span>
 <span class="normal">504</span>
 <span class="normal">505</span>
@@ -6911,12 +6908,15 @@ sample_prob : Bernoulli sample prob</p>
 <span class="normal">701</span>
 <span class="normal">702</span>
 <span class="normal">703</span>
-<span class="normal">704</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    sketch : numpy array over bound dimension</span>
-<span class="sd">    remainder_dims : &#39;free&#39; dimension -&gt; absent in the output</span>
+<span class="sd">    remainder_dims : 'free' dimension -&gt; absent in the output</span>
 <span class="sd">    sample_prob : Bernoulli sample prob</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">sketch</span><span class="p">:</span> <span class="n">LogicExpression</span>
     <span class="n">remainder_dims</span><span class="p">:</span> <span class="nb">set</span>
@@ -6927,7 +6927,7 @@ sample_prob : Bernoulli sample prob</p>
         <span class="n">base</span><span class="p">:</span> <span class="n">BaseTensorStats</span><span class="p">,</span>
         <span class="n">sketch</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span>
         <span class="n">sample_prob</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
-        <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uj1&quot;</span><span class="p">,</span>
+        <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"uj1"</span><span class="p">,</span>
         <span class="n">remainder_dims</span><span class="p">:</span> <span class="nb">set</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">remainder_dim_sizes</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">masks_ref</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6955,7 +6955,7 @@ sample_prob : Bernoulli sample prob</p>
             <span class="n">n</span><span class="p">,</span> <span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scan_cache</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
-            <span class="n">n_a</span><span class="p">,</span> <span class="n">dn_a</span><span class="p">,</span> <span class="n">f1_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">&quot;n&quot;</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">&quot;d_n&quot;</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">&quot;f_1&quot;</span><span class="p">)</span>
+            <span class="n">n_a</span><span class="p">,</span> <span class="n">dn_a</span><span class="p">,</span> <span class="n">f1_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"n"</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"d_n"</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"f_1"</span><span class="p">)</span>
             <span class="n">bodies</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="n">Query</span><span class="p">(</span>
                     <span class="n">n_a</span><span class="p">,</span>
@@ -6984,7 +6984,7 @@ sample_prob : Bernoulli sample prob</p>
             <span class="n">outputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">n_a</span><span class="p">,</span> <span class="n">dn_a</span><span class="p">,</span> <span class="n">f1_a</span><span class="p">]</span>
             <span class="n">max_a</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="n">needs_freq</span><span class="p">:</span>
-                <span class="n">max_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">&quot;max_val&quot;</span><span class="p">)</span>
+                <span class="n">max_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"max_val"</span><span class="p">)</span>
                 <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                     <span class="n">Query</span><span class="p">(</span>
                         <span class="n">max_a</span><span class="p">,</span>
@@ -7005,7 +7005,7 @@ sample_prob : Bernoulli sample prob</p>
             <span class="k">if</span> <span class="n">needs_freq</span><span class="p">:</span>
                 <span class="n">max_val</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="mi">3</span><span class="p">])[()])))</span>
                 <span class="k">if</span> <span class="n">max_val</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="n">freq_alias</span> <span class="o">=</span> <span class="p">[</span><span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;f_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_val</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+                    <span class="n">freq_alias</span> <span class="o">=</span> <span class="p">[</span><span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"f_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_val</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
                     <span class="n">freq_bodies</span> <span class="o">=</span> <span class="p">[</span>
                         <span class="n">Query</span><span class="p">(</span>
                             <span class="n">a</span><span class="p">,</span>
@@ -7049,7 +7049,7 @@ sample_prob : Bernoulli sample prob</p>
         <span class="k">return</span> <span class="n">d_n_raw</span> <span class="o">/</span> <span class="n">coverage</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot; &quot;</span>
+<span class="w">        </span><span class="sd">""" "</span>
 <span class="sd">        Using un-smoothened first order jackknife estimator</span>
 <span class="sd">        D_uj1 = (1-(1-q)*f_1/n)^{-1} * d_n</span>
 
@@ -7059,8 +7059,8 @@ sample_prob : Bernoulli sample prob</p>
 <span class="sd">        n = total sample size</span>
 <span class="sd">        N = population size [Total without sampling]</span>
 <span class="sd">        q = n/N</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">needs_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;uj2&quot;</span><span class="p">,</span> <span class="s2">&quot;schlosser&quot;</span><span class="p">,</span> <span class="s2">&quot;sh2&quot;</span><span class="p">,</span> <span class="s2">&quot;sh3&quot;</span><span class="p">,</span> <span class="s2">&quot;good1&quot;</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="n">needs_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"uj2"</span><span class="p">,</span> <span class="s2">"schlosser"</span><span class="p">,</span> <span class="s2">"sh2"</span><span class="p">,</span> <span class="s2">"sh3"</span><span class="p">,</span> <span class="s2">"good1"</span><span class="p">)</span>
         <span class="n">n</span><span class="p">,</span> <span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">needs_freq</span><span class="p">)</span>
         <span class="n">bound_size</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">f</span><span class="p">])</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
@@ -7079,34 +7079,34 @@ sample_prob : Bernoulli sample prob</p>
         <span class="n">ndims</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_dims</span><span class="p">)</span>
         <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span><span class="o">**</span><span class="n">ndims</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;uj1&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"uj1"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_duj1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;good1&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"good1"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dgood1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sj1&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sj1"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsj1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;uj2&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"uj2"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_duj2</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;schlosser&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"schlosser"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sh2&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sh2"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh2</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sh3&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sh3"</span><span class="p">:</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh3</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;silly&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"silly"</span><span class="p">:</span>
             <span class="n">q_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span> <span class="o">**</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
             <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsilly</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">q_output</span><span class="p">)</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Unknown estimator: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">estimator</span><span class="si">!r}</span><span class="s2">.&quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1&quot;</span>
+                <span class="sa">f</span><span class="s2">"Unknown estimator: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">estimator</span><span class="si">!r}</span><span class="s2">."</span>
+                <span class="sa">f</span><span class="s2">"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1"</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">formula_est</span><span class="p">)</span>
@@ -7157,10 +7157,7 @@ q = n/N</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">636</span>
-<span class="normal">637</span>
-<span class="normal">638</span>
-<span class="normal">639</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">639</span>
 <span class="normal">640</span>
 <span class="normal">641</span>
 <span class="normal">642</span>
@@ -7218,8 +7215,11 @@ q = n/N</p>
 <span class="normal">694</span>
 <span class="normal">695</span>
 <span class="normal">696</span>
-<span class="normal">697</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot; &quot;</span>
+<span class="normal">697</span>
+<span class="normal">698</span>
+<span class="normal">699</span>
+<span class="normal">700</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">""" "</span>
 <span class="sd">    Using un-smoothened first order jackknife estimator</span>
 <span class="sd">    D_uj1 = (1-(1-q)*f_1/n)^{-1} * d_n</span>
 
@@ -7229,8 +7229,8 @@ q = n/N</p>
 <span class="sd">    n = total sample size</span>
 <span class="sd">    N = population size [Total without sampling]</span>
 <span class="sd">    q = n/N</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">needs_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;uj2&quot;</span><span class="p">,</span> <span class="s2">&quot;schlosser&quot;</span><span class="p">,</span> <span class="s2">&quot;sh2&quot;</span><span class="p">,</span> <span class="s2">&quot;sh3&quot;</span><span class="p">,</span> <span class="s2">&quot;good1&quot;</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="n">needs_freq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"uj2"</span><span class="p">,</span> <span class="s2">"schlosser"</span><span class="p">,</span> <span class="s2">"sh2"</span><span class="p">,</span> <span class="s2">"sh3"</span><span class="p">,</span> <span class="s2">"good1"</span><span class="p">)</span>
     <span class="n">n</span><span class="p">,</span> <span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">needs_freq</span><span class="p">)</span>
     <span class="n">bound_size</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">f</span><span class="p">])</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
@@ -7249,34 +7249,34 @@ q = n/N</p>
     <span class="n">ndims</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_dims</span><span class="p">)</span>
     <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span><span class="o">**</span><span class="n">ndims</span>
 
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;uj1&quot;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"uj1"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_duj1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;good1&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"good1"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dgood1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sj1&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sj1"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsj1</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;uj2&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"uj2"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_duj2</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;schlosser&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"schlosser"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sh2&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sh2"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh2</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;sh3&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"sh3"</span><span class="p">:</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsh3</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">&quot;silly&quot;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">==</span> <span class="s2">"silly"</span><span class="p">:</span>
         <span class="n">q_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span> <span class="o">**</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
         <span class="n">formula_est</span> <span class="o">=</span> <span class="n">_dsilly</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">q_output</span><span class="p">)</span>
 
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Unknown estimator: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">estimator</span><span class="si">!r}</span><span class="s2">.&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1&quot;</span>
+            <span class="sa">f</span><span class="s2">"Unknown estimator: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">estimator</span><span class="si">!r}</span><span class="s2">."</span>
+            <span class="sa">f</span><span class="s2">"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1"</span>
         <span class="p">)</span>
 
     <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">formula_est</span><span class="p">)</span>
@@ -7307,7 +7307,7 @@ q = n/N</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStatsFactory">BaseTensorStatsFactory</span>[&#39;SamplingStats&#39;]</code></p>
+              Bases: <code><span title="finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStatsFactory">BaseTensorStatsFactory</span>[&#39;SamplingStats&#39;]</code>, <code><span title="finch.finch_logic.tensor_stats.StatsFactory">StatsFactory</span>[&#39;SamplingStats&#39;]</code></p>
 
 
 
@@ -7320,8 +7320,7 @@ q = n/N</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">284</span>
-<span class="normal">285</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
 <span class="normal">288</span>
@@ -7532,8 +7531,13 @@ q = n/N</p>
 <span class="normal">493</span>
 <span class="normal">494</span>
 <span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span><span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="s2">&quot;SamplingStats&quot;</span><span class="p">]):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_prob</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uj1&quot;</span><span class="p">):</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span>
+    <span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">],</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">]</span>
+<span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_prob</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"uj1"</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">SamplingStats</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span> <span class="o">=</span> <span class="n">sample_prob</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">=</span> <span class="n">estimator</span>
@@ -7541,7 +7545,7 @@ q = n/N</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-        <span class="s2">&quot;Returns mask for dimension that already exists or creates a new one&quot;</span>
+        <span class="s2">"Returns mask for dimension that already exists or creates a new one"</span>
         <span class="n">mask_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">mask_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">[</span><span class="n">mask_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rng</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
@@ -7555,7 +7559,7 @@ q = n/N</p>
 
         <span class="c1"># defining one Bernoulli mask per dimension, an entry will survive</span>
         <span class="c1"># only if all its indices are kept</span>
-        <span class="c1"># masks has the 0&#39;s 1&#39;s combination for each entry in a dimension</span>
+        <span class="c1"># masks has the 0's 1's combination for each entry in a dimension</span>
         <span class="n">masks</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_mask</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">field</span><span class="p">]))</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">]</span>
         <span class="n">non_fill</span> <span class="o">=</span> <span class="n">MapJoin</span><span class="p">(</span>
             <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span> <span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">tensor</span><span class="p">),</span> <span class="n">fields</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="p">))</span>
@@ -7577,9 +7581,9 @@ q = n/N</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">_mapjoin_join</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">join_args</span><span class="p">:</span> <span class="n">SamplingStats</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SamplingStats</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        N(C)_i =  N(A)_j * N(B)_k</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">join_args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">join_args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
@@ -7606,10 +7610,10 @@ q = n/N</p>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_mapjoin_union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">union_args</span><span class="p">:</span> <span class="n">SamplingStats</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        N(C)_i = sum_{juk\\i}[N(A)_j *prod_{l in k\\j}n(B)_l +</span>
 <span class="sd">        N(B)_k *prod_{l in j\\k}n(A)_l ] - N(A)_j*N(B)_k</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">base_stats</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_mapjoin_defs</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">union_args</span><span class="p">)</span>
         <span class="n">output_indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">base_stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
         <span class="n">new_remainder</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
@@ -7661,11 +7665,11 @@ q = n/N</p>
         <span class="n">reduce_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
         <span class="n">stats</span><span class="p">:</span> <span class="n">SamplingStats</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        op is identity on fill : N(B)_i = sum_j N(A)_j</span>
 <span class="sd">        op annihilates fill: N(B)_i = prod(l in k)n_l * min_k 1[N(A)_j &gt; 0]</span>
 <span class="sd">        otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="n">base_stats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggregate_def</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">reduce_indices</span><span class="p">,</span> <span class="n">stats</span><span class="p">)</span>
         <span class="n">reduce_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">reduce_indices</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>
@@ -7779,10 +7783,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">409</span>
 <span class="normal">410</span>
 <span class="normal">411</span>
 <span class="normal">412</span>
@@ -7841,18 +7842,21 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 <span class="normal">465</span>
 <span class="normal">466</span>
 <span class="normal">467</span>
-<span class="normal">468</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
     <span class="n">init</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">reduce_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">stats</span><span class="p">:</span> <span class="n">SamplingStats</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    op is identity on fill : N(B)_i = sum_j N(A)_j</span>
 <span class="sd">    op annihilates fill: N(B)_i = prod(l in k)n_l * min_k 1[N(A)_j &gt; 0]</span>
 <span class="sd">    otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">base_stats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">aggregate_def</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">reduce_indices</span><span class="p">,</span> <span class="n">stats</span><span class="p">)</span>
     <span class="n">reduce_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">reduce_indices</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>

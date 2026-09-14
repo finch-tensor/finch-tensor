@@ -5415,21 +5415,21 @@ inside <code>branch_and_bound_dfs</code>.</p>
 <span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicalOptimizer</span><span class="p">(</span><span class="n">LogicFusionOptimizer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),</span>
 <span class="sd">    then forwards the Plan to the downstream loader ``ctx``.</span>
 
-<span class="sd">    Default ``optimizer=&quot;bfs&quot;`` is exact layered branch-and-bound; ``&quot;dfs&quot;`` uses the</span>
+<span class="sd">    Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the</span>
 <span class="sd">    DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not</span>
 <span class="sd">    inside ``branch_and_bound_dfs``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">ctx</span><span class="p">:</span> <span class="n">LogicLoader</span><span class="p">,</span>
         <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
-        <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">&quot;bfs&quot;</span><span class="p">,</span>
+        <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"bfs"</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">use_components</span> <span class="o">=</span> <span class="n">use_components</span>
@@ -5443,8 +5443,8 @@ inside <code>branch_and_bound_dfs</code>.</p>
         <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported program type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">term</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Optimizing plan: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported program type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">term</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Optimizing plan: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
         <span class="n">term</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
             <span class="n">term</span><span class="p">,</span>
             <span class="n">stats_factory</span><span class="p">,</span>
@@ -5482,7 +5482,7 @@ inside <code>branch_and_bound_dfs</code>.</p>
 
 
 <h2 id="finch.autoschedule.galley_optimize.optimize_plan" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">optimize_plan</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">&#39;greedy&#39;</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">optimize_plan</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">'greedy'</span><span class="p">)</span></code>
 
 </h2>
 
@@ -5537,12 +5537,12 @@ pass through non-Query bodies (Produces), and update stats bindings.</p>
     <span class="n">stats_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
     <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">&quot;greedy&quot;</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"greedy"</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Optimize a full Plan: run the Galley optimizer on each Query body,</span>
 <span class="sd">    pass through non-Query bodies (Produces), and update stats bindings.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">plan</span> <span class="o">=</span> <span class="n">preprocess_plan_for_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span>
     <span class="n">optimized_queries</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">cache_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -5578,7 +5578,7 @@ pass through non-Query bodies (Produces), and update stats bindings.</p>
 
 
 <h2 id="finch.autoschedule.galley_optimize.optimize_query" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">optimize_query</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">&#39;dfs&#39;</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">optimize_query</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">'dfs'</span><span class="p">)</span></code>
 
 </h2>
 
@@ -5613,10 +5613,10 @@ greedy, bfs, or dfs.</p>
     <span class="n">stats_bindings</span><span class="p">,</span>
     <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">&quot;dfs&quot;</span><span class="p">,</span>
+    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"dfs"</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rewrite a single logical Query using ``optimizer``:</span>
-<span class="sd">    greedy, bfs, or dfs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Rewrite a single logical Query using ``optimizer``:</span>
+<span class="sd">    greedy, bfs, or dfs."""</span>
     <span class="n">annotated_query</span> <span class="o">=</span> <span class="n">AnnotatedQuery</span><span class="p">(</span><span class="n">stats_factory</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
     <span class="n">new_queries</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pruned_query_to_plan</span><span class="p">(</span>
         <span class="n">annotated_query</span><span class="p">,</span>

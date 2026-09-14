@@ -5471,12 +5471,12 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">439</span>
 <span class="normal">440</span>
 <span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the matrix product.</span>
 
 <span class="sd">    Returns a LazyTensor if either x1 or x2 is a LazyTensor.</span>
 <span class="sd">    Otherwise, computes the result eagerly.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span>
     <span class="n">c</span> <span class="o">=</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">)</span>
@@ -5518,9 +5518,9 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">892</span>
 <span class="normal">893</span>
 <span class="normal">894</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matrix_power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the power of a matrix.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matrix_power</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
@@ -5561,9 +5561,9 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">448</span>
 <span class="normal">449</span>
 <span class="normal">450</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="o">/</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the transpose of a matrix or stack of matrices.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">matrix_transpose</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
@@ -5601,12 +5601,12 @@ Otherwise, computes the result eagerly.</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="mi">2</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the tensordot operation.</span>
 
 <span class="sd">    Returns a LazyTensor if either x1 or x2 is a LazyTensor.</span>
 <span class="sd">    Otherwise, computes the result eagerly.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="n">axes</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="n">axes</span><span class="p">))</span>
@@ -5663,7 +5663,7 @@ axis: int, optional
 <span class="normal">1024</span>
 <span class="normal">1025</span>
 <span class="normal">1026</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Computes the (vector) dot product of two arrays.</span>
 
 <span class="sd">    Parameters</span>
@@ -5679,7 +5679,7 @@ axis: int, optional
 <span class="sd">    -------</span>
 <span class="sd">    out: array</span>
 <span class="sd">        A tensor containing the dot product of `x1` and `x2` along the specified axis.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">lazy</span><span class="o">.</span><span class="n">LazyTensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">lazy</span><span class="o">.</span><span class="n">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">compute</span><span class="p">(</span><span class="n">lazy</span><span class="o">.</span><span class="n">vecdot</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="n">axis</span><span class="p">))</span>

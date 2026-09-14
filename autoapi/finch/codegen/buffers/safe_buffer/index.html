@@ -5547,8 +5547,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
-<span class="normal"> 9</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 9</span>
 <span class="normal">10</span>
 <span class="normal">11</span>
 <span class="normal">12</span>
@@ -5579,25 +5578,26 @@
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SafeBuffer</span><span class="p">(</span><span class="n">Buffer</span><span class="p">):</span>
+<span class="normal">40</span>
+<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SafeBuffer</span><span class="p">(</span><span class="n">Buffer</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">buffer</span><span class="p">:</span> <span class="n">Buffer</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span> <span class="o">=</span> <span class="n">buffer</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the ftype of the buffer.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">SafeBufferFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> received an index out of bounds!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> received an index out of bounds!"</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">index</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">length</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> received an index out of bounds!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> received an index out of bounds!"</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5607,7 +5607,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="nb">len</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;safe(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"safe(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_underlying</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">underlying</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5684,8 +5684,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 43</span>
-<span class="normal"> 44</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 44</span>
 <span class="normal"> 45</span>
 <span class="normal"> 46</span>
 <span class="normal"> 47</span>
@@ -5845,7 +5844,8 @@
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
-<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SafeBufferFType</span><span class="p">(</span>
+<span class="normal">204</span>
+<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SafeBufferFType</span><span class="p">(</span>
     <span class="n">CBufferFType</span><span class="p">,</span> <span class="n">NumbaBufferFType</span><span class="p">,</span> <span class="n">CUnpackableFType</span><span class="p">,</span> <span class="n">NumbaUnpackableFType</span>
 <span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">underlying_format</span><span class="p">):</span>
@@ -5857,7 +5857,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_underlying_format</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="s2">&quot;SafeBufferFType&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="p">))</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="s2">"SafeBufferFType"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">c_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_type</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -5869,35 +5869,35 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_data</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_c_check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">&quot;#include &lt;stdio.h&gt;&quot;</span><span class="p">)</span>
-        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">&quot;#include &lt;stdlib.h&gt;&quot;</span><span class="p">)</span>
-        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">&quot;#include &lt;stddef.h&gt;&quot;</span><span class="p">)</span>
-        <span class="n">idx_n</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;computed&quot;</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">"#include &lt;stdio.h&gt;"</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">"#include &lt;stdlib.h&gt;"</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">"#include &lt;stddef.h&gt;"</span><span class="p">)</span>
+        <span class="n">idx_n</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"computed"</span><span class="p">)</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">size_t </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> = (</span><span class="si">{</span><span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span><span class="si">}</span><span class="s2">);</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">if (</span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &lt; 0 || </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &gt;= (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">c_length</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">)</span><span class="si">}</span><span class="s2">)) </span><span class="se">{{\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s1">    fprintf(stderr, &quot;Index out of bounds error!&quot;);</span><span class="se">\n</span><span class="s1">&#39;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">    exit(1);</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="se">}}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">size_t </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> = (</span><span class="si">{</span><span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span><span class="si">}</span><span class="s2">);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">if (</span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &lt; 0 || </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &gt;= (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">c_length</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">)</span><span class="si">}</span><span class="s2">)) </span><span class="se">{{\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s1">    fprintf(stderr, "Index out of bounds error!");</span><span class="se">\n</span><span class="s1">'</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">    exit(1);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="se">}}</span><span class="s2">"</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">idx_n</span><span class="p">,</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">c_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        A c_load function with preemptive index checking.</span>
 
-<span class="sd">        self.check returns the value of the computed index so things don&#39;t</span>
+<span class="sd">        self.check returns the value of the computed index so things don't</span>
 <span class="sd">        get computed twice.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_load</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">c_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        A c_store function with preemptive index checking.</span>
 
 <span class="sd">        self.check returns the variable name of the computed index so</span>
-<span class="sd">        things don&#39;t get computed twice.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        things don't get computed twice.</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_store</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">c_resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
@@ -5929,32 +5929,32 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">numba_length</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">numba_check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-        <span class="n">idx_n</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;computed&quot;</span><span class="p">)</span>
+        <span class="n">idx_n</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"computed"</span><span class="p">)</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> = (</span><span class="si">{</span><span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">if </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &lt; 0 or </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &gt;= (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">numba_length</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">)</span><span class="si">}</span><span class="s2">):</span><span class="se">\n</span><span class="s2">&quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">    raise IndexError()&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> = (</span><span class="si">{</span><span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">if </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &lt; 0 or </span><span class="si">{</span><span class="n">idx_n</span><span class="si">}</span><span class="s2"> &gt;= (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">numba_length</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="n">buf</span><span class="p">)</span><span class="si">}</span><span class="s2">):</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">    raise IndexError()"</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">idx_n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">idx_n</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="nb">int</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">numba_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        A numba_load function with preemptive index checking.</span>
 
-<span class="sd">        self.numba_check returns the value of the computed index so things don&#39;t</span>
+<span class="sd">        self.numba_check returns the value of the computed index so things don't</span>
 <span class="sd">        get computed twice.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">numba_load</span><span class="p">(</span>
             <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">numba_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">numba_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        A numba_store function with preemptive index checking.</span>
 
 <span class="sd">        self.numba_check returns the variable name of the computed index so</span>
-<span class="sd">        things don&#39;t get computed twice.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        things don't get computed twice.</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">numba_store</span><span class="p">(</span>
             <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">numba_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="n">value</span>
         <span class="p">)</span>
@@ -5982,30 +5982,30 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">construct_from_numba</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a SafeBuffer wrapping a buffer created by the underlying format.</span>
 <span class="sd">        Args:</span>
 <span class="sd">            *args: Arguments to pass to the underlying format</span>
 <span class="sd">            **kwargs: Keyword arguments to pass to the underlying format</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            A SafeBuffer instance wrapping the created buffer</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">underlying_buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">SafeBuffer</span><span class="p">(</span><span class="n">underlying_buffer</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the type of elements stored in the buffer.</span>
 <span class="sd">        This is typically the same as the dtype used to create the buffer.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">underlying_format</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Provide access to the underlying format.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6089,8 +6089,7 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">179</span>
-<span class="normal">180</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
@@ -6099,15 +6098,16 @@ Returns:
 <span class="normal">186</span>
 <span class="normal">187</span>
 <span class="normal">188</span>
-<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">189</span>
+<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Create a SafeBuffer wrapping a buffer created by the underlying format.</span>
 <span class="sd">    Args:</span>
 <span class="sd">        *args: Arguments to pass to the underlying format</span>
 <span class="sd">        **kwargs: Keyword arguments to pass to the underlying format</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A SafeBuffer instance wrapping the created buffer</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">underlying_buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">SafeBuffer</span><span class="p">(</span><span class="n">underlying_buffer</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6134,20 +6134,20 @@ get computed twice.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">80</span>
-<span class="normal">81</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">81</span>
 <span class="normal">82</span>
 <span class="normal">83</span>
 <span class="normal">84</span>
 <span class="normal">85</span>
 <span class="normal">86</span>
-<span class="normal">87</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">87</span>
+<span class="normal">88</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A c_load function with preemptive index checking.</span>
 
-<span class="sd">    self.check returns the value of the computed index so things don&#39;t</span>
+<span class="sd">    self.check returns the value of the computed index so things don't</span>
 <span class="sd">    get computed twice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_load</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6173,20 +6173,20 @@ things don't get computed twice.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">89</span>
-<span class="normal">90</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">90</span>
 <span class="normal">91</span>
 <span class="normal">92</span>
 <span class="normal">93</span>
 <span class="normal">94</span>
 <span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">96</span>
+<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A c_store function with preemptive index checking.</span>
 
 <span class="sd">    self.check returns the variable name of the computed index so</span>
-<span class="sd">    things don&#39;t get computed twice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    things don't get computed twice.</span>
+<span class="sd">    """</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">c_store</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_c_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="n">value</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6212,8 +6212,7 @@ get computed twice.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
-<span class="normal">136</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
@@ -6221,13 +6220,14 @@ get computed twice.</p>
 <span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span>
-<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A numba_load function with preemptive index checking.</span>
 
-<span class="sd">    self.numba_check returns the value of the computed index so things don&#39;t</span>
+<span class="sd">    self.numba_check returns the value of the computed index so things don't</span>
 <span class="sd">    get computed twice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">numba_load</span><span class="p">(</span>
         <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">numba_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
     <span class="p">)</span>
@@ -6255,8 +6255,7 @@ things don't get computed twice.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/safe_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
-<span class="normal">147</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
@@ -6264,13 +6263,14 @@ things don't get computed twice.</p>
 <span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
-<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">155</span>
+<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A numba_store function with preemptive index checking.</span>
 
 <span class="sd">    self.numba_check returns the variable name of the computed index so</span>
-<span class="sd">    things don&#39;t get computed twice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    things don't get computed twice.</span>
+<span class="sd">    """</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_underlying_format</span><span class="o">.</span><span class="n">numba_store</span><span class="p">(</span>
         <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">numba_check</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="n">value</span>
     <span class="p">)</span>

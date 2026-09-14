@@ -5314,9 +5314,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/executor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">15</span>
-<span class="normal">16</span>
-<span class="normal">17</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
@@ -5344,13 +5342,15 @@
 <span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
-<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_tensors</span><span class="p">(</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_tensors</span><span class="p">(</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">]]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Extracts tensors from logic plan, replacing them with aliases.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
     <span class="c1"># ids is a dictionary that has key value as memory_address : Alias</span>
     <span class="n">ids</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="nb">id</span><span class="p">(</span><span class="n">val</span><span class="p">):</span> <span class="n">key</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
@@ -5366,8 +5366,8 @@
                 <span class="k">if</span> <span class="nb">id</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">:</span>
                     <span class="n">var</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">tns</span><span class="p">)]</span>
                     <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
-                <span class="c1"># If we don&#39;t have an Alias for the tensor we just found we create one</span>
-                <span class="n">var</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">&quot;A&quot;</span><span class="p">))</span>
+                <span class="c1"># If we don't have an Alias for the tensor we just found we create one</span>
+                <span class="n">var</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span>
                 <span class="c1"># Updating the ids and bindings</span>
                 <span class="n">ids</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">tns</span><span class="p">)]</span> <span class="o">=</span> <span class="n">var</span>
                 <span class="n">bindings</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">tns</span>

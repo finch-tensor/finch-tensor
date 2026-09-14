@@ -5815,22 +5815,22 @@
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AbstractFill</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A tensor&#39;s fill value, and whether kernels may specialize on it.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A tensor's fill value, and whether kernels may specialize on it."""</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The dtype of the fill value, always known.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The dtype of the fill value, always known."""</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill value itself, always known.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The fill value itself, always known."""</span>
         <span class="o">...</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""This fill, marked so that kernels will not specialize on its value."""</span>
         <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -5913,7 +5913,7 @@
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DynamicFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;This fill, marked so that kernels will not specialize on its value.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""This fill, marked so that kernels will not specialize on its value."""</span>
     <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6004,13 +6004,13 @@ different <code>.value</code>'s.</p>
 <span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A fill value which kernels must not specialize on. The value is known and is</span>
 <span class="sd">    bound to the kernel at call time.</span>
 
 <span class="sd">    Equality and hashing are by dtype *only*, i.e. two equal `DynamicFill`s may have</span>
-<span class="sd">    different `.value`&#39;s.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    different `.value`'s.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
@@ -6046,7 +6046,7 @@ different <code>.value</code>'s.</p>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;DynamicFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"DynamicFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="si">!r}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6084,7 +6084,7 @@ different <code>.value</code>'s.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/exceptions.html#Exception">Exception</a></code></p>
+              Bases: <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/exceptions.html#Exception">Exception</a></code></p>
 
 
 
@@ -6107,11 +6107,11 @@ compilation.</p>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DynamicFillError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Raised when a fill value must be specialized on at compile time but the fill</span>
 <span class="sd">    is Dynamic. Callers may catch this to fall back to value-specialized</span>
 <span class="sd">    compilation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6145,13 +6145,7 @@ compilation.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
 <span class="normal">25</span>
 <span class="normal">26</span>
 <span class="normal">27</span>
@@ -6172,16 +6166,22 @@ compilation.</p>
 <span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
-<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span> <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="o">...</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">builtins</span><span class="o">.</span><span class="n">int</span><span class="p">:</span> <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Perform type conversion or construction with the given value.</span>
 
 <span class="sd">        For numeric/scalar types, this converts the value to this type.</span>
@@ -6192,13 +6192,13 @@ compilation.</p>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The converted/constructed value</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Check if `other` is an instance of this ftype.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6292,13 +6292,7 @@ For composite types, this may construct an instance of this type.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
@@ -6306,9 +6300,15 @@ For composite types, this may construct an instance of this type.</p>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Perform type conversion or construction with the given value.</span>
 
 <span class="sd">    For numeric/scalar types, this converts the value to this type.</span>
@@ -6319,7 +6319,7 @@ For composite types, this may construct an instance of this type.</p>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The converted/constructed value</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6343,14 +6343,14 @@ For composite types, this may construct an instance of this type.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Check if `other` is an instance of this ftype.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6392,28 +6392,28 @@ For composite types, this may construct an instance of this type.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">691</span>
-<span class="normal">692</span>
-<span class="normal">693</span>
-<span class="normal">694</span>
-<span class="normal">695</span>
-<span class="normal">696</span>
-<span class="normal">697</span>
-<span class="normal">698</span>
-<span class="normal">699</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">699</span>
 <span class="normal">700</span>
 <span class="normal">701</span>
-<span class="normal">702</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FTyped</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">702</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FTyped</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for objects that can be formatted.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        The ftype of the object.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6536,7 +6536,7 @@ For composite types, this may construct an instance of this type.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">return_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
         <span class="k">pass</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">is_distributive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other_op</span><span class="p">:</span> <span class="s2">&quot;FinchOperator&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_distributive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other_op</span><span class="p">:</span> <span class="s2">"FinchOperator"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">is_identity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -6546,15 +6546,15 @@ For composite types, this may construct an instance of this type.</p>
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">init_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2"> has no init_value&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2"> has no init_value"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">repeat_operator</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_idempotent</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2"> has no repeat_operator&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2"> has no repeat_operator"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__qual_str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return qualified string for printing/display purposes.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return qualified string for printing/display purposes."""</span>
         <span class="c1"># Display as just the lowercase name</span>
         <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6593,7 +6593,7 @@ For composite types, this may construct an instance of this type.</p>
 <span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">__qual_str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return qualified string for printing/display purposes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return qualified string for printing/display purposes."""</span>
     <span class="c1"># Display as just the lowercase name</span>
     <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -6639,19 +6639,19 @@ It is currently not used anywhere, but maybe it will be useful in the future?</p
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">780</span>
-<span class="normal">781</span>
-<span class="normal">782</span>
-<span class="normal">783</span>
-<span class="normal">784</span>
-<span class="normal">785</span>
-<span class="normal">786</span>
-<span class="normal">787</span>
-<span class="normal">788</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MutableStructFType</span><span class="p">(</span><span class="n">StructFType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">788</span>
+<span class="normal">789</span>
+<span class="normal">790</span>
+<span class="normal">791</span>
+<span class="normal">792</span>
+<span class="normal">793</span>
+<span class="normal">794</span>
+<span class="normal">795</span>
+<span class="normal">796</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MutableStructFType</span><span class="p">(</span><span class="n">StructFType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Class for a mutable struct type.</span>
 <span class="sd">    It is currently not used anywhere, but maybe it will be useful in the future?</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_mutable</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">:</span>
@@ -6758,11 +6758,11 @@ distinct kernels.</p>
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StaticFill</span><span class="p">(</span><span class="n">AbstractFill</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A fill value which kernels may specialize on. Equality and hashing are by</span>
 <span class="sd">    value, so ftypes carrying different static fills are distinct and get</span>
 <span class="sd">    distinct kernels.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
@@ -6781,7 +6781,7 @@ distinct kernels.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="c1"># Values are compared with `same` rather than `==` because of NaN.</span>
         <span class="c1"># ftypes filled with NaN must compare equal or they get separate</span>
-        <span class="c1"># kernels and fail each other&#39;s type checks. Imported lazily: `ffuncs`</span>
+        <span class="c1"># kernels and fail each other's type checks. Imported lazily: `ffuncs`</span>
         <span class="c1"># depends on this module.</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">.ffuncs</span><span class="w"> </span><span class="kn">import</span> <span class="n">same</span>
 
@@ -6804,7 +6804,7 @@ distinct kernels.</p>
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;StaticFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"StaticFill(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_value</span><span class="si">!r}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6855,15 +6855,7 @@ distinct kernels.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">705</span>
-<span class="normal">706</span>
-<span class="normal">707</span>
-<span class="normal">708</span>
-<span class="normal">709</span>
-<span class="normal">710</span>
-<span class="normal">711</span>
-<span class="normal">712</span>
-<span class="normal">713</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">713</span>
 <span class="normal">714</span>
 <span class="normal">715</span>
 <span class="normal">716</span>
@@ -6921,7 +6913,15 @@ distinct kernels.</p>
 <span class="normal">768</span>
 <span class="normal">769</span>
 <span class="normal">770</span>
-<span class="normal">771</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StructFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">771</span>
+<span class="normal">772</span>
+<span class="normal">773</span>
+<span class="normal">774</span>
+<span class="normal">775</span>
+<span class="normal">776</span>
+<span class="normal">777</span>
+<span class="normal">778</span>
+<span class="normal">779</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StructFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span>
             <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
@@ -6933,25 +6933,25 @@ distinct kernels.</p>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">fields_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">fields_str</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="n">fields_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">fields_str</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Construct a struct instance from the given fields.</span>
 
 <span class="sd">        Can be called with positional arguments matching struct_fields order,</span>
 <span class="sd">        or keyword arguments matching field names.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Cannot use both positional and keyword arguments&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Cannot use both positional and keyword arguments"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_fields</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">kwargs</span><span class="p">:</span>
             <span class="c1"># Convert kwargs to positional args in field order</span>
             <span class="n">field_values</span> <span class="o">=</span> <span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">]</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_fields</span><span class="p">(</span><span class="o">*</span><span class="n">field_values</span><span class="p">)</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;__call__ requires at least one argument&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"__call__ requires at least one argument"</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
@@ -7022,37 +7022,37 @@ or keyword arguments matching field names.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">720</span>
-<span class="normal">721</span>
-<span class="normal">722</span>
-<span class="normal">723</span>
-<span class="normal">724</span>
-<span class="normal">725</span>
-<span class="normal">726</span>
-<span class="normal">727</span>
-<span class="normal">728</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">728</span>
 <span class="normal">729</span>
 <span class="normal">730</span>
 <span class="normal">731</span>
 <span class="normal">732</span>
 <span class="normal">733</span>
 <span class="normal">734</span>
-<span class="normal">735</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct a struct instance from the given fields.</span>
 
 <span class="sd">    Can be called with positional arguments matching struct_fields order,</span>
 <span class="sd">    or keyword arguments matching field names.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">args</span> <span class="ow">and</span> <span class="n">kwargs</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Cannot use both positional and keyword arguments&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Cannot use both positional and keyword arguments"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_fields</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">kwargs</span><span class="p">:</span>
         <span class="c1"># Convert kwargs to positional args in field order</span>
         <span class="n">field_values</span> <span class="o">=</span> <span class="p">[</span><span class="n">kwargs</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">from_fields</span><span class="p">(</span><span class="o">*</span><span class="n">field_values</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;__call__ requires at least one argument&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"__call__ requires at least one argument"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7100,9 +7100,7 @@ advanced interfaces may be required for different backends.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
 <span class="normal">105</span>
@@ -7207,19 +7205,21 @@ advanced interfaces may be required for different backends.</p>
 <span class="normal">204</span>
 <span class="normal">205</span>
 <span class="normal">206</span>
-<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Tensor</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Tensor</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for tensor-like data structures. Tensors are</span>
 <span class="sd">    multi-dimensional arrays that can be used to represent data in various</span>
 <span class="sd">    formats. They support operations such as indexing, slicing, and reshaping,</span>
 <span class="sd">    and can be used in mathematical computations. This class provides the basic</span>
 <span class="sd">    interface for tensors to be used with lazy ops in Finch, though more</span>
 <span class="sd">    advanced interfaces may be required for different backends.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of dimensions of the tensor.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Number of dimensions of the tensor."""</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
 
     <span class="nd">@property</span>
@@ -7232,32 +7232,32 @@ advanced interfaces may be required for different backends.</p>
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;FType of the tensor, which may include metadata about the tensor.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""FType of the tensor, which may include metadata about the tensor."""</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The fill value for the tensor.  The fill value is the</span>
+<span class="w">        </span><span class="sd">"""The fill value for the tensor.  The fill value is the</span>
 <span class="sd">        default value for a tensor when it is created with a given shape and dtype,</span>
 <span class="sd">        as well as the background value for sparse tensors.</span>
 <span class="sd">        Note: this is the raw value NOT the AbstractFill.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        An equivalent tensor carrying `fill_value` as its fill.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The element type of the tensor.  The element type is the scalar type of</span>
+<span class="w">        </span><span class="sd">"""The element type of the tensor.  The element type is the scalar type of</span>
 <span class="sd">        the elements in a tensor, which may be different from the data type of the</span>
 <span class="sd">        tensor.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
@@ -7266,7 +7266,7 @@ advanced interfaces may be required for different backends.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">device</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;_device&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">"_device"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">device_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
@@ -7274,46 +7274,46 @@ advanced interfaces may be required for different backends.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_device</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">,</span> <span class="o">/</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">stream</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;stream argument is not supported; got </span><span class="si">{</span><span class="n">stream</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"stream argument is not supported; got </span><span class="si">{</span><span class="n">stream</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">device</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;device argument is not supported; got </span><span class="si">{</span><span class="n">device</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"device argument is not supported; got </span><span class="si">{</span><span class="n">device</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shape type of the tensor. The shape type is a tuple of the index</span>
-<span class="sd">        types in the tensor. It&#39;s the type of each element in tns.shape. It</span>
+<span class="w">        </span><span class="sd">"""Shape type of the tensor. The shape type is a tuple of the index</span>
+<span class="sd">        types in the tensor. It's the type of each element in tns.shape. It</span>
 <span class="sd">        should be an actual tuple, rather than a tupleftype, so that it can hold</span>
-<span class="sd">        e.g. dtypes, formats, or types, and so that we can easily index it.&quot;&quot;&quot;</span>
+<span class="sd">        e.g. dtypes, formats, or types, and so that we can easily index it."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">shape_type</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shape of the tensor.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Shape of the tensor."""</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Return the Python scalar stored in a zero-dimensional tensor.</span>
 
 <span class="sd">        Indexing tensor objects must keep returning tensor-like values, including for</span>
 <span class="sd">        zero-dimensional results. `item()` is the explicit escape hatch for code that</span>
 <span class="sd">        needs the underlying Python scalar value. Implementations should raise</span>
 <span class="sd">        `ValueError` when called on a non-scalar tensor.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the tensor to a NumPy representation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Convert the tensor to a NumPy representation."""</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the tensor to a SciPy sparse representation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Convert the tensor to a SciPy sparse representation."""</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7497,9 +7497,7 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
@@ -7507,16 +7505,18 @@ needs the underlying Python scalar value. Implementations should raise
 <span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
-<span class="normal">197</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the Python scalar stored in a zero-dimensional tensor.</span>
 
 <span class="sd">    Indexing tensor objects must keep returning tensor-like values, including for</span>
 <span class="sd">    zero-dimensional results. `item()` is the explicit escape hatch for code that</span>
 <span class="sd">    needs the underlying Python scalar value. Implementations should raise</span>
 <span class="sd">    `ValueError` when called on a non-scalar tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7544,12 +7544,12 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the tensor to a NumPy representation.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Convert the tensor to a NumPy representation."""</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7577,12 +7577,12 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the tensor to a SciPy sparse representation.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Convert the tensor to a SciPy sparse representation."""</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7606,18 +7606,18 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">139</span>
 <span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An equivalent tensor carrying `fill_value` as its fill.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value&quot;</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7659,8 +7659,7 @@ needs the underlying Python scalar value. Implementations should raise
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
-<span class="normal">31</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
@@ -7726,37 +7725,40 @@ needs the underlying Python scalar value. Implementations should raise
 <span class="normal">94</span>
 <span class="normal">95</span>
 <span class="normal">96</span>
-<span class="normal">97</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">97</span>
+<span class="normal">98</span>
+<span class="normal">99</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorFType</span><span class="p">(</span><span class="n">FType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of dimensions of the tensor.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Number of dimensions of the tensor."""</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">size</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-            <span class="n">size</span> <span class="o">*=</span> <span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">size</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"TensorFType does not have a shape."</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">*</span> <span class="nb">int</span><span class="p">(</span><span class="n">y</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;AbstractFill value of the tensor, either static or dynamic.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""AbstractFill value of the tensor, either static or dynamic."""</span>
         <span class="o">...</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        This ftype carrying `fill_value` as its fill.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value&quot;</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Data type of the tensor elements.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Data type of the tensor elements."""</span>
         <span class="o">...</span>
 
     <span class="nd">@property</span>
@@ -7774,22 +7776,22 @@ needs the underlying Python scalar value. Implementations should raise
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Shape type of the tensor. The shape type is a tuple of the index</span>
-<span class="sd">        types in the tensor. It&#39;s the type of each element in tns.shape. It</span>
+<span class="w">        </span><span class="sd">"""Shape type of the tensor. The shape type is a tuple of the index</span>
+<span class="sd">        types in the tensor. It's the type of each element in tns.shape. It</span>
 <span class="sd">        should be an actual tuple, rather than a tuple type, so that it can hold</span>
-<span class="sd">        e.g. dtypes, formats, or types, and so that we can easily index it.&quot;&quot;&quot;</span>
+<span class="sd">        e.g. dtypes, formats, or types, and so that we can easily index it."""</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Create a tensor instance with the given shape.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            shape: The shape of the tensor to create.</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            A tensor instance with the specified shape.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 
     <span class="nd">@abstractmethod</span>
@@ -7938,7 +7940,7 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
                 <code>shape</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -7957,9 +7959,7 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">86</span>
 <span class="normal">87</span>
 <span class="normal">88</span>
 <span class="normal">89</span>
@@ -7967,16 +7967,18 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 <span class="normal">91</span>
 <span class="normal">92</span>
 <span class="normal">93</span>
-<span class="normal">94</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">94</span>
+<span class="normal">95</span>
+<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Create a tensor instance with the given shape.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        shape: The shape of the tensor to create.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A tensor instance with the specified shape.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8000,18 +8002,18 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
-<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    This ftype carrying `fill_value` as its fill.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value&quot;</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8055,15 +8057,7 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">791</span>
-<span class="normal">792</span>
-<span class="normal">793</span>
-<span class="normal">794</span>
-<span class="normal">795</span>
-<span class="normal">796</span>
-<span class="normal">797</span>
-<span class="normal">798</span>
-<span class="normal">799</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">799</span>
 <span class="normal">800</span>
 <span class="normal">801</span>
 <span class="normal">802</span>
@@ -8140,26 +8134,46 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 <span class="normal">873</span>
 <span class="normal">874</span>
 <span class="normal">875</span>
-<span class="normal">876</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TupleFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FDType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;FType for Python tuples, with a struct-compatible interface.&quot;&quot;&quot;</span>
+<span class="normal">876</span>
+<span class="normal">877</span>
+<span class="normal">878</span>
+<span class="normal">879</span>
+<span class="normal">880</span>
+<span class="normal">881</span>
+<span class="normal">882</span>
+<span class="normal">883</span>
+<span class="normal">884</span>
+<span class="normal">885</span>
+<span class="normal">886</span>
+<span class="normal">887</span>
+<span class="normal">888</span>
+<span class="normal">889</span>
+<span class="normal">890</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TupleFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FDType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""FType for Python tuples, with a struct-compatible interface."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">struct_types</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_struct_types</span> <span class="o">=</span> <span class="n">struct_types</span>
 
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dtype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span>
+            <span class="p">[(</span><span class="n">name</span><span class="p">,</span> <span class="n">np_dtype</span><span class="p">(</span><span class="n">field_type</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">]</span>
+        <span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;TupleFType((</span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">repr</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">_struct_types</span><span class="p">))</span><span class="si">}</span><span class="s2">,))&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"TupleFType((</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">repr</span><span class="p">,</span><span class="w"> </span><span class="bp">self</span><span class="o">.</span><span class="n">_struct_types</span><span class="p">))</span><span class="si">}</span><span class="s2">,))"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">fields_str</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">fields_str</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="n">fields_str</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">type_</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">type_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">struct_fields</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_name</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">fields_str</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;tuple&quot;</span>
+        <span class="k">return</span> <span class="s2">"tuple"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">[(</span><span class="sa">f</span><span class="s2">&quot;element_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">fmt</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">fmt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_struct_types</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="sa">f</span><span class="s2">"element_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">fmt</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">fmt</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_struct_types</span><span class="p">)]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fieldnames</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
@@ -8173,7 +8187,7 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">TupleFType</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">struct_fieldtypes</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">struct_fieldtypes</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Tuple operands must have the same length.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Tuple operands must have the same length."</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">TupleFType</span><span class="o">.</span><span class="n">from_tuple</span><span class="p">(</span>
             <span class="nb">tuple</span><span class="p">(</span>
                 <span class="n">promote_type</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">other_type</span><span class="p">)</span>
@@ -8220,11 +8234,11 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
     <span class="nd">@staticmethod</span>
     <span class="nd">@lru_cache</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_tuple</span><span class="p">(</span><span class="n">types</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;TupleFType&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_tuple</span><span class="p">(</span><span class="n">types</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TupleFType</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">types</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;TupleFType.from_tuple expects tuple[FType, ...]&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"TupleFType.from_tuple expects tuple[FType, ...]"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">FType</span><span class="p">)</span> <span class="k">for</span> <span class="n">type_</span> <span class="ow">in</span> <span class="n">types</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;TupleFType.from_tuple expects tuple[FType, ...]&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"TupleFType.from_tuple expects tuple[FType, ...]"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">TupleFType</span><span class="p">(</span><span class="n">types</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8297,7 +8311,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_fill</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">fills</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compute the fill value of mapping `op` over tensors with fills `fills`.</span>
 
 <span class="sd">    A fill stays static only while its value is one the algebra can act on.</span>
@@ -8305,7 +8319,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="sd">    walks a fill through 1, 2, 3, ... -- and a static fill is compared by</span>
 <span class="sd">    value, so keeping those static would key a kernel per distinct value and</span>
 <span class="sd">    make a loop cost a compilation per iteration.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Imported lazily: `algebra` depends on this module.</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">.algebra</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_specializable_value</span>
 
@@ -8348,7 +8362,7 @@ make a loop cost a compilation per iteration.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">as_fill</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fill</span><span class="p">,</span> <span class="n">AbstractFill</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">fill</span>
     <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
@@ -8403,17 +8417,17 @@ a pointwise operator <code>y</code>.</p>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cansplitpush</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Return True if a reduction with operator `x` can be &#39;split-pushed&#39; through</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Return True if a reduction with operator `x` can be 'split-pushed' through</span>
 <span class="sd">    a pointwise operator `y`.</span>
 
 <span class="sd">    We allow split-push when:</span>
 <span class="sd">      - x has a known repeat operator (repeat_operator(x) is not None),</span>
 <span class="sd">      - x and y are the same operator,</span>
 <span class="sd">      - and x is both commutative and associative.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">callable</span><span class="p">(</span><span class="n">y</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t check splitpush of non-callable operators!&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Can't check splitpush of non-callable operators!"</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">repeat_operator</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -8443,14 +8457,14 @@ a pointwise operator <code>y</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">927</span>
-<span class="normal">928</span>
-<span class="normal">929</span>
-<span class="normal">930</span>
-<span class="normal">931</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">941</span>
+<span class="normal">942</span>
+<span class="normal">943</span>
+<span class="normal">944</span>
+<span class="normal">945</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">f</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Check if `x` is an instance of `f`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">f</span><span class="o">.</span><span class="n">fisinstance</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8579,7 +8593,7 @@ a pointwise operator <code>y</code>.</p>
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fixpoint_type</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Determines the fixpoint type after repeated calling the given operation.</span>
 
 <span class="sd">    Args:</span>
@@ -8589,7 +8603,7 @@ a pointwise operator <code>y</code>.</p>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The fixpoint type.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">s</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="n">z_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
     <span class="n">r</span> <span class="o">=</span> <span class="n">z_type</span>
@@ -8610,6 +8624,14 @@ a pointwise operator <code>y</code>.</p>
             <code class="highlight language-python"><span class="n">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span></code>
 
 </h2>
+          <div class="doc-overloads">
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TupleFType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">NumpyBuffer</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NumpyBufferFType</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FDTypeInteger</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">FT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FT</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span>
+</code></pre></div>          </div>
 
 
     <div class="doc doc-contents ">
@@ -8621,48 +8643,7 @@ Override .ftype to customize the ftype of an object.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 964</span>
-<span class="normal"> 965</span>
-<span class="normal"> 966</span>
-<span class="normal"> 967</span>
-<span class="normal"> 968</span>
-<span class="normal"> 969</span>
-<span class="normal"> 970</span>
-<span class="normal"> 971</span>
-<span class="normal"> 972</span>
-<span class="normal"> 973</span>
-<span class="normal"> 974</span>
-<span class="normal"> 975</span>
-<span class="normal"> 976</span>
-<span class="normal"> 977</span>
-<span class="normal"> 978</span>
-<span class="normal"> 979</span>
-<span class="normal"> 980</span>
-<span class="normal"> 981</span>
-<span class="normal"> 982</span>
-<span class="normal"> 983</span>
-<span class="normal"> 984</span>
-<span class="normal"> 985</span>
-<span class="normal"> 986</span>
-<span class="normal"> 987</span>
-<span class="normal"> 988</span>
-<span class="normal"> 989</span>
-<span class="normal"> 990</span>
-<span class="normal"> 991</span>
-<span class="normal"> 992</span>
-<span class="normal"> 993</span>
-<span class="normal"> 994</span>
-<span class="normal"> 995</span>
-<span class="normal"> 996</span>
-<span class="normal"> 997</span>
-<span class="normal"> 998</span>
-<span class="normal"> 999</span>
-<span class="normal">1000</span>
-<span class="normal">1001</span>
-<span class="normal">1002</span>
-<span class="normal">1003</span>
-<span class="normal">1004</span>
-<span class="normal">1005</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1005</span>
 <span class="normal">1006</span>
 <span class="normal">1007</span>
 <span class="normal">1008</span>
@@ -8697,11 +8678,52 @@ Override .ftype to customize the ftype of an object.</p>
 <span class="normal">1037</span>
 <span class="normal">1038</span>
 <span class="normal">1039</span>
-<span class="normal">1040</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the corresponding FType for a given object.  Recognizes numpy,</span>
+<span class="normal">1040</span>
+<span class="normal">1041</span>
+<span class="normal">1042</span>
+<span class="normal">1043</span>
+<span class="normal">1044</span>
+<span class="normal">1045</span>
+<span class="normal">1046</span>
+<span class="normal">1047</span>
+<span class="normal">1048</span>
+<span class="normal">1049</span>
+<span class="normal">1050</span>
+<span class="normal">1051</span>
+<span class="normal">1052</span>
+<span class="normal">1053</span>
+<span class="normal">1054</span>
+<span class="normal">1055</span>
+<span class="normal">1056</span>
+<span class="normal">1057</span>
+<span class="normal">1058</span>
+<span class="normal">1059</span>
+<span class="normal">1060</span>
+<span class="normal">1061</span>
+<span class="normal">1062</span>
+<span class="normal">1063</span>
+<span class="normal">1064</span>
+<span class="normal">1065</span>
+<span class="normal">1066</span>
+<span class="normal">1067</span>
+<span class="normal">1068</span>
+<span class="normal">1069</span>
+<span class="normal">1070</span>
+<span class="normal">1071</span>
+<span class="normal">1072</span>
+<span class="normal">1073</span>
+<span class="normal">1074</span>
+<span class="normal">1075</span>
+<span class="normal">1076</span>
+<span class="normal">1077</span>
+<span class="normal">1078</span>
+<span class="normal">1079</span>
+<span class="normal">1080</span>
+<span class="normal">1081</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the corresponding FType for a given object.  Recognizes numpy,</span>
 <span class="sd">    Python builtins, and Python tuples.  Sometimes recognizes types.</span>
 <span class="sd">    Override .ftype to customize the ftype of an object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">FType</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">x</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">FTyped</span><span class="p">):</span>
@@ -8767,7 +8789,7 @@ Override .ftype to customize the ftype of an object.</p>
         <span class="k">return</span> <span class="n">none_</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
         <span class="n">T</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="s2">&quot;_fields&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">T</span><span class="o">.</span><span class="n">_fields</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="s2">"_fields"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">T</span><span class="o">.</span><span class="n">_fields</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">NamedTupleFType</span><span class="p">(</span>
                 <span class="n">T</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                 <span class="p">[(</span><span class="n">fieldname</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fieldname</span><span class="p">)))</span> <span class="k">for</span> <span class="n">fieldname</span> <span class="ow">in</span> <span class="n">T</span><span class="o">.</span><span class="n">_fields</span><span class="p">],</span>
@@ -8806,10 +8828,10 @@ annihilator rule can fire against it; see <code>SPECIALIZABLE_VALUES</code>.</p>
 <span class="normal">89</span>
 <span class="normal">90</span>
 <span class="normal">91</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_specializable_value</span><span class="p">(</span><span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    A constant is only worth specializing on if some operator&#39;s identity or</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    A constant is only worth specializing on if some operator's identity or</span>
 <span class="sd">    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">val</span> <span class="o">==</span> <span class="n">candidate</span><span class="p">)</span> <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">SPECIALIZABLE_VALUES</span><span class="p">)</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
@@ -8836,21 +8858,7 @@ annihilator rule can fire against it; see <code>SPECIALIZABLE_VALUES</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">934</span>
-<span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span>
-<span class="normal">938</span>
-<span class="normal">939</span>
-<span class="normal">940</span>
-<span class="normal">941</span>
-<span class="normal">942</span>
-<span class="normal">943</span>
-<span class="normal">944</span>
-<span class="normal">945</span>
-<span class="normal">946</span>
-<span class="normal">947</span>
-<span class="normal">948</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">948</span>
 <span class="normal">949</span>
 <span class="normal">950</span>
 <span class="normal">951</span>
@@ -8863,33 +8871,47 @@ annihilator rule can fire against it; see <code>SPECIALIZABLE_VALUES</code>.</p>
 <span class="normal">958</span>
 <span class="normal">959</span>
 <span class="normal">960</span>
-<span class="normal">961</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">isdtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">kind</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">961</span>
+<span class="normal">962</span>
+<span class="normal">963</span>
+<span class="normal">964</span>
+<span class="normal">965</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span>
+<span class="normal">969</span>
+<span class="normal">970</span>
+<span class="normal">971</span>
+<span class="normal">972</span>
+<span class="normal">973</span>
+<span class="normal">974</span>
+<span class="normal">975</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">isdtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">kind</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Check if a dtype belongs to an Array API dtype kind.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">dtype</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">isdtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">kind</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">kind</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">kind</span><span class="p">:</span>
-            <span class="k">case</span> <span class="s2">&quot;bool&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"bool"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">(</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">bool</span><span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;signed integer&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"signed integer"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeSignedInteger</span><span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;unsigned integer&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"unsigned integer"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeUnsignedInteger</span><span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;integral&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"integral"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeInteger</span><span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;real floating&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"real floating"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeFloat</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
                     <span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeComplex</span>
                 <span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;complex floating&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"complex floating"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeComplex</span><span class="p">)</span>
-            <span class="k">case</span> <span class="s2">&quot;numeric&quot;</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"numeric"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dtype</span><span class="p">,</span> <span class="n">FDTypeNumeric</span><span class="p">)</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized dtype kind: </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized dtype kind: </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">builtins</span><span class="o">.</span><span class="n">bool</span><span class="p">(</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">ftype</span><span class="p">(</span><span class="n">kind</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8984,19 +9006,7 @@ which both type1 and type2 may be safely cast.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/ftypes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">71</span>
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
@@ -9005,8 +9015,20 @@ which both type1 and type2 may be safely cast.</p>
 <span class="normal">77</span>
 <span class="normal">78</span>
 <span class="normal">79</span>
-<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">promote_type</span><span class="p">(</span><span class="n">T1</span><span class="p">:</span> <span class="n">FDType</span><span class="p">,</span> <span class="n">T2</span><span class="p">:</span> <span class="n">FDType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FDType</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">promote_type</span><span class="p">(</span><span class="n">T1</span><span class="p">:</span> <span class="n">FDType</span><span class="p">,</span> <span class="n">T2</span><span class="p">:</span> <span class="n">FDType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FDType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Returns the data type with the smallest size and smallest scalar kind to</span>
 <span class="sd">    which both type1 and type2 may be safely cast.</span>
 
@@ -9016,17 +9038,17 @@ which both type1 and type2 may be safely cast.</p>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The common type of the given arguments.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">T1</span> <span class="o">==</span> <span class="n">T2</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">T1</span>
     <span class="n">S1</span> <span class="o">=</span> <span class="n">T1</span><span class="o">.</span><span class="n">__promote__</span><span class="p">(</span><span class="n">T2</span><span class="p">)</span>
     <span class="n">S2</span> <span class="o">=</span> <span class="n">T2</span><span class="o">.</span><span class="n">__promote__</span><span class="p">(</span><span class="n">T1</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">S1</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">assert</span> <span class="n">S1</span> <span class="o">==</span> <span class="n">S2</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Promotion of </span><span class="si">{</span><span class="n">T1</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">T2</span><span class="si">}</span><span class="s2"> is not consistent: </span><span class="si">{</span><span class="n">S1</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="n">S2</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">assert</span> <span class="n">S1</span> <span class="o">==</span> <span class="n">S2</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Promotion of </span><span class="si">{</span><span class="n">T1</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">T2</span><span class="si">}</span><span class="s2"> is not consistent: </span><span class="si">{</span><span class="n">S1</span><span class="si">}</span><span class="s2"> vs </span><span class="si">{</span><span class="n">S2</span><span class="si">}</span><span class="s2">"</span>
         <span class="k">return</span> <span class="n">S1</span>
     <span class="k">if</span> <span class="n">S2</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">S2</span>
-    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot promote types </span><span class="si">{</span><span class="n">T1</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">T2</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot promote types </span><span class="si">{</span><span class="n">T1</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">T2</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -9058,11 +9080,11 @@ then return g.</p>
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">repeat_operator</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    If there exists an operator g such that</span>
 <span class="sd">    f(x, x, ..., x)  (n times)  is equal to g(x, n),</span>
 <span class="sd">    then return g.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">op</span><span class="o">.</span><span class="n">repeat_operator</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>

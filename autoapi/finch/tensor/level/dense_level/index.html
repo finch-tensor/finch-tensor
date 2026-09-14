@@ -5504,7 +5504,12 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="Level (finch.tensor.level.level.Level)" href="../level/#finch.tensor.level.level.Level">Level</a></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="SingleDimensionLevel
+
+
+  
+      dataclass
+   (finch.tensor.level.level.SingleDimensionLevel)" href="../level/#finch.tensor.level.level.SingleDimensionLevel">SingleDimensionLevel</a></code></p>
 
 
 
@@ -5519,7 +5524,8 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/dense_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">229</span>
+<span class="normal">230</span>
 <span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
@@ -5547,14 +5553,11 @@
 <span class="normal">255</span>
 <span class="normal">256</span>
 <span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="normal">258</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing dense level.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
     <span class="n">dimension</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span>
@@ -5572,16 +5575,14 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevelFType</span><span class="p">:</span>
-        <span class="c1"># mypy does not understand that dataclasses generate __hash__ and __eq__</span>
-        <span class="c1"># https://github.com/python/mypy/issues/19799</span>
-        <span class="k">return</span> <span class="n">DenseLevelFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">))</span>  <span class="c1"># type: ignore[abstract]</span>
+        <span class="k">return</span> <span class="n">DenseLevelFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">val</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">val</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;DenseLevel(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">, dim=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"DenseLevel(lvl=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="si">}</span><span class="s2">, dim=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5623,7 +5624,7 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="LevelFType (finch.tensor.level.level.LevelFType)" href="../level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
+              Bases: <code><span title="finch.tensor.level.level.SingleDimensionLevelFType">SingleDimensionLevelFType</span></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
 
 
 
@@ -5838,22 +5839,21 @@
 <span class="normal">219</span>
 <span class="normal">220</span>
 <span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+<span class="normal">222</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
-    <span class="n">dimension_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
+    <span class="n">dimension_type</span><span class="p">:</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeInteger</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;DenseLevelFType&quot;</span>
+        <span class="k">return</span> <span class="s2">"DenseLevelFType"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span>
-            <span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;dimension&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">&quot;stride&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"lvl"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"dimension"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"stride"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
         <span class="p">]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
@@ -5864,14 +5864,14 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates an instance of DenseLevel with the given ftype.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            shape: The shape to be used for the level. (mandatory)</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            An instance of DenseLevel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span>
             <span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span>
@@ -5880,20 +5880,20 @@
         <span class="k">return</span> <span class="n">DenseLevel</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Convert a level to this dense level type.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            val: A value to convert to this type.</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            A DenseLevel instance of this type.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates an instance of DenseLevel with the given shape.</span>
 
 <span class="sd">        Args:</span>
@@ -5901,12 +5901,12 @@
 <span class="sd">            val: Value to pass to ElementLevel.</span>
 <span class="sd">        Returns:</span>
 <span class="sd">            An instance of DenseLevel.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">val</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">DenseLevel</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;DenseLevelFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"DenseLevelFType(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5918,23 +5918,23 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of elements stored in the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of the shape of the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">shape_type</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">position_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of positions within the levels.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">position_type</span>
 
     <span class="nd">@property</span>
@@ -5943,9 +5943,9 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">buffer_factory</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the ftype of the buffer used for the fibers.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">buffer_factory</span>
 
     <span class="nd">@property</span>
@@ -5955,56 +5955,55 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">level_format_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="n">Dense</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))]</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_format_properties</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;dimension&quot;</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_dim</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">r</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">r</span> <span class="o">-</span> <span class="mi">1</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_freeze</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_thaw</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;lvl&quot;</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;DenseLevelFType does not support level_lower_increment.&quot;</span>
+            <span class="s2">"DenseLevelFType does not support level_lower_increment."</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="s2">&quot;DenseLevelFType does not support level_lower_unwrap.&quot;</span>
+            <span class="s2">"DenseLevelFType does not support level_lower_unwrap."</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">ctx</span><span class="p">:</span> <span class="n">AssemblyContext</span><span class="p">,</span>
-        <span class="n">fiber</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span>
+        <span class="n">lvl</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span>
         <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span>
         <span class="n">mode</span><span class="p">,</span>
         <span class="n">proto</span><span class="p">,</span>
         <span class="n">pos</span><span class="p">:</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyExpression</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="n">tns</span> <span class="o">=</span> <span class="n">fiber</span>
-        <span class="n">ft_ftype</span><span class="p">:</span> <span class="n">FiberTensorFType</span> <span class="o">=</span> <span class="n">fiber</span><span class="o">.</span><span class="n">type</span>
-        <span class="n">lvl</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
+        <span class="n">ft_ftype</span><span class="p">:</span> <span class="n">FiberTensorFType</span> <span class="o">=</span> <span class="n">lvl</span><span class="o">.</span><span class="n">type</span>
+        <span class="n">fiber</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">fiber_level</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">child_accessor</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">LoopletContext</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">idx</span><span class="o">.</span><span class="n">type_</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected loop variable type for </span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected loop variable type for </span><span class="si">{</span><span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="n">pos_2</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
-                <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;_pos_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
+                <span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"_pos_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">"</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
             <span class="p">)</span>
             <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
                 <span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span>
@@ -6016,7 +6015,7 @@
                             <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
                                 <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">mul</span><span class="p">),</span>
                                 <span class="p">(</span>
-                                    <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">&quot;stride&quot;</span><span class="p">)),</span>
+                                    <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">fiber</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"stride"</span><span class="p">)),</span>
                                     <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
                                         <span class="n">idx</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">idx</span><span class="o">.</span><span class="n">type_</span>
                                     <span class="p">),</span>  <span class="c1"># TODO: lower with ctx.ctx</span>
@@ -6028,11 +6027,11 @@
             <span class="p">)</span>
             <span class="n">child_type</span> <span class="o">=</span> <span class="n">FiberTensorFType</span><span class="p">(</span><span class="n">ft_ftype</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">)</span>  <span class="c1"># type: ignore[abstract]</span>
             <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span>
-                <span class="n">tns</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">tns</span><span class="o">.</span><span class="n">lvl</span><span class="p">),</span>
+                <span class="n">lvl</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
+                <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">lvl</span><span class="o">.</span><span class="n">lvl</span><span class="p">),</span>
                 <span class="n">pos_2</span><span class="p">,</span>
                 <span class="n">child_type</span><span class="p">,</span>
-                <span class="p">(</span><span class="o">*</span><span class="n">tns</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span>
+                <span class="p">(</span><span class="o">*</span><span class="n">lvl</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">lplt</span><span class="o">.</span><span class="n">Lookup</span><span class="p">(</span>
@@ -6208,16 +6207,16 @@
 <span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this dense level type.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        val: A value to convert to this type.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        A DenseLevel instance of this type.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="sa">f</span><span class="s2">"Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6255,7 +6254,7 @@
                 <code>shape</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6289,14 +6288,14 @@
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of DenseLevel with the given ftype.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        shape: The shape to be used for the level. (mandatory)</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        An instance of DenseLevel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span>
         <span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span>
@@ -6339,7 +6338,7 @@
                 <code>shape</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a>, ...]</code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -6386,7 +6385,7 @@
 <span class="normal">82</span>
 <span class="normal">83</span>
 <span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of DenseLevel with the given shape.</span>
 
 <span class="sd">    Args:</span>
@@ -6394,7 +6393,7 @@
 <span class="sd">        val: Value to pass to ElementLevel.</span>
 <span class="sd">    Returns:</span>
 <span class="sd">        An instance of DenseLevel.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">lvl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">val</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">DenseLevel</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
 </code></pre></div></td></tr></table></div>

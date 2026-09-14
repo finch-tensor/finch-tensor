@@ -5457,7 +5457,7 @@
                 <summary>Source code in <code>src/finch/tensor/traits.py</code></summary>
                 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 9</span>
 <span class="normal">10</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AccessCapability</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Marker for a way a level can be read or written.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Marker for a way a level can be read or written."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5508,10 +5508,10 @@ occurs together with a subsequent non-fill slice.</p>
 <span class="normal">44</span>
 <span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Blocked</span><span class="p">(</span><span class="n">FormatProperty</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Each non-fill slice at an odd position along the conclusion dimensions</span>
 <span class="sd">    occurs together with a subsequent non-fill slice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">hypothesis_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="n">conclusion_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -5584,12 +5584,12 @@ these dimensions.</p>
 <span class="normal">33</span>
 <span class="normal">34</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Dense</span><span class="p">(</span><span class="n">FormatProperty</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Every slice identified by ``dims`` contains a non-fill value.</span>
 
-<span class="sd">    Equivalently, the tensor&#39;s non-fill support has a complete projection onto</span>
+<span class="sd">    Equivalently, the tensor's non-fill support has a complete projection onto</span>
 <span class="sd">    these dimensions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
@@ -5644,7 +5644,7 @@ these dimensions.</p>
                 <summary>Source code in <code>src/finch/tensor/traits.py</code></summary>
                 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
 <span class="normal">22</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormatProperty</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Marker for a structural property exposed by a tensor format.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Marker for a structural property exposed by a tensor format."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5682,7 +5682,7 @@ these dimensions.</p>
                 <summary>Source code in <code>src/finch/tensor/traits.py</code></summary>
                 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Random</span><span class="p">(</span><span class="n">AccessCapability</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The level supports direct access by index.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The level supports direct access by index."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5733,10 +5733,10 @@ with an subsequent identical slice.</p>
 <span class="normal">55</span>
 <span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Repeated</span><span class="p">(</span><span class="n">FormatProperty</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Each slice at an odd position along the conclusion dimension occurs together</span>
 <span class="sd">    with an subsequent identical slice.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">hypothesis_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="n">conclusion_dims</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -5794,7 +5794,7 @@ with an subsequent identical slice.</p>
                 <summary>Source code in <code>src/finch/tensor/traits.py</code></summary>
                 <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
 <span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Sequential</span><span class="p">(</span><span class="n">AccessCapability</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The level supports ordered traversal.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The level supports ordered traversal."""</span>
 </code></pre></div></td></tr></table></div>
               </details>
 

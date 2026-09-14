@@ -6501,7 +6501,8 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">231</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
+<span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
 <span class="normal">234</span>
@@ -6523,13 +6524,12 @@
 <span class="normal">250</span>
 <span class="normal">251</span>
 <span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Access</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression representing the value of tensor `tns` at the indices</span>
 <span class="sd">    `idx...`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">mode</span><span class="p">:</span> <span class="n">AccessMode</span>
@@ -6598,7 +6598,9 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
@@ -6621,9 +6623,7 @@
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AccessFType</span><span class="p">(</span><span class="n">FType</span><span class="p">):</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AccessFType</span><span class="p">(</span><span class="n">FType</span><span class="p">):</span>
     <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
@@ -6639,15 +6639,15 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the element type of the access ftype.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Convert `val` the way the accessed tensor&#39;s type would.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Convert `val` the way the accessed tensor's type would.</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6703,14 +6703,14 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">201</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Convert `val` the way the accessed tensor&#39;s type would.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Convert `val` the way the accessed tensor's type would.</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6763,13 +6763,13 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AccessMode</span><span class="p">(</span><span class="n">NotationNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AccessMode</span><span class="p">(</span><span class="n">NotationNode</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST node representing the access mode of a tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6844,9 +6844,9 @@
 <span class="normal">400</span>
 <span class="normal">401</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Assign</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that defines `lhs` as having the value `rhs`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">NotationExpression</span>
@@ -6931,9 +6931,9 @@
 <span class="normal">580</span>
 <span class="normal">581</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Block</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that executes each of its arguments in turn.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">bodies</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
@@ -7029,13 +7029,13 @@ properties about it.</p>
 <span class="normal">341</span>
 <span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Cached</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression `arg`, equivalent to the quoted expression `ref`.</span>
 
 <span class="sd">    Often used after the compiler caches the computation `ref` into a variable</span>
 <span class="sd">    `arg`, but we still wish to refer to the original expression to prove</span>
 <span class="sd">    properties about it.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">arg</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">ref</span><span class="p">:</span> <span class="n">NotationExpression</span>
@@ -7114,7 +7114,10 @@ properties about it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
@@ -7133,21 +7136,20 @@ properties about it.</p>
 <span class="normal">166</span>
 <span class="normal">167</span>
 <span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Call</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationExpression</span><span class="p">,</span> <span class="n">CallTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression for the result of calling the function `op` on</span>
 <span class="sd">    `args...`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
+    <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span> <span class="o">|</span> <span class="n">Variable</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
         <span class="n">arg_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">result_type</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="p">,</span> <span class="n">Literal</span><span class="p">)</span>  <span class="c1"># TODO: handle Variable</span>
         <span class="k">return</span> <span class="n">return_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">,</span> <span class="o">*</span><span class="n">arg_types</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
@@ -7227,12 +7229,12 @@ properties about it.</p>
 <span class="normal">423</span>
 <span class="normal">424</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Child</span><span class="p">(</span><span class="n">Cursor</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A child level reached from another cursor path.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">parent</span><span class="p">:</span> <span class="n">Cursor</span>
-    <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lvl&quot;</span>
+    <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"lvl"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7298,9 +7300,9 @@ properties about it.</p>
 <span class="normal">405</span>
 <span class="normal">406</span>
 <span class="normal">407</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Cursor</span><span class="p">(</span><span class="n">NotationNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    A cursor path into a tensor&#39;s level tree.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    A cursor path into a tensor's level tree.</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7386,10 +7388,10 @@ with <code>op</code> in the current scope.</p>
 <span class="normal">533</span>
 <span class="normal">534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Declare</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that declares `tns` with an initial value `init` reduced</span>
 <span class="sd">    with `op` in the current scope.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">init</span><span class="p">:</span> <span class="n">Literal</span>
@@ -7402,9 +7404,9 @@ with <code>op</code> in the current scope.</p>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Creates a Declare node from its children.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7449,9 +7451,9 @@ with <code>op</code> in the current scope.</p>
 <span class="normal">533</span>
 <span class="normal">534</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates a Declare node from its children.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7505,7 +7507,9 @@ rank <code>r</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
 <span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
@@ -7524,20 +7528,20 @@ rank <code>r</code>.</p>
 <span class="normal">224</span>
 <span class="normal">225</span>
 <span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Dimension</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression representing the dimension of tensor `tns` in</span>
 <span class="sd">    rank `r`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">r</span><span class="p">:</span> <span class="n">Literal</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="o">.</span><span class="n">val</span><span class="p">]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tns</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">r</span><span class="o">.</span><span class="n">val</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
@@ -7624,9 +7628,9 @@ rank <code>r</code>.</p>
 <span class="normal">441</span>
 <span class="normal">442</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Fiber</span><span class="p">(</span><span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A lowering cursor for fiber-tree access.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">root</span><span class="p">:</span> <span class="n">Any</span>
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Cursor</span>
@@ -7714,10 +7718,10 @@ modifications with <code>op</code>.</p>
 <span class="normal">548</span>
 <span class="normal">549</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Freeze</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that freezes `tns` in the current scope after</span>
 <span class="sd">    modifications with `op`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
@@ -7804,7 +7808,7 @@ return type of this function.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_notation.nodes.Function.args">args</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Variable
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Variable
 
 
   
@@ -7875,7 +7879,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="normal">610</span>
 <span class="normal">611</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Function</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a logical AST statement that defines a function `fun` on the</span>
 <span class="sd">    arguments `args...`.</span>
 
@@ -7885,7 +7889,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="sd">        args: The arguments to the function.</span>
 <span class="sd">        body: The body of the function. If it does not contain a return statement,</span>
 <span class="sd">            the function returns the value of `body`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Variable</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
@@ -7893,12 +7897,12 @@ the function returns the value of <code>body</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">args_body</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
         <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">args_body</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">args</span><span class="p">),</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -7965,7 +7969,7 @@ the function returns the value of <code>body</code>.</p>
 <span class="normal">610</span>
 <span class="normal">611</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_children</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">args_body</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates a term with the given head and arguments.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Creates a term with the given head and arguments."""</span>
     <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">body</span> <span class="o">=</span> <span class="n">args_body</span>
     <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">args</span><span class="p">),</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -8032,9 +8036,9 @@ the function returns the value of <code>body</code>.</p>
 <span class="normal">370</span>
 <span class="normal">371</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">If</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that only executes `body` if `cond` is true.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">cond</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">NotationStatement</span>
@@ -8119,10 +8123,10 @@ executes <code>else_body</code>.</p>
 <span class="normal">386</span>
 <span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">IfElse</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that executes `then_body` if `cond` is true, otherwise</span>
 <span class="sd">    executes `else_body`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">cond</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">then_body</span><span class="p">:</span> <span class="n">NotationStatement</span>
@@ -8192,7 +8196,8 @@ executes <code>else_body</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">288</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">287</span>
+<span class="normal">288</span>
 <span class="normal">289</span>
 <span class="normal">290</span>
 <span class="normal">291</span>
@@ -8202,12 +8207,11 @@ executes <code>else_body</code>.</p>
 <span class="normal">295</span>
 <span class="normal">296</span>
 <span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">298</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Increment</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that updates the value `lhs` using `rhs`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Access</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">NotationExpression</span>
@@ -8261,7 +8265,12 @@ executes <code>else_body</code>.</p>
 
   
       dataclass
-   (finch.finch_notation.nodes.NotationExpression)" href="#finch.finch_notation.nodes.NotationExpression">NotationExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm (finch.symbolic.LiteralTerm)" href="../../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
+   (finch.finch_notation.nodes.NotationExpression)" href="#finch.finch_notation.nodes.NotationExpression">NotationExpression</a></code>, <code><a class="autorefs autorefs-internal" title="LiteralTerm
+
+
+  
+      dataclass
+   (finch.symbolic.LiteralTerm)" href="../../symbolic/#finch.symbolic.LiteralTerm">LiteralTerm</a></code></p>
 
 
 
@@ -8287,22 +8296,18 @@ executes <code>else_body</code>.</p>
 <span class="normal">90</span>
 <span class="normal">91</span>
 <span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">93</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="n">LiteralTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression for the literal value `val`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="n">val</span><span class="p">:</span> <span class="n">Any</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;val&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"val"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">})</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -8378,9 +8383,9 @@ executes <code>else_body</code>.</p>
 <span class="normal">356</span>
 <span class="normal">357</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Loop</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that runs `body` for each value of `idx` in `ext`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">idx</span><span class="p">:</span> <span class="n">Variable</span>
     <span class="n">ext</span><span class="p">:</span> <span class="n">NotationExpression</span>
@@ -8451,7 +8456,7 @@ FinchNotation.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_notation.nodes.Module.funcs">funcs</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Function
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-internal" title="Function
 
 
   
@@ -8497,19 +8502,19 @@ FinchNotation.</p>
 <span class="normal">651</span>
 <span class="normal">652</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Module</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a group of functions. This is the toplevel translation unit for</span>
 <span class="sd">    FinchNotation.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        funcs: The functions defined in the module.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">funcs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Function</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">funcs</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -8613,18 +8618,18 @@ FinchNotation.</p>
 <span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationExpression</span><span class="p">(</span><span class="n">NotationNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression base class.</span>
 
 <span class="sd">    A Notation expression is a program node which evaluates to a value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Get the type of the expression.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -8733,15 +8738,15 @@ FinchNotation.</p>
 <span class="normal">45</span>
 <span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">NotationNode</span><span class="p">(</span><span class="n">Term</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    NotationNode</span>
 
 <span class="sd">    Base class for all Finch Notation nodes</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the head of the node."""</span>
         <span class="k">return</span> <span class="bp">cls</span>
 
     <span class="nd">@classmethod</span>
@@ -8753,7 +8758,7 @@ FinchNotation.</p>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">*</span><span class="n">children</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns a string representation of the node."""</span>
         <span class="n">ctx</span> <span class="o">=</span> <span class="n">NotationPrinterContext</span><span class="p">()</span>
         <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -8794,7 +8799,7 @@ FinchNotation.</p>
 <span class="normal">44</span>
 <span class="normal">45</span>
 <span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a string representation of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns a string representation of the node."""</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">NotationPrinterContext</span><span class="p">()</span>
     <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">res</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ctx</span><span class="o">.</span><span class="n">emit</span><span class="p">()</span>
@@ -8829,7 +8834,7 @@ FinchNotation.</p>
 <span class="normal">31</span>
 <span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">head</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the head of the node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns the head of the node."""</span>
     <span class="k">return</span> <span class="bp">cls</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8891,12 +8896,12 @@ not produce a value, but may modify the state of the machine.</p>
 <span class="normal">77</span>
 <span class="normal">78</span>
 <span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationStatement</span><span class="p">(</span><span class="n">NotationNode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement base class.</span>
 
 <span class="sd">    A Notation statement is a program node nested inside a function which does</span>
 <span class="sd">    not produce a value, but may modify the state of the machine.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -8959,7 +8964,8 @@ This mode allows reading the value of a tensor without modifying it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">256</span>
+<span class="normal">257</span>
 <span class="normal">258</span>
 <span class="normal">259</span>
 <span class="normal">260</span>
@@ -8967,13 +8973,12 @@ This mode allows reading the value of a tensor without modifying it.</p>
 <span class="normal">262</span>
 <span class="normal">263</span>
 <span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">265</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Read</span><span class="p">(</span><span class="n">AccessMode</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST node representing a read-only access mode for a tensor.</span>
 <span class="sd">    This mode allows reading the value of a tensor without modifying it.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -9099,21 +9104,21 @@ object <code>obj</code>. The original object may now be accessed and modified.</
 <span class="normal">509</span>
 <span class="normal">510</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Repack</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Registers updates from a symbolic object `val` with the original</span>
 <span class="sd">    object `obj`. The original object may now be accessed and modified.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        slot: The symbolic object to read from.</span>
 <span class="sd">        obj: The original object to write to.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">val</span><span class="p">:</span> <span class="n">Slot</span>
     <span class="n">obj</span><span class="p">:</span> <span class="n">NotationExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">obj</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9217,16 +9222,16 @@ function.</p>
 <span class="normal">629</span>
 <span class="normal">630</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Return</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that returns the value of `val` from the current</span>
 <span class="sd">    function.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">val</span><span class="p">:</span> <span class="n">NotationExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">]</span>
 
     <span class="nd">@classmethod</span>
@@ -9321,9 +9326,9 @@ function.</p>
 <span class="normal">413</span>
 <span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Root</span><span class="p">(</span><span class="n">Cursor</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The root level of a fiber tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -9391,7 +9396,7 @@ expression creates a copy of the object.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_notation.nodes.Slot.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -9448,25 +9453,25 @@ expression creates a copy of the object.</p>
 <span class="normal">468</span>
 <span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Slot</span><span class="p">(</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="n">NamedTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Represents a register to a symbolic object. Using a register in an</span>
 <span class="sd">    expression creates a copy of the object.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the symbolic object to register.</span>
 <span class="sd">        type: The type of the symbolic object.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="nb">type</span><span class="p">:</span> <span class="n">Any</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of the expression.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the type of the expression."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">})</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">symbol</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -9569,10 +9574,10 @@ from read-only mode to update-only mode with a reduction operator <code>op</code
 <span class="normal">563</span>
 <span class="normal">564</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Thaw</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that thaws `tns` in the current scope, moving the tensor</span>
 <span class="sd">    from read-only mode to update-only mode with a reduction operator `op`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">tns</span><span class="p">:</span> <span class="n">NotationExpression</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
@@ -9709,7 +9714,7 @@ corresponding <code>Repack</code> node is reached.</p>
 <span class="normal">489</span>
 <span class="normal">490</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Unpack</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationStatement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Attempts to convert `rhs` into a symbolic, which can be registerd with</span>
 <span class="sd">    `lhs`. The original object must not be accessed or modified until the</span>
 <span class="sd">    corresponding `Repack` node is reached.</span>
@@ -9717,14 +9722,14 @@ corresponding <code>Repack</code> node is reached.</p>
 <span class="sd">    Attributes:</span>
 <span class="sd">        lhs: The symbolic object to write to.</span>
 <span class="sd">        rhs: The original object to read from.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">lhs</span><span class="p">:</span> <span class="n">Slot</span>
     <span class="n">rhs</span><span class="p">:</span> <span class="n">NotationExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the children of the node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Returns the children of the node."""</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">lhs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">rhs</span><span class="p">]</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9810,7 +9815,8 @@ tensor <code>arg</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">302</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">301</span>
+<span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
 <span class="normal">305</span>
@@ -9830,12 +9836,12 @@ tensor <code>arg</code>.</p>
 <span class="normal">319</span>
 <span class="normal">320</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Unwrap</span><span class="p">(</span><span class="n">NotationTree</span><span class="p">,</span> <span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST statement that unwraps the scalar value from a 0-dimensional</span>
 <span class="sd">    tensor `arg`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">arg</span><span class="p">:</span> <span class="n">NotationNode</span>
+    <span class="n">arg</span><span class="p">:</span> <span class="n">NotationExpression</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -9843,9 +9849,10 @@ tensor <code>arg</code>.</p>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Returns the type of the unwrapped value.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">element_type</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -9936,7 +9943,8 @@ Attributes:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">269</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">268</span>
+<span class="normal">269</span>
 <span class="normal">270</span>
 <span class="normal">271</span>
 <span class="normal">272</span>
@@ -9951,10 +9959,9 @@ Attributes:
 <span class="normal">281</span>
 <span class="normal">282</span>
 <span class="normal">283</span>
-<span class="normal">284</span>
-<span class="normal">285</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">284</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Update</span><span class="p">(</span><span class="n">AccessMode</span><span class="p">,</span> <span class="n">NotationTree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST node representing an update access mode for a tensor.  This</span>
 <span class="sd">    mode allows reading and modifying the value of a tensor.  Increment</span>
 <span class="sd">    operations are allowed in this mode, and will use the update operation `op`</span>
@@ -9962,7 +9969,7 @@ Attributes:
 <span class="sd">    value of a tensor, use the ops `algebra.overwrite` or `algebra.init_write`.</span>
 <span class="sd">    Attributes:</span>
 <span class="sd">        op: The operation used to update the value of the tensor.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">op</span><span class="p">:</span> <span class="n">Literal</span>
 
@@ -10031,7 +10038,9 @@ type <code>type_</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
@@ -10044,14 +10053,12 @@ type <code>type_</code>.</p>
 <span class="normal">111</span>
 <span class="normal">112</span>
 <span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Value</span><span class="p">(</span><span class="n">NotationExpression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression for host code `val` expected to evaluate to a value of</span>
 <span class="sd">    type `type_`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">ex</span><span class="p">:</span> <span class="n">AssemblyNode</span>
     <span class="n">type_</span><span class="p">:</span> <span class="n">FType</span>
@@ -10061,7 +10068,7 @@ type <code>type_</code>.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;ex&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ex</span><span class="p">,</span> <span class="s2">&quot;type_&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">})</span>
+        <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"ex"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ex</span><span class="p">,</span> <span class="s2">"type_"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">})</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -10128,7 +10135,7 @@ type <code>type_</code>.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_notation.nodes.Variable.name">name</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></code>
+                  <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/builtins/stdtypes.html#str">str</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10139,7 +10146,7 @@ type <code>type_</code>.</p>
           <tr class="doc-section-item">
             <td><code><span title="finch.finch_notation.nodes.Variable.type_">type_</span></code></td>
             <td>
-                  <code><a class="autorefs autorefs-internal" title="FType (finch.algebra.FType)" href="../../algebra/#finch.algebra.FType">FType</a> | None</code>
+                  <code><a class="autorefs autorefs-internal" title="FType (finch.algebra.FType)" href="../../algebra/#finch.algebra.FType">FType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -10159,7 +10166,9 @@ type <code>type_</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/nodes.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">119</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
@@ -10184,25 +10193,21 @@ type <code>type_</code>.</p>
 <span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Variable</span><span class="p">(</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="n">NamedTerm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Notation AST expression for a variable named `name`.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        name: The name of the variable.</span>
 <span class="sd">        type_: The type of the variable.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">type_</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">type_</span><span class="p">:</span> <span class="n">FType</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">,</span> <span class="n">FType</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">,</span> <span class="n">FType</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">result_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -10210,7 +10215,7 @@ type <code>type_</code>.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">literal_repr</span><span class="p">(</span>
-            <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;type_&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">}</span>
+            <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="p">{</span><span class="s2">"name"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"type_"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type_</span><span class="p">}</span>
         <span class="p">)</span>
 
     <span class="nd">@property</span>

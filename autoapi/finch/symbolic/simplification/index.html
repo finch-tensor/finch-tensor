@@ -5430,13 +5430,13 @@ TODO: add a safe mode for nan</p>
 <span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">annihilate</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    `f(a..., z, b...)` =&gt; `z` when `z` is an annihilator for `f`.</span>
 
 <span class="sd">    Applied over every dtype, floats included, so `nan * 0` and `inf * 0` fold to</span>
 <span class="sd">    `0` rather than to `nan`.</span>
 <span class="sd">    TODO: add a safe mode for nan</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">):</span>
             <span class="k">return</span> <span class="nb">next</span><span class="p">(</span>
@@ -5535,7 +5535,7 @@ bubble up and to the left, where adjacent ones merge:
 <span class="normal">93</span>
 <span class="normal">94</span>
 <span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">canonicalize_associative</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unwraps singleton n-ary function calls.</span>
 <span class="sd">    - `f(x)` =&gt; `x`</span>
 
@@ -5549,7 +5549,7 @@ bubble up and to the left, where adjacent ones merge:
 <span class="sd">    - `f(f(k, x), y)`   =&gt; `f(k, f(x, y))`</span>
 <span class="sd">    - `f(x, f(k, y))`   =&gt; `f(k, f(x, y))`</span>
 <span class="sd">    - `f(x, k)`         =&gt; `f(k, x)`</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -5621,7 +5621,7 @@ bubble up and to the left, where adjacent ones merge:
 <span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dedup_idempotent</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;`f(a..., x, b..., x, c...)` =&gt; `f(a..., x, b..., c...)` for idempotent `f`.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""`f(a..., x, b..., x, c...)` =&gt; `f(a..., x, b..., c...)` for idempotent `f`."""</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span>
             <span class="n">is_idempotent</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">)</span> <span class="ow">and</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">)</span> <span class="ow">and</span> <span class="n">is_commutative</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
@@ -5679,9 +5679,9 @@ bubble up and to the left, where adjacent ones merge:
 <span class="normal">191</span>
 <span class="normal">192</span>
 <span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_identities</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    `f(a..., e, b...)` =&gt; `f(a..., b...)` when `e` is an identity for `f`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">arity</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">val</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
@@ -5767,14 +5767,14 @@ bubble up and to the left, where adjacent ones merge:
 <span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fold_literals</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Evaluate literal arguments at compile time.</span>
 
 <span class="sd">    - `f(x, y)` =&gt; `literal(f(x, y))` when every argument is a literal. The</span>
 <span class="sd">      call disappears, so this is sound for any operator.</span>
 <span class="sd">    - `f(a..., x, y, b...)` =&gt; `f(a..., f(x, y), b...)` folds adjacent</span>
 <span class="sd">      literal pairs of an associative n-ary `f`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span><span class="n">op</span><span class="o">=</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span> <span class="k">if</span> <span class="n">args</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">LiteralTerm</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">):</span>
