@@ -130,18 +130,8 @@ class FinchJLKernel(AssemblyKernel):
             self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(args)
         ]
-        result = finch_fn(*raw_args)
-
-        # @finch_kernel-generated functions return a NamedTuple keyed by the
-        # returned variable name(s), unlike @finch's bare Tensor/tuple.
-        if jl.isa(result, jl.NamedTuple):
-            result = jl.values(result)
-
-        # The finch function returns tuples when multiple values are returned
-        # or a non-tuple when a single value is returned.
-        if jl.isa(result, jl.Finch.Tensor):
-            return (self.buffer_context.tensor_to_python(result),)
-        return tuple(self.buffer_context.tensor_to_python(res) for res in result)
+        results = finch_fn(*raw_args)
+        return tuple(self.buffer_context.tensor_to_python(result) for result in results)
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
@@ -182,12 +172,16 @@ class FinchJLGenerator:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
                 proto_str = "\n".join(proto_lines)
+                inner_name = f"{name}_finch"
                 return (
                     "eval(let\n"
                     f"{proto_str}\n"
-                    f"    Finch.@finch_kernel function {name}({arg_str})\n"
+                    f"    Finch.@finch_kernel function {inner_name}({arg_str})\n"
                     f"{body_str}\n    end\n"
-                    "end)"
+                    "end)\n"
+                    f"@inline function {name}({arg_str})\n"
+                    f"    return Tuple({inner_name}({arg_str}))\n"
+                    "end"
                 )
 
             case ntn.Block(bodies):
@@ -378,7 +372,7 @@ class FinchJLCompiler(NotationCompiler):
                 jl_name = f"kernel_{uuid.uuid4().hex}"
                 kernel = FinchJLKernel(
                     jl_name,
-                    generated_prgm.replace(func.name.name, jl_name, 1),
+                    generated_prgm.replace(func.name.name, jl_name),
                     dynamic_args=dynamic_args,
                     buffer_context=self._buffer_context,
                 )
