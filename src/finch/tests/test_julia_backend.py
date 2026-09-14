@@ -358,9 +358,7 @@ def test_compile_julia_evaluates_variadic_and_or_call(
 def test_compile_julia_generator_returns_tuple(values):
     from finch.compile_jl.compiler import FinchJLGenerator
 
-    returned = ntn.Return(
-        ntn.Call(ntn.Literal(ffuncs.make_tuple), values)
-    )
+    returned = ntn.Return(ntn.Call(ntn.Literal(ffuncs.make_tuple), values))
     func = ntn.Function(ntn.Variable("generated_return"), (), returned)
 
     generated = FinchJLGenerator()(func)

@@ -128,12 +128,14 @@ class FinchJLKernel(AssemblyKernel):
     def __call__(self, *args):
         return self.runtime.kernel_call(self.func_name, args)
 
+
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
         self.kernel_dict = kernel_dict
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
 
 class FinchJLGenerator:
     def __init__(self):
