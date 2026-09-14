@@ -1,5 +1,6 @@
 from collections import Counter
 
+from finch import ffuncs
 from finch.finch_logic import Field, Literal, MapJoin, Plan, Produces, Table
 from finch.symbolic import PostOrderDFS, PreOrderDFS, intree, isdescendant
 
@@ -20,7 +21,7 @@ def test_preorder_dfs():
             Produces(
                 (
                     MapJoin(
-                        Field("op"),
+                        Literal(ffuncs.add),
                         (ta, tb),
                     ),
                 ),
@@ -31,7 +32,7 @@ def test_preorder_dfs():
     preorder = list(PreOrderDFS(prog))
 
     assert Counter(type(x).__name__ for x in preorder) == Counter(
-        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
+        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 3, "Field": 4}
     )
 
     pos = {}
@@ -61,7 +62,7 @@ def test_postorder_dfs():
             Produces(
                 (
                     MapJoin(
-                        Field("op"),
+                        Literal(ffuncs.add),
                         (ta, tb),
                     ),
                 ),
@@ -72,7 +73,7 @@ def test_postorder_dfs():
     postorder = list(PostOrderDFS(prog))
 
     assert Counter(type(x).__name__ for x in postorder) == Counter(
-        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 2, "Field": 5}
+        {"Plan": 1, "Produces": 1, "MapJoin": 1, "Table": 2, "Literal": 3, "Field": 4}
     )
 
     pos = {}
@@ -90,7 +91,7 @@ def test_intree():
     i, j, k = Field("i"), Field("j"), Field("k")
     ta = Table(Literal("A"), (i, j))
     tb = Table(Literal("B"), (j, k))
-    op = Field("op")
+    op = Literal(ffuncs.add)
     mj = MapJoin(op, (ta, tb))
     prog = Plan((Produces((mj,)),))
 
@@ -104,7 +105,7 @@ def test_isdescendant():
     i, j, k = Field("i"), Field("j"), Field("k")
     ta = Table(Literal("A"), (i, j))
     tb = Table(Literal("B"), (j, k))
-    op = Field("op")
+    op = Literal(ffuncs.add)
     mj = MapJoin(op, (ta, tb))
     prog = Plan((Produces((mj,)),))
 

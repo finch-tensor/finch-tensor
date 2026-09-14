@@ -17,6 +17,7 @@ from finch.algebra import (
     TupleFType,
     ffuncs,
     fisinstance,
+    np_dtype,
     promote_type,
 )
 from finch.finch_assembly import BufferFType
@@ -589,7 +590,7 @@ def mlir_type(t: FType):
         case algebra.float_:
             return "f64"
         case algebra.ftypes.FDTypeNumpy():
-            dt = np.dtype(t.dtype)
+            dt = np_dtype(t)
             match dt.kind:
                 case "b":
                     return "i1"
@@ -687,7 +688,7 @@ def serialize_to_mlir(fmt: FType, obj):
         case MLIRArgumentFType():
             return fmt.serialize_to_mlir(obj)
         case algebra.ftypes.FDTypeNumpy():
-            return np.ctypeslib.as_ctypes(np.array(obj, dtype=fmt.dtype))
+            return np.ctypeslib.as_ctypes(np.array(obj, dtype=np_dtype(fmt)))
         case algebra.int_ | algebra.float_ | algebra.bool_:
             return mlir_ctype(mlir_type(fmt))(obj)
         case algebra.none_:

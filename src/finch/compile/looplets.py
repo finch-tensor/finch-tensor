@@ -136,7 +136,7 @@ class StepperPass(LoopletPass):
             match node:
                 case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
                     return ntn.Access(
-                        st.chunk,  # type: ignore[arg-type]
+                        st.chunk,  # ty: ignore[invalid-argument-type]
                         mode,
                         (j, *idxs),
                     )
@@ -358,7 +358,7 @@ class RunPass(LoopletPass):
                                     asm.Literal(body), body.ftype
                                 )
                             )
-                        return ntn.Access(leaf, mode, (j, *idxs))
+                        return ntn.Access(leaf, mode, (j, *idxs))  # ty: ignore[invalid-argument-type]
             return None
 
         body_2 = PostWalk(run_node)(body)

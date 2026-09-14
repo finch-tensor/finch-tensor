@@ -94,16 +94,24 @@ pixi run test-julia
 
 #### Optional Static Type Checking
 
-The usual test command also runs mypy to check for type errors, so you shouldn't need to run it manually.
-In case you do need to run mypy manually, you can do so with:
+The usual test command also runs [ty](https://github.com/astral-sh/ty) to check for type errors, so you shouldn't need to run it manually.
+In case you do need to run ty manually, you can do so with:
 
 ```bash
 pixi run type-check
 ```
 
+In order to fix type checking failures, try the following, in order:
+
+1. Try to fix the type error by adding/modifying type annotations or fixing the code.
+2. Add `assert isinstance(...)` checks to the code to ensure the type is correct.
+3. If the type error persists, try to add an [ignore comment](https://docs.astral.sh/ty/suppression/) to suppress the error.
+
+Sometimes, these may need to be combined.
+
 #### Optional Array API Tests
 The usual test command also runs the Array API test to check for compliance with the Array API standard, so you shouldn't need to run it manually.
-In case you do need to run mypy manually, you can do so with:
+In case you do need to run the Array API tests manually, you can do so with:
 
 ```bash
 pixi run array-api-tests

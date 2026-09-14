@@ -168,6 +168,9 @@ def test_merge_queries_chain_of_three_aliases():
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
 
+    assert isinstance(out_query, Query)
+    assert isinstance(out_produces, Produces)
+
     assert out_query.lhs == Alias("A3")
     assert isinstance(out_query.rhs, Reorder)
     assert isinstance(out_query.rhs.arg, Table)
@@ -199,6 +202,10 @@ def test_merge_queries_produces_multiple_aliases():
     preprocessed = preprocess_plan_for_galley(plan)
     assert len(preprocessed.bodies) == 3
     out_q1, out_q2, out_produces = preprocessed.bodies
+
+    assert isinstance(out_q1, Query)
+    assert isinstance(out_q2, Query)
+    assert isinstance(out_produces, Produces)
 
     assert out_q1.lhs == Alias("A1")
     assert isinstance(out_q1.rhs, Reorder)
@@ -233,6 +240,7 @@ def test_normalize_reorders_strips_identity_reorder():
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
 
+    assert isinstance(norm_q, Query)
     assert norm_q.rhs.fields() == (j, i)
     assert norm_q.rhs.fields() == original_rhs.fields()
 
@@ -257,6 +265,7 @@ def test_normalize_reorders_nested_reorders_collapse():
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
 
+    assert isinstance(norm_q, Query)
     assert norm_q.rhs.fields() == (i, j)
     assert isinstance(norm_q.rhs, Reorder)
     assert norm_q.rhs.idxs == (i, j)
@@ -283,6 +292,7 @@ def test_normalize_reorders_aggregate_with_reorder_needs_outer():
     preprocessed = preprocess_plan_for_galley(plan)
     norm_q, _ = preprocessed.bodies
 
+    assert isinstance(norm_q, Query)
     assert norm_q.rhs.fields() == (i,)
     assert isinstance(norm_q.rhs, Reorder)
     assert norm_q.rhs.idxs == (i,)
@@ -317,6 +327,9 @@ def test_preprocess_plan_chain_with_reorder_and_aggregate():
 
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
+    assert isinstance(out_query, Query)
+    assert isinstance(out_produces, Produces)
+
     assert out_query.lhs == Alias("A2")
     assert out_query.rhs.fields() == (k, i)
     # At most one outer Reorder, no interior Reorders
@@ -346,6 +359,7 @@ def test_preprocess_plan_single_table_no_change():
 
     assert len(preprocessed.bodies) == 2
     out_query, _ = preprocessed.bodies
+    assert isinstance(out_query, Query)
     assert isinstance(out_query.rhs, Reorder)
     assert out_query.rhs.idxs == (i, j)
     assert out_query.rhs.arg == Table(A_lit, (i, j))
@@ -393,6 +407,8 @@ def test_preprocess_plan_A_at_B_at_C():
 
     assert len(preprocessed.bodies) == 2
     out_query, out_produces = preprocessed.bodies
+    assert isinstance(out_query, Query)
+    assert isinstance(out_produces, Produces)
     assert out_query.lhs == Alias("A2")
     assert out_query.rhs.fields() == (i, l_)
 
@@ -471,8 +487,10 @@ def test_merge_queries_inlines_mapjoin_aggregate_chain():
     assert isinstance(rhs, Aggregate)
     assert rhs.idxs == (i_17,)
     assert isinstance(rhs.arg, MapJoin)
+    assert isinstance(rhs.arg.args[0], Table)
     assert rhs.arg.args[0].tns == X_lit
     assert rhs.arg.args[0].idxs == (i_16, i_17)
+    assert isinstance(rhs.arg.args[1], Table)
     assert rhs.arg.args[1].tns == Y_lit
     assert rhs.arg.args[1].idxs == (i_17, i_18)
 

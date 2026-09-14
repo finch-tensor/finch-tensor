@@ -1,6 +1,6 @@
 from typing import Any
 
-from lark import Lark, Tree
+from lark import Lark, Token, Tree
 
 from finch.algebra import ffuncs
 from finch.symbolic import Namespace
@@ -235,46 +235,61 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
         ) if len(args) > 1:
             expr = _parse_einop_expr(args[0])
             for i in range(1, len(args), 2):
-                arg = _parse_einop_expr(args[i + 1])
-                op = ein.Literal(nary_ops[args[i].value])  # type: ignore[union-attr]
+                arg_i = args[i]
+                arg_ip1 = args[i + 1]
+                assert isinstance(arg_i, Token)
+                arg = _parse_einop_expr(arg_ip1)
+                op = ein.Literal(nary_ops[arg_i.value])
                 expr = ein.Call(op, (expr, arg))
             return expr
         case Tree("comparison_expr", args) if len(args) > 1:
             # Handle Python's comparison chaining: a < b < c becomes (a < b) and (b < c)
             left = _parse_einop_expr(args[0])
             right = _parse_einop_expr(args[2])
-            op = ein.Literal(nary_ops[args[1].value])  # type: ignore[union-attr]
+            assert isinstance(args[1], Token)
+            op = ein.Literal(nary_ops[args[1].value])
             expr = ein.Call(op, (left, right))
             for i in range(2, len(args) - 2, 2):
                 left = _parse_einop_expr(args[i])
                 right = _parse_einop_expr(args[i + 2])
-                and_ = ein.Literal(nary_ops["and"])  # type: ignore[union-attr]
-                op = ein.Literal(nary_ops[args[i + 1].value])  # type: ignore[union-attr]
-                expr = ein.Call(and_, (expr, ein.Call(op, (left, right))))  # type: ignore[union-attr]
+                and_ = ein.Literal(nary_ops["and"])
+                arg_ip1 = args[i + 1]
+                assert isinstance(arg_ip1, Token)
+                op = ein.Literal(nary_ops[arg_ip1.value])
+                expr = ein.Call(and_, (expr, ein.Call(op, (left, right))))
             return expr
         case Tree("power_expr", args) if len(args) > 1:
             left = _parse_einop_expr(args[0])
             right = _parse_einop_expr(args[2])
-            op = ein.Literal(nary_ops[args[1].value])  # type: ignore[union-attr]
+            assert isinstance(args[1], Token)
+            op = ein.Literal(nary_ops[args[1].value])
             return ein.Call(op, (left, right))
         case Tree("unary_expr" | "not_expr", [op, arg]):
-            op = ein.Literal(unary_ops[op.value])  # type: ignore[union-attr]
+            assert isinstance(op, Token)
+            op = ein.Literal(unary_ops[op.value])
             return ein.Call(op, (_parse_einop_expr(arg),))
         case Tree("access", [tns, *idxs]):
+            assert isinstance(tns, Token)
+            assert all(isinstance(idx, Token) for idx in idxs)
             return ein.Access(
-                ein.Alias(tns.value),  # type: ignore[union-attr]
-                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
+                ein.Alias(tns.value),
+                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[unresolved-attribute]
             )
         case Tree("bool_literal", (val,)):
-            return ein.Literal(val.value == "True")  # type: ignore[union-attr]
+            assert isinstance(val, Token)
+            return ein.Literal(val.value == "True")
         case Tree("int_literal", (val,)):
-            return ein.Literal(int(val.value))  # type: ignore[union-attr]
+            assert isinstance(val, Token)
+            return ein.Literal(int(val.value))
         case Tree("float_literal", (val,)):
-            return ein.Literal(float(val.value))  # type: ignore[union-attr]
+            assert isinstance(val, Token)
+            return ein.Literal(float(val.value))
         case Tree("complex_literal", (val,)):
-            return ein.Literal(complex(val.value))  # type: ignore[union-attr]
+            assert isinstance(val, Token)
+            return ein.Literal(complex(val.value))
         case Tree("call_func", [func, *args]):
-            return ein.Call(func.value, (*(_parse_einop_expr(arg) for arg in args),))  # type: ignore[union-attr]
+            assert isinstance(func, Token)
+            return ein.Call(func.value, (*(_parse_einop_expr(arg) for arg in args),))
         case _:
             raise ValueError(f"Unknown tree structure: {t}")
 
@@ -286,9 +301,13 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             "start",
             [Tree("increment", [Tree("access", [tns, *idxs]), op_token, expr_node])],
         ):
-            arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
-            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # type: ignore[union-attr]
-            op = ein.Literal(reduction_ops[op_token.value])  # type: ignore[union-attr]
+            assert isinstance(expr_node, Tree)
+            arg = _parse_einop_expr(expr_node)
+            assert all(isinstance(idx, Token) for idx in idxs)
+            idxs_exprs = tuple(ein.Index(idx.value) for idx in idxs)  # ty: ignore[unresolved-attribute]
+            assert isinstance(op_token, Token)
+            op = ein.Literal(reduction_ops[op_token.value])
+            assert isinstance(tns, Token)
             return ein.Einsum(
                 op,
                 ein.Alias(tns.value),  # type: ignore[union-attr]
@@ -297,12 +316,15 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             )
 
         case Tree("start", [Tree("assign", [Tree("access", [tns, *idxs]), expr_node])]):
-            arg = _parse_einop_expr(expr_node)  # type: ignore[arg-type]
+            assert isinstance(expr_node, Tree)
+            arg = _parse_einop_expr(expr_node)
             op = ein.Literal(ffuncs.overwrite)
+            assert isinstance(tns, Token)
+            assert all(isinstance(idx, Token) for idx in idxs)
             return ein.Einsum(
                 op,
-                ein.Alias(tns.value),  # type: ignore[union-attr]
-                tuple(ein.Index(idx.value) for idx in idxs),  # type: ignore[union-attr]
+                ein.Alias(tns.value),
+                tuple(ein.Index(idx.value) for idx in idxs),  # ty: ignore[unresolved-attribute]
                 arg,
             )
 
@@ -312,7 +334,7 @@ def parse_einop(expr: str) -> ein.EinsumNode:
             )
 
 
-def parse_einsum(*args_) -> tuple[ein.EinsumNode, dict[ein.Alias, Any]]:
+def parse_einsum(*args_) -> tuple[ein.Einsum, dict[ein.Alias, Any]]:
     args = list(args_)
     if len(args) < 2:
         raise ValueError("Expected at least a subscript string and one operand.")
