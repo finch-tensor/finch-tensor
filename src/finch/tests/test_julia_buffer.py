@@ -79,12 +79,12 @@ def test_default_julia_runtime_reuses_buffers_after_kernel_invocation():
     data = np.arange(4, dtype=np.float64)
     context = DefaultFinchJLRuntime()
     first_arg = ft.asarray(data)
-    first_jl = context.tensor_to_jl(first_arg)
+    first_jl = context._tensor_to_jl(first_arg)
 
     returned_jl = jl.first_arg(first_jl)
-    context.tensor_to_python(returned_jl)
+    context._tensor_to_python(returned_jl)
 
     second_arg = ft.asarray(data)
-    second_jl = context.tensor_to_jl(second_arg)
+    second_jl = context._tensor_to_jl(second_arg)
 
     assert second_jl is first_jl

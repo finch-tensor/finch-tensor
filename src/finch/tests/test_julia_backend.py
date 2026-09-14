@@ -173,13 +173,12 @@ def _compile_julia_fd(formatter):
 def _to_csr(fbr: FiberTensor) -> FiberTensor:
     """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
     own reformat, regardless of its current level structure (e.g. SparseHash)."""
-    from finch.compile_jl import DefaultFinchJLRuntime
+    from finch.compile_jl import jl_tensor_to_python, python_tensor_to_jl
     from finch.compile_jl.julia import jl
 
-    runtime = DefaultFinchJLRuntime()
-    jl_obj = runtime.tensor_to_jl(fbr)
+    jl_obj = python_tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
-    return runtime.tensor_to_python(jl.Tensor(csr_level, jl_obj))
+    return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
 
 
 def test_compile_julia_sums_sparse_list_level():

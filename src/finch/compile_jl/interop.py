@@ -8,15 +8,20 @@ from finch.algebra import ftype
 from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.finch_assembly import Buffer
 from finch.tensor import (
+    BufferizedNDArray,
     DenseLevel,
     ElementLevel,
+    FiberTensor,
     Level,
+    Scalar,
     SparseByteMapLevel,
     SparseCOOLevel,
     SparseHashLevel,
     SparseListLevel,
     element,
 )
+from finch.tensor.np_wrapper import NumPyWrapper
+from finch.tensor.patterns import FillTensor
 
 from . import types as jl_dtypes
 from .buffer import MinusOneBuffer
@@ -261,7 +266,44 @@ def _ndarray_to_jl_tensor(
     return jl.Tensor(lvl)
 
 
+def python_tensor_to_jl(obj, pin_fill: bool = False):
+    """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
+    forced to a zero of their dtype so the argument types line up with a
+    kernel compiled under `zero_dynamic_fills`."""
+    if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
+        return obj
+    if isinstance(obj, FiberTensor):
+        if obj.pos != 0:
+            raise ValueError("Only root-position FiberTensor objects can use Julia")
+        return jl.Tensor(level_to_jl(obj.lvl, pin_fill))
+    if isinstance(obj, BufferizedNDArray):
+        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        return _ndarray_to_jl_tensor(obj.to_numpy(), fill, copy=False)
+    if isinstance(obj, NumPyWrapper):
+        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
+    if isinstance(obj, Scalar):
+        return scalar_to_jl(obj.val, pin_fill=pin_fill)
+    if isinstance(obj, FillTensor):
+        lvl = jl.PatternLevel()
+        for dim in reversed(obj.shape):
+            lvl = jl.DenseLevel(lvl, int(dim))
+        return jl.Tensor(lvl)
+    if isinstance(obj, np.ndarray):
+        fill = np.asarray(0, dtype=obj.dtype)[()]
+        return _ndarray_to_jl_tensor(obj, fill, copy=False)
+    if np.isscalar(obj):
+        return scalar_to_jl(obj, pin_fill=pin_fill)
+    raise ValueError(f"Unsupported Julia backend argument type: {type(obj)}")
+
+
 def scalar_to_jl(val, pin_fill: bool = False):
     fill = ftype(val)(0) if pin_fill else val
     buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
+
+
+def jl_tensor_to_python(obj):
+    if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
+        return obj
+    return FiberTensor(jl_level_to_python(obj.lvl))
