@@ -1,10 +1,13 @@
+import pytest
+
 import numpy as np
 
 import finch as ft
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
-from finch.compile_jl.interop import JuliaBufferContext, _jl_index_buffer_to_python
+from finch.compile_jl.interop import _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
+from finch.compile_jl.runtime import DefaultFinchJLRuntime, FinchJLRuntime
 
 
 def _requires_julia_backend():
@@ -41,11 +44,25 @@ def test_minus_one_buffer_does_not_copy_backing_data():
     assert int(jl_vec[1]) == 8
 
 
-def test_julia_buffer_context_reuses_buffers_after_kernel_invocation():
+def test_finch_julia_runtime_is_abstract():
+    with pytest.raises(TypeError):
+        FinchJLRuntime()
+
+
+def test_default_julia_runtime_caches_kernels():
+    runtime = DefaultFinchJLRuntime()
+    kernel = object()
+
+    assert runtime.get_cached_kernel("kernel") is None
+    runtime.cache_kernel("kernel", kernel)
+    assert runtime.get_cached_kernel("kernel") is kernel
+
+
+def test_default_julia_runtime_reuses_buffers_after_kernel_invocation():
     _requires_julia_backend()
 
     data = np.arange(4, dtype=np.float64)
-    context = JuliaBufferContext()
+    context = DefaultFinchJLRuntime()
     first_arg = ft.asarray(data)
     first_jl = context.tensor_to_jl(first_arg)
 

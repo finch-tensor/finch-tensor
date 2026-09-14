@@ -230,9 +230,12 @@ def test_compile_julia_sums_sparse_bytemap_level():
 
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
+    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = RecordingFDFormatter(
+        LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime()))
+    )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
     arg = ft.asarray(data)
@@ -265,6 +268,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     op_name,
 ):
     _requires_julia_backend()
+    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
     sparse_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
@@ -280,7 +284,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = FDFormatter(LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime())))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a

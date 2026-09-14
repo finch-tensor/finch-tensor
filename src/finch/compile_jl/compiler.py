@@ -1,5 +1,4 @@
 import uuid
-from typing import ClassVar
 
 import numpy as np
 
@@ -18,8 +17,8 @@ from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 
-from .interop import JuliaBufferContext
 from .julia import jl
+from .runtime import FinchJLRuntime
 from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
 _JULIA_OPS = {
@@ -112,7 +111,7 @@ class FinchJLKernel(AssemblyKernel):
         jl_code,
         dynamic_args: tuple[int, ...] = (),
         *,
-        buffer_context: JuliaBufferContext,
+        runtime: FinchJLRuntime,
     ):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
@@ -121,17 +120,17 @@ class FinchJLKernel(AssemblyKernel):
         # arbitrarily set to zero. Other arguments keep their
         # Known fills.
         self.dynamic_args = dynamic_args
-        self.buffer_context = buffer_context
+        self.runtime = runtime
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
         raw_args = [
-            self.buffer_context.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
+            self.runtime.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
             for i, arg in enumerate(args)
         ]
         results = finch_fn(*raw_args)
-        return tuple(self.buffer_context.tensor_to_python(result) for result in results)
+        return tuple(self.runtime.tensor_to_python(result) for result in results)
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
@@ -339,18 +338,8 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
 
 
 class FinchJLCompiler(NotationCompiler):
-    # Keyed by (generated source, per-arg Julia type strings): the generated
-    # source alone isn't self-describing here -- argument types are inferred
-    # by @finch_kernel from prototype *values*, not written into the source
-    # text, so two calls with identical bodies but different argument types
-    # would otherwise collide on the same cache entry.
-    _kernels: ClassVar[
-        dict[tuple[str, tuple[str, ...], tuple[int, ...]], FinchJLKernel]
-    ] = {}
-    # Kernels are cached process-wide, so their Julia tensor wrappers must be
-    # cached process-wide as well. This lets a result produced by one compiled
-    # kernel be passed to another without rebuilding its Julia wrapper.
-    _buffer_context: ClassVar[JuliaBufferContext] = JuliaBufferContext()
+    def __init__(self, runtime: FinchJLRuntime):
+        self.runtime = runtime
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
@@ -367,16 +356,16 @@ class FinchJLCompiler(NotationCompiler):
             # Flat key: source, argument types, and which fills were pinned. All
             # three vary independently, so none may be folded into another.
             key = (generated_prgm, arg_type_strs, dynamic_args)
-            kernel = self._kernels.get(key)
+            kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
                 jl_name = f"kernel_{uuid.uuid4().hex}"
                 kernel = FinchJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name),
                     dynamic_args=dynamic_args,
-                    buffer_context=self._buffer_context,
+                    runtime=self.runtime,
                 )
-                self._kernels[key] = kernel
+                self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)
