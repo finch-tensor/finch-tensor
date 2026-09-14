@@ -610,9 +610,10 @@ def full_like(x, /, fill_value, *, dtype=None, device=None):
 
 
 def linspace(start, stop, /, num, *, dtype=None, endpoint=True, device=None):
+    np_dt = np_dtype(ftype(dtype)) if dtype is not None else None
     return broadcast_to(
         asarray(
-            np.linspace(start, stop, num, endpoint=endpoint, dtype=np_dtype(dtype)),
+            np.linspace(start, stop, num, endpoint=endpoint, dtype=np_dt),
             device=device,
         ),
         (num,),
@@ -661,7 +662,8 @@ def arange(
 ) -> LazyTensor:
     if stop is None:
         start, stop = 0, start
-    arr = np.arange(start, stop, step, dtype=np_dtype(dtype))
+    np_dt = np_dtype(ftype(dtype)) if dtype is not None else None
+    arr = np.arange(start, stop, step, dtype=np_dt)
     return defer(asarray(arr, device=device))
 
 

@@ -1073,19 +1073,7 @@ def ftype(x: Any) -> FType:
     raise NotImplementedError
 
 
-@overload
-def np_dtype(dtype: None) -> None: ...
-@overload
-def np_dtype(dtype: type[np.generic] | np.dtype | FType) -> np.dtype: ...
-
-
-def np_dtype(dtype) -> np.dtype | None:
-    if dtype is None:
-        return None
-    if isinstance(dtype, type) and issubclass(dtype, np.generic):
-        return np.dtype(dtype)
-    if isinstance(dtype, np.dtype):
-        return dtype
+def np_dtype(dtype: FType) -> np.dtype:
     if isinstance(dtype, FDTypeNumpy):
         return dtype.dtype
     if isinstance(dtype, FDTypeBuiltin):
