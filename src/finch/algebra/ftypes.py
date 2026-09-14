@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import builtins
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -872,7 +874,7 @@ class TupleFType(ImmutableStructFType, FDType):
 
     @staticmethod
     @lru_cache
-    def from_tuple(types: tuple[FType, ...]) -> "TupleFType":
+    def from_tuple(types: tuple[FType, ...]) -> TupleFType:
         if not isinstance(types, tuple):
             raise TypeError("TupleFType.from_tuple expects tuple[FType, ...]")
         if not all(isinstance(type_, FType) for type_ in types):
@@ -1070,10 +1072,12 @@ def ftype(x: Any) -> FType:
         return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
     raise NotImplementedError
 
+
 @overload
 def np_dtype(dtype: None) -> None: ...
 @overload
 def np_dtype(dtype: type[np.generic] | np.dtype | FType) -> np.dtype: ...
+
 
 def np_dtype(dtype) -> np.dtype | None:
     if dtype is None:

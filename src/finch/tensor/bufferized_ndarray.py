@@ -31,7 +31,7 @@ from .scalar import Scalar
 from .traits import Dense, FormatProperty
 
 
-def _get_default_strides(size: tuple[np.intp, ...]) -> tuple[np.intp, ...]:
+def _get_default_strides(size: tuple[int | np.intp, ...]) -> tuple[np.intp, ...]:
     strides: list[np.intp] = [np.intp(1)]
     for d in reversed(size):
         strides.append(strides[-1] * np.intp(d))
@@ -123,8 +123,8 @@ class BufferizedNDArray(OverrideTensor):
         )
 
     @property
-    def shape(self) -> tuple[np.intp, ...]:
-        return tuple(np.intp(s) for s in self._shape)
+    def shape(self) -> tuple[int, ...]:
+        return tuple(int(s) for s in self._shape)
 
     @property
     def ndim(self) -> int:

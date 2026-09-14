@@ -104,7 +104,7 @@ def create_shared_lib(filename, c_code, cc, cflags):
             str(shared_lib_path),
             str(c_file_path),
         ]
-        if not shutil.which(cc):
+        if not shutil.which(str(cc)):
             raise FileNotFoundError(
                 f"Compiler '{cc}' not found. Ensure it is installed and in your PATH."
             )
