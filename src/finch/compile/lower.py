@@ -352,7 +352,7 @@ class AssemblyContext(Context):
         slots=None,
         access_modes=None,
         types=None,
-        func_state=None,
+        func_state: HaltState | None = None,
     ):
         super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
         if bindings is None:
@@ -433,6 +433,7 @@ class AssemblyContext(Context):
         Check if the current function should halt.
         This is used to determine if the function has returned.
         """
+        assert self.func_state is not None
         return self.func_state.has_returned
 
     def emit(self):

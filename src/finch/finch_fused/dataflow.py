@@ -14,6 +14,7 @@ from .nodes import (
     Block,
     Break,
     Call,
+    Function,
     FusedNode,
     FusedStatement,
     Literal,
@@ -192,7 +193,7 @@ def _unnest_block(node: FusedNode) -> FusedNode:
             return node
 
 
-def insert_lazy_and_compute(prgm: FusedNode) -> FusedNode:
+def insert_lazy_and_compute(prgm: Function) -> Function:
     # desugar the input name and number additional statements for CFG construction
     nspc = Namespace(prgm)
     numbered_prgm, _ = number_statements(prgm)

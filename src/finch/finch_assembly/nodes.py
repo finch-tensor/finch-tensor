@@ -15,7 +15,7 @@ from finch.symbolic import (
 )
 from finch.util import qual_str
 
-from .buffer import length_type
+from .buffer import BufferFType, length_type
 
 
 class AssemblyNode(Term):
@@ -310,6 +310,7 @@ class Load(AssemblyExpression, AssemblyTree):
     @property
     def result_type(self) -> FType:
         """Returns the type of the expression."""
+        assert isinstance(self.buffer.result_type, BufferFType)
         return self.buffer.result_type.element_type
 
 

@@ -290,6 +290,8 @@ STORAGE_CANDIDATES = (StorageCostDenseLevelOption(), StorageCostSparseHashLevelO
 
 
 class CostFormatter(SmartFormatter):
+    candidates: tuple[LevelOption, ...]
+
     def __init__(self, loader: LogicLoader | None = None):
         super().__init__(loader)
         self._stats_factory = None

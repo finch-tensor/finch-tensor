@@ -66,8 +66,8 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         bindings=None,
         slots=None,
         types=None,
-        loop_state=None,
-        function_state=None,
+        loop_state: HaltState | None = None,
+        function_state: HaltState | None = None,
         stdout=None,
     ):
         if bindings is None:
@@ -330,10 +330,12 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 self.bindings[func_n] = my_func
                 return None
             case asm.Return(value):
+                assert self.function_state is not None
                 self.function_state.return_value = self(value)
                 self.function_state.should_halt = True
                 return None
             case asm.Break():
+                assert self.loop_state is not None
                 self.loop_state.should_halt = True
                 return None
             case asm.Module(funcs):

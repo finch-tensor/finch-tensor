@@ -4,6 +4,7 @@ from typing import Any, NamedTuple, cast
 import numpy as np
 
 import numba
+import numba.typed
 
 from finch.algebra import FType, TupleFType, ftype, ftypes
 from finch.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type

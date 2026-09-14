@@ -30,8 +30,8 @@ class PlusOneBuffer(Buffer, ABC):
     element when stored.
     """
 
-    def __init__(self, data):
-        self.data: Buffer = data
+    def __init__(self, data: NumpyBuffer):
+        self.data = data
 
     def ftype(self):
         return PlusOneBufferFType(self.data.ftype())
@@ -80,8 +80,8 @@ class MinusOneBufferFType(BufferFType):
 class MinusOneBuffer(Buffer, ABC):
     """Buffer that subtracts one on loads and adds one on stores."""
 
-    def __init__(self, data):
-        self.data: Buffer = data
+    def __init__(self, data: NumpyBuffer):
+        self.data = data
 
     @property
     def ftype(self):
