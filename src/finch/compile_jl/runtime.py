@@ -29,6 +29,9 @@ class FinchJLRuntime(ABC):
     @abstractmethod
     def cache_kernel(self, key, kernel): ...
 
+    @abstractmethod
+    def kernel_call(self, func_name, args): ...
+
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
         """Create a Julia representation without runtime-specific caching."""
         if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
@@ -69,6 +72,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def __init__(self):
         self._kernels: dict[Any, Any] = {}
+        self._kernels_by_name: dict[str, Any] = {}
         self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
 
     def get_cached_kernel(self, key):
@@ -76,6 +80,17 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def cache_kernel(self, key, kernel):
         self._kernels[key] = kernel
+        self._kernels_by_name[kernel.func_name] = kernel
+
+    def kernel_call(self, func_name, args):
+        kernel = self._kernels_by_name[func_name]
+        finch_fn = getattr(jl, func_name)
+        raw_args = [
+            self.tensor_to_jl(arg, pin_fill=i in kernel.dynamic_args)
+            for i, arg in enumerate(args)
+        ]
+        results = finch_fn(*raw_args)
+        return tuple(self.tensor_to_python(result) for result in results)
 
     @staticmethod
     def _tensor_cache_key(obj):
@@ -110,4 +125,5 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def close(self):
         self._kernels.clear()
+        self._kernels_by_name.clear()
         self._tensors.clear()

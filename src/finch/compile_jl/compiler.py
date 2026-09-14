@@ -109,12 +109,14 @@ class FinchJLKernel(AssemblyKernel):
         self,
         func_name,
         jl_code,
+        finch_program: ntn.Function,
         dynamic_args: tuple[int, ...] = (),
         *,
         runtime: FinchJLRuntime,
     ):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
+        self.finch_program = finch_program
         self.func_name = func_name
         # Argument positions with dynamic fill values that are
         # arbitrarily set to zero. Other arguments keep their
@@ -124,13 +126,7 @@ class FinchJLKernel(AssemblyKernel):
         jl.seval(self.jl_code)
 
     def __call__(self, *args):
-        finch_fn = getattr(jl, self.func_name)
-        raw_args = [
-            self.runtime.tensor_to_jl(arg, pin_fill=i in self.dynamic_args)
-            for i, arg in enumerate(args)
-        ]
-        results = finch_fn(*raw_args)
-        return tuple(self.runtime.tensor_to_python(result) for result in results)
+        return self.runtime.kernel_call(self.func_name, args)
 
 class FinchJLLibrary(AssemblyLibrary):
     def __init__(self, kernel_dict):
@@ -362,6 +358,7 @@ class FinchJLCompiler(NotationCompiler):
                 kernel = FinchJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name),
+                    func,
                     dynamic_args=dynamic_args,
                     runtime=self.runtime,
                 )

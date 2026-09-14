@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 import numpy as np
@@ -5,6 +7,7 @@ import numpy as np
 import finch as ft
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
+from finch.compile_jl.compiler import FinchJLKernel
 from finch.compile_jl.interop import _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
 from finch.compile_jl.runtime import DefaultFinchJLRuntime, FinchJLRuntime
@@ -51,11 +54,23 @@ def test_finch_julia_runtime_is_abstract():
 
 def test_default_julia_runtime_caches_kernels():
     runtime = DefaultFinchJLRuntime()
-    kernel = object()
+    kernel = SimpleNamespace(func_name="kernel")
 
     assert runtime.get_cached_kernel("kernel") is None
     runtime.cache_kernel("kernel", kernel)
     assert runtime.get_cached_kernel("kernel") is kernel
+
+
+def test_julia_kernel_delegates_calls_to_runtime():
+    calls = []
+    kernel = FinchJLKernel.__new__(FinchJLKernel)
+    kernel.func_name = "kernel"
+    kernel.runtime = SimpleNamespace(
+        kernel_call=lambda func_name, args: calls.append((func_name, args)) or ("ok",)
+    )
+
+    assert kernel(1, 2) == ("ok",)
+    assert calls == [("kernel", (1, 2))]
 
 
 def test_default_julia_runtime_reuses_buffers_after_kernel_invocation():
