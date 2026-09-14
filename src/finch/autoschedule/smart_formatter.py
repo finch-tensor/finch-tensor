@@ -54,7 +54,9 @@ def optimize_format(
     fill_ftype = ftype(fill_value)
     leaf = element(fill_value, fill_ftype)
     val_size = np_dtype(fill_ftype.dtype).itemsize
-    pos_size = np_dtype(leaf.position_type).itemsize
+    pos_dtype = np_dtype(leaf.position_type)
+    assert pos_dtype is not None
+    pos_size = pos_dtype.itemsize
 
     # memoizing (l,nnz) : (best_cost,best_fmt)
     memo = {}

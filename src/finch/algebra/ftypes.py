@@ -1070,8 +1070,14 @@ def ftype(x: Any) -> FType:
         return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
     raise NotImplementedError
 
+@overload
+def np_dtype(dtype: None) -> None: ...
+@overload
+def np_dtype(dtype: type[np.generic] | np.dtype | FType) -> np.dtype: ...
 
-def np_dtype(dtype) -> np.dtype:
+def np_dtype(dtype) -> np.dtype | None:
+    if dtype is None:
+        return None
     if isinstance(dtype, type) and issubclass(dtype, np.generic):
         return np.dtype(dtype)
     if isinstance(dtype, np.dtype):
