@@ -121,19 +121,34 @@ def create_log_simple_node():
             log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
                 log.Alias("AB"),
-                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("A"), log.Alias("B"))),
+                log.MapJoin(
+                    log.Literal(ffuncs.mul),
+                    (
+                        log.Table(log.Alias("A"), (i, j)),
+                        log.Table(log.Alias("B"), (k, j)),
+                    ),
+                ),
             ),
             # matmul
             log.Query(
                 log.Alias("C"),
                 log.Aggregate(
-                    log.Literal(ffuncs.add), log.Literal(0), log.Alias("AB"), (k,)
+                    log.Literal(ffuncs.add),
+                    log.Literal(0),
+                    log.Table(log.Alias("AB"), (i, j, k)),
+                    (k,),
                 ),
             ),
             # elemwise
             log.Query(
                 log.Alias("RES"),
-                log.MapJoin(log.Literal(ffuncs.mul), (log.Alias("C"), log.Alias("S"))),
+                log.MapJoin(
+                    log.Literal(ffuncs.mul),
+                    (
+                        log.Table(log.Alias("C"), (i, j)),
+                        log.Table(log.Alias("S"), (i, j)),
+                    ),
+                ),
             ),
             log.Produces((log.Alias("RES"),)),
         )

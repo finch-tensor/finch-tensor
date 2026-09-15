@@ -8,6 +8,7 @@ import numpy as np
 import finch as ft
 from finch import ffuncs
 from finch.algebra import TensorFType, TupleFType, ftype
+from finch.algebra.fill import StaticFill
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
 from finch.autoschedule.smart_formatter import FDFormatter, SmartFormatter
@@ -183,7 +184,7 @@ def test_sampling_aggregate():
 
     node = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(k,),
     )
@@ -430,7 +431,7 @@ def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     stats = FDStats(base, dense_props={frozenset({i})})
 
     ftype = FDFormatter().get_tensor_ftype(
-        0,
+        StaticFill(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -450,7 +451,7 @@ def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
     )
 
     ftype = FDFormatter().get_tensor_ftype(
-        0,
+        StaticFill(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -1020,7 +1021,9 @@ def test_dummy_aggregate():
     i, j = Field("i"), Field("j")
     table = Table(Literal(ft.asarray(np.eye(10))), (i, j))
 
-    node_sum = Aggregate(op=Literal(ffuncs.add), init=None, arg=table, idxs=(j,))
+    node_sum = Aggregate(
+        op=Literal(ffuncs.add), init=Literal(0.0), arg=table, idxs=(j,)
+    )
     stats = insert_statistics(
         stats_factory=DummyStatsFactory(),
         node=node_sum,
@@ -1259,7 +1262,7 @@ def test_vp_aggregate():
 
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(j,),
     )
@@ -1473,7 +1476,7 @@ def test_uniform_aggregate():
     table = Table(Literal(ft.asarray(data)), (Field("i"), Field("j")))
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )
@@ -1928,7 +1931,7 @@ def test_aggregate():
 
     node_add = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )

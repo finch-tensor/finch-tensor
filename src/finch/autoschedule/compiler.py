@@ -412,6 +412,7 @@ class NotationGenerator(LogicNotationLowerer):
             match node:
                 case ntn.Return(expr):
                     ret_t = expr.result_type
+        assert ret_t is not None
         return ntn.Module(
             (
                 ntn.Function(

@@ -71,6 +71,7 @@ def concordize(
                 swizzle_queries = _get_swizzle_queries(lhs)
                 return Plan((q, *swizzle_queries))
 
+    assert isinstance(root, Plan)
     root = flatten_plans(root)
     match root:
         case Plan(bodies) if isinstance(bodies[-1], Produces):
@@ -93,7 +94,8 @@ def add_output_orders(prgm: LogicStatement) -> LogicStatement:
     for stmt in PostOrderDFS(prgm):
         match stmt:
             case Produces(vars):
-                produced_aliases.update(vars)
+                assert all(isinstance(v, Alias) for v in vars)
+                produced_aliases.update(vars)  # ty: ignore[invalid-argument-type]
 
     def rule_1(node: LogicNode) -> LogicNode | None:
         match node:
@@ -165,7 +167,7 @@ def drop_internal_reorders(
                         MapJoin(
                             op,
                             tbl,
-                            Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs),
+                            Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs),  # ty: ignore[too-many-positional-arguments]
                         ),
                         idxs,
                     ),
@@ -285,32 +287,36 @@ class AbstractLoopOrderer(LogicLoopOrderOptimizer):
 
     def lower(
         self,
-        prgm: LogicStatement,
+        prgm: Plan,
         bindings: dict[Alias, TensorFType],
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
         def loop_order_transform(prgm, bindings):
             prgm = add_output_orders(prgm)
+            assert isinstance(prgm, Plan)
             output_fields = {
                 body.lhs: body.rhs.fields()
                 for body in prgm.bodies
                 if isinstance(body, Query)
             }
             prgm = drop_internal_reorders(prgm, keep_loop_orders=False)
+            assert isinstance(prgm, Plan)
             prgm = self.set_loop_orders(
                 prgm, stats, stats_factory, output_fields=output_fields
             )
             prgm = push_fields(prgm)
+            assert isinstance(prgm, Plan)
             prgm = concordize(prgm, bindings)
             prgm = drop_internal_reorders(prgm, keep_loop_orders=True)
             prgm = propagate_copy_queries(prgm, bindings)
             prgm = flatten_plans(prgm)
             return prgm, bindings
 
-        prgm, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
-        prgm = flatten_plans(prgm)
-        return self.ctx(prgm, bindings, stats, stats_factory)
+        stmt, bindings = with_unique_lhs(loop_order_transform, prgm, bindings)
+        assert isinstance(stmt, Plan)
+        stmt = flatten_plans(stmt)
+        return self.ctx(stmt, bindings, stats, stats_factory)
 
 
 class DefaultLoopOrderer(AbstractLoopOrderer):
