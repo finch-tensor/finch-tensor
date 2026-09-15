@@ -212,7 +212,7 @@ def test_value_pool_rejects_foreign_operands_with_matching_ids():
 
 def test_value_pool_nodes_are_frozen_and_fresh_nodes_are_distinct():
     pool = _ValuePool()
-    first = pool.fresh()
+    first = cast(Any, pool.fresh())
     second = pool.fresh()
     literal = cast(Any, pool.literal(int, 1))
     derived = cast(Any, pool.derived(Query, (first,), metadata=("base",)))
@@ -638,6 +638,7 @@ def test_frontend_generated_elementwise_queries():
         x.ctx.join(y.ctx, z.ctx).trace() + (Produces((x.data, y.data, z.data)),)
     )
     plan, tensors = extract_tensors(plan, {})
+    assert isinstance(plan, Plan)
     result = logic_local_value_numbering(
         plan, {alias: ftype(tns) for alias, tns in tensors.items()}
     )
