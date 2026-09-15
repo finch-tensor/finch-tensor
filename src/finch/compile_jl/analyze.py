@@ -77,9 +77,9 @@ def reset_argument_positions(function: ntn.Function) -> frozenset[int]:
 
 def _return_rule(node: Any, values: list[tuple[Any, ...] | None]) -> None:
     match node:
-        case ntn.Return(
-            ntn.Call(ntn.Literal(operator), arguments)
-        ) if operator == make_tuple:
+        case ntn.Return(ntn.Call(ntn.Literal(operator), arguments)) if (
+            operator == make_tuple
+        ):
             values.append(arguments)
         case ntn.Return(ntn.Variable() as value):
             values.append((value,))

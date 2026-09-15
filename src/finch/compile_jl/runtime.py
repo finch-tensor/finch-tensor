@@ -148,9 +148,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 tensor, JuliaOwnedTensor
             ):
                 ftype = tensor.ftype
-                lease = self.free_pool.acquire(
-                    ftype, tensor.shape, pin_fill=pin_fill
-                )
+                lease = self.free_pool.acquire(ftype, tensor.shape, pin_fill=pin_fill)
                 owned = JuliaOwnedTensor(
                     ftype,
                     lease.key.shape,
@@ -208,9 +206,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._owned_by_buffer.pop(key, None)
 
     @staticmethod
-    def _tensor_cache_key(
-        tensor: Tensor, pin_fill: bool = False
-    ) -> _TensorCacheKey:
+    def _tensor_cache_key(tensor: Tensor, pin_fill: bool = False) -> _TensorCacheKey:
         if isinstance(tensor, BufferizedNDArray):
             array = tensor.to_numpy()
             return _TensorCacheKey(
