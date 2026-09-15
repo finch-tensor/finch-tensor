@@ -205,10 +205,15 @@ class _LowerPackedStructSlotsContext:
             case asm.Block(bodies):
                 stmts: list[asm.AssemblyStatement] = []
                 for body in bodies:
+                    assert isinstance(body, asm.AssemblyStatement)
                     body_2 = self.stmt(body)
                     match body_2:
                         case asm.Block(nested):
-                            stmts.extend(nested)
+                            assert all(
+                                isinstance(stmt, asm.AssemblyStatement)
+                                for stmt in nested
+                            )
+                            stmts.extend(nested)  # ty: ignore[invalid-argument-type]
                         case _:
                             stmts.append(body_2)
                 return asm.Block(tuple(stmts))

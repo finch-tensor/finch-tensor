@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import MutableMapping
 from typing import Any, Generic, TypeVar
 
 from finch.algebra import AbstractFill, FinchOperator
@@ -20,25 +20,29 @@ class TensorStats(ABC):
 
     @property
     @abstractmethod
-    def dim_sizes(self) -> Mapping[Field, float]: ...
+    def dim_sizes(self) -> MutableMapping[Field, float]: ...
 
     @property
     @abstractmethod
     def fill_value(self) -> AbstractFill: ...
 
-
-T = TypeVar("T", bound=TensorStats)
-
-
-class StatsFactory(ABC, Generic[T]):
+    @fill_value.setter
     @abstractmethod
-    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> T: ...
+    def fill_value(self, value: AbstractFill) -> None: ...
+
+
+TS = TypeVar("TS", bound=TensorStats)
+
+
+class StatsFactory(ABC, Generic[TS]):
+    @abstractmethod
+    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> TS: ...
 
     @abstractmethod
-    def copy(self, stat: T) -> T: ...
+    def copy(self, stat: TS) -> TS: ...
 
     @abstractmethod
-    def mapjoin(self, op: FinchOperator, *args: T) -> T: ...
+    def mapjoin(self, op: FinchOperator, *args: TS) -> TS: ...
 
     @abstractmethod
     def aggregate(
@@ -46,11 +50,11 @@ class StatsFactory(ABC, Generic[T]):
         op: FinchOperator,
         init: Any | None,
         reduce_indices: tuple[Field, ...],
-        stats: T,
-    ) -> T: ...
+        stats: TS,
+    ) -> TS: ...
 
     @abstractmethod
-    def relabel(self, stats: T, relabel_indices: tuple[Field, ...]) -> T: ...
+    def relabel(self, stats: TS, relabel_indices: tuple[Field, ...]) -> TS: ...
 
     @abstractmethod
-    def reorder(self, stats: T, reorder_indices: tuple[Field, ...]) -> T: ...
+    def reorder(self, stats: TS, reorder_indices: tuple[Field, ...]) -> TS: ...
