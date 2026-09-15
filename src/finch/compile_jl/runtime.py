@@ -202,6 +202,11 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         return owned
 
     def _drop_source_buffer(self, key: _TensorCacheKey) -> None:
+        """Drop cached Julia state once its Python source tensor is collected.
+
+        Cached conversions retain Julia-owned buffers, so their entries must not
+        outlive the Python tensor that owns the backing storage.
+        """
         self._source_finalizers.pop(key, None)
         self._owned_by_buffer.pop(key, None)
 

@@ -65,16 +65,29 @@ def test_default_julia_runtime_caches_kernels():
     assert runtime.get_cached_kernel("kernel") is kernel
 
 
+class RecordingFinchJLRuntime(FinchJLRuntime):
+    def __init__(self):
+        self.calls = []
+
+    def get_cached_kernel(self, key):
+        return None
+
+    def cache_kernel(self, key, kernel):
+        pass
+
+    def kernel_call(self, func_name, args):
+        self.calls.append((func_name, args))
+        return ("ok",)
+
+
 def test_julia_kernel_delegates_calls_to_runtime():
-    calls = []
     kernel = FinchJLKernel.__new__(FinchJLKernel)
     kernel.func_name = "kernel"
-    kernel.runtime = SimpleNamespace(
-        kernel_call=lambda func_name, args: calls.append((func_name, args)) or ("ok",)
-    )
+    runtime = RecordingFinchJLRuntime()
+    kernel.runtime = runtime
 
     assert kernel(1, 2) == ("ok",)
-    assert calls == [("kernel", (1, 2))]
+    assert runtime.calls == [("kernel", (1, 2))]
 
 
 def test_default_julia_runtime_reuses_buffers_after_kernel_invocation():

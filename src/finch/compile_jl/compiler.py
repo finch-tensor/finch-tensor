@@ -169,16 +169,12 @@ class FinchJLGenerator:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
                 proto_str = "\n".join(proto_lines)
-                inner_name = f"{name}_finch"
                 return (
                     "eval(let\n"
                     f"{proto_str}\n"
-                    f"    Finch.@finch_kernel function {inner_name}({arg_str})\n"
+                    f"    Finch.@finch_kernel function {name}({arg_str})\n"
                     f"{body_str}\n    end\n"
-                    "end)\n"
-                    f"@inline function {name}({arg_str})\n"
-                    f"    return Tuple({inner_name}({arg_str}))\n"
-                    "end"
+                    "end)"
                 )
 
             case ntn.Block(bodies):

@@ -344,22 +344,3 @@ def test_compile_julia_evaluates_variadic_and_or_call(
     from finch.compile_jl.julia import jl
 
     assert jl.seval(generated) == expected
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        (ntn.Variable("left"), ntn.Variable("right")),
-        (ntn.Variable("value"),),
-        (),
-    ],
-)
-def test_compile_julia_generator_returns_tuple(values):
-    from finch.compile_jl.compiler import FinchJLGenerator
-
-    returned = ntn.Return(ntn.Call(ntn.Literal(ffuncs.make_tuple), values))
-    func = ntn.Function(ntn.Variable("generated_return"), (), returned)
-
-    generated = FinchJLGenerator()(func)
-
-    assert "return Tuple(generated_return_finch())" in generated
