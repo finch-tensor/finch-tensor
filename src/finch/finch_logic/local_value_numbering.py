@@ -2,24 +2,16 @@
 
 Adapted from the hash-based local value-numbering approach in Steven S. Muchnick,
 Advanced Compiler Design and Implementation (1997), section 12.4.1, pp. 344-348.
-Unlike its Remove routine (Figure 12.14, p. 347), this analysis versions changed
-operands rather than deleting historical expression keys. The table records value
-equivalence, not available replacement candidates. It does not implement the
-textbook's rewrites, commutative matching, or global algorithm in section 12.4.2.
-
-This analysis records values immediately after definitions, not the current
-contents of all tensors ever assigned those values. Equal value numbers do not
-prove that a replacement is available or that two outputs may share storage.
-Branches, loops, reductions and general alias/effect analysis are not supported.
+Changed operands receive fresh versions; historical expression keys are retained.
 """
 
-from collections.abc import Iterator
-from dataclasses import dataclass
-from typing import Any
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 import numpy as np
 
-from finch.algebra import FType, TensorFType, ffuncs, ftype, return_type
+from finch.algebra import ffuncs
 from finch.symbolic import PostOrderDFS
 
 from .nodes import (
@@ -36,24 +28,28 @@ from .nodes import (
     Table,
 )
 
-_NUMPY_SCALARS = (
-    np.int8,
-    np.int16,
-    np.int32,
-    np.int64,
-    np.uint8,
-    np.uint16,
-    np.uint32,
-    np.uint64,
-    np.float16,
-    np.float32,
-    np.float64,
-    np.complex64,
-    np.complex128,
-)
-_SCALARS = (int, float, complex, *_NUMPY_SCALARS)
-_NUMPY_TYPES = tuple(ftype(t) for t in _NUMPY_SCALARS)
-_TYPES = tuple(ftype(t) for t in _SCALARS)
+
+class _RankedTensor(Protocol):
+    @property
+    def ndim(self) -> int: ...
+
+
+def _literal_bits(value: Any) -> int | bytes | None:
+    scalar_type = type(value)
+    if scalar_type is int:
+        return value
+    if scalar_type is float or scalar_type is complex:
+        return np.asarray(value).tobytes()
+    if type(scalar_type) is type and issubclass(scalar_type, np.generic):
+        dtype = np.dtype(scalar_type)
+        # Exclude custom scalars and extended formats with non-value padding.
+        if (
+            scalar_type is dtype.type
+            and dtype.kind in "iufc"
+            and dtype.itemsize <= (16 if dtype.kind == "c" else 8)
+        ):
+            return np.asarray(value).tobytes()
+    return None
 
 
 @dataclass(frozen=True)
@@ -74,8 +70,9 @@ class LogicDefinition:
 class LogicLocalValueNumberingResult:
     """Definition snapshots and stored-value equivalence within a single plan.
 
-    ``uses`` records query-entry definitions referenced by the RHS. For opaque
-    expressions it does not resolve reads after effects nested inside that RHS.
+    ``uses[sid]`` lists query-entry definition IDs in RHS traversal order,
+    including repeats, not per-read facts across nested effects in opaque RHSs.
+    All IDs and value numbers are local to this analysis run.
     """
 
     definitions: dict[int, LogicDefinition]
@@ -94,12 +91,100 @@ class LogicLocalValueNumberingResult:
         return {vn: tuple(sids) for vn, sids in groups.items()}
 
 
+@dataclass(frozen=True, eq=False)
+class _NumberedValue:
+    id: int = field(compare=False)
+    _owner: object = field(compare=False)
+
+
+@dataclass(frozen=True)
+class _LiteralValue(_NumberedValue):
+    scalar_type: type
+    payload: int | bytes
+
+
+@dataclass(frozen=True, eq=False)
+class _DerivedValue(_NumberedValue):
+    kind: type
+    operands: tuple[_NumberedValue, ...]
+    op: object | None = None
+    metadata: tuple = ()
+
+    def __hash__(self) -> int:
+        # Canonical operand IDs keep hashing shallow, even for deep graphs.
+        return hash(
+            (
+                self.kind,
+                id(self.op),
+                tuple(operand.id for operand in self.operands),
+                self.metadata,
+            )
+        )
+
+    def __eq__(self, other: object) -> bool:
+        match other:
+            case _DerivedValue():
+                return (
+                    self.kind is other.kind
+                    and self.op is other.op
+                    and self.metadata == other.metadata
+                    and len(self.operands) == len(other.operands)
+                    and all(
+                        a is b
+                        for a, b in zip(self.operands, other.operands, strict=True)
+                    )
+                )
+            case _:
+                return NotImplemented
+
+
+class _ValuePool:
+    def __init__(self) -> None:
+        self._values: dict[_NumberedValue, _NumberedValue] = {}
+        self._next_id = 0
+        self._owner = object()
+
+    def fresh(self) -> _NumberedValue:
+        value = _NumberedValue(self._next_id, self._owner)
+        self._next_id += 1
+        return value
+
+    def literal(self, scalar_type: type, payload: int | bytes) -> _NumberedValue:
+        return self._intern(
+            _LiteralValue(self._next_id, self._owner, scalar_type, payload)
+        )
+
+    def derived(
+        self,
+        kind: type,
+        operands: tuple[_NumberedValue, ...],
+        *,
+        op: object | None = None,
+        metadata: tuple = (),
+    ) -> _NumberedValue:
+        for operand in operands:
+            if operand._owner is not self._owner:
+                raise ValueError("Cannot derive values from a different pool")
+        return self._intern(
+            _DerivedValue(self._next_id, self._owner, kind, operands, op, metadata)
+        )
+
+    def _intern(self, candidate: _NumberedValue) -> _NumberedValue:
+        value = self._values.setdefault(candidate, candidate)
+        if value is candidate:
+            self._next_id += 1
+        return value
+
+
 @dataclass(frozen=True)
 class _Value:
-    number: int
-    dtype: FType | None
+    node: _NumberedValue
     ndim: int | None
     materialized: bool = False
+
+    @property
+    def number(self) -> int:
+        return self.node.id
 
 
 @dataclass(frozen=True)
@@ -123,28 +208,15 @@ def _statements(node: LogicStatement) -> Iterator[Query | Produces]:
 
 
 class _LogicLocalValueNumbering:
-    def __init__(self, bindings: dict[Alias, TensorFType]):
+    def __init__(self, bindings: Mapping[Alias, _RankedTensor]):
         self.result = LogicLocalValueNumberingResult({}, {}, {}, {})
         self.values: dict[Alias, _Value] = {}
         self.external = tuple(bindings)
-        self.table: dict[tuple, int] = {}
-        self.next_value = 0
+        self.pool = _ValuePool()
         self.next_version = -1
         for alias, tp in bindings.items():
-            dtype: FType | None = tp.element_type
-            dtype = dtype if any(dtype is t for t in _TYPES) else None
-            value = _Value(self.fresh(), dtype, tp.ndim)
+            value = _Value(self.pool.fresh(), tp.ndim)
             self.version(alias, value)
-
-    def fresh(self) -> int:
-        number = self.next_value
-        self.next_value += 1
-        return number
-
-    def intern(self, key: tuple) -> int:
-        if key not in self.table:
-            self.table[key] = self.fresh()
-        return self.table[key]
 
     def record(self, definition: LogicDefinition, value: _Value) -> None:
         self.result.definitions[definition.sid] = definition
@@ -161,8 +233,7 @@ class _LogicLocalValueNumbering:
         for alias in aliases:
             old = self.values[alias]
             value = _Value(
-                self.fresh(),
-                None if unknown_effect else old.dtype,
+                self.pool.fresh(),
                 None if unknown_effect else old.ndim,
             )
             self.version(alias, value, sid)
@@ -191,14 +262,15 @@ class _LogicLocalValueNumbering:
         match expr:
             case Table(Alias() as alias, fields):
                 value = self.values[alias]
-                if value.dtype is not None:
+                if value.ndim is not None:
                     return _Expression(value, fields)
-            case Literal(val) if type(val) in _SCALARS:
-                # Literal/StaticFill equality collapses signed zero. Exact scalar
-                # types and bytes also preserve complex signs and NaN payloads.
-                bits: Any = val if type(val) is int else np.asarray(val).tobytes()
-                number = self.intern((Literal, type(val), bits))
-                return _Expression(_Value(number, ftype(val), 0), ())
+            case Literal(val):
+                # Exact type/bits preserve signed zero and NaN payloads.
+                bits = _literal_bits(val)
+                if bits is None:
+                    return None
+                node = self.pool.literal(type(val), bits)
+                return _Expression(_Value(node, 0), ())
             case MapJoin(Literal(op), args) if (
                 any(op is f for f in (ffuncs.add, ffuncs.sub, ffuncs.mul))
                 and len(args) == 2
@@ -210,29 +282,16 @@ class _LogicLocalValueNumbering:
                 fields = tuple(dict.fromkeys(f for arg in known for f in arg.fields))
                 if any(arg.fields and set(arg.fields) != set(fields) for arg in known):
                     return None  # Broadcasting between non-scalar arrays.
-                types = [
-                    arg.value.dtype for arg in known if arg.value.dtype is not None
-                ]
-                if len(types) != len(known):
-                    return None
-                # Only trusted operators on exact, standard numeric types reach
-                # Finch's inference, which evaluates operators on sample scalars.
-                try:
-                    dtype = return_type(op, *types)
-                except (TypeError, ValueError, NotImplementedError):
-                    return None
-                if not any(dtype is t for t in _TYPES):
-                    return None
-                key = (
-                    MapJoin,
-                    op,
-                    tuple(
-                        (arg.value.number, tuple(fields.index(f) for f in arg.fields))
-                        for arg in known
-                    ),
-                    dtype,
+                axis_mappings = tuple(
+                    tuple(fields.index(f) for f in arg.fields) for arg in known
                 )
-                return _Expression(_Value(self.intern(key), dtype, len(fields)), fields)
+                node = self.pool.derived(
+                    MapJoin,
+                    tuple(arg.value.node for arg in known),
+                    op=op,
+                    metadata=axis_mappings,
+                )
+                return _Expression(_Value(node, len(fields)), fields)
             case Reorder(arg, fields):
                 inner = self.expression(arg)
                 if inner is None:
@@ -244,21 +303,17 @@ class _LogicLocalValueNumbering:
                 if fields == inner.fields:
                     return inner
                 permutation = tuple(inner.fields.index(f) for f in fields)
-                number = self.intern((Reorder, inner.value.number, permutation))
-                return _Expression(
-                    _Value(number, inner.value.dtype, len(fields)), fields
+                node = self.pool.derived(
+                    Reorder, (inner.value.node,), metadata=(permutation,)
                 )
+                return _Expression(_Value(node, len(fields)), fields)
         return None
 
     def materialize(self, value: _Value) -> _Value:
-        # Keep the Query boundary: literal and external tensor metadata need not
-        # survive allocation unchanged. Copies of known numeric local results are
-        # idempotent. Operand VNs carry shape/fill provenance without comparing
-        # DynamicFill objects (whose equality intentionally ignores their values).
+        # First allocation may change metadata; later copies preserve it.
         if value.materialized:
             return value
-        dtype = value.dtype if any(value.dtype is t for t in _NUMPY_TYPES) else None
-        return _Value(self.intern((Query, value.number)), dtype, value.ndim, True)
+        return _Value(self.pool.derived(Query, (value.node,)), value.ndim, True)
 
     def analyze(self, plan: Plan) -> LogicLocalValueNumberingResult:
         sid = 0
@@ -273,22 +328,19 @@ class _LogicLocalValueNumbering:
                     old = self.values.get(lhs)
                     if expr is None:
                         self.invalidate(tuple(self.values), sid, unknown_effect=True)
-                        value = _Value(self.fresh(), None, None)
+                        value = _Value(self.pool.fresh(), None)
                     else:
                         value = self.materialize(expr.value)
                     if lhs in self.external:
                         self.invalidate(self.external, sid)
                         value = _Value(
-                            self.fresh(),
-                            old.dtype if old and expr is not None else None,
+                            self.pool.fresh(),
                             old.ndim if old and expr is not None else None,
                         )
                     elif old is not None and old.number != value.number:
-                        # Equal rank/type is not proof of equal extents or fill.
-                        # Preserve storage metadata only for modeled writes.
+                        # Equal rank does not imply equal extents, dtype or fill.
                         value = _Value(
-                            self.fresh(),
-                            old.dtype if expr is not None else None,
+                            self.pool.fresh(),
                             old.ndim if expr is not None else None,
                         )
                     self.record(LogicDefinition(sid, lhs, stmt), value)
@@ -297,21 +349,23 @@ class _LogicLocalValueNumbering:
 
 
 def logic_local_value_numbering(
-    plan: Plan, bindings: dict[Alias, TensorFType]
+    plan: Plan, bindings: Mapping[Alias, _RankedTensor]
 ) -> LogicLocalValueNumberingResult:
     """Locally number query definitions and equivalent stored values without rewriting.
 
-    Inputs must be aliased Logic with defined RHS reads. Query IDs start at zero;
-    ``uses[sid]`` lists query-entry definition/version IDs in RHS traversal order,
-    including repeated references. For an opaque RHS, these are not per-read facts
-    across nested effects. IDs and value numbers are local to this invocation.
+    Requires aliased Logic with defined RHS reads and bindings providing ``ndim``.
+    Recognized arithmetic, including overloaded scalar operations, must be pure,
+    deterministic and well-typed; no purity checks or dtype inference are performed.
+    New Query destinations must have independent storage; copies of stored results
+    must preserve contents, shape, dtype and fill.
 
-    Recognizes ordered numeric add/subtract/multiply, scalar literals, copies and
-    rank-preserving reorders. External writes invalidate every external binding;
-    unsupported expressions conservatively invalidate all current tensor facts.
-    Materialization boundaries are retained, so a copy of an external tensor or a
-    literal need not share its source's number. Historical equivalence is not CSE
-    availability, storage identity, or equivalence across separate plan executions.
+    Recognizes ordered add/subtract/multiply, exactly encodable numeric literals,
+    copies and rank-preserving reorders, but not branches, loops or reductions.
+    External writes invalidate every external binding; unsupported expressions
+    conservatively invalidate all current tensor facts.
+    First materialization retains a distinct number from its source. Equivalence
+    describes definition snapshots, not current contents, CSE availability or
+    shared storage.
     """
     if not isinstance(plan, Plan):
         raise TypeError("Value numbering requires a Logic Plan")
