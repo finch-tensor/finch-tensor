@@ -115,9 +115,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernels_by_name: dict[str, Any] = {}
         self._kernel_metadata: dict[str, _KernalMetadata] = {}
         self._owned_by_buffer: dict[_TensorCacheKey, JuliaOwnedTensor] = {}
-        self._buffer_tokens: dict[_TensorCacheKey, int] = {}
-        self._source_finalizers: dict[int, weakref.finalize] = {}
-        self._next_buffer_token = 0
+        self._source_finalizers: dict[_TensorCacheKey, weakref.finalize] = {}
         self.free_pool = _BufferPool()
 
     def get_cached_kernel(self, key):
@@ -200,19 +198,13 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             pin_fill,
         )
         self._owned_by_buffer[key] = owned
-        self._next_buffer_token += 1
-        token = self._next_buffer_token
-        self._buffer_tokens[key] = token
-        self._source_finalizers[token] = weakref.finalize(
-            tensor, self._drop_source_buffer, key, token
+        self._source_finalizers[key] = weakref.finalize(
+            tensor, self._drop_source_buffer, key
         )
         return owned
 
-    def _drop_source_buffer(self, key: _TensorCacheKey, token: int) -> None:
-        if self._buffer_tokens.get(key) != token:
-            return
-        self._buffer_tokens.pop(key, None)
-        self._source_finalizers.pop(token, None)
+    def _drop_source_buffer(self, key: _TensorCacheKey) -> None:
+        self._source_finalizers.pop(key, None)
         self._owned_by_buffer.pop(key, None)
 
     @staticmethod
@@ -252,7 +244,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernels_by_name.clear()
         self._kernel_metadata.clear()
         self._owned_by_buffer.clear()
-        self._buffer_tokens.clear()
         self._source_finalizers.clear()
 
 
