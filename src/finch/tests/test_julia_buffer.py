@@ -10,7 +10,11 @@ from finch.compile_jl.buffer import MinusOneBuffer
 from finch.compile_jl.compiler import FinchJLKernel
 from finch.compile_jl.interop import _jl_index_buffer_to_python
 from finch.compile_jl.julia import jl, julia_available
-from finch.compile_jl.runtime import DefaultFinchJLRuntime, FinchJLRuntime
+from finch.compile_jl.runtime import (
+    DefaultFinchJLRuntime,
+    FinchJLRuntime,
+    JuliaOwnedTensor,
+)
 
 
 def _requires_julia_backend():
@@ -81,10 +85,36 @@ def test_default_julia_runtime_reuses_buffers_after_kernel_invocation():
     first_arg = ft.asarray(data)
     first_jl = context._tensor_to_jl(first_arg)
 
-    returned_jl = jl.first_arg(first_jl)
-    context._tensor_to_python(returned_jl)
+    result = context._to_julia_owned_tensor(first_arg)
+
+    assert isinstance(result, JuliaOwnedTensor)
+    assert context._tensor_to_jl(result) is first_jl
 
     second_arg = ft.asarray(data)
     second_jl = context._tensor_to_jl(second_arg)
 
     assert second_jl is first_jl
+
+
+def test_default_julia_runtime_reuses_released_result_buffers():
+    _requires_julia_backend()
+
+    context = DefaultFinchJLRuntime()
+    tensor = ft.asarray(np.arange(4, dtype=np.float64))
+    pool = context.free_pool
+    lease = pool.acquire(tensor.ftype, tensor.shape, pin_fill=False)
+    result = JuliaOwnedTensor(
+        tensor.ftype,
+        lease.key.shape,
+        context,
+        lease.raw,
+        lease.key.pin_fill,
+        lease=lease,
+    )
+    raw = lease.raw
+
+    context.release(result)
+
+    reused = pool.acquire(tensor.ftype, tensor.shape, pin_fill=False)
+
+    assert reused.raw is raw
