@@ -173,10 +173,10 @@ def _compile_julia_fd(formatter):
 def _to_csr(fbr: FiberTensor) -> FiberTensor:
     """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
     own reformat, regardless of its current level structure (e.g. SparseHash)."""
-    from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
+    from finch.compile_jl import jl_tensor_to_python, python_tensor_to_jl
     from finch.compile_jl.julia import jl
 
-    jl_obj = tensor_to_jl(fbr)
+    jl_obj = python_tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
     return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
 
@@ -230,9 +230,12 @@ def test_compile_julia_sums_sparse_bytemap_level():
 
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
+    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = RecordingFDFormatter(
+        LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime()))
+    )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
     arg = ft.asarray(data)
@@ -265,6 +268,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     op_name,
 ):
     _requires_julia_backend()
+    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
     sparse_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
@@ -280,7 +284,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = FDFormatter(LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime())))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a

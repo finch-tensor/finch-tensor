@@ -267,10 +267,12 @@ def _ndarray_to_jl_tensor(
     return jl.Tensor(lvl)
 
 
-def tensor_to_jl(obj, pin_fill: bool = False):
+def python_tensor_to_jl(obj, pin_fill: bool = False):
     """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
     forced to a zero of their dtype so the argument types line up with a
     kernel compiled under `zero_dynamic_fills`."""
+    if hasattr(obj, "raw_julia_obj"):
+        return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, FiberTensor):
@@ -308,44 +310,3 @@ def jl_tensor_to_python(obj):
     if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
         return obj
     return FiberTensor(jl_level_to_python(obj.lvl))
-
-
-class JuliaBufferContext:
-    """Keep Julia-owned tensor buffers alive across kernel invocations."""
-
-    def __init__(self):
-        self._tensors: dict[tuple[Any, ...], tuple[Any, Any]] = {}
-
-    @staticmethod
-    def _cache_key(obj):
-        # defer() can create a fresh wrapper around the same NumPy
-        # allocation, so wrapper identity alone would miss reuse.
-        if isinstance(obj, BufferizedNDArray):
-            arr = obj.to_numpy()
-            pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
-        if isinstance(obj, NumPyWrapper):
-            arr = obj._data
-            pointer = arr.__array_interface__["data"][0]
-            return ("numpy", pointer, arr.shape, arr.strides, arr.dtype.str)
-        # FiberTensors reuse their ids so we restrict cache keys to id.
-        return ("object", id(obj))
-
-    def tensor_to_jl(self, obj, *, pin_fill: bool = False):
-        key = self._cache_key(obj)
-        cached = self._tensors.get(key)
-        if cached is not None:
-            return cached[1]
-
-        jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
-        self._tensors[key] = (obj, jl_obj)
-        return jl_obj
-
-    def tensor_to_python(self, obj):
-        result = jl_tensor_to_python(obj)
-        if isinstance(result, FiberTensor):
-            self._tensors[self._cache_key(result)] = (result, obj)
-        return result
-
-    def close(self):
-        self._tensors.clear()
