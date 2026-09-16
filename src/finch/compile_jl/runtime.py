@@ -100,6 +100,11 @@ class JuliaOwnedTensor(Tensor):
             return values[0].item()
         return self._as_tensor().item()
 
+    def __getitem__(self, index):
+        if not self._shape:
+            return self.item()
+        return self._as_tensor().to_numpy()[index]
+
     def to_numpy(self):
         return self._as_tensor().to_numpy()
 
