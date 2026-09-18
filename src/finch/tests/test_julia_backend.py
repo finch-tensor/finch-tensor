@@ -265,7 +265,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     compiler = RecordingJLCompiler()
     scheduler = LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
             ),
             stats_factory=FDStatsFactory(),
