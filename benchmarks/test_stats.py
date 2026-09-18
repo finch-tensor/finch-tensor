@@ -16,7 +16,6 @@ The benchmark covers these statistics models:
 - ``DCStatsFactory`` estimates bounds from degree constraints.
 - ``LPStatsFactory`` computes bounds from a configurable set of p-norm statistics.
 - ``VPStatsFactory`` uses a database-theory-based statistics model.
-- ``DenseStatsFactory`` assumes the result occupies its full dense index space.
 
 Run: ``pixi run --environment=benchmark-julia pytest --codspeed
 benchmarks/test_stats.py``
@@ -34,7 +33,6 @@ from finch import ffuncs
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.autoschedule.tensor_stats import (
     DCStatsFactory,
-    DenseStatsFactory,
     LPStatsFactory,
     UniformStatsFactory,
     VPStatsFactory,
@@ -189,7 +187,6 @@ def est_triangle(factory, tns_a):
         pytest.param("dc", DCStatsFactory(), id="dc"),
         pytest.param("lp", LPStatsFactory(), id="lp"),
         pytest.param("vp", VPStatsFactory(), id="vp"),
-        pytest.param("dense", DenseStatsFactory(), id="dense"),
     ],
 )
 @pytest.mark.parametrize(
