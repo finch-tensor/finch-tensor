@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import scipy.sparse as sps
 
 from finch.algebra import (
+    AbstractFill,
+    DynamicFill,
     DynamicFillError,
     ImmutableStructFType,
+    StaticFill,
     TupleFType,
+    as_fill,
     bool_,
     ftype,
     is_dynamic,
@@ -51,6 +55,9 @@ class FiberTensor(OverrideTensor):
         Returns the ftype of the fiber tensor, which is a FiberTensorFType.
         """
         return FiberTensorFType(self.lvl.ftype, self._device)
+
+    def with_fill(self, fill_value: AbstractFill) -> FiberTensor:
+        return replace(self, lvl=self.lvl.with_fill(fill_value))
 
     @property
     def shape(self):
@@ -319,7 +326,13 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         """
         fmt = self
         if fill_value is not None:
-            fmt = self.with_fill(self.element_type(fill_value))
+            fill = as_fill(fill_value)
+            coerced = self.element_type(fill.value)
+            fmt = self.with_fill(
+                DynamicFill(coerced, self.element_type)
+                if is_dynamic(fill)
+                else StaticFill(coerced)
+            )
         elif is_dynamic(self.fill_value):
             raise DynamicFillError(
                 f"cannot construct {self!r} without a resolved fill value"
@@ -392,19 +405,19 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
     def lower_thaw(self, ctx, tns, op):
         return self.lvl_t.level_lower_thaw(ctx, ctx.fiber_level(tns), op, tns.pos)
 
-    def lower_unwrap(self, ctx, tns):
-        return self.lvl_t.level_lower_unwrap(ctx, tns, tns.pos)
+    def lower_unwrap(self, ctx, obj):
+        return self.lvl_t.level_lower_unwrap(ctx, obj, obj.pos)
 
-    def lower_increment(self, ctx, tns, op, val):
-        return self.lvl_t.level_lower_increment(ctx, tns, op, val, tns.pos)
+    def lower_increment(self, ctx, obj, op, val):
+        return self.lvl_t.level_lower_increment(ctx, obj, op, val, obj.pos)
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
             ctx, ctx.fiber_level(tns), init, op, shape, tns.pos
         )
 
-    def lower_dim(self, ctx, obj, r):
-        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), r)
+    def lower_dim(self, ctx, obj, i):
+        return self.lvl_t.level_lower_dim(ctx, ctx.fiber_level(obj), i)
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos, dirty_bit = args
@@ -420,7 +433,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         )
 
 
-def fiber_tensor(lvl: LevelFType):
+def fiber_tensor(lvl: LevelFType) -> FiberTensorFType:
     """
     Creates a FiberTensorFType with the given level ftype and position type.
 
@@ -429,6 +442,4 @@ def fiber_tensor(lvl: LevelFType):
     Returns:
         An instance of a fiber tensor format.
     """
-    # mypy does not understand that dataclasses generate __hash__ and __eq__
-    # https://github.com/python/mypy/issues/19799
-    return FiberTensorFType(lvl)  # type: ignore[abstract]
+    return FiberTensorFType(lvl)

@@ -4,8 +4,9 @@ from typing import Any, NamedTuple, cast
 import numpy as np
 
 import numba
+import numba.typed
 
-from finch.algebra import FType, TupleFType, ftype, ftypes
+from finch.algebra import FType, TupleFType, ftype, ftypes, np_dtype
 from finch.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_type
 from finch.codegen.mlir_codegen import (
     MLIRBufferFType,
@@ -13,7 +14,7 @@ from finch.codegen.mlir_codegen import (
     mlir_ctype,
     mlir_type,
 )
-from finch.codegen.numba_codegen import NumbaBufferFType, to_numpy_type
+from finch.codegen.numba_codegen import NumbaBufferFType
 from finch.finch_assembly import Buffer
 from finch.finch_assembly.nodes import AssemblyExpression
 from finch.util import qual_str
@@ -107,11 +108,11 @@ class NumpyBufferFType(
     """
 
     def __init__(self, element_type: FType):
-        self._element_type = ftype(to_numpy_type(ftype(element_type)))
+        self._element_type = ftype(np_dtype(ftype(element_type)))
 
     @property
     def _dtype(self):
-        return to_numpy_type(self._element_type)
+        return np_dtype(self._element_type)
 
     def __eq__(self, other):
         if not isinstance(other, NumpyBufferFType):

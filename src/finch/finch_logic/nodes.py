@@ -98,12 +98,12 @@ class TableValueFType(FType):
     tns: Any
     idxs: tuple[Field, ...]
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, TableValueFType):
             return False
         return self.tns == other.tns and self.idxs == other.idxs
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.tns, self.idxs))
 
 
@@ -116,14 +116,17 @@ class TableValue(FTyped):
     def ftype(self):
         return TableValueFType(ftype(self.tns), self.idxs)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if isinstance(self.tns, TableValue):
             raise ValueError("The tensor (tns) cannot be a TableValue")
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if not isinstance(other, TableValue):
             return False
         return (self.tns == other.tns).all() and self.idxs == other.idxs
+
+    def __hash__(self) -> int:
+        return hash((self.tns, self.idxs))
 
 
 @dataclass(eq=True, frozen=True)
@@ -138,7 +141,7 @@ class LogicNode(Term, ABC):
     """
 
     @classmethod
-    def head(cls):
+    def head(cls) -> Callable[..., Self]:
         """Returns the head of the node."""
         return cls
 
@@ -299,8 +302,6 @@ class Literal(LogicExpression, LiteralTerm):
         val: The literal value.
     """
 
-    val: Any
-
     def __hash__(self):
         try:
             return hash((type(self.val), self.val))
@@ -430,7 +431,7 @@ class Table(LogicTree, LogicExpression):
         idxs: The fields indexing the tensor.
     """
 
-    tns: Literal | Value | Alias
+    tns: Literal | Alias
     idxs: tuple[Field, ...]
 
     @property
@@ -451,7 +452,7 @@ class Table(LogicTree, LogicExpression):
                     f"Cannot resolve dims of Alias {self.tns.name}"
                 )
             return dim_bindings[self.tns]
-        raise NotImplementedError("Cannot resolve dims of Tables")
+        raise NotImplementedError(f"Cannot resolve dims of {type(self.tns).__name__}")
 
     def valmap(
         self,
@@ -734,7 +735,7 @@ class Produces(LogicTree, LogicStatement):
         args: The arguments to return.
     """
 
-    args: tuple[Alias, ...]
+    args: tuple[Alias | LogicExpression, ...]
 
     @property
     def children(self):

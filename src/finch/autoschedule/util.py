@@ -1,4 +1,4 @@
-from functools import reduce
+import itertools
 from typing import overload
 
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
@@ -90,18 +90,18 @@ def push_fields(root):
     return Rewrite(PreWalk(Fixpoint(rule_2)))(root)
 
 
-def flatten_plans(root):
-    def rule_0(ex):
+def flatten_plans(root: Plan) -> Plan:
+    def rule_0(ex: Plan) -> Plan:
         match ex:
             case Plan(bodies):
                 new_bodies = [
                     tuple(body.bodies) if isinstance(body, Plan) else (body,)
                     for body in bodies
                 ]
-                flatten_bodies = tuple(reduce(lambda x, y: x + y, new_bodies, ()))
+                flatten_bodies = tuple(itertools.chain(*new_bodies))
                 return Plan(flatten_bodies)
 
-    def rule_1(ex):
+    def rule_1(ex: Plan) -> Plan:
         match ex:
             case Plan(bodies):
                 body_iter = iter(bodies)
@@ -112,7 +112,9 @@ def flatten_plans(root):
                         break
                 return Plan(tuple(new_bodies))
 
-    return PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+    flat = PostWalk(Fixpoint(Chain([rule_0, rule_1])))(root)
+    assert flat is not None
+    return flat
 
 
 def propagate_copy_queries(root, bindings):

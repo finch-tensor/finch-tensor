@@ -21,6 +21,8 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.nodes import LogicExpression
 from finch.tensor import RandomMaskTensor
+from finch.finch_logic.tensor_stats import StatsFactory
+from finch.tensor import BufferizedNDArray
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
@@ -281,7 +283,9 @@ def _dsh3(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float):
     return d_n + f_1 * ratio1 * (K_raw**2)
 
 
-class SamplingStatsFactory(BaseTensorStatsFactory["SamplingStats"]):
+class SamplingStatsFactory(
+    BaseTensorStatsFactory["SamplingStats"], StatsFactory["SamplingStats"]
+):
     def __init__(self, sample_prob: float = 0.5, estimator: str = "uj1"):
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
