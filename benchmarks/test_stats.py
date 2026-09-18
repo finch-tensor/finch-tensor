@@ -28,7 +28,7 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def tensor(request):
     name, group = request.param
     matrix_info = next(
@@ -128,7 +128,7 @@ def est_triangle(factory, tns_a):
 
 @pytest.mark.parametrize(
     "tensor",
-    [pytest.param(("ct20stif", "Boeing"), id="Boeing-ct20stif")],
+    [pytest.param(("ca-HepPh", "SNAP"), id="snap-ca-hepph")],
     indirect=True,
 )
 @pytest.mark.parametrize(
