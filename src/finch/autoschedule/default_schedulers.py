@@ -169,6 +169,21 @@ NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     )
 )
 
+# Accept already ordered, concordant statistics plans and use dense outputs.
+NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        LogicSimplify(
+            DefaultLogicFormatter(
+                LogicCompiler(
+                    FinchJLCompiler() if julia_available() else NotationInterpreter()
+                )
+            )
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
 _DEFAULT_SCHEDULER = threading.local()
 
 
