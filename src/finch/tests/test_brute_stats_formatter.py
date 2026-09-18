@@ -6,8 +6,8 @@ import pytest
 import numpy as np
 
 import finch as fl
-from finch.autoschedule.galley.logical_optimizer import insert_statistics
-from finch.autoschedule.smart_formatter import (
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.formatter.smart_formatter import (
     IterCostFormatter,
     StorageCostFormatter,
     total_tree_cost,

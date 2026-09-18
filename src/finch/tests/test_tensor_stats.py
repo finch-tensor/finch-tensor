@@ -11,7 +11,7 @@ from finch.algebra import TensorFType, TupleFType, ftype
 from finch.algebra.fill import StaticFill
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.galley.logical_optimizer import insert_statistics
-from finch.autoschedule.smart_formatter import FDFormatter, SmartFormatter
+from finch.autoschedule.formatter.smart_formatter import FDFormatter, SmartFormatter
 from finch.autoschedule.tensor_stats import (
     DC,
     BaseTensorStats,

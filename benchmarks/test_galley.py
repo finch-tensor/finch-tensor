@@ -21,7 +21,7 @@ from finch.autoschedule import (
     LogicNormalizer,
 )
 from finch.autoschedule.compiler import LogicCompiler
-from finch.autoschedule.galley_optimize import GalleyLogicalOptimizer
+from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from finch.autoschedule.tensor_stats import UniformStatsFactory
 from finch.codegen.numba_codegen.numba import NumbaCompiler
 from finch.compile.lower import NotationCompiler
@@ -81,7 +81,7 @@ def _make_pipeline():
             )
         )
     )
-    optimizer = GalleyLogicalOptimizer(DefaultLoopOrderer(formatter))
+    optimizer = GalleyLogicFactorizer(DefaultLoopOrderer(formatter))
     executor = LogicExecutor(optimizer, stats_factory=UniformStatsFactory())
     return LogicNormalizer(executor), formatter
 
@@ -97,7 +97,7 @@ def _make_pipeline():
 def test_galley_matmul_chain(
     benchmark, monkeypatch, empty_last: bool, metric: Literal["optimize", "downstream"]
 ) -> None:
-    import finch.autoschedule.galley_optimize as galley
+    import finch.autoschedule.factorizer.galley_factorizer.galley_optimize as galley
 
     # Warmup
     pipeline, formatter = _make_pipeline()

@@ -302,7 +302,7 @@ class FormattedForm(LoopOrderedForm):
         validate(term)
 
 
-class LogicFusionOptimizer(AliasedForm, LogicLoader):
+class LogicFactorizer(AliasedForm, LogicLoader):
     @abstractmethod
     def lower(
         self,
@@ -322,7 +322,7 @@ class LogicFusionOptimizer(AliasedForm, LogicLoader):
         """
 
 
-class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
+class LogicLoopOrderer(SingleAggregateForm, LogicLoader):
     @abstractmethod
     def lower(
         self,
@@ -342,7 +342,7 @@ class LogicLoopOrderOptimizer(SingleAggregateForm, LogicLoader):
         """
 
 
-class LogicFormatOptimizer(LoopOrderedForm, LogicLoader):
+class LogicFormatter(LoopOrderedForm, LogicLoader):
     @abstractmethod
     def lower(
         self,

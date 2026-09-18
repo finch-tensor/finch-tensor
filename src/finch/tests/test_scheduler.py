@@ -4,14 +4,14 @@ import finch
 from finch.algebra import ffuncs
 from finch.algebra.ftypes import ftype
 from finch.autoschedule import (
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     LogicCapture,
     normalize_names,
 )
-from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_ordering import concordize, heuristic_loop_order
-from finch.autoschedule.optimize import (
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_ordering import concordize, heuristic_loop_order
+from finch.autoschedule.factorizer.optimize import (
     isolate_aggregates,
     lift_fields,
     optimize,
@@ -815,7 +815,7 @@ def test_scheduler_e2e_sddmm(file_regression):
     )
 
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(
+    scheduler = DefaultLogicFactorizer(
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
     bindings = {
@@ -894,7 +894,7 @@ def test_scheduler_inplace(file_regression):
         ),
     )
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(
+    scheduler = DefaultLogicFactorizer(
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
 

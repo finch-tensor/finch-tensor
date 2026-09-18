@@ -14,7 +14,7 @@ from finch.finch_logic import (
     Table,
 )
 
-from .galley.logical_optimizer import insert_statistics
+from ..factorizer.galley_factorizer import insert_statistics
 from .loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
@@ -22,8 +22,8 @@ from .loop_order_cost import (
     get_reformat_set,
 )
 from .loop_ordering import AbstractLoopOrderer
-from .tensor_stats import TensorStats
-from .tensor_stats.numeric_stats import NumericStats
+from ..tensor_stats import TensorStats
+from ..tensor_stats.numeric_stats import NumericStats
 
 TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)

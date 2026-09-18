@@ -9,7 +9,7 @@ import numpy as np
 import finch
 from finch.autoschedule import (
     DefaultLogicFormatter,
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     LogicCapture,
     LogicCompiler,
@@ -466,7 +466,7 @@ def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):
     """
     capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
     executor = LogicExecutor(
-        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+        DefaultLogicFactorizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
     )
     arr = np.arange(3.0)
     with finch.with_default_scheduler(LogicNormalizer(executor)):
@@ -511,7 +511,7 @@ def test_jit_inlines_literal_operands():
 
     capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
     executor = LogicExecutor(
-        DefaultLogicOptimizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
+        DefaultLogicFactorizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
     )
 
     arr = np.arange(3.0)
@@ -550,7 +550,7 @@ def test_jit_constant_folded_in_a_loop_does_not_grow_the_kernel_cache(trip_count
     counts = []
     for k in trip_counts:
         executor = LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
                 )

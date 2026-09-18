@@ -37,7 +37,7 @@ from finch.autoschedule import (
     INTERPRET_ASSEMBLY,
     INTERPRET_NOTATION,
     DefaultLogicFormatter,
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     LogicCompiler,
     LogicExecutor,
@@ -152,7 +152,7 @@ def test_compiled_scalar_operand(ctx):
 
 def _cached_scheduler():
     executor = LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
@@ -358,10 +358,10 @@ def test_order_independence():
 
 
 def _cached_galley_scheduler():
-    from finch.autoschedule.galley_optimize import GalleyLogicalOptimizer
+    from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 
     executor = LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )
@@ -461,7 +461,7 @@ def test_sparse_dynamic_fill_channel(backend):
     # fill from the struct channel: gap positions reflect each instance's
     # actual fill value.
     executor = LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(backend())))
         ),
         cache=True,
@@ -493,7 +493,7 @@ def test_backend_refusal_propagates():
     # runtime fill; the error reaches the caller so the backend (or the user)
     # can decide what to do, rather than silently recompiling per value.
     loader = _DynamicRejectingLoader(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
             )

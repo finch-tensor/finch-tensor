@@ -18,7 +18,7 @@ from finch import (
     ftype,
 )
 from finch.autoschedule import (
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     FDFormatter,
     LogicCompiler,
@@ -164,7 +164,7 @@ def _compute_sparse_axis_sum(level):
 def _compile_julia_fd(formatter):
     return LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(DefaultLoopOrderer(formatter)),
+            DefaultLogicFactorizer(DefaultLoopOrderer(formatter)),
             stats_factory=FDStatsFactory(),
         )
     )
