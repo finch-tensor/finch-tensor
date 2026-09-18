@@ -1,7 +1,6 @@
 import itertools
 from collections import OrderedDict
 
-from finch.autoschedule.loop_orderer import loop_order_greedy
 import pytest
 
 import numpy as np
@@ -12,6 +11,7 @@ from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer import loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,

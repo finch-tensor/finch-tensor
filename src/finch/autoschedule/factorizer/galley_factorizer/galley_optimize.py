@@ -8,21 +8,10 @@ from __future__ import annotations
 import logging
 
 from finch.algebra.tensor import TensorFType
-from .annotated_query import (
-    AnnotatedQuery,
-)
-from .branch_and_bound import (
-    GalleyOptimizer,
-    pruned_query_to_plan,
-)
-from ...tensor_stats.logic_to_stats import (
+from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.tensor_stats.logic_to_stats import (
     insert_statistics,
 )
-from .query_normalization import (
-    postprocess_plan_after_galley,
-    preprocess_plan_for_galley,
-)
-from finch.autoschedule.stages import LogicFactorizer
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -33,6 +22,18 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.util.logging import LOG_GALLEY
+
+from .annotated_query import (
+    AnnotatedQuery,
+)
+from .branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
+from .query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 

@@ -21,7 +21,9 @@ from finch.autoschedule import (
     LogicNormalizer,
 )
 from finch.autoschedule.compiler import LogicCompiler
-from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import (
+    GalleyLogicFactorizer,
+)
 from finch.autoschedule.tensor_stats import UniformStatsFactory
 from finch.codegen.numba_codegen.numba import NumbaCompiler
 from finch.compile.lower import NotationCompiler

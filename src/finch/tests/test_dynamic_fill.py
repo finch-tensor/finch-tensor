@@ -36,8 +36,8 @@ from finch.autoschedule import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
     INTERPRET_NOTATION,
-    DefaultLogicFormatter,
     DefaultLogicFactorizer,
+    DefaultLogicFormatter,
     DefaultLoopOrderer,
     LogicCompiler,
     LogicExecutor,
@@ -358,7 +358,9 @@ def test_order_independence():
 
 
 def _cached_galley_scheduler():
-    from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+    from finch.autoschedule.factorizer.galley_factorizer.galley_optimize import (
+        GalleyLogicFactorizer,
+    )
 
     executor = LogicExecutor(
         GalleyLogicFactorizer(

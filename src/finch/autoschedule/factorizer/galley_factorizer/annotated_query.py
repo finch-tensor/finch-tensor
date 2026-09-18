@@ -14,6 +14,7 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
+from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
     Aggregate,
@@ -32,8 +33,6 @@ from finch.finch_logic import (
 )
 from finch.symbolic import gensym
 from finch.tensor import Scalar
-
-from ...tensor_stats.logic_to_stats import insert_statistics
 
 # A location in an expression tree. Unlike a node value, a path identifies one
 # occurrence, so rewrites addressed by path cannot confuse structurally equal

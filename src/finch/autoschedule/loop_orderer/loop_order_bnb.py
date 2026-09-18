@@ -4,6 +4,9 @@ import itertools
 from collections.abc import Mapping, MutableMapping
 from typing import Generic, TypeVar
 
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.tensor_stats import TensorStats
+from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -17,7 +20,6 @@ from finch.finch_logic import (
     Table,
 )
 
-from ..factorizer.galley_factorizer import insert_statistics
 from .loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
@@ -27,8 +29,6 @@ from .loop_order_cost import (
 )
 from .loop_order_greedy import connected_loop_candidates, greedy_loop_order
 from .loop_ordering import AbstractLoopOrderer
-from ..tensor_stats import TensorStats
-from ..tensor_stats.numeric_stats import NumericStats
 
 TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)

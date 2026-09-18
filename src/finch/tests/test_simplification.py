@@ -9,8 +9,8 @@ from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
-    DefaultLogicFormatter,
     DefaultLogicFactorizer,
+    DefaultLogicFormatter,
     DefaultLoopOrderer,
     LogicCapture,
     LogicCompiler,

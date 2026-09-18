@@ -9,8 +9,6 @@ from finch.autoschedule import (
     LogicCapture,
     normalize_names,
 )
-from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_orderer.loop_ordering import concordize, heuristic_loop_order
 from finch.autoschedule.factorizer.optimize import (
     isolate_aggregates,
     lift_fields,
@@ -19,6 +17,11 @@ from finch.autoschedule.factorizer.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
+)
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_ordering import (
+    concordize,
+    heuristic_loop_order,
 )
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import flatten_plans, push_fields

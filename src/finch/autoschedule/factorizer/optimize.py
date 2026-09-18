@@ -3,6 +3,7 @@ from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
 from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.util import flatten_plans, propagate_copy_queries, push_fields
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -30,8 +31,6 @@ from finch.symbolic import (
     Rewrite,
     gensym,
 )
-
-from ..util import flatten_plans, propagate_copy_queries, push_fields
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:

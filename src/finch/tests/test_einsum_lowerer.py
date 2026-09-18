@@ -5,9 +5,9 @@ import numpy as np
 import finch
 from finch.autoschedule.einsum import LogicEinsumLoader
 from finch.autoschedule.executor import LogicExecutor
+from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_ordering import DefaultLoopOrderer
-from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
 from finch.finch_einsum import MockEinsumLoader
 from finch.interface.fuse import compute
 from finch.interface.lazy import defer

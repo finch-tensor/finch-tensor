@@ -1,6 +1,6 @@
 import logging
 import random
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 
@@ -13,7 +13,6 @@ from finch.finch_logic import (
     MockLogicLoader,
     StatsFactory,
     TensorStats,
-    
 )
 from finch.tensor import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType

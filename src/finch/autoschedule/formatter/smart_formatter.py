@@ -15,6 +15,7 @@ from finch.algebra import (
     ftypes,
     np_dtype,
 )
+from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
 from finch.tensor import dense, element, fiber_tensor, sparse_hash
@@ -22,7 +23,6 @@ from finch.tensor.level import DenseLevelFType, SparseHashLevelFType
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
-from ..tensor_stats import FDStats, StatsInterpreter
 
 if TYPE_CHECKING:
     from finch.algebra import FiberTensorFType
@@ -135,7 +135,6 @@ class SmartFormatter(LogicFormatter):
         if loader is None:
             loader = MockLogicLoader()
         self.ctx = loader
-
 
     @abstractmethod
     def get_tensor_ftype(

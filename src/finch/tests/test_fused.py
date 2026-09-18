@@ -8,8 +8,8 @@ import numpy as np
 
 import finch
 from finch.autoschedule import (
-    DefaultLogicFormatter,
     DefaultLogicFactorizer,
+    DefaultLogicFormatter,
     DefaultLoopOrderer,
     LogicCapture,
     LogicCompiler,
