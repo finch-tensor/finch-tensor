@@ -20,9 +20,8 @@ from finch.finch_logic import (
     Table,
 )
 from finch.finch_logic.nodes import LogicExpression
-from finch.tensor import RandomMaskTensor
 from finch.finch_logic.tensor_stats import StatsFactory
-from finch.tensor import BufferizedNDArray
+from finch.tensor import RandomMaskTensor
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
