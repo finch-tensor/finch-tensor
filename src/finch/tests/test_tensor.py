@@ -382,7 +382,7 @@ def test_chunk_mask_requires_positive_chunk_size(b):
 
 def test_chunk_mask_requires_integer_chunk_size():
     with pytest.raises(TypeError):
-        ChunkMaskTensor((10, 4), b=2.5)
+        ChunkMaskTensor((10, 4), b=2.5) # ty: ignore[invalid-argument-type]
 
 
 def test_chunk_mask_requires_matching_shape():
@@ -501,7 +501,7 @@ def test_random_mask_validates_probability_before_rounding():
     from fractions import Fraction
 
     with pytest.raises(ValueError, match="p must lie"):
-        RandomMaskTensor(3, Fraction((1 << 64) + 1, 1 << 64))
+        RandomMaskTensor(3, Fraction((1 << 64) + 1, 1 << 64)) # ty: ignore[invalid-argument-type]
 
 
 @pytest.mark.parametrize("seed", [-1, 1 << 64])
@@ -512,7 +512,7 @@ def test_random_mask_requires_uint64_seed(seed):
 
 def test_random_mask_requires_integer_seed():
     with pytest.raises(TypeError):
-        RandomMaskTensor(3, 0.5, seed=0.5)
+        RandomMaskTensor(3, 0.5, seed=0.5) # ty: ignore[invalid-argument-type]
 
 
 def test_random_mask_requires_nonnegative_shape():
