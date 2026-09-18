@@ -1,3 +1,28 @@
+"""
+Benchmark tensor statistics estimates on real-world sparse matrices.
+
+The benchmarks compare each statistics factory's estimated number of non-fill values
+with the actual value computed from a SuiteSparse matrix. The benchmarks provide the
+following functionality:
+
+- CodSpeed measures estimator runtime on the target matrices.
+- Estimator accuracy is written to `junit/stats_accuracy.csv`.
+- You can test any matrix available through `ssgetpy` by adding it to
+  `TARGET_MATRICES`.
+
+The benchmark covers these statistics models:
+
+- ``UniformStatsFactory`` assumes non-fill values are uniformly distributed.
+- ``DCStatsFactory`` estimates bounds from degree constraints.
+- ``LPStatsFactory`` computes bounds from a configurable set of p-norm statistics.
+- ``VPStatsFactory`` uses a database-theory-based statistics model.
+- ``DenseStatsFactory`` assumes the result occupies its full dense index space.
+
+Run: ``pixi run --environment=benchmark-julia pytest --codspeed
+benchmarks/test_stats.py``
+"""
+
+import csv
 from pathlib import Path
 
 import pytest
@@ -27,6 +52,32 @@ pytestmark = pytest.mark.skipif(
     reason="Julia backend (juliacall/juliapkg) or ssgetpy not installed",
 )
 
+# Matrices used by the statistics benchmarks.
+# Each tuple contains the SuiteSparse matrix name and group.
+TARGET_MATRICES = [
+    pytest.param(("ca-GrQc", "SNAP"), id="snap-ca-grqc"),
+]
+
+
+@pytest.fixture(scope="session")
+def stats_csv():
+    path = Path("junit/stats_accuracy.csv")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="") as output:
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "matrix",
+                "factory",
+                "kernel",
+                "actual_nnz",
+                "estimated_nnz",
+                "ratio",
+            ],
+        )
+        writer.writeheader()
+    return path
+
 
 @pytest.fixture(scope="session")
 def tensor(request):
@@ -39,7 +90,7 @@ def tensor(request):
     localdestpath, _ = matrix_info.download(format="MM", extract=True)
     mtx_path = Path(localdestpath) / f"{name}.mtx"
     matrix = scipy.io.mmread(mtx_path).tocsr()
-    return matrix, ft.asarray(matrix)
+    return name, matrix, ft.asarray(matrix)
 
 
 def act_hadamard(a, b):
@@ -128,32 +179,40 @@ def est_triangle(factory, tns_a):
 
 @pytest.mark.parametrize(
     "tensor",
-    [pytest.param(("ca-HepPh", "SNAP"), id="snap-ca-hepph")],
+    TARGET_MATRICES,
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "factory",
+    "factory_name, factory",
     [
-        pytest.param(UniformStatsFactory(), id="uniform"),
-        pytest.param(DCStatsFactory(), id="dc"),
-        pytest.param(LPStatsFactory(), id="lp"),
-        pytest.param(VPStatsFactory(), id="vp"),
-        pytest.param(DenseStatsFactory(), id="dense"),
+        pytest.param("uniform", UniformStatsFactory(), id="uniform"),
+        pytest.param("dc", DCStatsFactory(), id="dc"),
+        pytest.param("lp", LPStatsFactory(), id="lp"),
+        pytest.param("vp", VPStatsFactory(), id="vp"),
+        pytest.param("dense", DenseStatsFactory(), id="dense"),
     ],
 )
 @pytest.mark.parametrize(
-    "estimator, actual, count",
+    "kernel_name, estimator, actual, count",
     [
-        pytest.param(est_hadamard, act_hadamard, 2, id="hadamard"),
-        pytest.param(est_spgemm, act_spgemm, 2, id="spgemm"),
-        pytest.param(est_spgemm2, act_spgemm2, 2, id="spgemm-2"),
-        pytest.param(est_triangle, act_triangle, 1, id="triangle"),
+        pytest.param("hadamard", est_hadamard, act_hadamard, 2, id="hadamard"),
+        pytest.param("spgemm", est_spgemm, act_spgemm, 2, id="spgemm"),
+        pytest.param("spgemm-2", est_spgemm2, act_spgemm2, 2, id="spgemm-2"),
+        pytest.param("triangle", est_triangle, act_triangle, 1, id="triangle"),
     ],
 )
-def test_estimated_kernel_web_notredame(
-    tensor, factory, estimator, actual, count, benchmark, record_property
+def test_estimated_kernel(
+    tensor,
+    factory_name,
+    factory,
+    kernel_name,
+    estimator,
+    actual,
+    count,
+    benchmark,
+    stats_csv,
 ):
-    matrix, finch_tensor = tensor
+    matrix_name, matrix, finch_tensor = tensor
     act_nnz = actual(*([matrix] * count))
     ops = [finch_tensor] * count
 
@@ -166,6 +225,15 @@ def test_estimated_kernel_web_notredame(
 
     ratio = max(est_nnz, 1) / act_nnz
 
-    record_property("actual_nnz", act_nnz)
-    record_property("estimated_nnz", est_nnz)
-    record_property("ratio", ratio)
+    with stats_csv.open("a", newline="") as output:
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                matrix_name,
+                factory_name,
+                kernel_name,
+                act_nnz,
+                est_nnz,
+                ratio,
+            ]
+        )
