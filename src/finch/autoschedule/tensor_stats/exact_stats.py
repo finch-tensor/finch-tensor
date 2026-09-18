@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from functools import cached_property
 from typing import Any
 
 import numpy as np
 
-import finch
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.autoschedule.default_schedulers import get_default_scheduler
 from finch.finch_logic import (
@@ -32,7 +33,10 @@ class ExactStatsFactory(
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> ExactStats:
         base = super().__call__(tensor, fields)
-        expr = Table(Literal(tensor != tensor.fill_value), fields)
+        expr = MapJoin(
+            Literal(ffuncs.ne),
+            (Table(Literal(deepcopy(tensor)), fields), Literal(tensor.fill_value)),
+        )
         return ExactStats(base, expr=expr)
 
     def _mapjoin_join(self, op: FinchOperator, *join_args: ExactStats) -> ExactStats:
@@ -91,17 +95,23 @@ class ExactStats(NumericStats):
     ):
         super().__init__(base)
         self.expr = expr
-        self.nnz = self.estimate_non_fill_values()
 
-    def estimate_non_fill_values(self) -> float:
+    @cached_property
+    def nnz(self) -> float:
         if self.expr is None:
             return 0.0
 
-        result = get_default_scheduler()(self.expr)
+        expr = Aggregate(
+            Literal(ffuncs.add), Literal(np.intp(0)), self.expr, self.expr.fields()
+        )
+        result = get_default_scheduler()(expr)
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
-        return float(finch.reduce(ffuncs.add, result.tns, init=np.uint64(0)))
+        return float(result.tns)
+
+    def estimate_non_fill_values(self) -> float:
+        return self.nnz
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

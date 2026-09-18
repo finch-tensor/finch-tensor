@@ -601,6 +601,137 @@ class RepeatTensor(PatternTensor):
         return self._k > 0 and j == i // self._k
 
 
+class ChunkMaskTensor(PatternTensor):
+    """Map ``n`` indices to chunks of size ``b``.
+
+    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.
+    """
+
+    def __init__(self, shape, *, b: int, dtype=None):
+        self._b = operator.index(b)
+        if self._b <= 0:
+            raise ValueError("b must be positive")
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            b=self._b,
+        )
+        n, chunks = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if chunks != (n + self._b - 1) // self._b:
+            raise ValueError("shape[1] must equal ceil(shape[0] / b)")
+
+    def contains(self, i, j) -> bool:
+        return j == i // self._b
+
+
+class SplitMaskTensor(PatternTensor):
+    """Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.
+
+    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p <= i < n*(j+1)//p``.
+    """
+
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+        )
+        n, p = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if p <= 0:
+            raise ValueError("shape[1] must be positive")
+
+    def contains(self, i, j) -> bool:
+        n, p = self.shape
+        return n * j // p <= i < n * (j + 1) // p
+
+
+def _randommask_mix(x: int) -> int:
+    # Match Finch.jl's SplitMix64 arithmetic, including unsigned overflow.
+    mask = (1 << 64) - 1
+    x = (x + 0x9E3779B97F4A7C15) & mask
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & mask
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & mask
+    return x ^ (x >> 31)
+
+
+def _randommask_uniform(h: int) -> float:
+    return (h >> 11) * 2.0**-53
+
+
+class RandomMaskTensor(PatternTensor):
+    """A reproducible random mask with true probability ``p`` and no stored entries.
+
+    ``shape`` may be an integer for a vector, or a tuple (including ``()``).
+    An omitted ``seed`` draws one random 64-bit seed from ``rng`` (a new NumPy
+    generator by default). Reads consume no randomness; a fixed seed and
+    coordinates give the same value even if the shape changes.
+
+    Like Finch.jl, indexed masks mix the seed, then each one-based coordinate
+    from the last axis to the first. Scalar masks use the seed directly.
+    The high 53 bits give a value in ``[0, 1)`` that is compared with ``p``.
+    """
+
+    def __init__(
+        self,
+        shape,
+        p: float,
+        *,
+        seed: int | None = None,
+        rng: np.random.Generator | None = None,
+        dtype=None,
+    ):
+        if not 0 <= p <= 1:
+            raise ValueError("p must lie in [0, 1]")
+        if isinstance(shape, int | np.integer):
+            shape = (shape,)
+        shape = tuple(operator.index(dim) for dim in shape)
+        if any(dim < 0 for dim in shape):
+            raise ValueError("shape dimensions must be nonnegative")
+        if any(dim > np.iinfo(np.intp).max for dim in shape):
+            raise OverflowError("shape dimensions must fit in intp")
+        self._p = float(p)
+        if seed is None:
+            if rng is None:
+                rng = np.random.default_rng()
+            self._seed = int(rng.integers(0, 1 << 64, dtype=np.uint64))
+        else:
+            self._seed = operator.index(seed)
+        if not 0 <= self._seed < 1 << 64:
+            raise ValueError("seed must lie in [0, 2**64 - 1]")
+        super().__init__(
+            shape,
+            ndim=len(shape),
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            p=self._p,
+            seed=self._seed,
+        )
+
+    def contains(self, *idxs) -> bool:
+        if not idxs:
+            return _randommask_uniform(self._seed) < self._p
+        state = _randommask_mix(self._seed)
+        for idx in reversed(idxs):
+            state = _randommask_mix(state ^ (operator.index(idx) + 1))
+        return _randommask_uniform(state) < self._p
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self[()].item()
+
+
 class OddEvenMergeSortPartnerMaskTensor(PatternTensor):
     def __init__(self, shape, *, p: int, k: int, dtype=None):
         self._p = p

@@ -21,6 +21,7 @@ from finch.finch_logic import (
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
 from finch.symbolic import Form, PreWalk, Rewrite, Stage
+from finch.tensor.patterns import PatternTensorFType
 
 
 class AliasedForm(Form):
@@ -214,7 +215,11 @@ class LoopOrderedForm(SingleAggregateForm):
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
-                case Table(_, idxs):
+                case Table(tns, idxs):
+                    # Implicit patterns have no row-major storage to preserve.
+                    match bindings.get(tns):
+                        case PatternTensorFType():
+                            return None
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
