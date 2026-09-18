@@ -8,21 +8,10 @@ from __future__ import annotations
 import logging
 
 from finch.algebra.tensor import TensorFType
-from finch.autoschedule.galley.logical_optimizer.annotated_query import (
-    AnnotatedQuery,
-)
-from finch.autoschedule.galley.logical_optimizer.branch_and_bound import (
-    GalleyOptimizer,
-    pruned_query_to_plan,
-)
-from finch.autoschedule.galley.logical_optimizer.logic_to_stats import (
+from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.tensor_stats.logic_to_stats import (
     insert_statistics,
 )
-from finch.autoschedule.galley.logical_optimizer.query_normalization import (
-    postprocess_plan_after_galley,
-    preprocess_plan_for_galley,
-)
-from finch.autoschedule.stages import LogicFusionOptimizer
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -33,6 +22,18 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.util.logging import LOG_GALLEY
+
+from .annotated_query import (
+    AnnotatedQuery,
+)
+from .branch_and_bound import (
+    GalleyOptimizer,
+    pruned_query_to_plan,
+)
+from .query_normalization import (
+    postprocess_plan_after_galley,
+    preprocess_plan_for_galley,
+)
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_GALLEY)
 
@@ -95,7 +96,7 @@ def optimize_plan(
     return postprocess_plan_after_galley(Plan(tuple(optimized_queries)))
 
 
-class GalleyLogicalOptimizer(LogicFusionOptimizer):
+class GalleyLogicFactorizer(LogicFactorizer):
     """
     LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),
     then forwards the Plan to the downstream loader ``ctx``.

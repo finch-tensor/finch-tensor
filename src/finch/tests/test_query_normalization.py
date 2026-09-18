@@ -1,5 +1,5 @@
 from finch import ffuncs
-from finch.autoschedule.galley.logical_optimizer.query_normalization import (
+from finch.autoschedule.factorizer.galley_factorizer.query_normalization import (
     merge_queries,
     preprocess_plan_for_galley,
 )

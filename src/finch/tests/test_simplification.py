@@ -9,8 +9,8 @@ from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
+    DefaultLogicFactorizer,
     DefaultLogicFormatter,
-    DefaultLogicOptimizer,
     DefaultLoopOrderer,
     LogicCapture,
     LogicCompiler,
@@ -327,7 +327,7 @@ def _capturing_scheduler():
     capture = LogicCapture(
         DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
     )
-    executor = LogicExecutor(DefaultLogicOptimizer(LogicSimplify(capture)))
+    executor = LogicExecutor(DefaultLogicFactorizer(LogicSimplify(capture)))
     return capture, LogicNormalizer(executor)
 
 
@@ -412,7 +412,7 @@ def _assembly_for(build):
     capture = _CaptureAssembly(AssemblyInterpreter())
     ctx = LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 LogicSimplify(
                     DefaultLoopOrderer(
                         DefaultLogicFormatter(
