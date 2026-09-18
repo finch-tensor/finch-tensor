@@ -5402,8 +5402,7 @@ source text, with no Python-side values left to inject.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
-<span class="normal">107</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">107</span>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
@@ -5417,7 +5416,8 @@ source text, with no Python-side values left to inject.</p>
 <span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompiledJLKernel</span><span class="p">:</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompiledJLKernel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Pure-data compiled-but-not-evaluated kernel: self-contained Julia</span>
 <span class="sd">    source text, with no Python-side values left to inject."""</span>
 
@@ -5466,11 +5466,11 @@ returning the now-callable kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
-<span class="normal">118</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"FinchJLKernel"</span><span class="p">:</span>
+<span class="normal">121</span>
+<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"FinchJLKernel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Defines the kernel function in the running Julia session,</span>
 <span class="sd">    returning the now-callable kernel."""</span>
     <span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">jl_code</span><span class="p">)</span>
@@ -5517,8 +5517,7 @@ returning the now-callable kernel.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
-<span class="normal">125</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
@@ -5551,7 +5550,8 @@ returning the now-callable kernel.</p>
 <span class="normal">155</span>
 <span class="normal">156</span>
 <span class="normal">157</span>
-<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="normal">158</span>
+<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A kernel already defined (evaluated) in the running Julia session."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">jl_code</span><span class="p">,</span> <span class="n">dynamic_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">()):</span>
@@ -5629,15 +5629,7 @@ potentially unsound rewrite which should be removed eventually.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
 <span class="normal">354</span>
 <span class="normal">355</span>
 <span class="normal">356</span>
@@ -5648,7 +5640,15 @@ potentially unsound rewrite which should be removed eventually.</p>
 <span class="normal">361</span>
 <span class="normal">362</span>
 <span class="normal">363</span>
-<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_fills</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">handle_fills</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""Rewrite every Dynamic fill in `func` to a zero of its dtype, and report</span>
 <span class="sd">    which argument positions carried a Dynamic fill. This is a necessary but</span>
 <span class="sd">    potentially unsound rewrite which should be removed eventually.</span>

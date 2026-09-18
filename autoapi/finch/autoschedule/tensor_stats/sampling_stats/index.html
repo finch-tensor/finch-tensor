@@ -5406,7 +5406,7 @@
 
 
 
-        <p>sketch : numpy array over bound dimension
+        <p>sketch : deferred expression over bound dimensions
 remainder_dims : 'free' dimension -&gt; absent in the output
 sample_prob : Bernoulli sample prob</p>
 
@@ -5419,7 +5419,9 @@ sample_prob : Bernoulli sample prob</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">502</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
 <span class="normal">503</span>
 <span class="normal">504</span>
 <span class="normal">505</span>
@@ -5624,9 +5626,24 @@ sample_prob : Bernoulli sample prob</p>
 <span class="normal">704</span>
 <span class="normal">705</span>
 <span class="normal">706</span>
-<span class="normal">707</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span>
+<span class="normal">718</span>
+<span class="normal">719</span>
+<span class="normal">720</span>
+<span class="normal">721</span>
+<span class="normal">722</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    sketch : numpy array over bound dimension</span>
+<span class="sd">    sketch : deferred expression over bound dimensions</span>
 <span class="sd">    remainder_dims : 'free' dimension -&gt; absent in the output</span>
 <span class="sd">    sample_prob : Bernoulli sample prob</span>
 <span class="sd">    """</span>
@@ -5672,13 +5689,15 @@ sample_prob : Bernoulli sample prob</p>
             <span class="n">bodies</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="n">Query</span><span class="p">(</span>
                     <span class="n">n_a</span><span class="p">,</span>
-                    <span class="n">Aggregate</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">fields</span><span class="p">),</span>
+                    <span class="n">Aggregate</span><span class="p">(</span>
+                        <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">fields</span>
+                    <span class="p">),</span>
                 <span class="p">),</span>
                 <span class="n">Query</span><span class="p">(</span>
                     <span class="n">dn_a</span><span class="p">,</span>
                     <span class="n">Aggregate</span><span class="p">(</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                        <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span>
+                        <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
                         <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">gt</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))),</span>
                         <span class="n">fields</span><span class="p">,</span>
                     <span class="p">),</span>
@@ -5687,7 +5706,7 @@ sample_prob : Bernoulli sample prob</p>
                     <span class="n">f1_a</span><span class="p">,</span>
                     <span class="n">Aggregate</span><span class="p">(</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                        <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span>
+                        <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
                         <span class="n">MapJoin</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">eq</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">1.0</span><span class="p">))),</span>
                         <span class="n">fields</span><span class="p">,</span>
                     <span class="p">),</span>
@@ -5702,7 +5721,10 @@ sample_prob : Bernoulli sample prob</p>
                     <span class="n">Query</span><span class="p">(</span>
                         <span class="n">max_a</span><span class="p">,</span>
                         <span class="n">Aggregate</span><span class="p">(</span>
-                            <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">fields</span>
+                            <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span>
+                            <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span>
+                            <span class="n">fields</span><span class="p">,</span>
                         <span class="p">),</span>
                     <span class="p">)</span>
                 <span class="p">)</span>
@@ -5724,7 +5746,7 @@ sample_prob : Bernoulli sample prob</p>
                             <span class="n">a</span><span class="p">,</span>
                             <span class="n">Aggregate</span><span class="p">(</span>
                                 <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                                <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">),</span>
+                                <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
                                 <span class="n">MapJoin</span><span class="p">(</span>
                                     <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">eq</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)))</span>
                                 <span class="p">),</span>
@@ -5745,6 +5767,7 @@ sample_prob : Bernoulli sample prob</p>
         <span class="k">return</span> <span class="n">n</span><span class="p">,</span> <span class="n">d_n</span><span class="p">,</span> <span class="n">f_1</span><span class="p">,</span> <span class="n">frequencies</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">coverage_correction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">finch.autoschedule.default_schedulers</span><span class="w"> </span><span class="kn">import</span> <span class="n">NON_RECURSIVE_SCHEDULER</span>
 
         <span class="n">_</span><span class="p">,</span> <span class="n">d_n_raw</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">needs_freq</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="n">coverage</span> <span class="o">=</span> <span class="mf">1.0</span>
@@ -5753,7 +5776,18 @@ sample_prob : Bernoulli sample prob</p>
             <span class="n">mask</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">masks_ref</span><span class="o">.</span><span class="n">get</span><span class="p">((</span><span class="n">field</span><span class="p">,</span> <span class="n">size</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="k">continue</span>
-            <span class="n">actual_fraction</span> <span class="o">=</span> <span class="n">mask</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">/</span> <span class="n">size</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"sampled_count"</span><span class="p">)</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span>
+                <span class="n">out</span><span class="p">,</span>
+                <span class="n">Aggregate</span><span class="p">(</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
+                    <span class="n">mask_table</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">mask</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">field</span><span class="p">,),</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+            <span class="p">(</span><span class="n">count</span><span class="p">,)</span> <span class="o">=</span> <span class="n">NON_RECURSIVE_SCHEDULER</span><span class="p">(</span><span class="n">Plan</span><span class="p">((</span><span class="n">query</span><span class="p">,</span> <span class="n">Produces</span><span class="p">((</span><span class="n">out</span><span class="p">,)))))</span>
+            <span class="n">actual_fraction</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">count</span><span class="p">)[()])</span> <span class="o">/</span> <span class="n">size</span>
             <span class="k">if</span> <span class="n">actual_fraction</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">coverage</span> <span class="o">*=</span> <span class="n">actual_fraction</span>
@@ -5870,22 +5904,7 @@ q = n/N</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span>
-<span class="normal">643</span>
-<span class="normal">644</span>
-<span class="normal">645</span>
-<span class="normal">646</span>
-<span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
-<span class="normal">650</span>
-<span class="normal">651</span>
-<span class="normal">652</span>
-<span class="normal">653</span>
-<span class="normal">654</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">654</span>
 <span class="normal">655</span>
 <span class="normal">656</span>
 <span class="normal">657</span>
@@ -5931,7 +5950,22 @@ q = n/N</p>
 <span class="normal">697</span>
 <span class="normal">698</span>
 <span class="normal">699</span>
-<span class="normal">700</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="normal">700</span>
+<span class="normal">701</span>
+<span class="normal">702</span>
+<span class="normal">703</span>
+<span class="normal">704</span>
+<span class="normal">705</span>
+<span class="normal">706</span>
+<span class="normal">707</span>
+<span class="normal">708</span>
+<span class="normal">709</span>
+<span class="normal">710</span>
+<span class="normal">711</span>
+<span class="normal">712</span>
+<span class="normal">713</span>
+<span class="normal">714</span>
+<span class="normal">715</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">""" "</span>
 <span class="sd">    Using un-smoothened first order jackknife estimator</span>
 <span class="sd">    D_uj1 = (1-(1-q)*f_1/n)^{-1} * d_n</span>
@@ -6245,24 +6279,21 @@ q = n/N</p>
 <span class="normal">494</span>
 <span class="normal">495</span>
 <span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span>
+<span class="normal">497</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span>
     <span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">],</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">]</span>
 <span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_prob</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"uj1"</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">SamplingStats</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span> <span class="o">=</span> <span class="n">sample_prob</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">estimator</span> <span class="o">=</span> <span class="n">estimator</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">RandomMaskTensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">()</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-        <span class="s2">"Returns mask for dimension that already exists or creates a new one"</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_mask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">field</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RandomMaskTensor</span><span class="p">:</span>
         <span class="n">mask_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">mask_key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">[</span><span class="n">mask_key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rng</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">size</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span>
-                <span class="nb">float</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">[</span><span class="n">mask_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">RandomMaskTensor</span><span class="p">(</span>
+                <span class="n">size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">sample_prob</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_rng</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_masks</span><span class="p">[</span><span class="n">mask_key</span><span class="p">]</span>
 
@@ -6270,9 +6301,8 @@ q = n/N</p>
         <span class="n">base</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">fields</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
 
-        <span class="c1"># defining one Bernoulli mask per dimension, an entry will survive</span>
-        <span class="c1"># only if all its indices are kept</span>
-        <span class="c1"># masks has the 0's 1's combination for each entry in a dimension</span>
+        <span class="c1"># Reuse each field's Bernoulli mask across tensors so joins sample the</span>
+        <span class="c1"># same coordinates. An entry survives only if every dimension is kept.</span>
         <span class="n">masks</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_mask</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">field</span><span class="p">]))</span> <span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="n">fields</span><span class="p">]</span>
         <span class="n">non_fill</span> <span class="o">=</span> <span class="n">MapJoin</span><span class="p">(</span>
             <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">ne</span><span class="p">),</span> <span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">tensor</span><span class="p">),</span> <span class="n">fields</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="p">))</span>
@@ -6393,7 +6423,7 @@ q = n/N</p>
             <span class="n">new_sketch</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">Aggregate</span><span class="p">(</span>
                     <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                    <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)),</span>
+                    <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
                     <span class="n">stats</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span>
                     <span class="n">reduce_fields</span><span class="p">,</span>
                 <span class="p">)</span>
@@ -6496,7 +6526,9 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">409</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
 <span class="normal">410</span>
 <span class="normal">411</span>
 <span class="normal">412</span>
@@ -6556,9 +6588,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 <span class="normal">466</span>
 <span class="normal">467</span>
 <span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
+<span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
     <span class="n">init</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -6580,7 +6610,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
         <span class="n">new_sketch</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Aggregate</span><span class="p">(</span>
                 <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
-                <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">(</span><span class="mf">0.0</span><span class="p">)),</span>
+                <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
                 <span class="n">stats</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span>
                 <span class="n">reduce_fields</span><span class="p">,</span>
             <span class="p">)</span>
