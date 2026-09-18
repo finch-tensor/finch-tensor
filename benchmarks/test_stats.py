@@ -42,16 +42,16 @@ def tensor(request):
     return matrix, ft.asarray(matrix)
 
 
-def actual_hadamard(a, b):
+def act_hadamard(a, b):
     return max(int(a.multiply(b).count_nonzero()), 1)
 
 
-def actual_spgemm(a, b):
+def act_spgemm(a, b):
     result = a.astype(bool).astype(float) @ b.astype(bool).astype(float)
     return max(int(result.count_nonzero()), 1)
 
 
-def actual_spgemm2(a, b):
+def act_spgemm2(a, b):
     result = (a.astype(bool).astype(float) @ b.astype(bool).astype(float) > 0).astype(
         float
     )
@@ -59,7 +59,7 @@ def actual_spgemm2(a, b):
     return max(int(result.count_nonzero()), 1)
 
 
-def actual_triangle(a):
+def act_triangle(a):
     result = a.astype(bool).astype(float) @ a.astype(bool).astype(float)
     return max(int(result.multiply(a).count_nonzero()), 1)
 
@@ -128,7 +128,7 @@ def est_triangle(factory, tns_a):
 
 @pytest.mark.parametrize(
     "tensor",
-    [pytest.param(("web-NotreDame", "SNAP"), id="snap-web-notredame")],
+    [pytest.param(("ct20stif", "Boeing"), id="Boeing-ct20stif")],
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -144,10 +144,10 @@ def est_triangle(factory, tns_a):
 @pytest.mark.parametrize(
     "estimator, actual, count",
     [
-        pytest.param(est_hadamard, actual_hadamard, 2, id="hadamard"),
-        pytest.param(est_spgemm, actual_spgemm, 2, id="spgemm"),
-        pytest.param(est_spgemm2, actual_spgemm2, 2, id="spgemm-2"),
-        pytest.param(est_triangle, actual_triangle, 1, id="triangle"),
+        pytest.param(est_hadamard, act_hadamard, 2, id="hadamard"),
+        pytest.param(est_spgemm, act_spgemm, 2, id="spgemm"),
+        pytest.param(est_spgemm2, act_spgemm2, 2, id="spgemm-2"),
+        pytest.param(est_triangle, act_triangle, 1, id="triangle"),
     ],
 )
 def test_estimated_kernel_web_notredame(
