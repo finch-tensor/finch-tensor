@@ -23,10 +23,8 @@ from .compiler import LogicCompiler
 from .executor import LogicExecutor
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from .factorizer.optimize import DefaultLogicFactorizer
-from .formatter.formatter import DefaultLogicFormatter
-from .formatter.smart_formatter import FDFormatter
-from .loop_orderer.loop_order_bnb import BFSLoopOrderer
-from .loop_orderer.loop_ordering import DefaultLoopOrderer
+from .formatter import DefaultLogicFormatter, FDFormatter, StorageCostFormatter
+from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
 
 INTERPRET_LOGIC = LogicInterpreter()
@@ -154,7 +152,9 @@ COMPILE_JULIA = LogicNormalizer(
 COMPILE_JULIA_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicFactorizer(
-            LogicSimplify(BFSLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler()))))
+            LogicSimplify(
+                BFSLoopOrderer(StorageCostFormatter(LogicCompiler(FinchJLCompiler())))
+            )
         ),
         stats_factory=FDStatsFactory(),
         cache=True,
