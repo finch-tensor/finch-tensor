@@ -25,9 +25,9 @@ def test_lookup_and_run(start, end, expected):
             ntn.Literal(ffuncs.add),
             (
                 result,
-                ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,))),
+                ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,))),  # ty: ignore[invalid-argument-type]
                 ntn.Unwrap(
-                    ntn.Access(Run(ntn.Full(ntn.Literal(10))), ntn.Read(), (idx,))
+                    ntn.Access(Run(ntn.Full(ntn.Literal(10))), ntn.Read(), (idx,))  # ty: ignore[invalid-argument-type]
                 ),
             ),
         ),
@@ -64,7 +64,7 @@ def test_lookup_switch_thunk(start, end, expected):
         result,
         ntn.Call(
             ntn.Literal(ffuncs.add),
-            (result, ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,)))),
+            (result, ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,)))),  # ty: ignore[invalid-argument-type]
         ),
     )
     LoopletContext(ctx, idx)(SymbolicExtent(ntn.Literal(start), ntn.Literal(end)), body)

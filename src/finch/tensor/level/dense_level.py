@@ -7,19 +7,19 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finch.algebra import ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
 from finch.tensor.traits import Dense
 
-from .level import Level, LevelFType
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(LevelFType, ImmutableStructFType):
+class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: FType = ftypes.intp
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
     @property
     def struct_name(self):
@@ -119,16 +119,16 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return [Dense(tuple(range(n + 1)))] + self.lvl_t.level_format_properties(n + 1)
 
-    def level_lower_dim(self, ctx, lvl, r):
+    def level_lower_dim(self, ctx, obj, r):
         if r == 0:
-            return asm.GetAttr(lvl, asm.Literal("dimension"))
+            return asm.GetAttr(obj, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
@@ -209,7 +209,7 @@ def dense(lvl, dimension_type=ftypes.intp):
 
 
 @dataclass
-class DenseLevel(Level):
+class DenseLevel(SingleDimensionLevel):
     """
     A class representing dense level.
     """
@@ -232,9 +232,7 @@ class DenseLevel(Level):
 
     @property
     def ftype(self) -> DenseLevelFType:
-        # mypy does not understand that dataclasses generate __hash__ and __eq__
-        # https://github.com/python/mypy/issues/19799
-        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
+        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))
 
     @property
     def val(self) -> Any:

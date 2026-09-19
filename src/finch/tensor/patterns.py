@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import builtins
 import operator
-from dataclasses import dataclass
+from copy import copy
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
 
 from finch.algebra import (
     AbstractFill,
+    DynamicFill,
     FType,
     StaticFill,
     TensorFType,
     as_fill,
     ffuncs,
     ftype,
+    is_dynamic,
 )
 
 from .override_tensor import OverrideTensor
@@ -35,20 +38,31 @@ def _shape_size(shape: tuple) -> int:
 class IndexTensorFType(TensorFType):
     _element_type: FType
     _shape_type: tuple[FType, ...]
+    _fill_value: AbstractFill
 
     def __init__(
         self,
         _element_type: FType | type = np.intp,
         _shape_type: tuple[FType | type, ...] = (),
+        _fill_value: AbstractFill | None = None,
     ):
+        # Frozen dataclass: fields have to be set through `object`.
         object.__setattr__(self, "_element_type", ftype(_element_type))
         object.__setattr__(
             self, "_shape_type", tuple(ftype(dim_t) for dim_t in _shape_type)
         )
+        object.__setattr__(
+            self,
+            "_fill_value",
+            StaticFill(self._element_type(0)) if _fill_value is None else _fill_value,
+        )
 
     @property
     def fill_value(self) -> AbstractFill:
-        return StaticFill(self._element_type(0))
+        return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> IndexTensorFType:
+        return IndexTensorFType(self._element_type, self._shape_type, fill_value)
 
     @property
     def element_type(self) -> FType:
@@ -106,6 +120,9 @@ class FillTensorFType(TensorFType):
     def fill_value(self) -> AbstractFill:
         return self._fill_value
 
+    def with_fill(self, fill_value: AbstractFill) -> FillTensorFType:
+        return replace(self, _fill_value=fill_value)
+
     @property
     def element_type(self) -> FType:
         return self._element_type
@@ -161,6 +178,9 @@ class FillTensor(OverrideTensor):
     shape is needed but the values are irrelevant.
     """
 
+    def with_fill(self, fill_value: AbstractFill) -> FillTensor:
+        return FillTensor(self._shape, fill_value)
+
     def __init__(self, shape, fill_value):
         self._shape = shape
         self._fill = as_fill(fill_value)
@@ -213,9 +233,18 @@ class IndexTensor(OverrideTensor):
     to access it.
     """
 
-    def __init__(self, shape, element_type: FType | type = np.intp):
+    def __init__(
+        self,
+        shape,
+        element_type: FType | type = np.intp,
+        fill_value: AbstractFill | None = None,
+    ):
         self._shape = tuple(shape)
         self._element_type = ftype(element_type)
+        self._fill = fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> IndexTensor:
+        return IndexTensor(self._shape, self._element_type, fill_value)
 
     def __getitem__(self, idxs):
         if self.ndim == 0 and idxs in ((), Ellipsis, (...,)):
@@ -266,6 +295,7 @@ class IndexTensor(OverrideTensor):
         return IndexTensorFType(
             self._element_type,
             tuple(ftype(dim) for dim in self.shape),
+            self._fill,
         )
 
 
@@ -284,6 +314,9 @@ class PatternTensorFType(TensorFType):
     @property
     def fill_value(self) -> AbstractFill:
         return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> PatternTensorFType:
+        return replace(self, _fill_value=fill_value)
 
     @property
     def element_type(self) -> FType:
@@ -360,22 +393,33 @@ class PatternTensor(OverrideTensor):
         pattern_value=1,
         **constructor_kwargs,
     ):
-        if isinstance(shape, int):
-            shape = (shape,) if ndim == 1 else (shape, shape)
-        self._shape = tuple(shape)
+        if isinstance(shape, int | np.integer):
+            shape = (shape,) * ndim
+        self._shape = tuple(int(d) for d in shape)
         if len(self._shape) != ndim:
             raise ValueError(f"Expected a {ndim}D shape, got {self._shape}")
         self._element_type = ftype(dtype if dtype is not None else default_dtype)
-        self._fill_value = self._element_type(fill_value)
+        fill = as_fill(fill_value)
+        coerced = self._element_type(fill.value)
+        self._fill_value: AbstractFill = (
+            DynamicFill(coerced, self._element_type)
+            if is_dynamic(fill)
+            else StaticFill(coerced)
+        )
         self._pattern_value = self._element_type(pattern_value)
         self._constructor_kwargs = tuple(constructor_kwargs.items())
+
+    def with_fill(self, fill_value: AbstractFill) -> PatternTensor:
+        clone = copy(self)
+        clone._fill_value = as_fill(fill_value)
+        return clone
 
     def __getitem__(self, idxs):
         if not isinstance(idxs, tuple):
             idxs = (idxs,)
         if len(idxs) != self.ndim:
             raise ValueError(f"{type(self).__name__} requires one index per dimension.")
-        val = self._pattern_value if self.contains(*idxs) else self._fill_value
+        val = self._pattern_value if self.contains(*idxs) else self._fill_value.value
         return Scalar(val, fill_value=self._fill_value)
 
     def contains(self, *idxs) -> bool:
@@ -555,6 +599,137 @@ class RepeatTensor(PatternTensor):
 
     def contains(self, i, j) -> bool:
         return self._k > 0 and j == i // self._k
+
+
+class ChunkMaskTensor(PatternTensor):
+    """Map ``n`` indices to chunks of size ``b``.
+
+    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.
+    """
+
+    def __init__(self, shape, *, b: int, dtype=None):
+        self._b = operator.index(b)
+        if self._b <= 0:
+            raise ValueError("b must be positive")
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            b=self._b,
+        )
+        n, chunks = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if chunks != (n + self._b - 1) // self._b:
+            raise ValueError("shape[1] must equal ceil(shape[0] / b)")
+
+    def contains(self, i, j) -> bool:
+        return j == i // self._b
+
+
+class SplitMaskTensor(PatternTensor):
+    """Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.
+
+    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p <= i < n*(j+1)//p``.
+    """
+
+    def __init__(self, shape, *, dtype=None):
+        super().__init__(
+            shape,
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+        )
+        n, p = map(operator.index, self.shape)
+        if n < 0:
+            raise ValueError("n must be nonnegative")
+        if p <= 0:
+            raise ValueError("shape[1] must be positive")
+
+    def contains(self, i, j) -> bool:
+        n, p = self.shape
+        return n * j // p <= i < n * (j + 1) // p
+
+
+def _randommask_mix(x: int) -> int:
+    # Match Finch.jl's SplitMix64 arithmetic, including unsigned overflow.
+    mask = (1 << 64) - 1
+    x = (x + 0x9E3779B97F4A7C15) & mask
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & mask
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & mask
+    return x ^ (x >> 31)
+
+
+def _randommask_uniform(h: int) -> float:
+    return (h >> 11) * 2.0**-53
+
+
+class RandomMaskTensor(PatternTensor):
+    """A reproducible random mask with true probability ``p`` and no stored entries.
+
+    ``shape`` may be an integer for a vector, or a tuple (including ``()``).
+    An omitted ``seed`` draws one random 64-bit seed from ``rng`` (a new NumPy
+    generator by default). Reads consume no randomness; a fixed seed and
+    coordinates give the same value even if the shape changes.
+
+    Like Finch.jl, indexed masks mix the seed, then each one-based coordinate
+    from the last axis to the first. Scalar masks use the seed directly.
+    The high 53 bits give a value in ``[0, 1)`` that is compared with ``p``.
+    """
+
+    def __init__(
+        self,
+        shape,
+        p: float,
+        *,
+        seed: int | None = None,
+        rng: np.random.Generator | None = None,
+        dtype=None,
+    ):
+        if not 0 <= p <= 1:
+            raise ValueError("p must lie in [0, 1]")
+        if isinstance(shape, int | np.integer):
+            shape = (shape,)
+        shape = tuple(operator.index(dim) for dim in shape)
+        if any(dim < 0 for dim in shape):
+            raise ValueError("shape dimensions must be nonnegative")
+        if any(dim > np.iinfo(np.intp).max for dim in shape):
+            raise OverflowError("shape dimensions must fit in intp")
+        self._p = float(p)
+        if seed is None:
+            if rng is None:
+                rng = np.random.default_rng()
+            self._seed = int(rng.integers(0, 1 << 64, dtype=np.uint64))
+        else:
+            self._seed = operator.index(seed)
+        if not 0 <= self._seed < 1 << 64:
+            raise ValueError("seed must lie in [0, 2**64 - 1]")
+        super().__init__(
+            shape,
+            ndim=len(shape),
+            dtype=dtype,
+            default_dtype=np.bool_,
+            fill_value=False,
+            pattern_value=True,
+            p=self._p,
+            seed=self._seed,
+        )
+
+    def contains(self, *idxs) -> bool:
+        if not idxs:
+            return _randommask_uniform(self._seed) < self._p
+        state = _randommask_mix(self._seed)
+        for idx in reversed(idxs):
+            state = _randommask_mix(state ^ (operator.index(idx) + 1))
+        return _randommask_uniform(state) < self._p
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self[()].item()
 
 
 class OddEvenMergeSortPartnerMaskTensor(PatternTensor):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -34,17 +35,26 @@ class TensorFType(FType, ABC):
         return len(self.shape_type)
 
     @property
-    def size(self):
-        size = 1
-        for dim in self.shape:
-            size *= int(dim)
-        return size
+    def shape(self) -> tuple[int, ...]:
+        raise TypeError("TensorFType does not have a shape.")
+
+    @property
+    def size(self) -> int:
+        return functools.reduce(lambda x, y: x * int(y), self.shape, 1)
 
     @property
     @abstractmethod
     def fill_value(self) -> AbstractFill:
         """AbstractFill value of the tensor, either static or dynamic."""
         ...
+
+    def with_fill(self, fill_value: AbstractFill) -> TensorFType:
+        """
+        This ftype carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
 
     @property
     @abstractmethod
@@ -126,6 +136,14 @@ class Tensor(FTyped, ABC):
         """
         return self.ftype.fill_value.value
 
+    def with_fill(self, fill_value: AbstractFill) -> Tensor:
+        """
+        An equivalent tensor carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
     @property
     def element_type(self) -> FType:
         """The element type of the tensor.  The element type is the scalar type of
@@ -164,7 +182,7 @@ class Tensor(FTyped, ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> tuple:
+    def shape(self) -> tuple[np.intp, ...]:
         """Shape of the tensor."""
         ...
 

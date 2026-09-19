@@ -66,7 +66,9 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
     )
 
     interpreter = StatsInterpreter(stats_factory=DCStatsFactory())
-    result_stats = interpreter(p, {})[0]
+    result = interpreter(p, {})
+    assert isinstance(result, tuple)
+    result_stats = result[0]
 
     expected_rows = shape_a[0]
     expected_cols = shape_b[1]
@@ -164,7 +166,9 @@ def test_vp_stats_matrix_multiplication(shape_a, shape_b):
     )
 
     interpreter = StatsInterpreter(stats_factory=VPStatsFactory())
-    result_stats = interpreter(p, {})[0]
+    result = interpreter(p, {})
+    assert isinstance(result, tuple)
+    result_stats = result[0]
 
     expected_rows = shape_a[0]
     expected_cols = shape_b[1]

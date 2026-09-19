@@ -2,7 +2,8 @@ from finch.algebra import DynamicFill, StaticFill, ffuncs
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
-from finch.autoschedule.stages import LogicFusionOptimizer
+from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.util import flatten_plans, propagate_copy_queries, push_fields
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -30,8 +31,6 @@ from finch.symbolic import (
     Rewrite,
     gensym,
 )
-
-from .util import flatten_plans, propagate_copy_queries, push_fields
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -186,6 +185,7 @@ def optimize(
         return prgm, bindings
 
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
+    assert isinstance(prgm, Plan)
     return flatten_plans(prgm), bindings
 
 
@@ -194,7 +194,8 @@ def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
         case Plan(bodies):
             return get_productions(bodies[-1])
         case Produces(args):
-            return args
+            assert all(isinstance(arg, Alias) for arg in args)
+            return args  # ty: ignore[invalid-return-type]
         case Query(lhs, _):
             return (lhs,)
         case _:
@@ -258,7 +259,9 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
             case Table(Alias() as a, idxs) if (
                 uses.get(a, 0) == 1 and a not in rets and a in defs
             ):
-                return Relabel(defs[a], idxs)
+                arg = defs[a]
+                assert isinstance(arg, LogicExpression)
+                return Relabel(arg, idxs)
 
     root = Rewrite(PreWalk(rule_1))(root)
     root = push_fields(root)
@@ -358,7 +361,7 @@ def propagate_transpose_queries(root: LogicStatement):
     return flatten_plans(push_fields(root))
 
 
-class DefaultLogicOptimizer(LogicFusionOptimizer):
+class DefaultLogicFactorizer(LogicFactorizer):
     def __init__(self, ctx):
         self.ctx = ctx
 

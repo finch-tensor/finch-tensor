@@ -3,14 +3,14 @@ import pytest
 import numpy as np
 
 import finch
-from finch import ConstantScalar
+from finch import ConstantScalar, Scalar
 from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
+    DefaultLogicFactorizer,
     DefaultLogicFormatter,
-    DefaultLogicOptimizer,
     DefaultLoopOrderer,
     LogicCapture,
     LogicCompiler,
@@ -127,12 +127,16 @@ def _same(actual, expected) -> bool:
         (call(ffuncs.add, ntn.Literal(0), x), x),
         (call(ffuncs.mul, x, ntn.Literal(1)), x),
         (call(ffuncs.or_, x, ntn.Literal(False)), x),
-        (call(ffuncs.and_, x, ntn.Literal(True)), x),
+        # Bitwise `and`'s identity is all-ones, i.e. -1 -- not `True`, which is
+        # all-ones only against another boolean. `x & True` is `x & 1`.
+        (call(ffuncs.and_, x, ntn.Literal(-1)), x),
         # annihilators
         (call(ffuncs.mul, x, ntn.Literal(0)), ntn.Literal(0)),
         (call(ffuncs.mul, ntn.Literal(0), x), ntn.Literal(0)),
         (call(ffuncs.and_, x, ntn.Literal(False)), ntn.Literal(False)),
-        (call(ffuncs.or_, x, ntn.Literal(True)), ntn.Literal(True)),
+        # Bitwise `or` swallows its other operand only at all-ones, i.e. -1;
+        # `int | True` is `int | 1`, which keeps bits from the other side.
+        (call(ffuncs.or_, x, ntn.Literal(-1)), ntn.Literal(-1)),
         # flattening and folding literals across an associative call
         (
             call(ffuncs.add, call(ffuncs.add, x, ntn.Literal(1)), ntn.Literal(2)),
@@ -301,7 +305,7 @@ def test_simplify_assembly():
 
 
 def test_simplify_logic_mapjoin():
-    a = lgc.Alias("A")
+    a = lgc.Table(lgc.Alias("A"), ())
     term = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (lgc.MapJoin(lgc.Literal(ffuncs.mul), (a, lgc.Literal(2))), lgc.Literal(3)),
@@ -323,7 +327,7 @@ def _capturing_scheduler():
     capture = LogicCapture(
         DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
     )
-    executor = LogicExecutor(DefaultLogicOptimizer(LogicSimplify(capture)))
+    executor = LogicExecutor(DefaultLogicFactorizer(LogicSimplify(capture)))
     return capture, LogicNormalizer(executor)
 
 
@@ -399,16 +403,16 @@ class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
         self.ctx = ctx
         self.last: asm.Module
 
-    def lower(self, prgm: asm.Module):
-        self.last = prgm
-        return self.ctx(prgm)
+    def lower(self, term: asm.Module):
+        self.last = term
+        return self.ctx(term)
 
 
 def _assembly_for(build):
     capture = _CaptureAssembly(AssemblyInterpreter())
     ctx = LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 LogicSimplify(
                     DefaultLoopOrderer(
                         DefaultLogicFormatter(
@@ -440,10 +444,14 @@ def test_annihilator_empties_the_loop_body():
     """
     # The remaining `mul`s are stride arithmetic; `mul(load(` is the one that
     # multiplies an element of `A`.
-    code, out, arr = _assembly_for(lambda x, arr: x * ConstantScalar(0))
-    np.testing.assert_array_equal(out, arr * 0)
-    assert "mul(load(" not in code
+    for build in (
+        lambda x, arr: x * ConstantScalar(0),
+        lambda x, arr: x * 0,
+    ):
+        code, out, arr = _assembly_for(build)
+        np.testing.assert_array_equal(out, arr * 0)
+        assert "mul(load(" not in code
 
-    runtime_code, runtime_out, _ = _assembly_for(lambda x, arr: x * 0)
+    runtime_code, runtime_out, arr = _assembly_for(lambda x, arr: x * Scalar(0))
     np.testing.assert_array_equal(runtime_out, arr * 0)
     assert "mul(load(" in runtime_code

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Generic, TypeVar, cast
 
 from finch.algebra import (
     DynamicFill,
@@ -14,6 +14,7 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
+from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
     Aggregate,
@@ -33,17 +34,17 @@ from finch.finch_logic import (
 from finch.symbolic import gensym
 from finch.tensor import Scalar
 
-from .logic_to_stats import insert_statistics
-
 # A location in an expression tree. Unlike a node value, a path identifies one
 # occurrence, so rewrites addressed by path cannot confuse structurally equal
 # subexpressions (e.g. two `Literal(2.0)` constants, repeated tables, ...).
 Path = tuple[int, ...]
 
+TS = TypeVar("TS", bound=TensorStats)
+
 
 @dataclass
-class AnnotatedQuery:
-    stats_factory: StatsFactory
+class AnnotatedQuery(Generic[TS]):
+    stats_factory: StatsFactory[TS]
     output_name: Alias
     reduce_idxs: list[Field]
     point_expr: LogicExpression
@@ -54,14 +55,14 @@ class AnnotatedQuery:
     original_idx: OrderedDict[Field, Field]
     connected_components: list[list[Field]]
     connected_idxs: OrderedDict[Field, set[Field]]
-    bindings: OrderedDict[Alias, TensorStats]
+    bindings: OrderedDict[Alias, TS]
     output_order: list[Field] | None = None
 
     def __init__(
         self,
-        stats_factory: StatsFactory,
+        stats_factory: StatsFactory[TS],
         q: Query,
-        bindings: OrderedDict[Alias, TensorStats] | None = None,
+        bindings: OrderedDict[Alias, TS] | None = None,
     ):
         """
         Build an `AnnotatedQuery` from a logical `Query`, extracting reduction
@@ -85,7 +86,7 @@ class AnnotatedQuery:
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
-        cache: dict[object, TensorStats] = {}
+        cache: dict[object, TS] = {}
         insert_statistics(
             self.stats_factory,
             q,
@@ -157,7 +158,7 @@ class AnnotatedQuery:
 
             starting_reduce_idxs.append(idx)
 
-        cache_point: dict[object, TensorStats] = {}
+        cache_point: dict[object, TS] = {}
         insert_statistics(
             self.stats_factory,
             point_expr,

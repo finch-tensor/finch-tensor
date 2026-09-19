@@ -8,14 +8,16 @@ import numpy as np
 import finch as ft
 from finch import ffuncs
 from finch.algebra import TensorFType, TupleFType, ftype
+from finch.algebra.fill import StaticFill
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.galley.logical_optimizer import insert_statistics
-from finch.autoschedule.smart_formatter import FDFormatter, SmartFormatter
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.formatter.smart_formatter import FDFormatter, SmartFormatter
 from finch.autoschedule.tensor_stats import (
     DC,
     BaseTensorStats,
     BaseTensorStatsFactory,
     BlockedStatsFactory,
+    BlockedUniformStatsFactory,
     DCStats,
     DCStatsFactory,
     DenseStatsFactory,
@@ -45,6 +47,45 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
+def test_sampling_reuses_random_masks():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory._rng = np.random.default_rng(42)
+    first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
+    mask_i = factory._get_mask(i, 5)
+    assert isinstance(mask_i, ft.RandomMaskTensor)
+    assert mask_i.element_type == ftype(np.intp)
+
+    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
+    assert factory._get_mask(i, 5) is mask_i
+    assert first.masks_ref is second.masks_ref is factory._masks
+    assert len(factory._masks) == 3
+    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
+    assert factory._get_mask(j, 7).ftype != mask_i.ftype
+    assert factory._get_mask(i, 6) is not mask_i
+
+
+@pytest.mark.parametrize("shape", [(12, 9), (0, 5)])
+@pytest.mark.parametrize("sample_prob", [0.0, 0.5, 1.0])
+def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_prob=sample_prob)
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    expected_count = math.prod(
+        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        for field, size in zip((i, j), shape, strict=True)
+    )
+    assert stats.scan(needs_freq=True) == (
+        expected_count,
+        expected_count,
+        expected_count,
+        {1: expected_count} if expected_count else None,
+    )
+    expected_coverage = math.prod(shape) if expected_count else 0
+    assert stats.coverage_correction() == pytest.approx(expected_coverage)
+
+
 def test_sampling_from_tensor():
     i, j = Field("i"), Field("j")
     data = np.eye(20)
@@ -183,7 +224,7 @@ def test_sampling_aggregate():
 
     node = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=MapJoin(Literal(ffuncs.mul), (ta, tb)),
         idxs=(k,),
     )
@@ -430,7 +471,7 @@ def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     stats = FDStats(base, dense_props={frozenset({i})})
 
     ftype = FDFormatter().get_tensor_ftype(
-        0,
+        StaticFill(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -450,7 +491,7 @@ def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
     )
 
     ftype = FDFormatter().get_tensor_ftype(
-        0,
+        StaticFill(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -561,6 +602,27 @@ def test_fd_stats_records_dense_projections_without_chasing():
 
 
 # ─────────────────────────────── ExactStats tests ────────────────────────────────
+
+
+def test_exact_construction_snapshots_and_defers_count(monkeypatch):
+    from unittest.mock import Mock
+
+    from finch.autoschedule import with_default_scheduler
+    from finch.autoschedule.tensor_stats import exact_stats
+
+    evaluate = Mock(wraps=ft.get_default_scheduler())
+    monkeypatch.setattr(exact_stats, "get_default_scheduler", lambda: evaluate)
+    data = np.array([[2.0, 0.0, 3.0], [0.0, 4.0, 0.0]])
+    tensor = ft.BufferizedNDArray.from_numpy(data)
+    with with_default_scheduler(evaluate):
+        stats = ExactStatsFactory()(tensor, (Field("i"), Field("j")))
+    evaluate.assert_not_called()
+
+    data[:] = 0
+    assert stats.estimate_non_fill_values() == 3
+    assert stats.nnz == 3
+    np.testing.assert_allclose(stats.get_embedding(), np.log2([2, 3, 4]))
+    evaluate.assert_called_once()
 
 
 def test_exact_elementwise_mul():
@@ -1020,7 +1082,9 @@ def test_dummy_aggregate():
     i, j = Field("i"), Field("j")
     table = Table(Literal(ft.asarray(np.eye(10))), (i, j))
 
-    node_sum = Aggregate(op=Literal(ffuncs.add), init=None, arg=table, idxs=(j,))
+    node_sum = Aggregate(
+        op=Literal(ffuncs.add), init=Literal(0.0), arg=table, idxs=(j,)
+    )
     stats = insert_statistics(
         stats_factory=DummyStatsFactory(),
         node=node_sum,
@@ -1259,7 +1323,7 @@ def test_vp_aggregate():
 
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(j,),
     )
@@ -1473,7 +1537,7 @@ def test_uniform_aggregate():
     table = Table(Literal(ft.asarray(data)), (Field("i"), Field("j")))
     node_sum = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )
@@ -1491,6 +1555,52 @@ def test_uniform_aggregate():
     assert us_agg.index_order == (Field("i"),)
     assert us_agg.get_dim_size(Field("i")) == 10
     assert us_agg.estimate_non_fill_values() == pytest.approx(expected_nnz)
+
+
+@pytest.mark.parametrize("fill_value", [0.0, -1.0])
+@pytest.mark.parametrize(
+    "shape, counts",
+    [
+        ((4, 6), (2, 3)),
+        ((4, 6, 2), (2, 3, 1)),
+        ((5, 7), (2, 3)),
+        ((3, 2), (5, 3)),
+        ((0, 7), (2, 3)),
+        ((), ()),
+    ],
+)
+def test_blocked_uniform_grid(shape, counts, fill_value):
+    fields = tuple(Field(f"x{axis}") for axis in range(len(shape)))
+    data = np.full(shape, fill_value)
+    data.flat[::3] = fill_value + 1
+    tensor = ft.BufferizedNDArray.from_numpy(data, fill_value=fill_value)
+    factory = BlockedUniformStatsFactory(
+        blocks_per_dim=dict(zip(fields, counts, strict=True))
+    )
+    stats = factory(tensor, fields)
+
+    expected = np.zeros(counts, dtype=np.intp)
+    for coord in np.ndindex(counts):
+        slices = tuple(
+            slice(n * block // count, n * (block + 1) // count)
+            for n, block, count in zip(shape, coord, counts, strict=True)
+        )
+        expected[coord] = np.count_nonzero(data[slices] != fill_value)
+
+    np.testing.assert_array_equal(stats.nnz_grid, expected)
+    assert stats.nnz_grid.dtype == np.dtype(np.intp)
+    assert stats.blocks_per_dim == dict(zip(fields, counts, strict=True))
+    assert stats.estimate_non_fill_values() == np.count_nonzero(data != fill_value)
+    for field, n, count in zip(fields, shape, counts, strict=True):
+        assert stats.block_sizes[field].dtype == np.dtype(np.intp)
+        np.testing.assert_array_equal(
+            stats.block_sizes[field], np.diff(np.arange(count + 1) * n // count)
+        )
+    volume = stats._block_volume_grid()
+    expected_density = np.divide(
+        expected, volume, out=np.zeros(counts, dtype=float), where=volume > 0
+    )
+    np.testing.assert_allclose(stats.density_grid(), expected_density)
 
 
 # ------------------------------ BlockedStats -------------------------------------
@@ -1928,7 +2038,7 @@ def test_aggregate():
 
     node_add = Aggregate(
         op=Literal(ffuncs.add),
-        init=None,
+        init=Literal(0.0),
         arg=table,
         idxs=(Field("j"),),
     )

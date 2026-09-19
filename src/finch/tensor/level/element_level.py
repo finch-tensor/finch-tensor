@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -6,6 +6,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    AbstractFill,
     DynamicFill,
     FType,
     ImmutableStructFType,
@@ -13,6 +14,7 @@ from finch.algebra import (
     as_fill,
     ftype,
     is_dynamic,
+    np_dtype,
 )
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
@@ -45,8 +47,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         # no inner level
         # cost = num_pos * bytes per value
-        elem_type = getattr(self.element_type, "dtype", np.float64)
-        val_size = np.dtype(elem_type).itemsize
+        assert self.element_type is not None
+        val_size = np_dtype(self.element_type).itemsize
         return num_pos * val_size
 
     def __post_init__(self):
@@ -62,7 +64,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
-            self.position_type = np.intp
+            self.position_type = ftype(np.intp)
         self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
         fill = as_fill(self.fill_value)
@@ -142,12 +144,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         fmt = self if fill is None else self.with_fill(fill)
         return ElementLevel(_format=fmt, _val=val)
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
-        buf = asm.GetAttr(lvl, asm.Literal("val"))
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        buf = asm.GetAttr(tns, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
         init_e: asm.AssemblyExpression = (
             # The init value arrives at bind time through the fill field.
-            asm.GetAttr(lvl, asm.Literal("fill"))
+            asm.GetAttr(tns, asm.Literal("fill"))
             if is_dynamic(getattr(init, "val", None))
             else asm.Literal(init.val)
         )
@@ -185,7 +187,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
 
 
@@ -238,6 +240,9 @@ class ElementLevel(Level):
     @property
     def ftype(self) -> ElementLevelFType:
         return self._format
+
+    def with_fill(self, fill_value: AbstractFill) -> "ElementLevel":
+        return replace(self, _format=self._format.with_fill(fill_value))
 
     @property
     def val(self) -> Any:

@@ -1,6 +1,7 @@
-from collections.abc import Callable
-from collections.abc import Sequence as Seq
+import itertools
+from collections.abc import Callable, Sequence
 from functools import partial
+from typing import TypeVar
 
 from finch.algebra import ffuncs, is_associative, is_idempotent
 from finch.algebra.utils import all_unique, intersect, is_disjoint, setdiff
@@ -9,14 +10,16 @@ from finch.symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
 from .nodes import Cached, Call, NotationNode
 from .nodes import Literal as L
 
-NN = NotationNode
+NN = TypeVar("NN", bound=NotationNode)
+
+NN_Seq = Sequence[NN]
 
 
 def _find_first_call(
-    args: Seq[NN], op: Callable
-) -> tuple[Seq[NN], Seq[NN], Seq[NN]] | None:
+    args: NN_Seq, op: Callable
+) -> tuple[NN_Seq, NN_Seq, NN_Seq] | None:
     for i, arg in enumerate(args):
-        if isinstance(arg, Call) and arg.op == L(op):
+        if isinstance(arg, Call) and arg.op.val == op:
             return args[:i], arg.args, args[i + 1 :]
     return None
 
@@ -49,7 +52,7 @@ def rule_single_arg(ex):
             return arg
 
 
-def rule_associative_flatten(ex):
+def rule_associative_flatten(ex) -> Call | None:
     """Flatten nested associative ops."""
     match ex:
         case Call(L(op), args) if (
@@ -59,14 +62,14 @@ def rule_associative_flatten(ex):
             return Call(L(op), (*before, *call_args, *after))
 
 
-def rule_equal_same(ex):
+def rule_equal_same(ex) -> L | None:
     """Match eq(a, a) => True."""
     match ex:
         case Call(L(op), (a, b)) if op == ffuncs.eq and a == b:
             return L(True)
 
 
-def rule_ge(ex):
+def rule_ge(ex) -> Call | None:
     """Transform ge(a, b) => eq(a, max(a, b))."""
     match ex:
         case Call(L(op), (a, b)) if op == ffuncs.ge:
@@ -80,7 +83,7 @@ def rule_le(ex):
             return Call(L(ffuncs.eq), (Call(L(ffuncs.max), (a, b)), b))
 
 
-def rule_add_with(ex, func):
+def rule_add_with(ex, func) -> Call | None:
     """
     Distribute max/min over add.
 
@@ -104,7 +107,7 @@ rule_add_with_max = partial(rule_add_with, func=ffuncs.max)
 rule_add_with_min = partial(rule_add_with, func=ffuncs.min)
 
 
-def rule_disjoint_nested(ex, func1, func2):
+def rule_disjoint_nested(ex, func1, func2) -> Call | None:
     """Handle nested max/min in min/max."""
     match ex:
         case Call(L(op), args) if (
@@ -124,7 +127,9 @@ def rule_disjoint_nested(ex, func1, func2):
                                 L(func2),
                                 (
                                     *before2,
-                                    *setdiff(call_args2, before + after),
+                                    *setdiff(
+                                        call_args2, itertools.chain(before, after)
+                                    ),
                                     *after2,
                                 ),
                             ),
@@ -142,7 +147,7 @@ rule_disjoint_nested_min_max = partial(
 )
 
 
-def rule_disjoint_flat_single(ex, func1, func2):
+def rule_disjoint_flat_single(ex, func1, func2) -> Call | None:
     """
     Remove min/max from max/min when disjoint.
     """
@@ -164,7 +169,7 @@ rule_disjoint_flat_single_min_max = partial(
 )
 
 
-def rule_disjoint_flat_pair(ex, func1, func2):
+def rule_disjoint_flat_pair(ex, func1, func2) -> Call | None:
     """Handle two mins/maxes in max/min."""
     match ex:
         case Call(L(op), args) if (

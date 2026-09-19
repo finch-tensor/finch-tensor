@@ -5,15 +5,15 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, TupleFType, ffuncs, ftype, ftypes
 
-from .level import Level, LevelFType
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 _LOWERING_ERROR = "SparseHashLevelFType lowering is not implemented."
 
 
 @dataclass(unsafe_hash=True)
-class SparseHashLevelFType(LevelFType, ImmutableStructFType):
+class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: FType = ftypes.intp
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
     single_writer: bool = True
 
     def __post_init__(self) -> None:
@@ -100,8 +100,7 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
         return self._lvl_t
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
-        pos_type = getattr(self.position_type, "dtype", np.intp)
-        pos_size = np.dtype(pos_type).itemsize
+        pos_size = ftypes.np_dtype(self.position_type).itemsize
         size_ptr = (num_pos + 1) * pos_size
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:
@@ -152,10 +151,10 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -164,7 +163,7 @@ class SparseHashLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def from_fields(
@@ -190,7 +189,7 @@ def sparse_hash(lvl_t, dimension_type=None, *, single_writer: bool = True):
 
 
 @dataclass(init=False)
-class SparseHashLevel(Level):
+class SparseHashLevel(SingleDimensionLevel):
     lvl: Level
     dimension: np.integer
     ptr: Any | None

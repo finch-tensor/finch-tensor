@@ -31,6 +31,5 @@ class UnvalidatedForm(Form):
     This is essentially a to-do for validation and should be replaced.
     """
 
-    @classmethod
-    def validate_inputs(cls, *inputs):
+    def validate_inputs(self, *inputs):
         return

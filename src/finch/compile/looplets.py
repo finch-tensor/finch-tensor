@@ -136,7 +136,7 @@ class StepperPass(LoopletPass):
             match node:
                 case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
                     return ntn.Access(
-                        st.chunk,  # type: ignore[arg-type]
+                        st.chunk,  # ty: ignore[invalid-argument-type]
                         mode,
                         (j, *idxs),
                     )

@@ -29,7 +29,7 @@ from finch.symbolic import gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
 
-from .loop_ordering import CycleInFields, toposort
+from .loop_orderer.loop_ordering import CycleInFields, toposort
 from .stages import FormattedForm, LogicNotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
@@ -412,6 +412,7 @@ class NotationGenerator(LogicNotationLowerer):
             match node:
                 case ntn.Return(expr):
                     ret_t = expr.result_type
+        assert ret_t is not None
         return ntn.Module(
             (
                 ntn.Function(

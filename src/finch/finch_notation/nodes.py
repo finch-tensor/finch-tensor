@@ -2,11 +2,18 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from finch import tensor
-from finch.algebra import DynamicFill, FType, StaticFill, ftype, return_type
-from finch.finch_assembly import AssemblyNode
+from finch.algebra import (
+    DynamicFill,
+    FType,
+    StaticFill,
+    TensorFType,
+    ftype,
+    return_type,
+)
+from finch.finch_assembly import AssemblyExpression, AssemblyNode
 from finch.symbolic import (
     CallTerm,
     Context,
@@ -17,6 +24,10 @@ from finch.symbolic import (
     literal_repr,
 )
 from finch.util import qual_str
+
+if TYPE_CHECKING:
+    from finch.compile.lower import FinchTensorFType
+    from finch.tensor.level import LevelFType
 
 
 @dataclass(eq=True, frozen=True)
@@ -86,8 +97,6 @@ class Literal(NotationExpression, LiteralTerm):
     Notation AST expression for the literal value `val`.
     """
 
-    val: Any
-
     @property
     def result_type(self):
         return ftype(self.val)
@@ -128,11 +137,10 @@ class Variable(NotationExpression, NamedTerm):
     """
 
     name: str
-    type_: FType | None = None
+    type_: FType
 
     def __post_init__(self):
-        if self.type_ is not None:
-            assert isinstance(self.type_, FType)
+        assert isinstance(self.type_, FType)
 
     @property
     def result_type(self):
@@ -155,12 +163,13 @@ class Call(NotationTree, NotationExpression, CallTerm):
     `args...`.
     """
 
-    op: Literal
+    op: Literal | Variable
     args: tuple[NotationExpression, ...]
 
     @property
-    def result_type(self):
+    def result_type(self) -> FType:
         arg_types = [a.result_type for a in self.args]
+        assert isinstance(self.op, Literal)  # TODO: handle Variable
         return return_type(self.op.val, *arg_types)
 
     @classmethod
@@ -218,6 +227,7 @@ class Dimension(NotationTree, NotationExpression):
 
     @property
     def result_type(self):
+        assert isinstance(self.tns.result_type, TensorFType)
         return self.tns.result_type.shape_type[self.r.val]
 
     @classmethod
@@ -334,7 +344,7 @@ class Unwrap(NotationTree, NotationExpression):
     tensor `arg`.
     """
 
-    arg: NotationNode
+    arg: NotationExpression
 
     @property
     def children(self):
@@ -345,6 +355,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
+        assert isinstance(self.arg.result_type, TensorFType)
         return self.arg.result_type.element_type
 
 
@@ -434,14 +445,18 @@ class Cursor(NotationExpression, ABC):
 
     @property
     @abstractmethod
-    def root(self) -> NotationExpression: ...
+    def root(self) -> NotationExpression | AssemblyExpression: ...
+
+    @property
+    @abstractmethod
+    def result_type(self) -> LevelFType: ...
 
 
 @dataclass(eq=True, frozen=True)
 class Root(NotationTree, Cursor):
     """The first level of a tensor."""
 
-    tns: NotationExpression
+    tns: NotationExpression | AssemblyExpression
 
     @property
     def root(self):
@@ -449,7 +464,7 @@ class Root(NotationTree, Cursor):
 
     @property
     def result_type(self):
-        return self.tns.result_type.get_child_type("lvl")
+        return cast("FinchTensorFType", self.tns.result_type).get_child_type("lvl")
 
     @property
     def children(self):
@@ -494,9 +509,9 @@ class Fiber(NotationExpression):
         match self.lvl:
             case Root(tns):
                 return tns.result_type
-        return tensor.FiberTensorFType(
-            self.lvl.result_type, self.lvl.root.result_type.device
-        )
+        root_type = self.lvl.root.result_type
+        assert isinstance(root_type, TensorFType)
+        return tensor.FiberTensorFType(self.lvl.result_type, root_type.device)
 
 
 @dataclass(eq=True, frozen=True)

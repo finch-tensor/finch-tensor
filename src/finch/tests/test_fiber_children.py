@@ -8,6 +8,7 @@ from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import DynamicFill, ffuncs
 from finch.compile.lower import AssemblyContext
+from finch.symbolic import ScopedDict
 from finch.tensor import (
     BufferizedNDArray,
     DenseLevel,
@@ -28,7 +29,9 @@ class VirtualChildrenFType(FiberTensorFType):
 
 
 def test_stored_levels():
-    tensor = FiberTensor(DenseLevel(DenseLevel(ElementLevel(element(0)), 4), 3))
+    tensor = FiberTensor(
+        DenseLevel(DenseLevel(ElementLevel(element(0)), np.intp(4)), np.intp(3))
+    )
     root = ntn.Literal(tensor)
     level = ntn.Root(root)
     expected = tensor.lvl
@@ -52,7 +55,7 @@ def test_stored_levels():
 
 
 def test_virtual_root():
-    tensor = FiberTensor(DenseLevel(ElementLevel(element(0)), 3))
+    tensor = FiberTensor(DenseLevel(ElementLevel(element(0)), np.intp(3)))
     root = asm.Variable("root", VirtualChildrenFType(tensor.lvl.ftype))
     level = ntn.Root(root)
     ctx = AssemblyContext()
@@ -78,7 +81,7 @@ def test_named_child():
     child = ntn.Child(level, "body")
     bindings = {"tensor": SimpleNamespace(lvl=SimpleNamespace(body=body))}
     assert child.result_type == body.ftype
-    assert ntn.NotationInterpreter(bindings=bindings)(child) is body
+    assert ntn.NotationInterpreter(bindings=ScopedDict(bindings))(child) is body
     lowered = AssemblyContext()(child)
     assert asm.AssemblyInterpreter(bindings=bindings)(lowered) is body
     assert ntn.Child.make_term(child.head(), *child.children) == child

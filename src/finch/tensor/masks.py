@@ -8,12 +8,17 @@ from finch.algebra import ImmutableStructFType, ffuncs, is_dynamic
 from finch.compile import looplets as lplt
 
 from .fiber_tensor import FiberTensor
-from .level import Level, LevelFType
+from .level.level import (
+    Level,
+    LevelFType,
+    MultiDimensionLevelFType,
+    SingleDimensionLevelFType,
+)
 
 
 @dataclass(unsafe_hash=True)
 class LoTriMaskFType(LevelFType, ImmutableStructFType):
-    body: LevelFType
+    body: SingleDimensionLevelFType | MultiDimensionLevelFType
 
     @property
     def element_type(self):
@@ -65,14 +70,14 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         return self.body.level_lower_freeze(
-            ctx, asm.GetAttr(tns, asm.Literal("body")), op, pos
+            ctx, asm.GetAttr(lvl, asm.Literal("body")), op, pos
         )
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         return self.body.level_lower_thaw(
-            ctx, asm.GetAttr(tns, asm.Literal("body")), op, pos
+            ctx, asm.GetAttr(lvl, asm.Literal("body")), op, pos
         )
 
     def level_lower_unwrap(self, ctx, obj, pos):
@@ -177,10 +182,6 @@ class LoTriMask(Level):
     @property
     def shape(self):
         return self.lvl.shape
-
-    @property
-    def dimension(self):
-        return self.lvl.dimension
 
     @property
     def body(self):

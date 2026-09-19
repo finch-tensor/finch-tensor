@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 import numpy as np
 
 import finch
@@ -16,7 +18,85 @@ from finch.algebra import (
     promote_type,
     repeat_operator,
 )
-from finch.algebra.ftypes import FDType
+from finch.algebra.ftypes import FDType, NamedTupleFType, none_, np_dtype
+
+
+@pytest.mark.parametrize(
+    "dtype, expected",
+    [
+        (finch.bool, np.bool_),
+        (finch.int8, np.int8),
+        (finch.int16, np.int16),
+        (finch.int32, np.int32),
+        (finch.int64, np.int64),
+        (finch.uint8, np.uint8),
+        (finch.uint16, np.uint16),
+        (finch.uint32, np.uint32),
+        (finch.uint64, np.uint64),
+        (finch.float16, np.float16),
+        (finch.float32, np.float32),
+        (finch.float64, np.float64),
+        (finch.complex64, np.complex64),
+        (finch.complex128, np.complex128),
+        (finch.bool_, bool),
+        (finch.int_, int),
+        (finch.float_, float),
+        (finch.complex_, complex),
+        (finch.str_, str),
+        (none_, type(None)),
+    ],
+)
+def test_numpy_dtype(dtype: FDType, expected):
+    assert dtype.dtype == np.dtype(expected)
+    assert np_dtype(dtype) == np.dtype(expected)
+    assert np.dtype(dtype) == np.dtype(expected)
+
+
+def test_tuple_numpy_dtype_roundtrip():
+    dtype = TupleFType.from_tuple(
+        (finch.int32, TupleFType.from_tuple((finch.float64, finch.bool)))
+    )
+    expected = np.dtype(
+        [
+            ("element_0", np.int32),
+            ("element_1", [("element_0", np.float64), ("element_1", np.bool_)]),
+        ]
+    )
+    assert dtype.dtype == expected
+    assert np.dtype(dtype) == expected
+    assert np_dtype(dtype) == expected
+    assert finch.ftype(np_dtype(dtype)) == dtype
+    assert np_dtype(TupleFType.from_tuple(())) == np.dtype([])
+
+
+def test_numpy_dtype_custom_fdtype():
+    class CustomDType(FDType):
+        @property
+        def dtype(self) -> np.dtype:
+            return np.dtype(np.int32)
+
+        def __eq__(self, other):
+            return type(self) is type(other)
+
+        def __hash__(self):
+            return hash(type(self))
+
+        def __call__(self, val):
+            return self.dtype.type(val)
+
+    dtype = CustomDType()
+    assert np_dtype(dtype) == np.dtype(np.int32)
+    assert np_dtype(TupleFType.from_tuple((dtype,))) == np.dtype(
+        [("element_0", np.int32)]
+    )
+
+
+def test_numpy_dtype_rejects_non_data_types():
+    dtype = NamedTupleFType("Point", [("x", finch.float64)])
+    with pytest.raises(TypeError, match="Unsupported NumPy dtype"):
+        np_dtype(dtype)
+    with pytest.raises(TypeError, match="Unsupported NumPy dtype"):
+        np_dtype(TupleFType.from_tuple((dtype,)))
 
 
 def test_algebra_selected():
@@ -30,15 +110,15 @@ def test_algebra_selected():
     assert is_distributive(ffuncs.logical_or, ffuncs.logical_and)
     assert is_annihilator(ffuncs.add, math.inf)
     assert is_annihilator(ffuncs.mul, 0)
-    assert is_annihilator(ffuncs.or_, True)
-    assert is_annihilator(ffuncs.and_, False)
+    assert is_annihilator(ffuncs.or_, -1)
+    assert is_annihilator(ffuncs.and_, 0)
     assert is_annihilator(ffuncs.logaddexp, math.inf)
     assert is_annihilator(ffuncs.logical_or, True)
     assert is_annihilator(ffuncs.logical_and, False)
     assert is_identity(ffuncs.add, 0)
     assert is_identity(ffuncs.mul, 1)
     assert is_identity(ffuncs.or_, False)
-    assert is_identity(ffuncs.and_, True)
+    assert is_identity(ffuncs.and_, -1)
     assert is_identity(ffuncs.truediv, 1)
     assert is_identity(ffuncs.lshift, 0)
     assert is_identity(ffuncs.rshift, 0)

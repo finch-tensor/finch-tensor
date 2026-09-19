@@ -211,9 +211,6 @@ class _Pow(BinaryFinchOperator):
     def is_identity(self, arg):
         return arg == 1
 
-    def is_annihilator(self, arg):
-        return arg == 0
-
     def __repr__(self) -> str:
         return "pow"
 
@@ -261,7 +258,7 @@ class _And(NAryFinchOperator):
         return reduce(operator.and_, args)
 
     def is_identity(self, arg):
-        return bool(arg)
+        return arg == -1
 
     def is_annihilator(self, arg):
         return not bool(arg)
@@ -313,7 +310,7 @@ class _Or(NAryFinchOperator):
         return not bool(arg)
 
     def is_annihilator(self, arg):
-        return bool(arg)
+        return arg == -1
 
     def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
         return isinstance(other_op, _And)

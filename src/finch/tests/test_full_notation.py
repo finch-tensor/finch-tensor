@@ -8,7 +8,7 @@ from finch.algebra import Tensor, ffuncs, ftype, is_dynamic
 from finch.compile import NotationCompiler, make_extent
 from finch.compile.looplets import Run
 from finch.finch_notation.interpreter import FullView
-from finch.symbolic import Reflector
+from finch.symbolic import Reflector, ScopedDict
 from finch.tensor import BufferizedNDArray
 
 
@@ -16,7 +16,7 @@ from finch.tensor import BufferizedNDArray
 def test_full_interpreter(shape):
     value = ntn.Variable("value", ftype(np.int64))
     full = ntn.Full(value, tuple(ntn.Literal(dim) for dim in shape))
-    interpreter = ntn.NotationInterpreter(bindings={"value": np.int64(7)})
+    interpreter = ntn.NotationInterpreter(bindings=ScopedDict({"value": np.int64(7)}))
     tensor = interpreter(full)
     assert isinstance(tensor, FullView)
     assert isinstance(tensor, Tensor)
@@ -91,7 +91,7 @@ def test_full_compiler():
         )
     )
     interpreted = ntn.NotationInterpreter()(program)
-    compiled = asm.AssemblyInterpreter()(NotationCompiler(Reflector())(program))
+    compiled = asm.AssemblyInterpreter()(NotationCompiler(Reflector())(program))  # ty: ignore[invalid-argument-type]
     for value in (np.int64(7), np.int64(11)):
         for module in (interpreted, compiled):
             actual = module.read_full(buf, value).to_numpy()
@@ -99,12 +99,12 @@ def test_full_compiler():
 
 
 def test_full_run_annihilator():
-    access = ntn.Unwrap(ntn.Access(Run(ntn.Full(ntn.Literal(0))), ntn.Read(), ()))
+    access = ntn.Unwrap(ntn.Access(Run(ntn.Full(ntn.Literal(0))), ntn.Read(), ()))  # ty: ignore[invalid-argument-type]
     term = ntn.Call(ntn.Literal(ffuncs.mul), (access, ntn.Literal(5)))
     assert ntn.LoopletSimplify.simplify(term) == access
     dynamic = ntn.Unwrap(
         ntn.Access(
-            Run(ntn.Full(ntn.Variable("value", ftype(np.int64)))),
+            Run(ntn.Full(ntn.Variable("value", ftype(np.int64)))),  # ty: ignore[invalid-argument-type]
             ntn.Read(),
             (),
         )

@@ -3,7 +3,7 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.smart_formatter import (
+from finch.autoschedule.formatter.smart_formatter import (
     IterCostFormatter,
     StorageCostFormatter,
 )

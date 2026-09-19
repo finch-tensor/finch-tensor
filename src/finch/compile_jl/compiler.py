@@ -17,10 +17,11 @@ from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
+from finch.tensor.patterns import PatternTensorFType
 
 from .interop import JuliaBufferContext
 from .julia import jl
-from .types import ftype_to_jl_constructor_str, ftype_to_jl_type_str
+from .types import _leaf_type_str, ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
 _JULIA_OPS = {
     # arithmetic
@@ -252,7 +253,14 @@ class FinchJLGenerator:
                 idx_str = ",".join(
                     [self.generate_julia(idx, nestingLvl) for idx in reversed(idxs)]
                 )
-                return f"{tns_str}[{idx_str}]"
+                access = f"{tns_str}[{idx_str}]"
+                match tns.result_type:
+                    case PatternTensorFType() as tensor_type:
+                        # Julia masks yield Bool, but Python patterns can carry
+                        # numeric dtypes with different arithmetic semantics.
+                        elem_t = _leaf_type_str(tensor_type.element_type)
+                        return f"{elem_t}({access})"
+                return access
 
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
