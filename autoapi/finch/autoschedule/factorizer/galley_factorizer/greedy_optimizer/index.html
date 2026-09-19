@@ -9,25 +9,25 @@
       
       
       
-        <link rel="prev" href="../galley/logical_optimizer/query_normalization/">
+        <link rel="prev" href="../galley_optimize/">
       
       
-        <link rel="next" href="../loop_order_bnb/">
+        <link rel="next" href="../query_normalization/">
       
       
         
       
       
-      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>galley_optimize - Finch Tensor</title>
+        <title>greedy_optimizer - Finch Tensor</title>
       
     
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -46,9 +46,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../../../../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#finch.autoschedule.galley_optimize" class="md-skip">
+        <a href="#finch.autoschedule.factorizer.galley_factorizer.greedy_optimizer" class="md-skip">
           Skip to content
         </a>
       
@@ -82,7 +82,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../.." title="Finch Tensor" class="md-header__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
+    <a href="../../../../../.." title="Finch Tensor" class="md-header__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              galley_optimize
+              greedy_optimizer
             
           </span>
         </div>
@@ -152,7 +152,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../.." title="Finch Tensor" class="md-nav__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
+    <a href="../../../../../.." title="Finch Tensor" class="md-nav__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -182,7 +182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../.." class="md-nav__link">
+      <a href="../../../../../.." class="md-nav__link">
         
   
   
@@ -285,7 +285,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../conftest/" class="md-nav__link">
+      <a href="../../../../../conftest/" class="md-nav__link">
         
   
   
@@ -409,7 +409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/algebra/" class="md-nav__link">
+      <a href="../../../../algebra/algebra/" class="md-nav__link">
         
   
   
@@ -437,7 +437,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/devices/" class="md-nav__link">
+      <a href="../../../../algebra/devices/" class="md-nav__link">
         
   
   
@@ -465,7 +465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ffuncs/" class="md-nav__link">
+      <a href="../../../../algebra/ffuncs/" class="md-nav__link">
         
   
   
@@ -493,7 +493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/fill/" class="md-nav__link">
+      <a href="../../../../algebra/fill/" class="md-nav__link">
         
   
   
@@ -521,7 +521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ftypes/" class="md-nav__link">
+      <a href="../../../../algebra/ftypes/" class="md-nav__link">
         
   
   
@@ -549,7 +549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/tensor/" class="md-nav__link">
+      <a href="../../../../algebra/tensor/" class="md-nav__link">
         
   
   
@@ -577,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/utils/" class="md-nav__link">
+      <a href="../../../../algebra/utils/" class="md-nav__link">
         
   
   
@@ -613,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../array_namespace_info/" class="md-nav__link">
+      <a href="../../../../array_namespace_info/" class="md-nav__link">
         
   
   
@@ -690,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cache/" class="md-nav__link">
+      <a href="../../../cache/" class="md-nav__link">
         
   
   
@@ -718,7 +718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../capture/" class="md-nav__link">
+      <a href="../../../capture/" class="md-nav__link">
         
   
   
@@ -746,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compiler/" class="md-nav__link">
+      <a href="../../../compiler/" class="md-nav__link">
         
   
   
@@ -774,7 +774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../default_schedulers/" class="md-nav__link">
+      <a href="../../../default_schedulers/" class="md-nav__link">
         
   
   
@@ -802,7 +802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../einsum/" class="md-nav__link">
+      <a href="../../../einsum/" class="md-nav__link">
         
   
   
@@ -830,7 +830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../executor/" class="md-nav__link">
+      <a href="../../../executor/" class="md-nav__link">
         
   
   
@@ -855,17 +855,115 @@
                 
   
   
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_3_7" id="__nav_3_2_3_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    factorizer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2_3_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    factorizer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_7_1" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3_2_3_7_1" id="__nav_3_2_3_7_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    galley_factorizer
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="5" aria-labelledby="__nav_3_2_3_7_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3_2_3_7_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    galley_factorizer
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
-      <a href="../formatter/" class="md-nav__link">
+      <a href="../annotated_query/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    formatter
+    annotated_query
   
 
     
@@ -874,6 +972,216 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../branch_and_bound/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    branch_and_bound
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../galley_optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    galley_optimize
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    greedy_optimizer
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    greedy_optimizer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.factorizer.galley_factorizer.greedy_optimizer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        greedy_optimizer
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../query_normalization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    query_normalization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    optimize
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -904,7 +1212,7 @@
   <span class="md-ellipsis">
     
   
-    galley
+    formatter
   
 
     
@@ -920,11 +1228,75 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    galley
+    formatter
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../formatter/formatter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    formatter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../formatter/smart_formatter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    smart_formatter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
             
               
                 
@@ -941,17 +1313,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_8_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_9" >
         
           
-          <label class="md-nav__link" for="__nav_3_2_3_8_1" id="__nav_3_2_3_8_1_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_2_3_9" id="__nav_3_2_3_9_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
     
   
-    logical_optimizer
+    loop_orderer
   
 
     
@@ -962,12 +1334,12 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="5" aria-labelledby="__nav_3_2_3_8_1_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_3_8_1">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_3_9">
             <span class="md-nav__icon md-icon"></span>
             
   
-    logical_optimizer
+    loop_orderer
   
 
           </label>
@@ -980,278 +1352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/annotated_query/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    annotated_query
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/branch_and_bound/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    branch_and_bound
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/greedy_optimizer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    greedy_optimizer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/logic_to_stats/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    logic_to_stats
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../galley/logical_optimizer/query_normalization/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    query_normalization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    galley_optimize
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    galley_optimize
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        galley_optimize
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.GalleyLogicalOptimizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GalleyLogicalOptimizer
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.optimize_plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        optimize_plan
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.optimize_query" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        optimize_query
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../loop_order_bnb/" class="md-nav__link">
+      <a href="../../../loop_orderer/loop_order_bnb/" class="md-nav__link">
         
   
   
@@ -1279,7 +1380,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_order_cost/" class="md-nav__link">
+      <a href="../../../loop_orderer/loop_order_cost/" class="md-nav__link">
         
   
   
@@ -1307,7 +1408,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_order_greedy/" class="md-nav__link">
+      <a href="../../../loop_orderer/loop_order_greedy/" class="md-nav__link">
         
   
   
@@ -1335,7 +1436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../loop_ordering/" class="md-nav__link">
+      <a href="../../../loop_orderer/loop_ordering/" class="md-nav__link">
         
   
   
@@ -1356,6 +1457,14 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
               
                 
   
@@ -1363,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../normalize/" class="md-nav__link">
+      <a href="../../../normalize/" class="md-nav__link">
         
   
   
@@ -1391,63 +1500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../optimize/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    optimize
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../smart_formatter/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    smart_formatter
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../stages/" class="md-nav__link">
+      <a href="../../../stages/" class="md-nav__link">
         
   
   
@@ -1483,10 +1536,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_18" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_12" >
         
           
-          <label class="md-nav__link" for="__nav_3_2_3_18" id="__nav_3_2_3_18_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3_2_3_12" id="__nav_3_2_3_12_label" tabindex="0">
             
   
   
@@ -1504,8 +1557,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_18_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3_2_3_18">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2_3_12">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1522,7 +1575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/blocked_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/blocked_stats/" class="md-nav__link">
         
   
   
@@ -1550,7 +1603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/blocked_uniform/" class="md-nav__link">
+      <a href="../../../tensor_stats/blocked_uniform/" class="md-nav__link">
         
   
   
@@ -1578,7 +1631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/bound_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/bound_stats/" class="md-nav__link">
         
   
   
@@ -1606,7 +1659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/dense_stat/" class="md-nav__link">
+      <a href="../../../tensor_stats/dense_stat/" class="md-nav__link">
         
   
   
@@ -1634,7 +1687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/dummy_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/dummy_stats/" class="md-nav__link">
         
   
   
@@ -1662,7 +1715,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/exact_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/exact_stats/" class="md-nav__link">
         
   
   
@@ -1690,7 +1743,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/fd_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/fd_stats/" class="md-nav__link">
         
   
   
@@ -1718,7 +1771,35 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/numeric_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/logic_to_stats/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    logic_to_stats
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tensor_stats/numeric_stats/" class="md-nav__link">
         
   
   
@@ -1746,7 +1827,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/sampling_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/sampling_stats/" class="md-nav__link">
         
   
   
@@ -1774,7 +1855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/stats_interpreter/" class="md-nav__link">
+      <a href="../../../tensor_stats/stats_interpreter/" class="md-nav__link">
         
   
   
@@ -1802,7 +1883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/tensor_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/tensor_stats/" class="md-nav__link">
         
   
   
@@ -1830,7 +1911,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/uniform_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/uniform_stats/" class="md-nav__link">
         
   
   
@@ -1858,7 +1939,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/util/" class="md-nav__link">
+      <a href="../../../tensor_stats/util/" class="md-nav__link">
         
   
   
@@ -1886,7 +1967,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tensor_stats/vp_stats/" class="md-nav__link">
+      <a href="../../../tensor_stats/vp_stats/" class="md-nav__link">
         
   
   
@@ -1922,7 +2003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../util/" class="md-nav__link">
+      <a href="../../../util/" class="md-nav__link">
         
   
   
@@ -2052,7 +2133,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/malloc_buffer/" class="md-nav__link">
+      <a href="../../../../codegen/buffers/malloc_buffer/" class="md-nav__link">
         
   
   
@@ -2080,7 +2161,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/numpy_buffer/" class="md-nav__link">
+      <a href="../../../../codegen/buffers/numpy_buffer/" class="md-nav__link">
         
   
   
@@ -2108,7 +2189,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
+      <a href="../../../../codegen/buffers/safe_buffer/" class="md-nav__link">
         
   
   
@@ -2191,7 +2272,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/c_codegen/c/" class="md-nav__link">
+      <a href="../../../../codegen/c_codegen/c/" class="md-nav__link">
         
   
   
@@ -2219,7 +2300,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/c_codegen/stages/" class="md-nav__link">
+      <a href="../../../../codegen/c_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2302,7 +2383,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/mlir/" class="md-nav__link">
+      <a href="../../../../codegen/mlir_codegen/mlir/" class="md-nav__link">
         
   
   
@@ -2330,7 +2411,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
+      <a href="../../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
         
   
   
@@ -2358,7 +2439,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/stages/" class="md-nav__link">
+      <a href="../../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2441,7 +2522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/numba_codegen/numba/" class="md-nav__link">
+      <a href="../../../../codegen/numba_codegen/numba/" class="md-nav__link">
         
   
   
@@ -2469,7 +2550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/numba_codegen/stages/" class="md-nav__link">
+      <a href="../../../../codegen/numba_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2560,7 +2641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile/extents/" class="md-nav__link">
+      <a href="../../../../compile/extents/" class="md-nav__link">
         
   
   
@@ -2588,7 +2669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile/looplets/" class="md-nav__link">
+      <a href="../../../../compile/looplets/" class="md-nav__link">
         
   
   
@@ -2616,7 +2697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile/lower/" class="md-nav__link">
+      <a href="../../../../compile/lower/" class="md-nav__link">
         
   
   
@@ -2644,7 +2725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile/stages/" class="md-nav__link">
+      <a href="../../../../compile/stages/" class="md-nav__link">
         
   
   
@@ -2727,7 +2808,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/buffer/" class="md-nav__link">
+      <a href="../../../../compile_jl/buffer/" class="md-nav__link">
         
   
   
@@ -2755,7 +2836,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/compiler/" class="md-nav__link">
+      <a href="../../../../compile_jl/compiler/" class="md-nav__link">
         
   
   
@@ -2783,7 +2864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/interop/" class="md-nav__link">
+      <a href="../../../../compile_jl/interop/" class="md-nav__link">
         
   
   
@@ -2811,7 +2892,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/julia/" class="md-nav__link">
+      <a href="../../../../compile_jl/julia/" class="md-nav__link">
         
   
   
@@ -2839,7 +2920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/profiling/" class="md-nav__link">
+      <a href="../../../../compile_jl/profiling/" class="md-nav__link">
         
   
   
@@ -2867,7 +2948,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/types/" class="md-nav__link">
+      <a href="../../../../compile_jl/types/" class="md-nav__link">
         
   
   
@@ -2950,7 +3031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/buffer/" class="md-nav__link">
+      <a href="../../../../finch_assembly/buffer/" class="md-nav__link">
         
   
   
@@ -2978,7 +3059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/cfg_builder/" class="md-nav__link">
+      <a href="../../../../finch_assembly/cfg_builder/" class="md-nav__link">
         
   
   
@@ -3006,7 +3087,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/dataflow/" class="md-nav__link">
+      <a href="../../../../finch_assembly/dataflow/" class="md-nav__link">
         
   
   
@@ -3034,7 +3115,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/interpreter/" class="md-nav__link">
+      <a href="../../../../finch_assembly/interpreter/" class="md-nav__link">
         
   
   
@@ -3062,7 +3143,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/nodes/" class="md-nav__link">
+      <a href="../../../../finch_assembly/nodes/" class="md-nav__link">
         
   
   
@@ -3090,7 +3171,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/parser/" class="md-nav__link">
+      <a href="../../../../finch_assembly/parser/" class="md-nav__link">
         
   
   
@@ -3118,7 +3199,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/simplification/" class="md-nav__link">
+      <a href="../../../../finch_assembly/simplification/" class="md-nav__link">
         
   
   
@@ -3146,7 +3227,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/stages/" class="md-nav__link">
+      <a href="../../../../finch_assembly/stages/" class="md-nav__link">
         
   
   
@@ -3174,7 +3255,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/struct_slots/" class="md-nav__link">
+      <a href="../../../../finch_assembly/struct_slots/" class="md-nav__link">
         
   
   
@@ -3202,7 +3283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/type_checker/" class="md-nav__link">
+      <a href="../../../../finch_assembly/type_checker/" class="md-nav__link">
         
   
   
@@ -3230,7 +3311,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/utils/" class="md-nav__link">
+      <a href="../../../../finch_assembly/utils/" class="md-nav__link">
         
   
   
@@ -3313,7 +3394,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/interpreter/" class="md-nav__link">
+      <a href="../../../../finch_einsum/interpreter/" class="md-nav__link">
         
   
   
@@ -3341,7 +3422,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/nodes/" class="md-nav__link">
+      <a href="../../../../finch_einsum/nodes/" class="md-nav__link">
         
   
   
@@ -3369,7 +3450,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/parser/" class="md-nav__link">
+      <a href="../../../../finch_einsum/parser/" class="md-nav__link">
         
   
   
@@ -3397,7 +3478,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/stages/" class="md-nav__link">
+      <a href="../../../../finch_einsum/stages/" class="md-nav__link">
         
   
   
@@ -3480,7 +3561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/cfg_builder/" class="md-nav__link">
+      <a href="../../../../finch_fused/cfg_builder/" class="md-nav__link">
         
   
   
@@ -3508,7 +3589,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/dataflow/" class="md-nav__link">
+      <a href="../../../../finch_fused/dataflow/" class="md-nav__link">
         
   
   
@@ -3536,7 +3617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/jit/" class="md-nav__link">
+      <a href="../../../../finch_fused/jit/" class="md-nav__link">
         
   
   
@@ -3564,7 +3645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/nodes/" class="md-nav__link">
+      <a href="../../../../finch_fused/nodes/" class="md-nav__link">
         
   
   
@@ -3592,7 +3673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/parser/" class="md-nav__link">
+      <a href="../../../../finch_fused/parser/" class="md-nav__link">
         
   
   
@@ -3675,7 +3756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/interpreter/" class="md-nav__link">
+      <a href="../../../../finch_logic/interpreter/" class="md-nav__link">
         
   
   
@@ -3703,7 +3784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/nodes/" class="md-nav__link">
+      <a href="../../../../finch_logic/nodes/" class="md-nav__link">
         
   
   
@@ -3731,7 +3812,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/simplification/" class="md-nav__link">
+      <a href="../../../../finch_logic/simplification/" class="md-nav__link">
         
   
   
@@ -3759,7 +3840,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/stages/" class="md-nav__link">
+      <a href="../../../../finch_logic/stages/" class="md-nav__link">
         
   
   
@@ -3787,7 +3868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/tensor_stats/" class="md-nav__link">
+      <a href="../../../../finch_logic/tensor_stats/" class="md-nav__link">
         
   
   
@@ -3870,7 +3951,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/cfg_builder/" class="md-nav__link">
+      <a href="../../../../finch_notation/cfg_builder/" class="md-nav__link">
         
   
   
@@ -3898,7 +3979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/interpreter/" class="md-nav__link">
+      <a href="../../../../finch_notation/interpreter/" class="md-nav__link">
         
   
   
@@ -3926,7 +4007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/nodes/" class="md-nav__link">
+      <a href="../../../../finch_notation/nodes/" class="md-nav__link">
         
   
   
@@ -3954,7 +4035,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/proves/" class="md-nav__link">
+      <a href="../../../../finch_notation/proves/" class="md-nav__link">
         
   
   
@@ -3982,7 +4063,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/simplification/" class="md-nav__link">
+      <a href="../../../../finch_notation/simplification/" class="md-nav__link">
         
   
   
@@ -4010,7 +4091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/stages/" class="md-nav__link">
+      <a href="../../../../finch_notation/stages/" class="md-nav__link">
         
   
   
@@ -4093,7 +4174,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/eager/" class="md-nav__link">
+      <a href="../../../../interface/eager/" class="md-nav__link">
         
   
   
@@ -4121,7 +4202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/fft/" class="md-nav__link">
+      <a href="../../../../interface/fft/" class="md-nav__link">
         
   
   
@@ -4149,7 +4230,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/fuse/" class="md-nav__link">
+      <a href="../../../../interface/fuse/" class="md-nav__link">
         
   
   
@@ -4177,7 +4258,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/lazy/" class="md-nav__link">
+      <a href="../../../../interface/lazy/" class="md-nav__link">
         
   
   
@@ -4205,7 +4286,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/linalg/" class="md-nav__link">
+      <a href="../../../../interface/linalg/" class="md-nav__link">
         
   
   
@@ -4288,7 +4369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/dataflow/" class="md-nav__link">
+      <a href="../../../../symbolic/dataflow/" class="md-nav__link">
         
   
   
@@ -4316,7 +4397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/environment/" class="md-nav__link">
+      <a href="../../../../symbolic/environment/" class="md-nav__link">
         
   
   
@@ -4344,7 +4425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/gensym/" class="md-nav__link">
+      <a href="../../../../symbolic/gensym/" class="md-nav__link">
         
   
   
@@ -4372,7 +4453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/rewriters/" class="md-nav__link">
+      <a href="../../../../symbolic/rewriters/" class="md-nav__link">
         
   
   
@@ -4400,7 +4481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/simplification/" class="md-nav__link">
+      <a href="../../../../symbolic/simplification/" class="md-nav__link">
         
   
   
@@ -4428,7 +4509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/stage/" class="md-nav__link">
+      <a href="../../../../symbolic/stage/" class="md-nav__link">
         
   
   
@@ -4456,7 +4537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/term/" class="md-nav__link">
+      <a href="../../../../symbolic/term/" class="md-nav__link">
         
   
   
@@ -4484,7 +4565,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/traversal/" class="md-nav__link">
+      <a href="../../../../symbolic/traversal/" class="md-nav__link">
         
   
   
@@ -4567,7 +4648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/bufferized_ndarray/" class="md-nav__link">
+      <a href="../../../../tensor/bufferized_ndarray/" class="md-nav__link">
         
   
   
@@ -4595,7 +4676,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/fiber_tensor/" class="md-nav__link">
+      <a href="../../../../tensor/fiber_tensor/" class="md-nav__link">
         
   
   
@@ -4670,7 +4751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/dense_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/dense_level/" class="md-nav__link">
         
   
   
@@ -4698,7 +4779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/element_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/element_level/" class="md-nav__link">
         
   
   
@@ -4726,7 +4807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/level/" class="md-nav__link">
+      <a href="../../../../tensor/level/level/" class="md-nav__link">
         
   
   
@@ -4754,7 +4835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_bytemap_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/sparse_bytemap_level/" class="md-nav__link">
         
   
   
@@ -4782,7 +4863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_coo_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/sparse_coo_level/" class="md-nav__link">
         
   
   
@@ -4810,7 +4891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_hash_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/sparse_hash_level/" class="md-nav__link">
         
   
   
@@ -4838,7 +4919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_list_level/" class="md-nav__link">
+      <a href="../../../../tensor/level/sparse_list_level/" class="md-nav__link">
         
   
   
@@ -4874,7 +4955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/masks/" class="md-nav__link">
+      <a href="../../../../tensor/masks/" class="md-nav__link">
         
   
   
@@ -4902,7 +4983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/np_wrapper/" class="md-nav__link">
+      <a href="../../../../tensor/np_wrapper/" class="md-nav__link">
         
   
   
@@ -4930,7 +5011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/override_tensor/" class="md-nav__link">
+      <a href="../../../../tensor/override_tensor/" class="md-nav__link">
         
   
   
@@ -4958,7 +5039,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/patterns/" class="md-nav__link">
+      <a href="../../../../tensor/patterns/" class="md-nav__link">
         
   
   
@@ -4986,7 +5067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/scalar/" class="md-nav__link">
+      <a href="../../../../tensor/scalar/" class="md-nav__link">
         
   
   
@@ -5014,7 +5095,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/traits/" class="md-nav__link">
+      <a href="../../../../tensor/traits/" class="md-nav__link">
         
   
   
@@ -5097,7 +5178,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/cache/" class="md-nav__link">
+      <a href="../../../../util/cache/" class="md-nav__link">
         
   
   
@@ -5125,7 +5206,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/config/" class="md-nav__link">
+      <a href="../../../../util/config/" class="md-nav__link">
         
   
   
@@ -5153,7 +5234,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/logging/" class="md-nav__link">
+      <a href="../../../../util/logging/" class="md-nav__link">
         
   
   
@@ -5181,7 +5262,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/print/" class="md-nav__link">
+      <a href="../../../../util/print/" class="md-nav__link">
         
   
   
@@ -5250,43 +5331,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize" class="md-nav__link">
+  <a href="#finch.autoschedule.factorizer.galley_factorizer.greedy_optimizer" class="md-nav__link">
     <span class="md-ellipsis">
       
-        galley_optimize
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.GalleyLogicalOptimizer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GalleyLogicalOptimizer
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.optimize_plan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        optimize_plan
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.autoschedule.galley_optimize.optimize_query" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        optimize_query
+        greedy_optimizer
       
     </span>
   </a>
@@ -5313,18 +5361,15 @@
   
 
 
-  <h1>galley_optimize</h1>
+  <h1>greedy_optimizer</h1>
 
 <div class="doc doc-object doc-module">
 
 
 
-<a id="finch.autoschedule.galley_optimize"></a>
+<a id="finch.autoschedule.factorizer.galley_factorizer.greedy_optimizer"></a>
     <div class="doc doc-contents first">
 
-        <p>Galley logical optimizer: applies greedy query rewriting to logical plans, with
-an optional exact branch-and-bound path for query bodies.</p>
-
 
 
 
@@ -5344,291 +5389,6 @@ an optional exact branch-and-bound path for query bodies.</p>
 
 
 
-<div class="doc doc-object doc-class">
-
-
-
-<h2 id="finch.autoschedule.galley_optimize.GalleyLogicalOptimizer" class="doc doc-heading">
-            <code>GalleyLogicalOptimizer</code>
-
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="LogicFusionOptimizer (finch.autoschedule.stages.LogicFusionOptimizer)" href="../stages/#finch.autoschedule.stages.LogicFusionOptimizer">LogicFusionOptimizer</a></code></p>
-
-
-
-        <p>LogicLoader stage that runs Galley on each <code>Query</code> body (see <code>optimizer</code>),
-then forwards the Plan to the downstream loader <code>ctx</code>.</p>
-<p>Default <code>optimizer="bfs"</code> is exact layered branch-and-bound; <code>"dfs"</code> uses the
-DFS kernel. Greedy <code>k=1</code> bounds are used only on the layered exact path, not
-inside <code>branch_and_bound_dfs</code>.</p>
-
-
-
-
-
-
-
-
-              <details class="mkdocstrings-source">
-                <summary>Source code in <code>src/finch/autoschedule/galley_optimize.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicalOptimizer</span><span class="p">(</span><span class="n">LogicFusionOptimizer</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),</span>
-<span class="sd">    then forwards the Plan to the downstream loader ``ctx``.</span>
-
-<span class="sd">    Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the</span>
-<span class="sd">    DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not</span>
-<span class="sd">    inside ``branch_and_bound_dfs``.</span>
-<span class="sd">    """</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">ctx</span><span class="p">:</span> <span class="n">LogicLoader</span><span class="p">,</span>
-        <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"bfs"</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">use_components</span> <span class="o">=</span> <span class="n">use_components</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">optimizer</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
-        <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
-        <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
-        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported program type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">term</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Optimizing plan: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
-        <span class="n">term</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
-            <span class="n">term</span><span class="p">,</span>
-            <span class="n">stats_factory</span><span class="p">,</span>
-            <span class="n">stats</span><span class="p">,</span>
-            <span class="n">use_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_components</span><span class="p">,</span>
-            <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-              </details>
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="finch.autoschedule.galley_optimize.optimize_plan" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">optimize_plan</span><span class="p">(</span><span class="n">plan</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">'greedy'</span><span class="p">)</span></code>
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Optimize a full Plan: run the Galley optimizer on each Query body,
-pass through non-Query bodies (Produces), and update stats bindings.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/autoschedule/galley_optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_plan</span><span class="p">(</span>
-    <span class="n">plan</span><span class="p">,</span>
-    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
-    <span class="n">stats_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
-    <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="o">*</span><span class="p">,</span>
-    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"greedy"</span><span class="p">,</span>
-<span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Optimize a full Plan: run the Galley optimizer on each Query body,</span>
-<span class="sd">    pass through non-Query bodies (Produces), and update stats bindings.</span>
-<span class="sd">    """</span>
-    <span class="n">plan</span> <span class="o">=</span> <span class="n">preprocess_plan_for_galley</span><span class="p">(</span><span class="n">plan</span><span class="p">)</span>
-    <span class="n">optimized_queries</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">cache_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">object</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">plan</span><span class="o">.</span><span class="n">bodies</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Query</span><span class="p">):</span>
-            <span class="n">new_queries</span> <span class="o">=</span> <span class="n">optimize_query</span><span class="p">(</span>
-                <span class="n">body</span><span class="p">,</span>
-                <span class="n">stats_factory</span><span class="p">,</span>
-                <span class="n">stats_bindings</span><span class="p">,</span>
-                <span class="n">use_components</span><span class="o">=</span><span class="n">use_components</span><span class="p">,</span>
-                <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="k">for</span> <span class="n">new_query</span> <span class="ow">in</span> <span class="n">new_queries</span><span class="p">:</span>
-                <span class="n">insert_statistics</span><span class="p">(</span>
-                    <span class="n">stats_factory</span><span class="p">,</span>
-                    <span class="n">new_query</span><span class="p">,</span>
-                    <span class="n">stats_bindings</span><span class="p">,</span>
-                    <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-                    <span class="n">cache</span><span class="o">=</span><span class="n">cache_dict</span><span class="p">,</span>
-                <span class="p">)</span>
-            <span class="n">optimized_queries</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">new_queries</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">optimized_queries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">postprocess_plan_after_galley</span><span class="p">(</span><span class="n">Plan</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">optimized_queries</span><span class="p">)))</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="finch.autoschedule.galley_optimize.optimize_query" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">optimize_query</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">use_components</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">optimizer</span><span class="o">=</span><span class="s1">'dfs'</span><span class="p">)</span></code>
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Rewrite a single logical Query using <code>optimizer</code>:
-greedy, bfs, or dfs.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/autoschedule/galley_optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_query</span><span class="p">(</span>
-    <span class="n">query</span><span class="p">,</span>
-    <span class="n">stats_factory</span><span class="p">,</span>
-    <span class="n">stats_bindings</span><span class="p">,</span>
-    <span class="n">use_components</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="o">*</span><span class="p">,</span>
-    <span class="n">optimizer</span><span class="p">:</span> <span class="n">GalleyOptimizer</span> <span class="o">=</span> <span class="s2">"dfs"</span><span class="p">,</span>
-<span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Rewrite a single logical Query using ``optimizer``:</span>
-<span class="sd">    greedy, bfs, or dfs."""</span>
-    <span class="n">annotated_query</span> <span class="o">=</span> <span class="n">AnnotatedQuery</span><span class="p">(</span><span class="n">stats_factory</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
-    <span class="n">new_queries</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">pruned_query_to_plan</span><span class="p">(</span>
-        <span class="n">annotated_query</span><span class="p">,</span>
-        <span class="n">use_components</span><span class="o">=</span><span class="n">use_components</span><span class="p">,</span>
-        <span class="n">optimizer</span><span class="o">=</span><span class="n">optimizer</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="k">return</span> <span class="n">new_queries</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
 
 
 
@@ -5686,10 +5446,10 @@ greedy, bfs, or dfs.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../../../..", "features": [], "search": "../../../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
