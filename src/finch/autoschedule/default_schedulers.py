@@ -21,24 +21,23 @@ from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import LogicCompiler
 from .executor import LogicExecutor
-from .formatter import DefaultLogicFormatter
-from .galley_optimize import GalleyLogicalOptimizer
-from .loop_ordering import DefaultLoopOrderer
+from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter import DefaultLogicFormatter, FDFormatter, StorageCostFormatter
+from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .optimize import DefaultLogicOptimizer
-from .smart_formatter import FDFormatter
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader())))
         )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
@@ -49,7 +48,7 @@ INTERPRET_NOTATION = LogicNormalizer(
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -62,7 +61,7 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -84,7 +83,7 @@ COMPILE_NUMBA = LogicNormalizer(
 
 COMPILE_NUMBA_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -106,7 +105,7 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
 
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
@@ -118,7 +117,7 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
 
 COMPILE_MLIR = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -140,9 +139,21 @@ COMPILE_MLIR = LogicNormalizer(
 
 COMPILE_JULIA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler())))
+            )
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+COMPILE_JULIA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                BFSLoopOrderer(StorageCostFormatter(LogicCompiler(FinchJLCompiler())))
             )
         ),
         stats_factory=FDStatsFactory(),
@@ -161,7 +172,7 @@ _NON_RECURSIVE_BACKEND = (
 
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND))
         ),
         stats_factory=FDStatsFactory(),

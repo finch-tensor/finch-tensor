@@ -27,7 +27,7 @@ import pytest
 import numpy as np
 
 import finch as fl
-from finch.autoschedule.galley.logical_optimizer import insert_statistics
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import Field, Literal, Table
 from finch.tensor.level.dense_level import DenseLevelFType

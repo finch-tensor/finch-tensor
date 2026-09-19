@@ -2,7 +2,8 @@ from finch.algebra import DynamicFill, StaticFill, ffuncs
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
-from finch.autoschedule.stages import LogicFusionOptimizer
+from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.util import flatten_plans, propagate_copy_queries, push_fields
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -30,8 +31,6 @@ from finch.symbolic import (
     Rewrite,
     gensym,
 )
-
-from .util import flatten_plans, propagate_copy_queries, push_fields
 
 
 def isolate_aggregates(root: LogicStatement) -> LogicStatement:
@@ -362,7 +361,7 @@ def propagate_transpose_queries(root: LogicStatement):
     return flatten_plans(push_fields(root))
 
 
-class DefaultLogicOptimizer(LogicFusionOptimizer):
+class DefaultLogicFactorizer(LogicFactorizer):
     def __init__(self, ctx):
         self.ctx = ctx
 

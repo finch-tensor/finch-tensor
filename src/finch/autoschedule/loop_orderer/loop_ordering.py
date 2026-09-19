@@ -6,6 +6,9 @@ from itertools import chain as join_chains
 
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, with_subsequence
+from finch.autoschedule.factorizer.optimize import with_unique_lhs
+from finch.autoschedule.stages import LogicLoopOrderer
+from finch.autoschedule.util import flatten_plans, propagate_copy_queries, push_fields
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -26,10 +29,6 @@ from finch.finch_logic import (
 from finch.finch_logic.nodes import MapJoin
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finch.util.logging import LOG_LOGIC_POST_OPT
-
-from .optimize import with_unique_lhs
-from .stages import LogicLoopOrderOptimizer
-from .util import flatten_plans, propagate_copy_queries, push_fields
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
@@ -268,7 +267,7 @@ def heuristic_loop_order(
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 
 
-class AbstractLoopOrderer(LogicLoopOrderOptimizer):
+class AbstractLoopOrderer(LogicLoopOrderer):
     def __init__(self, ctx: LogicLoader | None = None):
         if ctx is None:
             ctx = MockLogicLoader()

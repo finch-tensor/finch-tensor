@@ -8,8 +8,8 @@ import numpy as np
 
 import finch as ft
 from finch.algebra import ffuncs
-from finch.autoschedule.galley.logical_optimizer import AnnotatedQuery
-from finch.autoschedule.galley.logical_optimizer.branch_and_bound import (
+from finch.autoschedule.factorizer.galley_factorizer import AnnotatedQuery
+from finch.autoschedule.factorizer.galley_factorizer.branch_and_bound import (
     branch_and_bound,
     branch_and_bound_dfs,
     pruned_query_to_plan,

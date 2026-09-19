@@ -18,7 +18,7 @@ from finch import (
     ftype,
 )
 from finch.autoschedule import (
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     FDFormatter,
     LogicCompiler,
@@ -265,7 +265,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     compiler = RecordingJLCompiler()
     scheduler = LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
             ),
             stats_factory=FDStatsFactory(),
@@ -465,7 +465,7 @@ def _compute_sparse_axis_sum(level):
 def _compile_julia_fd(formatter):
     return LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(DefaultLoopOrderer(formatter)),
+            DefaultLogicFactorizer(DefaultLoopOrderer(formatter)),
             stats_factory=FDStatsFactory(),
         )
     )

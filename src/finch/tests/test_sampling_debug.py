@@ -7,7 +7,7 @@ import numpy as np
 import finch as fl
 import finch.algebra.ffuncs as ffuncs
 from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
-from finch.autoschedule.galley.logical_optimizer import insert_statistics
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.sampling_stats import (
     SamplingStatsFactory,
     _dgood1,
