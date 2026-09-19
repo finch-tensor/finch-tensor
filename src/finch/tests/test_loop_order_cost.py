@@ -7,18 +7,19 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule import DefaultLogicOptimizer, loop_order_greedy
+from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_order_cost import (
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer import loop_order_greedy
+from finch.autoschedule.loop_orderer.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
     get_prefix_cost,
     get_reformat_set,
     loop_order_cost,
 )
-from finch.autoschedule.loop_order_greedy import (
+from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
     connected_loop_candidates,
     greedy_loop_order,
@@ -83,7 +84,7 @@ def test_empty_relation():
 def greedy_scheduler():
     return LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 GreedyLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
                 )

@@ -31,11 +31,15 @@ from .default_schedulers import (
     with_default_scheduler,
 )
 from .executor import LogicExecutor
-from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
-from .loop_ordering import DefaultLoopOrderer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter.formatter import (
+    BufferizedNDArrayFormatter,
+    DefaultLogicFormatter,
+    LogicFormatter,
+)
+from .formatter.smart_formatter import FDFormatter, SmartFormatter
+from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
-from .optimize import DefaultLogicOptimizer
-from .smart_formatter import FDFormatter, SmartFormatter
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
@@ -51,8 +55,8 @@ __all__ = [
     "Aggregate",
     "Alias",
     "BufferizedNDArrayFormatter",
+    "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
-    "DefaultLogicOptimizer",
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",

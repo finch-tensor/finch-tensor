@@ -6,7 +6,7 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.autoschedule.galley.logical_optimizer import (
+from finch.autoschedule.factorizer.galley_factorizer import (
     AnnotatedQuery,
     greedy_query,
     insert_statistics,

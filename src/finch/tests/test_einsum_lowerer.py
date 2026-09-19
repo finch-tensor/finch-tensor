@@ -5,9 +5,9 @@ import numpy as np
 import finch
 from finch.autoschedule.einsum import LogicEinsumLoader
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_ordering import DefaultLoopOrderer
-from finch.autoschedule.optimize import DefaultLogicOptimizer
+from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_ordering import DefaultLoopOrderer
 from finch.finch_einsum import MockEinsumLoader
 from finch.interface.fuse import compute
 from finch.interface.lazy import defer
@@ -23,7 +23,7 @@ def rng():
 @pytest.fixture
 def ctx():
     return LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             DefaultLoopOrderer(
                 DefaultLogicFormatter(LogicEinsumLoader(ctx_load=MockEinsumLoader()))
             )
