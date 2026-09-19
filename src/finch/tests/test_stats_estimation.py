@@ -1,26 +1,3 @@
-"""
-Benchmark tensor statistics estimates on real-world sparse matrices.
-
-The benchmarks compare each statistics factory's estimated number of non-fill values
-with the actual value computed from a SuiteSparse matrix. The benchmarks provide the
-following functionality:
-
-- CodSpeed measures estimator runtime on the target matrices.
-- Estimator accuracy is written to `junit/stats_accuracy.csv`.
-- You can test any matrix available through `ssgetpy` by adding it to
-  `TARGET_MATRICES`.
-
-The benchmark covers these statistics models:
-
-- ``UniformStatsFactory`` assumes non-fill values are uniformly distributed.
-- ``DCStatsFactory`` estimates bounds from degree constraints.
-- ``LPStatsFactory`` computes bounds from a configurable set of p-norm statistics.
-- ``VPStatsFactory`` uses a database-theory-based statistics model.
-
-Run: ``pixi run --environment=benchmark-julia pytest --codspeed
-benchmarks/test_stats.py``
-"""
-
 import csv
 from pathlib import Path
 
@@ -33,6 +10,7 @@ from finch import ffuncs
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.autoschedule.tensor_stats import (
     DCStatsFactory,
+    DenseStatsFactory,
     LPStatsFactory,
     UniformStatsFactory,
     VPStatsFactory,
@@ -53,12 +31,18 @@ pytestmark = pytest.mark.skipif(
 # Matrices used by the statistics benchmarks.
 # Each tuple contains the SuiteSparse matrix name and group.
 TARGET_MATRICES = [
+    pytest.param(("ct20stif", "Boeing"), id="boeing-ct20stif"),
+    pytest.param(("bcsstk39", "Boeing"), id="boeing-bcsstk39"),
     pytest.param(("ca-GrQc", "SNAP"), id="snap-ca-grqc"),
+    pytest.param(("ca-HepTh", "SNAP"), id="snap-ca-hepth"),
+    pytest.param(("web-NotreDame", "SNAP"), id="snap-web-notredame"),
 ]
+
+ACTUAL_NNZ = Path(__file__).with_name("data") / "stats_actual_nnz.csv"
 
 
 @pytest.fixture(scope="session")
-def stats_csv():
+def stats_data():
     path = Path("junit/stats_accuracy.csv")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as output:
@@ -74,7 +58,14 @@ def stats_csv():
             ],
         )
         writer.writeheader()
-    return path
+
+    with ACTUAL_NNZ.open(newline="") as input_file:
+        actual_nnz = {
+            (row["matrix"], row["group"], row["kernel"]): int(row["actual_nnz"])
+            for row in csv.DictReader(input_file)
+        }
+
+    return path, actual_nnz
 
 
 @pytest.fixture(scope="session")
@@ -88,29 +79,7 @@ def tensor(request):
     localdestpath, _ = matrix_info.download(format="MM", extract=True)
     mtx_path = Path(localdestpath) / f"{name}.mtx"
     matrix = scipy.io.mmread(mtx_path).tocsr()
-    return name, matrix, ft.asarray(matrix)
-
-
-def act_hadamard(a, b):
-    return max(int(a.multiply(b).count_nonzero()), 1)
-
-
-def act_spgemm(a, b):
-    result = a.astype(bool).astype(float) @ b.astype(bool).astype(float)
-    return max(int(result.count_nonzero()), 1)
-
-
-def act_spgemm2(a, b):
-    result = (a.astype(bool).astype(float) @ b.astype(bool).astype(float) > 0).astype(
-        float
-    )
-    result = result @ b.astype(bool).astype(float)
-    return max(int(result.count_nonzero()), 1)
-
-
-def act_triangle(a):
-    result = a.astype(bool).astype(float) @ a.astype(bool).astype(float)
-    return max(int(result.multiply(a).count_nonzero()), 1)
+    return name, group, ft.asarray(matrix)
 
 
 def est_hadamard(factory, tns_a, tns_b):
@@ -187,15 +156,16 @@ def est_triangle(factory, tns_a):
         pytest.param("dc", DCStatsFactory(), id="dc"),
         pytest.param("lp", LPStatsFactory(), id="lp"),
         pytest.param("vp", VPStatsFactory(), id="vp"),
+        pytest.param("dense", DenseStatsFactory(), id="dense"),
     ],
 )
 @pytest.mark.parametrize(
-    "kernel_name, estimator, actual, count",
+    "kernel_name, estimator, count",
     [
-        pytest.param("hadamard", est_hadamard, act_hadamard, 2, id="hadamard"),
-        pytest.param("spgemm", est_spgemm, act_spgemm, 2, id="spgemm"),
-        pytest.param("spgemm-2", est_spgemm2, act_spgemm2, 2, id="spgemm-2"),
-        pytest.param("triangle", est_triangle, act_triangle, 1, id="triangle"),
+        pytest.param("hadamard", est_hadamard, 2, id="hadamard"),
+        pytest.param("spgemm", est_spgemm, 2, id="spgemm"),
+        pytest.param("spgemm-2", est_spgemm2, 2, id="spgemm-2"),
+        pytest.param("triangle", est_triangle, 1, id="triangle"),
     ],
 )
 def test_estimated_kernel(
@@ -204,13 +174,13 @@ def test_estimated_kernel(
     factory,
     kernel_name,
     estimator,
-    actual,
     count,
     benchmark,
-    stats_csv,
+    stats_data,
 ):
-    matrix_name, matrix, finch_tensor = tensor
-    act_nnz = actual(*([matrix] * count))
+    stats_csv, actual_nnz = stats_data
+    matrix_name, matrix_group, finch_tensor = tensor
+    act_nnz = actual_nnz[(matrix_name, matrix_group, kernel_name)]
     ops = [finch_tensor] * count
 
     with with_default_scheduler(COMPILE_JULIA):
