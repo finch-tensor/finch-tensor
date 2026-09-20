@@ -285,7 +285,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                         case Aggregate(Literal(g), Literal(init), arg, idxs) as agg if (
                             is_distributive(f, g)
                             and is_annihilator(f, init)
-                            and len(agg.fields())
+                            and len(arg.fields())
                             == len(
                                 MapJoin(
                                     Literal(f), (*before_item, arg, *after_item)
