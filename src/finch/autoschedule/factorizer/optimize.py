@@ -288,7 +288,7 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                             and len(agg.fields())
                             == len(
                                 MapJoin(
-                                    Literal(f), (*before_item, *after_item)
+                                    Literal(f), (*before_item, arg, *after_item)
                                 ).fields()
                             )
                         ):
