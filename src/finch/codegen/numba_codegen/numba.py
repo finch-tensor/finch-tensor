@@ -19,6 +19,7 @@ from finch.algebra import (
     is_dynamic,
 )
 from finch.finch_assembly import BufferFType
+from finch.finch_assembly.calls import lower_callable
 from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util.logging import LOG_BACKEND_NUMBA
 
@@ -138,7 +139,14 @@ def numba_call_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
 def numba_function_call(op, ctx, *args: Any) -> str:
     match op:
         case ffuncs._InitWrite():
-            return ctx(args[1])
+            if is_dynamic(op.fill):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            x, y = args
+            return (
+                f"({ctx(x)} if {ctx(y)} == {ctx(asm.Literal(op.value))} else {ctx(y)})"
+            )
         case ffuncs.where:
             condition, x1, x2 = args
             return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
@@ -699,6 +707,8 @@ class NumbaContext(Context):
                 return None
             case asm.Call(asm.Literal(op), args):
                 return numba_function_call(op, self, *args)
+            case asm.Call(op, args):
+                return self(lower_callable(op, args))
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):
                 if val.result_type != var_t:

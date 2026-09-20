@@ -12,15 +12,18 @@ import numpy as np
 from finch import algebra
 from finch import finch_assembly as asm
 from finch.algebra import (
+    DynamicFillError,
     FType,
     StructFType,
     TupleFType,
     ffuncs,
     fisinstance,
+    is_dynamic,
     np_dtype,
     promote_type,
 )
 from finch.finch_assembly import BufferFType
+from finch.finch_assembly.calls import lower_callable
 from finch.symbolic import Context, Form, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
@@ -460,7 +463,27 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
 
     match op:
         case ffuncs._InitWrite():
-            return ctx(args[1])
+            if is_dynamic(op.fill):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            x, y = args
+            cond = ctx(asm.Call(asm.Literal(ffuncs.eq), (y, asm.Literal(op.value))))
+            x_val, y_val = ctx(x), ctx(y)
+            res = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{res} = arith.select {cond}, {x_val}, {y_val}"
+                f" : {mlir_type(y.result_type)}"
+            )
+            return res
+        case ffuncs.where:
+            cond, x, y = (ctx(arg) for arg in args)
+            res = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{res} = arith.select {cond}, {x}, {y}"
+                f" : {mlir_type(args[1].result_type)}"
+            )
+            return res
         case ffuncs.make_tuple:
             t = TupleFType.from_tuple(tuple(a.result_type for a in args))
             st = mlir_type(t)
@@ -915,6 +938,8 @@ class MLIRContext(Context):
 
             case asm.Call(asm.Literal(op), args):
                 return mlir_function_call(op, self, *args)
+            case asm.Call(op, args):
+                return self(lower_callable(op, args))
 
             case asm.Length(buffer):
                 buf_t = buffer.result_type

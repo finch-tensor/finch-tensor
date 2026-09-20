@@ -1,6 +1,7 @@
 import builtins
 import math
 import operator
+from dataclasses import dataclass
 from functools import reduce
 from typing import Any
 
@@ -8,10 +9,11 @@ import numpy as np
 
 from .algebra import (
     FinchOperator,
+    FinchOperatorFType,
     type_max,
     type_min,
 )
-from .fill import DynamicFill, StaticFill, is_dynamic
+from .fill import AbstractFill, DynamicFill, StaticFill, as_fill, is_dynamic
 from .ftypes import (
     FDType,
     FDTypeBoolean,
@@ -21,6 +23,7 @@ from .ftypes import (
     FDTypeOrdered,
     FDTypeUnsignedInteger,
     FType,
+    ImmutableStructFType,
     TupleFType,
     bool,
     ftype,
@@ -1355,31 +1358,75 @@ class _Sign(UnaryFinchOperator):
 sign = _Sign()
 
 
+@dataclass(unsafe_hash=True)
+class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
+    fill: AbstractFill
+
+    @property
+    def struct_name(self):
+        return "InitWrite"
+
+    @property
+    def struct_fields(self):
+        return [("value", self.fill.ftype)]
+
+    def __call__(self, value):
+        if isinstance(value, _InitWrite) and value.ftype == self:
+            return value
+        raise TypeError(f"Expected an init_write of type {self}")
+
+    def from_fields(self, value):
+        fill = (
+            DynamicFill(value, self.fill.ftype) if is_dynamic(self.fill) else self.fill
+        )
+        return _InitWrite(fill)
+
+    def is_identity(self, val):
+        return not is_dynamic(self.fill) and val == self.fill.value
+
+    def return_type(self, *args: FType) -> FType:
+        if len(args) != 2:
+            raise TypeError("init_write expects two arguments")
+        return args[1]
+
+
 class _InitWrite(FinchOperator):
     """
-    init_write may assert that its first argument is
-    equal to z, and returns its second argument. This is useful when you want to
-    communicate to the compiler that the tensor has already been initialized to
-    a specific value.
+    Write a non-fill value, preserving the existing value when given the fill.
+
+    init_write(z)(x, z) = x; otherwise init_write(z)(x, y) = y.
+    A store of the fill value may therefore be omitted, regardless of the
+    existing value. This operator makes no assumption that x equals z.
+
+    StaticFill permits specialization on z. DynamicFill keeps z as a runtime
+    field; pass such operators through callable expressions in compiled code.
     """
 
     arity = 2
 
     def __init__(self, value):
-        self.value = value
+        self.fill = as_fill(value)
+
+    @property
+    def value(self):
+        return self.fill.value
+
+    @property
+    def ftype(self):
+        return _InitWriteFType(self.fill)
 
     def __eq__(self, other):
-        return isinstance(other, _InitWrite) and self.value == other.value
+        return (
+            isinstance(other, _InitWrite)
+            and self.fill == other.fill
+            and StaticFill(self.value) == StaticFill(other.value)
+        )
 
     def __hash__(self):
-        return hash((self.value,))
+        return hash((type(self), self.fill, StaticFill(self.value)))
 
     def __call__(self, x: Any, y: Any):
-        # A dynamic init has no compile-time value to check against.
-        assert is_dynamic(self.value) or x == self.value, (
-            f"Expected {self.value}, got {x}"
-        )
-        return y
+        return x if y == self.value else y
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
@@ -1389,16 +1436,7 @@ class _InitWrite(FinchOperator):
 
 
 def init_write(value):
-    # `_InitWrite` carries its value into the IR and into kernel identity, so it
-    # takes a raw value, or a DynamicFill sentinel when nothing may specialize
-    # on it. A StaticFill wrapper must not get that far.
-    match value:
-        case DynamicFill():
-            raise ValueError("init_write cannot be used with DynamicFill")
-        case StaticFill():
-            return _InitWrite(value.value)
-        case _:
-            return _InitWrite(value)
+    return _InitWrite(value)
 
 
 class _Overwrite(FinchOperator):

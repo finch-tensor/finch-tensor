@@ -113,17 +113,11 @@ class AssemblyTypeChecker:
             case asm.GetAttr(obj, asm.Literal(attr)):
                 obj_type = self.check_struct(obj)
                 return check_attrtype(obj_type, attr)
-            case asm.Call(asm.Literal(op), args):
-                arg_types = [self.check_expr(arg) for arg in args]
-                try:
-                    return algebra.return_type(op, *arg_types)
-                except (AttributeError, TypeError):
-                    raise AssemblyTypeError(
-                        "Return type of function is not registered."
-                    ) from AttributeError
-                    raise AssemblyTypeError(
-                        "Operation not defined on given types."
-                    ) from TypeError
+            case asm.Call(op, args):
+                op_type = self.check_expr(op)
+                if not isinstance(op_type, algebra.CallableFType):
+                    raise AssemblyTypeError(f"Expected a callable type, got {op_type}")
+                return op_type.return_type(*(self.check_expr(arg) for arg in args))
             case asm.Load(buffer, index):
                 buffer_type = self.check_buffer(buffer)
                 index_type = self.check_expr(index)

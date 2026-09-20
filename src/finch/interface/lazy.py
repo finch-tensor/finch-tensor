@@ -1063,7 +1063,7 @@ def argmin(
             elementwise(ffuncs.make_tuple, x, indices),
             axis=axis,
             keepdims=keepdims,
-            init=(ffuncs.min.init_value(x.element_type), sentinel),
+            init=(ffuncs.min.ftype.init_value(x.element_type), sentinel),
         ),
     )
 
@@ -1097,7 +1097,7 @@ def argmax(
                 elementwise(ffuncs.make_tuple, x, indices),
                 axis=axis,
                 keepdims=keepdims,
-                init=(ffuncs.max.init_value(x.element_type), -sentinel),
+                init=(ffuncs.max.ftype.init_value(x.element_type), -sentinel),
             ),
         )
     )

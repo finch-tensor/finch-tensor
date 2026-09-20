@@ -14,6 +14,7 @@ import numpy as np
 from finch import algebra
 from finch import finch_assembly as asm
 from finch.algebra import (
+    DynamicFillError,
     FType,
     ImmutableStructFType,
     MutableStructFType,
@@ -23,9 +24,11 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     ftype,
+    is_dynamic,
 )
 from finch.algebra.algebra import FinchOperator
 from finch.finch_assembly import BufferFType
+from finch.finch_assembly.calls import lower_callable
 from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util import config, file_cache
 from finch.util.logging import LOG_BACKEND_C
@@ -334,6 +337,17 @@ def c_function_call(op: FinchOperator, ctx: Any, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
+    match op:
+        case ffuncs._InitWrite():
+            if is_dynamic(op.fill):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            x, y = args
+            return f"({ctx(y)} == {ctx(asm.Literal(op.value))} ? {ctx(x)} : {ctx(y)})"
+    if op is ffuncs.where:
+        cond, x, y = args
+        return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
     c_symbol = c_function_name(op, ctx, *args)
     match op:
         case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
@@ -440,6 +454,9 @@ def struct_c_type(fmt: StructFType):
     if res:
         return res
     fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
+    # C and libffi need a nonzero-sized representation for singleton values.
+    if not fields:
+        fields = [("_padding", ctypes.c_ubyte)]
     new_struct = type(
         c_structnames.freshen("C", fmt.struct_name),
         (ctypes.Structure,),
@@ -677,8 +694,9 @@ class CContext(Context):
                 c_setattr(obj_t, self, self(obj), attr.val, val_code)
                 return None
             case asm.Call(f, args):
-                assert isinstance(f, asm.Literal)  # TODO: Handle asm.Variable
-                return c_function_call(f.val, self, *args)
+                if isinstance(f, asm.Literal):
+                    return c_function_call(f.val, self, *args)
+                return self(lower_callable(f, args))
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:

@@ -1,6 +1,8 @@
 from . import ffuncs
 from .algebra import (
     FinchOperator,
+    FinchOperatorFType,
+    SingletonOperatorFType,
     arity,
     cansplitpush,
     fixpoint_type,
@@ -46,6 +48,7 @@ from .fill import (
     is_dynamic,
 )
 from .ftypes import (
+    CallableFType,
     FDTypeSignedInteger,
     FDTypeUnsignedInteger,
     FInfo,
@@ -103,6 +106,7 @@ __all__ = [
     "CPUFType",
     "CPUThread",
     "CPUThreadFType",
+    "CallableFType",
     "DeviceFType",
     "DynamicFill",
     "DynamicFillError",
@@ -112,6 +116,7 @@ __all__ = [
     "FType",
     "FTyped",
     "FinchOperator",
+    "FinchOperatorFType",
     "IInfo",
     "ImmutableStructFType",
     "MutableStructFType",
@@ -121,6 +126,7 @@ __all__ = [
     "SerialFType",
     "SerialTask",
     "SerialTaskFType",
+    "SingletonOperatorFType",
     "StaticFill",
     "StructFType",
     "TaskFType",

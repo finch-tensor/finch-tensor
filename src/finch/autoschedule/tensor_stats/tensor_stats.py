@@ -149,8 +149,8 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
             else:
                 union_args.append(s)
         if (
-            op.is_associative
-            and op.is_commutative
+            op.ftype.is_associative
+            and op.ftype.is_commutative
             and isinstance(op, NAryFinchOperator)
         ):
             if union_args:

@@ -50,13 +50,16 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
                 #i_8#14__pos_7: finch.int64 = q_2
                 for #i_8#14 in range(i_start, min(add(1, i_stop), i_stop, i_stop_2)):
                     #i_8#14__pos: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop_2), min(add(1, i_stop), i_stop)):
                     #i_8#14__pos_3: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_3, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop), min(add(1, i_stop), i_stop_2)):
                     #i_8#14__pos_5: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_5, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop, i_stop_2), add(1, i_stop)):
                     #i_8#14__pos_8: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
-                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_8, _initwrite(load(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_8), mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_6), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_7))))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_8, mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_6), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_7)))
                 i_start: finch.int64 = add(1, i_stop)
                 q: finch.int64 = add(1, q)
                 if lt(q, q_stop):
@@ -70,13 +73,16 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
                 #i_8#14__pos_15: finch.int64 = q_2
                 for #i_8#14 in range(i_start, min(add(1, i_stop_2), i_stop, i_stop_2)):
                     #i_8#14__pos_9: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_9, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop_2), min(add(1, i_stop_2), i_stop)):
                     #i_8#14__pos_11: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_11, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop), min(add(1, i_stop_2), i_stop_2)):
                     #i_8#14__pos_13: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_13, 0.0)
                 for #i_8#14 in range(max(i_start, i_stop, i_stop_2), add(1, i_stop_2)):
                     #i_8#14__pos_16: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
-                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_16, _initwrite(load(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_16), mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_14), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_15))))
+                    store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_16, mul(load(slot(#_A_9#4_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_14), load(slot(#_A_10#7_lvl_lvl_lvl_val_slot, np_buf_t(float64)), #i_8#14__pos_15)))
                 i_start: finch.int64 = add(1, i_stop_2)
                 q_2: finch.int64 = add(1, q_2)
                 if lt(q_2, q_stop_2):
@@ -85,10 +91,13 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
                     i_stop_2: finch.int64 = #_A_10#7.lvl.lvl.dimension
         for #i_8#14 in range(max(0, add(1, i_last_2)), min(#A_10_dim_1#9, add(1, i_last))):
             #i_8#14__pos_17: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+            store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_17, 0.0)
         for #i_8#14 in range(max(0, add(1, i_last)), min(#A_10_dim_1#9, add(1, i_last_2))):
             #i_8#14__pos_18: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+            store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_18, 0.0)
         for #i_8#14 in range(max(0, add(1, i_last), add(1, i_last_2)), #A_10_dim_1#9):
             #i_8#14__pos_19: finch.int64 = add(#i_7#13__pos, mul(#_A_4#10.strides.element_1, #i_8#14))
+            store(slot(#_A_4#10_val_slot, np_buf_t(float64)), #i_8#14__pos_19, 0.0)
     repack(#_A_9#4_lvl_lvl_lvl_val_slot)
     repack(#_A_9#4_lvl_lvl_ptr_slot)
     repack(#_A_9#4_lvl_lvl_idx_slot)

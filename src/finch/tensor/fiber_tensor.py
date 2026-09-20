@@ -15,7 +15,6 @@ from finch.algebra import (
     StaticFill,
     TupleFType,
     as_fill,
-    bool_,
     ftype,
     is_dynamic,
     normalize_device,
@@ -42,7 +41,6 @@ class FiberTensor(OverrideTensor):
 
     lvl: Level
     pos: np.integer = np.intp(0)
-    dirty_bit: bool = False
     _device: Any = None
 
     def __post_init__(self):
@@ -95,7 +93,7 @@ class FiberTensor(OverrideTensor):
         device = normalize_device(device)
         if device == self.device:
             return self
-        return FiberTensor(self.lvl, self.pos, self.dirty_bit, device)
+        return FiberTensor(self.lvl, self.pos, device)
 
     @property
     def position_type(self):
@@ -304,7 +302,6 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
             ("lvl", self.lvl_t),
             ("shape", TupleFType.from_tuple(self.shape_type)),
             ("pos", self.position_type),
-            ("dirty_bit", bool_),
         ]
 
     def get_child_type(self, attr):
@@ -427,8 +424,8 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
     def from_fields(self, *args) -> FiberTensor:
-        lvl, shape, pos, dirty_bit = args
-        return FiberTensor(lvl, pos, dirty_bit, self.device)
+        lvl, shape, pos = args
+        return FiberTensor(lvl, pos, self.device)
 
     def from_numpy(self, arr: np.ndarray) -> FiberTensor:
         def build_level(lvl_t, shape):
@@ -452,7 +449,6 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return FiberTensor(
             build_level(self.lvl_t, arr.shape),
             pos=self.position_type(0),
-            dirty_bit=False,
             _device=self.device,
         )
 

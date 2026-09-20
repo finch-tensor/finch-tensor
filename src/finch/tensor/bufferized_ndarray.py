@@ -469,8 +469,6 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             init_e,
         )
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
-        if isinstance(tns.lvl.root, asm.Slot):
-            ctx.slots[tns.lvl.root.name] = replace(tns, dirty=True)
         return
 
     def lower_freeze(self, ctx, tns, op):
@@ -537,10 +535,6 @@ class BufferizedNDArrayAccessor(Tensor):
     @property
     def ftype(self):
         return FiberTensorFType(self.lvl.ftype, self.tns.device)
-
-    @property
-    def dirty_bit(self):
-        return False
 
     @property
     def shape(self):
@@ -770,17 +764,6 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
             op_e,
             (asm.Load(buf, pos_e), val_e),
         )
-        if (
-            obj.dirty
-            and op.val is ffuncs.overwrite
-            # init_write only helps the simplifier elide stores of a Known fill
-            and not is_dynamic(self.fill_value)
-        ):
-            increment_call = asm.Call(
-                asm.Literal(ffuncs.init_write(self.fill_value)),
-                (asm.Load(buf, pos_e), increment_call),
-            )
-
         ctx.exec(asm.Store(buf, pos_e, increment_call))
 
     def level_unfurl(self, ctx: AssemblyContext, tns, ext, mode, proto, pos):
@@ -817,7 +800,6 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
                     ntn.Child(level),
                     pos_2,
                     (*tns.idxs, idx),
-                    tns.dirty,
                 )
             )
 

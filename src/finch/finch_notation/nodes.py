@@ -163,14 +163,13 @@ class Call(NotationTree, NotationExpression, CallTerm):
     `args...`.
     """
 
-    op: Literal | Variable
+    op: NotationExpression
     args: tuple[NotationExpression, ...]
 
     @property
     def result_type(self) -> FType:
         arg_types = [a.result_type for a in self.args]
-        assert isinstance(self.op, Literal)  # TODO: handle Variable
-        return return_type(self.op.val, *arg_types)
+        return return_type(self.op.result_type, *arg_types)
 
     @classmethod
     def from_children(cls, op, *args):
@@ -502,7 +501,6 @@ class Fiber(NotationExpression):
     lvl: Cursor
     pos: Any
     idxs: tuple[Any, ...] = ()
-    dirty: bool = False
 
     @property
     def result_type(self):

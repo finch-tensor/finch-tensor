@@ -334,3 +334,44 @@ def test_samehash():
     assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finch.float64)
     assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finch.float32)
     assert ffuncs.samehash(SameHash()) == ("samehash", 1)
+
+
+@pytest.mark.parametrize("fill", [0, 5, finch.algebra.StaticFill(5)])
+def test_init_write(fill):
+    op = ffuncs.init_write(fill)
+    z = fill.value if isinstance(fill, finch.algebra.StaticFill) else fill
+    assert op(17, z) == 17
+    assert op(17, z + 1) == z + 1
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        value
+        for value in vars(ffuncs).values()
+        if isinstance(value, finch.algebra.FinchOperator)
+    ],
+)
+def test_function_types(op):
+    assert isinstance(op, finch.algebra.FTyped)
+    op_type = finch.ftype(op)
+    assert isinstance(op_type, finch.algebra.FinchOperatorFType)
+    assert finch.algebra.arity(op_type) == finch.algebra.arity(op)
+    assert is_associative(op_type) == is_associative(op)
+    assert is_idempotent(op_type) == is_idempotent(op)
+
+
+def test_function_properties_dispatch_on_types():
+    add_t, mul_t = finch.ftype(ffuncs.add), finch.ftype(ffuncs.mul)
+    assert is_identity(add_t, 0)
+    assert is_annihilator(mul_t, 0)
+    assert is_distributive(mul_t, add_t)
+    assert not is_distributive(add_t, mul_t)
+    assert repeat_operator(add_t) is ffuncs.mul
+    assert init_value(add_t, finch.int64) == 0
+    assert cansplitpush(add_t, add_t)
+    assert finch.algebra.return_type(add_t, finch.int64, finch.int64) == finch.int64
+    static = finch.ftype(ffuncs.init_write(finch.algebra.StaticFill(0)))
+    dynamic = finch.ftype(ffuncs.init_write(finch.algebra.DynamicFill(0)))
+    assert is_identity(static, 0)
+    assert not is_identity(dynamic, 0)

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 import numpy as np
 
 if TYPE_CHECKING:
+    from finch.algebra.algebra import FinchOperator, FinchOperatorFType
     from finch.algebra.tensor import Tensor, TensorFType
     from finch.codegen.buffers import NumpyBuffer, NumpyBufferFType
 
@@ -49,6 +50,11 @@ class FType(ABC):
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
+
+
+class CallableFType(FType, ABC):
+    @abstractmethod
+    def return_type(self, *args: FType) -> FType: ...
 
 
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
@@ -976,6 +982,10 @@ def isdtype(dtype, kind):
 
 
 FT = TypeVar("FT", bound=FType)
+
+
+@overload
+def ftype(x: FinchOperator) -> FinchOperatorFType: ...
 
 
 @overload
