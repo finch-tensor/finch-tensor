@@ -1,4 +1,13 @@
+"""
+Checks estimator accuracy against stored baselines. One .yml per factory.
+Ground truth is stored in stats_actual_nnz.csv, generated offline.
+
+Run: pixi run --environment=test-julia pytest src/finch/tests/test_stats_estimation.py
+The test accepts a new baseline result when you add --force-regen to the run command.
+"""
+
 import csv
+import functools
 from pathlib import Path
 
 import pytest
@@ -23,54 +32,24 @@ try:
 except ImportError:
     ssgetpy = None
 
+
 pytestmark = pytest.mark.skipif(
     not julia_available() or ssgetpy is None,
     reason="Julia backend (juliacall/juliapkg) or ssgetpy not installed",
 )
 
-# Matrices used by the statistics benchmarks.
-# Each tuple contains the SuiteSparse matrix name and group.
-TARGET_MATRICES = [
-    pytest.param(("ct20stif", "Boeing"), id="boeing-ct20stif"),
-    pytest.param(("bcsstk39", "Boeing"), id="boeing-bcsstk39"),
-    pytest.param(("ca-GrQc", "SNAP"), id="snap-ca-grqc"),
-    pytest.param(("ca-HepTh", "SNAP"), id="snap-ca-hepth"),
-    pytest.param(("web-NotreDame", "SNAP"), id="snap-web-notredame"),
-]
-
-ACTUAL_NNZ = Path(__file__).with_name("data") / "stats_actual_nnz.csv"
-
 
 @pytest.fixture(scope="session")
-def stats_data():
-    path = Path("junit/stats_accuracy.csv")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as output:
-        writer = csv.DictWriter(
-            output,
-            fieldnames=[
-                "matrix",
-                "factory",
-                "kernel",
-                "actual_nnz",
-                "estimated_nnz",
-                "ratio",
-            ],
-        )
-        writer.writeheader()
-
-    with ACTUAL_NNZ.open(newline="") as input_file:
-        actual_nnz = {
+def actual_nnz(original_datadir):
+    with (original_datadir / "stats_actual_nnz.csv").open(newline="") as input_file:
+        return {
             (row["matrix"], row["group"], row["kernel"]): int(row["actual_nnz"])
             for row in csv.DictReader(input_file)
         }
 
-    return path, actual_nnz
 
-
-@pytest.fixture(scope="session")
-def tensor(request):
-    name, group = request.param
+@functools.cache
+def load(name, group):
     matrix_info = next(
         matrix
         for matrix in ssgetpy.search(name=name, group=group)
@@ -79,7 +58,7 @@ def tensor(request):
     localdestpath, _ = matrix_info.download(format="MM", extract=True)
     mtx_path = Path(localdestpath) / f"{name}.mtx"
     matrix = scipy.io.mmread(mtx_path).tocsr()
-    return name, group, ft.asarray(matrix)
+    return ft.asarray(matrix)
 
 
 def est_hadamard(factory, tns_a, tns_b):
@@ -144,11 +123,23 @@ def est_triangle(factory, tns_a):
     ).estimate_non_fill_values()
 
 
-@pytest.mark.parametrize(
-    "tensor",
-    TARGET_MATRICES,
-    indirect=True,
-)
+MATRICES = [
+    ("ct20stif", "Boeing"),
+    ("bcsstk39", "Boeing"),
+    ("ca-GrQc", "SNAP"),
+    ("ca-HepTh", "SNAP"),
+    ("web-NotreDame", "SNAP"),
+]
+
+
+KERNELS = [
+    ("hadamard", est_hadamard, 2),
+    ("spgemm", est_spgemm, 2),
+    ("spgemm-2", est_spgemm2, 2),
+    ("triangle", est_triangle, 1),
+]
+
+
 @pytest.mark.parametrize(
     "factory_name, factory",
     [
@@ -159,48 +150,31 @@ def est_triangle(factory, tns_a):
         pytest.param("dense", DenseStatsFactory(), id="dense"),
     ],
 )
-@pytest.mark.parametrize(
-    "kernel_name, estimator, count",
-    [
-        pytest.param("hadamard", est_hadamard, 2, id="hadamard"),
-        pytest.param("spgemm", est_spgemm, 2, id="spgemm"),
-        pytest.param("spgemm-2", est_spgemm2, 2, id="spgemm-2"),
-        pytest.param("triangle", est_triangle, 1, id="triangle"),
-    ],
-)
-def test_estimated_kernel(
-    tensor,
-    factory_name,
-    factory,
-    kernel_name,
-    estimator,
-    count,
-    benchmark,
-    stats_data,
-):
-    stats_csv, actual_nnz = stats_data
-    matrix_name, matrix_group, finch_tensor = tensor
-    act_nnz = actual_nnz[(matrix_name, matrix_group, kernel_name)]
-    ops = [finch_tensor] * count
+def test_estimated_kernel(factory_name, factory, actual_nnz, data_regression):
+    rows = []
 
-    with with_default_scheduler(COMPILE_JULIA):
-        # Warmup
-        estimator(factory, *ops)
+    for matrix_name, matrix_group in MATRICES:
+        finch_tensor = load(matrix_name, matrix_group)
 
-        # Benchmark
-        est_nnz = benchmark(estimator, factory, *ops)
+        for kernel_name, estimator, count in KERNELS:
+            act_nnz = actual_nnz[(matrix_name, matrix_group, kernel_name)]
+            ops = [finch_tensor] * count
 
-    ratio = max(est_nnz, 1) / act_nnz
+            with with_default_scheduler(COMPILE_JULIA):
+                est_nnz = estimator(factory, *ops)
 
-    with stats_csv.open("a", newline="") as output:
-        writer = csv.writer(output)
-        writer.writerow(
-            [
-                matrix_name,
-                factory_name,
-                kernel_name,
-                act_nnz,
-                est_nnz,
-                ratio,
-            ]
-        )
+            ratio = max(est_nnz, 1) / act_nnz
+
+            rows.append(
+                {
+                    "group": matrix_group,
+                    "matrix": matrix_name,
+                    "kernel": kernel_name,
+                    "factory": factory_name,
+                    "actual_nnz": act_nnz,
+                    "estimated_nnz": float(f"{est_nnz:.6g}"),
+                    "ratio": float(f"{ratio:.6g}"),
+                }
+            )
+
+    data_regression.check(rows)
