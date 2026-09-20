@@ -2372,11 +2372,11 @@ def test_disjunction_dc_card(fields1, dims1, dcs1, fields2, dims2, dcs2, expecte
     ],
 )
 def test_disjoint_join_dc_card(fill3, expected_nnz):
-    dims1 = {Field("i"): 1000, Field("j"): 100}
+    dims1 = {Field("i"): 1000.0, Field("j"): 100.0}
     dcs1 = [DC(frozenset(), frozenset([Field("i"), Field("j")]), 5)]
-    dims2 = {Field("j"): 100, Field("k"): 1000}
+    dims2 = {Field("j"): 100.0, Field("k"): 1000.0}
     dcs2 = [DC(frozenset(), frozenset([Field("j"), Field("k")]), 10)]
-    dims3 = {Field("i"): 1000, Field("j"): 100, Field("k"): 1000}
+    dims3 = {Field("i"): 1000.0, Field("j"): 100.0, Field("k"): 1000.0}
     dcs3 = [DC(frozenset(), frozenset([Field("i"), Field("j"), Field("k")]), 10)]
     cache = {}
 

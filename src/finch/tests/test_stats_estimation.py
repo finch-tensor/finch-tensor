@@ -50,6 +50,7 @@ def actual_nnz(original_datadir):
 
 @functools.cache
 def load(name, group):
+    assert ssgetpy is not None
     matrix_info = next(
         matrix
         for matrix in ssgetpy.search(name=name, group=group)
