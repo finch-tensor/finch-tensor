@@ -243,11 +243,10 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
-        dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
             f"Finch.SparseByteMapLevel({_level_constructor_str(level_ftype.lvl_t)}, "
             f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
-            f"{_plus_one_ctor_str(dim_t)})"
+            f"{_plus_one_ctor_str(pos_t)})"
         )
     if isinstance(level_ftype, SparseCOOLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)

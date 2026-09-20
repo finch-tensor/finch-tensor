@@ -597,6 +597,25 @@ def test_compile_julia_sums_sparse_bytemap_level():
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
 
 
+def test_compile_julia_sums_sparse_bytemap_level_with_narrow_dimension_type():
+    _requires_julia_backend()
+    stored_positions = np.array([0, 2, 4, 6, 8], dtype=np.intp)
+    table = np.zeros(9, dtype=np.bool_)
+    table[stored_positions] = True
+    data = np.array([1, 0, 2, 0, 3, 0, 4, 0, 5], dtype=DTYPE)
+    level = SparseByteMapLevel(
+        _element_level(data),
+        np.int32(COLS),
+        ROW_PTR,
+        NumpyBuffer(table),
+        NumpyBuffer(stored_positions),
+    )
+
+    result = _compute_sparse_axis_sum(level)
+
+    np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
+
+
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
@@ -760,3 +779,19 @@ def test_compile_julia_galley_chained_matmul():
     )
 
     np.testing.assert_allclose(_to_csr(result).to_scipy().toarray(), a @ b @ c)
+
+
+@pytest.mark.parametrize("scheduler", ["COMPILE_JULIA", "COMPILE_JULIA_GALLEY"])
+def test_compile_julia_full_reduction_returns_a_scalar(scheduler):
+    _requires_julia_backend()
+    from finch import autoschedule
+
+    data = np.arange(12, dtype=np.float64).reshape(4, 3)
+
+    result = ft.compute(
+        ft.sum(ft.defer(ft.asarray(data))),
+        ctx=getattr(autoschedule, scheduler),
+    )
+
+    assert result.shape == ()
+    np.testing.assert_allclose(np.array(result), data.sum())
