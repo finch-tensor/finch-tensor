@@ -44,7 +44,7 @@ jobs:
             default
             test-julia
       - name: Run Julia backend tests
-        run: pixi run test-julia 0 -- --junit-xml=test-ubuntu-latest-Env-test-julia.xml
+        run: pixi run test-julia -- --junit-xml=test-ubuntu-latest-Env-test-julia.xml
       - uses: codecov/codecov-action@v7
 
 on:

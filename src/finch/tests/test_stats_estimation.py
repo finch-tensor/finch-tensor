@@ -1,13 +1,12 @@
 """
-Checks estimator accuracy against stored baselines. One .yml per factory.
-Ground truth is stored in stats_actual_nnz.csv, generated offline.
+Checks estimator accuracy against actual kernel results. One .yml per factory.
 
-Run: pixi run --environment=test-julia pytest src/finch/tests/test_stats_estimation.py
+Run:
+    pixi run --environment=test-julia pytest -s \
+        src/finch/tests/test_stats_estimation.py
 The test accepts a new baseline result when you add --force-regen to the run command.
 """
 
-import csv
-import functools
 from pathlib import Path
 
 import pytest
@@ -27,39 +26,12 @@ from finch.autoschedule.tensor_stats import (
 from finch.compile_jl.julia import julia_available
 from finch.finch_logic import Field
 
-try:
-    import ssgetpy
-except ImportError:
-    ssgetpy = None
-
+DATA_DIR = Path(__file__).parent / "data"
 
 pytestmark = pytest.mark.skipif(
-    not julia_available() or ssgetpy is None,
-    reason="Julia backend (juliacall/juliapkg) or ssgetpy not installed",
+    not julia_available(),
+    reason="Julia backend (juliacall/juliapkg) not installed",
 )
-
-
-@pytest.fixture(scope="session")
-def actual_nnz(original_datadir):
-    with (original_datadir / "stats_actual_nnz.csv").open(newline="") as input_file:
-        return {
-            (row["matrix"], row["group"], row["kernel"]): int(row["actual_nnz"])
-            for row in csv.DictReader(input_file)
-        }
-
-
-@functools.cache
-def load(name, group):
-    assert ssgetpy is not None
-    matrix_info = next(
-        matrix
-        for matrix in ssgetpy.search(name=name, group=group)
-        if matrix.name == name and matrix.group == group
-    )
-    localdestpath, _ = matrix_info.download(format="MM", extract=True)
-    mtx_path = Path(localdestpath) / f"{name}.mtx"
-    matrix = scipy.io.mmread(mtx_path).tocsr()
-    return ft.asarray(matrix)
 
 
 def est_hadamard(factory, tns_a, tns_b):
@@ -124,6 +96,22 @@ def est_triangle(factory, tns_a):
     ).estimate_non_fill_values()
 
 
+def act_hadamard(a, b):
+    return max(a.multiply(b).nnz, 1)
+
+
+def act_spgemm(a, b):
+    return max((a @ b).nnz, 1)
+
+
+def act_spgemm2(a, b):
+    return max(((a @ b) @ b).nnz, 1)
+
+
+def act_triangle(a):
+    return max((a @ a).multiply(a).nnz, 1)
+
+
 MATRICES = [
     ("ct20stif", "Boeing"),
     ("bcsstk39", "Boeing"),
@@ -134,10 +122,10 @@ MATRICES = [
 
 
 KERNELS = [
-    ("hadamard", est_hadamard, 2),
-    ("spgemm", est_spgemm, 2),
-    ("spgemm-2", est_spgemm2, 2),
-    ("triangle", est_triangle, 1),
+    ("hadamard", est_hadamard, act_hadamard, 2),
+    ("spgemm", est_spgemm, act_spgemm, 2),
+    ("spgemm-2", est_spgemm2, act_spgemm2, 2),
+    ("triangle", est_triangle, act_triangle, 1),
 ]
 
 
@@ -151,18 +139,21 @@ KERNELS = [
         pytest.param("dense", DenseStatsFactory(), id="dense"),
     ],
 )
-def test_estimated_kernel(factory_name, factory, actual_nnz, data_regression):
+def test_estimated_kernel(factory_name, factory, data_regression):
     rows = []
 
     for matrix_name, matrix_group in MATRICES:
-        finch_tensor = load(matrix_name, matrix_group)
+        matrix = scipy.io.mmread(DATA_DIR / f"{matrix_name}.mtx").tocsr()
+        finch_tensor = ft.asarray(matrix)
+        pattern = matrix.astype(bool)
+        pattern.eliminate_zeros()
 
-        for kernel_name, estimator, count in KERNELS:
-            act_nnz = actual_nnz[(matrix_name, matrix_group, kernel_name)]
-            ops = [finch_tensor] * count
+        for kernel_name, estimator, actual_kernel, count in KERNELS:
+            act_nnz = actual_kernel(*([pattern] * count))
+            est_ops = [finch_tensor] * count
 
             with with_default_scheduler(COMPILE_JULIA):
-                est_nnz = estimator(factory, *ops)
+                est_nnz = estimator(factory, *est_ops)
 
             ratio = max(est_nnz, 1) / act_nnz
 
