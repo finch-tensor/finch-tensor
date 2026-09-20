@@ -150,9 +150,6 @@ COMPILE_JULIA = LogicNormalizer(
     )
 )
 
-# Galley's factorizer and format selector both reason about non-fill counts, so
-# this scheduler estimates with degree constraints rather than functional
-# dependencies.
 COMPILE_JULIA_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicFactorizer(
