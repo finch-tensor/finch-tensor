@@ -18,6 +18,7 @@ from finch.algebra import (
     fisinstance,
     is_dynamic,
 )
+from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
 from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util.logging import LOG_BACKEND_NUMBA
@@ -61,53 +62,53 @@ class NumbaUnaryOperator(NumbaOperator):
 
 def numba_function_name(op, ctx, *args: Any) -> str:
     match op:
-        case ffuncs.add:
+        case ffuncs._AddFType():
             return "+"
-        case ffuncs.mul:
+        case ffuncs._MulFType():
             return "*"
-        case ffuncs.sub:
+        case ffuncs._SubFType():
             return "-"
-        case ffuncs.truediv:
+        case ffuncs._TrueDivFType():
             return "/"
-        case ffuncs.floordiv:
+        case ffuncs._FloorDivFType():
             return "//"
-        case ffuncs.mod:
+        case ffuncs._ModFType():
             return "%"
-        case ffuncs.pow:
+        case ffuncs._PowFType():
             return "**"
-        case ffuncs.lshift:
+        case ffuncs._LShiftFType():
             return "<<"
-        case ffuncs.rshift:
+        case ffuncs._RShiftFType():
             return ">>"
-        case ffuncs.and_:
+        case ffuncs._AndFType():
             return "&"
-        case ffuncs.xor:
+        case ffuncs._XorFType():
             return "^"
-        case ffuncs.or_:
+        case ffuncs._OrFType():
             return "|"
-        case ffuncs.not_:
+        case ffuncs._NotFType():
             return "not "
-        case ffuncs.invert:
+        case ffuncs._InvertFType():
             return "~"
-        case ffuncs.eq:
+        case ffuncs._EqFType():
             return "=="
-        case ffuncs.ne:
+        case ffuncs._NeFType():
             return "!="
-        case ffuncs.gt:
+        case ffuncs._GtFType():
             return ">"
-        case ffuncs.lt:
+        case ffuncs._LtFType():
             return "<"
-        case ffuncs.ge:
+        case ffuncs._GeFType():
             return ">="
-        case ffuncs.le:
+        case ffuncs._LeFType():
             return "<="
-        case ffuncs.min:
+        case ffuncs._MinFType():
             return "min"
-        case ffuncs.max:
+        case ffuncs._MaxFType():
             return "max"
-        case ffuncs.scansearch:
+        case ffuncs._ScansearchFType():
             return "scansearch"
-        case ffuncs.resize_if_smaller:
+        case ffuncs._ResizeIfSmallerFType():
             return "resize_if_smaller"
         case NumbaOperator():
             return op.numba_name()
@@ -135,27 +136,83 @@ def numba_call_function_call(numba_name: str, ctx: Any, *args: Any) -> str:
     return f"{numba_name}({', '.join(map(ctx, args))})"
 
 
+def numba_same(ctx, x, y):
+    x, y = ctx.cache("same_x", x), ctx.cache("same_y", y)
+    match x.result_type, y.result_type:
+        case TupleFType() as x_type, TupleFType() as y_type:
+            if x_type.struct_fieldnames != y_type.struct_fieldnames:
+                return "False"
+            comparisons = [
+                numba_same(
+                    ctx,
+                    asm.GetAttr(x, asm.Literal(field)),
+                    asm.GetAttr(y, asm.Literal(field)),
+                )
+                for field in x_type.struct_fieldnames
+            ]
+            return f"({' and '.join(comparisons)})" if comparisons else "True"
+        case FDType(), FDType():
+            a, b = ctx(x), ctx(y)
+            return f"(({a} == {b}) or (({a} != {a}) and ({b} != {b})))"
+        case _:
+            raise NotImplementedError(
+                f"Cannot compare {x.result_type} and {y.result_type}"
+            )
+
+
 def numba_function_call(op, ctx, *args: Any) -> str:
-    match op:
-        case ffuncs._InitWrite():
+    op_type = op.result_type
+    match op_type:
+        case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
+            return ctx(args[0])
+        case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs.where:
+        case ffuncs._InitWriteFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            value = (
+                asm.GetAttr(op, asm.Literal("value"))
+                if is_dynamic(fill)
+                else asm.Literal(fill.value)
+            )
+            x, y = args
+            y = ctx.cache("write_y", y)
+            return f"({ctx(x)} if ({ctx(y)} == {ctx(value)}) else {ctx(y)})"
+        case ffuncs._SameFType():
+            return numba_same(ctx, *args)
+        case ffuncs._ChooseFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError("Pass a dynamic choose as a runtime operator")
+            value = ctx.cache(
+                "fill",
+                asm.GetAttr(op, asm.Literal("fill_value"))
+                if is_dynamic(fill)
+                else asm.Literal(fill.value),
+            )
+            args = tuple(ctx.cache("choice", arg) for arg in args)
+            result = ctx(value)
+            for arg in reversed(args):
+                result = f"({result} if {numba_same(ctx, arg, value)} else {ctx(arg)})"
+            return result
+        case ffuncs._WhereFType():
             condition, x1, x2 = args
             return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
-        case ffuncs.make_tuple:
+        case ffuncs._MakeTupleFType():
             return f"({','.join([ctx(arg) for arg in args])},)"
-        case ffuncs.last:
+        case ffuncs._LastFType():
             (arg,) = args
             if not isinstance(arg.result_type, TupleFType):
                 raise TypeError(f"Expected tuple type, got: {arg.result_type}")
             return f"{ctx(arg)}[{len(arg.result_type.struct_fieldtypes) - 1}]"
-        case ffuncs.minby | ffuncs.maxby:
+        case ffuncs._MinByFType() | ffuncs._MaxByFType():
             a, b = (ctx.cache("by_a", args[0]), ctx.cache("by_b", args[1]))
             if not isinstance(a.result_type, TupleFType):
                 raise TypeError(f"Expected tuple type, got: {a.result_type}")
             a_code, b_code = ctx(a), ctx(b)
-            comparator = "<" if op is ffuncs.minby else ">"
-            tie_comparator = "<=" if op is ffuncs.minby else ">="
+            comparator = "<" if op_type == ffuncs.minby.ftype else ">"
+            tie_comparator = "<=" if op_type == ffuncs.minby.ftype else ">="
             last_index = len(a.result_type.struct_fieldtypes) - 1
             return (
                 f"({a_code} if "
@@ -166,31 +223,42 @@ def numba_function_call(op, ctx, *args: Any) -> str:
                 f"else {b_code})"
             )
         case NumbaOperator():
-            return op.numba_function_call(op, ctx, *args)
+            return op_type.numba_function_call(op, ctx, *args)
 
-    numba_name = numba_function_name(op, ctx, *args)
-    match op:
-        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+    numba_name = numba_function_name(op_type, ctx, *args)
+    match op_type:
+        case (
+            ffuncs._AddFType()
+            | ffuncs._MulFType()
+            | ffuncs._AndFType()
+            | ffuncs._XorFType()
+            | ffuncs._OrFType()
+        ):
             return numba_nary_function_call(numba_name, ctx, *args)
         case (
-            ffuncs.sub
-            | ffuncs.truediv
-            | ffuncs.floordiv
-            | ffuncs.mod
-            | ffuncs.pow
-            | ffuncs.lshift
-            | ffuncs.rshift
-            | ffuncs.eq
-            | ffuncs.ne
-            | ffuncs.gt
-            | ffuncs.lt
-            | ffuncs.ge
-            | ffuncs.le
+            ffuncs._SubFType()
+            | ffuncs._TrueDivFType()
+            | ffuncs._FloorDivFType()
+            | ffuncs._ModFType()
+            | ffuncs._PowFType()
+            | ffuncs._LShiftFType()
+            | ffuncs._RShiftFType()
+            | ffuncs._EqFType()
+            | ffuncs._NeFType()
+            | ffuncs._GtFType()
+            | ffuncs._LtFType()
+            | ffuncs._GeFType()
+            | ffuncs._LeFType()
         ):
             return numba_binary_function_call(numba_name, ctx, *args)
-        case ffuncs.not_ | ffuncs.invert:
+        case ffuncs._NotFType() | ffuncs._InvertFType():
             return numba_unary_function_call(numba_name, ctx, *args)
-        case ffuncs.min | ffuncs.max | ffuncs.scansearch | ffuncs.resize_if_smaller:
+        case (
+            ffuncs._MinFType()
+            | ffuncs._MaxFType()
+            | ffuncs._ScansearchFType()
+            | ffuncs._ResizeIfSmallerFType()
+        ):
             return numba_call_function_call(numba_name, ctx, *args)
         case _:
             raise TypeError(f"{op} has no Numba representation.")
@@ -697,7 +765,7 @@ class NumbaContext(Context):
                 val_code = self(val)
                 numba_setattr(obj_t, self, obj_code, attr.val, val_code)
                 return None
-            case asm.Call(asm.Literal(op), args):
+            case asm.Call(op, args):
                 return numba_function_call(op, self, *args)
 
             case asm.Unpack(asm.Slot(var_n, var_t) as slot, val):

@@ -13,6 +13,7 @@ from .simplification import simplify_rules
 from .stage import Form, Stage, UnvalidatedForm
 from .term import (
     CallTerm,
+    ExpressionTerm,
     LiteralTerm,
     Term,
     TermTree,
@@ -27,6 +28,7 @@ __all__ = [
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",
+    "ExpressionTerm",
     "Fixpoint",
     "Form",
     "LiteralTerm",

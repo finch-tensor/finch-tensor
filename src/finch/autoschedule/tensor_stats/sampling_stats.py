@@ -422,7 +422,7 @@ class SamplingStatsFactory(
         reduce_fields = tuple(reduce_set)
 
         # check is_annihilator
-        if is_identity(op, stats.fill_value):
+        if is_identity(op.ftype, stats.fill_value):
             new_sketch = (
                 Aggregate(
                     Literal(ffuncs.add),
@@ -434,7 +434,7 @@ class SamplingStatsFactory(
                 else stats.sketch
             )
 
-        elif is_annihilator(op, stats.fill_value):
+        elif is_annihilator(op.ftype, stats.fill_value):
             exists: LogicExpression = MapJoin(
                 Literal(ffuncs.gt), (stats.sketch, Literal(0.0))
             )

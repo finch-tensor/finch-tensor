@@ -1,5 +1,5 @@
 from finch import finch_assembly as asm
-from finch.algebra import ffuncs, is_annihilator, is_identity
+from finch.algebra import FinchOperatorFType, ffuncs, is_annihilator, is_identity
 from finch.symbolic import UnvalidatedForm, simplify_rules
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 
@@ -17,15 +17,18 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
 
         match term:
             # overwrite(x, y) => y
-            case asm.Call(asm.Literal(fn), (_, y)) if fn is ffuncs.overwrite:
+            case asm.Call(op, (_, y)) if op.result_type == ffuncs.overwrite.ftype:
                 return y
             # op(..., arg, ...) where arg is anihilator => arg
-            case asm.Call(asm.Literal(_) as op, args):
+            case asm.Call(
+                asm.AssemblyExpression(result_type=FinchOperatorFType() as op_type),
+                args,
+            ):
                 for arg in args:
                     match arg:
                         case asm.Literal(val) if isinstance(
                             val, Scalar
-                        ) and is_annihilator(op.val, val.val):
+                        ) and is_annihilator(op_type, val.val):
                             return arg
                 return None
             # slot(a, idx) = op(slot(a, idx), arg) where RHS is:
@@ -39,16 +42,16 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
                         asm.Slot(_) as s1,
                         idx1,
                         asm.Call(
-                            asm.Literal(op),
+                            asm.AssemblyExpression(
+                                result_type=FinchOperatorFType() as op_type
+                            ),
                             (asm.Load(asm.Slot(_) as s2, idx2), asm.Literal(arg)),
                         ),
                     ),
                 ) as bodies
             ) if s1 == s2 and idx1 == idx2:
                 arg_val = arg.val if isinstance(arg, Scalar) else arg
-                if op == ffuncs.init_write(arg_val):
-                    return asm.Block(bodies[:-1])
-                if is_identity(op, arg_val):
+                if is_identity(op_type, arg_val):
                     return asm.Block(bodies[:-1])
             # loop(...) {} is removed
             case asm.ForLoop(_, _, _, asm.Block(())):

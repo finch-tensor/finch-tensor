@@ -16,7 +16,7 @@ from finch.algebra import (
     ffuncs,
     ftype,
 )
-from finch.algebra.algebra import FinchOperator
+from finch.algebra.algebra import FinchOperator, SingletonOperatorFType
 from finch.codegen.numba_codegen import NumbaNAryOperator
 from finch.finch_assembly import (
     AssemblyInterpreter,
@@ -124,15 +124,25 @@ class Extent(FTyped):
         return ExtentFType(ftype(self.start), ftype(self.end))
 
 
+class _MakeExtentFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return make_extent
+
+    def return_type(self, start: FType, end: FType) -> FType:  # type: ignore[override]
+        return ExtentFType(start, end)  # type: ignore[abstract]
+
+
 class _MakeExtent(FinchOperator):
+    @property
+    def ftype(self):
+        return _MakeExtentFType()
+
     def __repr__(self):
         return "make_extent"
 
     def __call__(self, start: Any, end: Any) -> Extent:
         return Extent(start, end)
-
-    def return_type(self, start: FType, end: FType) -> FType:  # type: ignore[override]
-        return ExtentFType(start, end)  # type: ignore[abstract]
 
 
 make_extent = _MakeExtent()
@@ -142,10 +152,10 @@ def numba_lower_dimension(ctx, tns, mode: int) -> str:
     return f"Numba_Extent(type({ctx(tns)}.shape[{mode}])(0), {ctx(tns)}.shape[{mode}])"
 
 
-class _Dimension(FinchOperator, NumbaNAryOperator):
-    def __call__(self, tns, mode: int) -> Extent:
-        end = tns.shape[mode]
-        return Extent(ftype(end)(0), end)
+class _DimensionFType(SingletonOperatorFType, NumbaNAryOperator):
+    @property
+    def operator(self):
+        return dimension
 
     def return_type(self, tns: FType, mode: FType) -> FType:  # type: ignore[override]
         return ExtentFType(ftype(np.intp), ftype(np.intp))  # type: ignore[abstract]
@@ -156,6 +166,16 @@ class _Dimension(FinchOperator, NumbaNAryOperator):
 
     def numba_name(self) -> str:
         return "dimension"
+
+
+class _Dimension(FinchOperator):
+    @property
+    def ftype(self):
+        return _DimensionFType()
+
+    def __call__(self, tns, mode: int) -> Extent:
+        end = tns.shape[mode]
+        return Extent(ftype(end)(0), end)
 
     def __repr__(self) -> str:
         return "dimension"
@@ -184,7 +204,9 @@ class SymbolicExtent(FTyped):
     @classmethod
     def from_notation(cls, node: ntn.NotationNode):
         match node:
-            case ntn.Call(ntn.Literal(op), (start, end)) if isinstance(op, _MakeExtent):
+            case ntn.Call(op, (start, end)) if isinstance(
+                op.result_type, _MakeExtentFType
+            ):
                 return SymbolicExtent(start, end)
             case _:
                 raise Exception(node)
@@ -703,6 +725,8 @@ def lower_looplets(
     body = instantiate(ctx, body)
     ctx_2 = ctx.scope()
 
+    looplets = comp.looplets  # ty: ignore[possibly-missing-submodule]
+
     def unfurl_node(node):
         match node:
             case ntn.Access(tns, mode, (j, *idxs)):
@@ -710,7 +734,7 @@ def lower_looplets(
                     tns = ctx_2.resolve(tns)
                     match tns:
                         case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
-                            tns_2 = comp.looplets.Run(ntn.Full(val, tuple(shape)))  # ty: ignore[possibly-missing-submodule]
+                            tns_2 = looplets.Run(ntn.Full(val, tuple(shape)))
                         case _:
                             tns_2 = tns.result_type.unfurl(
                                 ctx_2, tns, ext, mode, proto=None

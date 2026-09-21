@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from finch import tensor
 from finch.algebra import (
+    CallableFType,
     DynamicFill,
     FType,
     StaticFill,
@@ -17,6 +18,7 @@ from finch.finch_assembly import AssemblyExpression, AssemblyNode
 from finch.symbolic import (
     CallTerm,
     Context,
+    ExpressionTerm,
     LiteralTerm,
     NamedTerm,
     Term,
@@ -66,7 +68,7 @@ class NotationTree(NotationNode, TermTree):
         ...
 
 
-class NotationExpression(NotationNode):
+class NotationExpression(NotationNode, ExpressionTerm):
     """
     Notation AST expression base class.
 
@@ -163,14 +165,15 @@ class Call(NotationTree, NotationExpression, CallTerm):
     `args...`.
     """
 
-    op: Literal | Variable
+    op: NotationExpression
     args: tuple[NotationExpression, ...]
 
     @property
     def result_type(self) -> FType:
         arg_types = [a.result_type for a in self.args]
-        assert isinstance(self.op, Literal)  # TODO: handle Variable
-        return return_type(self.op.val, *arg_types)
+        op_type = self.op.result_type
+        assert isinstance(op_type, CallableFType)
+        return return_type(op_type, *arg_types)
 
     @classmethod
     def from_children(cls, op, *args):
@@ -316,7 +319,7 @@ class Update(AccessMode, NotationTree):
         op: The operation used to update the value of the tensor.
     """
 
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):
@@ -502,7 +505,6 @@ class Fiber(NotationExpression):
     lvl: Cursor
     pos: Any
     idxs: tuple[Any, ...] = ()
-    dirty: bool = False
 
     @property
     def result_type(self):
@@ -591,7 +593,7 @@ class Declare(NotationTree, NotationStatement):
 
     tns: NotationExpression
     init: Literal
-    op: Literal
+    op: NotationExpression
     shape: tuple[NotationExpression, ...]
 
     @property
@@ -614,7 +616,7 @@ class Freeze(NotationTree, NotationStatement):
     """
 
     tns: NotationExpression
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):
@@ -629,7 +631,7 @@ class Thaw(NotationTree, NotationStatement):
     """
 
     tns: NotationExpression
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):

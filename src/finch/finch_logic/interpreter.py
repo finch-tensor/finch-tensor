@@ -106,7 +106,7 @@ class LogicMachine:
                             idxs.append(idx)
                             dims[idx] = dim
                 fill_val = op(*[arg.tns.fill_value for arg in args])
-                dtype = return_type(op, *[arg.tns.element_type for arg in args])
+                dtype = return_type(op.ftype, *[arg.tns.element_type for arg in args])
                 assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
@@ -121,7 +121,7 @@ class LogicMachine:
                 return TableValue(result, tuple(idxs))
             case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
-                dtype = fixpoint_type(op, init, arg.tns.element_type)
+                dtype = fixpoint_type(op.ftype, init, arg.tns.element_type)
                 new_shape = tuple(
                     int(dim)
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)

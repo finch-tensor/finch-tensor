@@ -12,6 +12,7 @@ from finch.algebra import (
     StaticFill,
     ffuncs,
     ftypes,
+    is_dynamic,
 )
 from finch.algebra.tensor import TensorFType
 from finch.compile.lower import make_extent
@@ -262,24 +263,26 @@ class NotationContext:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
             case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
-                body = self._lower_query_of_reorder(lhs, ffuncs.overwrite, arg, idxs_2)
                 match self.bindings[lhs].fill_value:
                     case DynamicFill() as fill:
                         init = ntn.Literal(fill)
+                        op = ffuncs.overwrite
                     case StaticFill() as fill:
                         init = ntn.Literal(fill.value)
+                        op = ffuncs.init_write(fill.value)
+                body = self._lower_query_of_reorder(lhs, op, arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Declare(
                             self.slots[lhs],
                             init,
-                            ntn.Literal(ffuncs.overwrite),
+                            ntn.Literal(op),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(ffuncs.overwrite),
+                            ntn.Literal(op),
                         ),
                     )
                 )
@@ -295,6 +298,8 @@ class NotationContext:
                     output_idxs,
                 ),
             ):
+                if op == ffuncs.overwrite and not idxs_2 and not is_dynamic(init):
+                    op = ffuncs.init_write(init)
                 body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
                 return ntn.Block(
                     (

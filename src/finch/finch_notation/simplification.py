@@ -1,5 +1,5 @@
 from finch import finch_notation as ntn
-from finch.algebra import is_annihilator
+from finch.algebra import FinchOperatorFType, is_annihilator
 from finch.compile import looplets
 from finch.symbolic import simplify_rules
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
@@ -16,7 +16,10 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
     @staticmethod
     def simplify(term: ntn.NotationNode):
         match term:
-            case ntn.Call(ntn.Literal(_) as op, args):
+            case ntn.Call(
+                ntn.NotationExpression(result_type=FinchOperatorFType() as op_type),
+                args,
+            ):
                 for arg in args:
                     match arg:
                         case ntn.Unwrap(
@@ -26,6 +29,6 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                                 idxs,
                             )
                         ):
-                            if is_annihilator(op.val, val):
+                            if is_annihilator(op_type, val):
                                 return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
         return None

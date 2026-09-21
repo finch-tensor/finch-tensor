@@ -2,11 +2,12 @@ from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from finch.algebra import ftype, return_type
+from finch.algebra import CallableFType, ftype, return_type
 from finch.algebra.ftypes import FType, StructFType
 from finch.symbolic import (
     CallTerm,
     Context,
+    ExpressionTerm,
     LiteralTerm,
     NamedTerm,
     Term,
@@ -60,7 +61,7 @@ class AssemblyTree(AssemblyNode, TermTree):
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
 
-class AssemblyExpression(AssemblyNode):
+class AssemblyExpression(AssemblyNode, ExpressionTerm):
     """
     Assembly AST expression base class.
 
@@ -270,7 +271,7 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
         args: The arguments to call on the function.
     """
 
-    op: Literal | Variable
+    op: AssemblyExpression
     args: tuple[AssemblyExpression, ...]
 
     @property
@@ -286,8 +287,9 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
     def result_type(self):
         """Returns the type of the expression."""
         arg_types = [arg.result_type for arg in self.args]
-        assert isinstance(self.op, Literal)
-        return return_type(self.op.val, *arg_types)
+        op_type = self.op.result_type
+        assert isinstance(op_type, CallableFType)
+        return return_type(op_type, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
@@ -642,7 +644,7 @@ class AssemblyPrinterContext(Context):
                 return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
-            case Call(Literal(_) as lit, args):
+            case Call(lit, args):
                 call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
                 if emit_calls:
                     self.exec(call_expr)
