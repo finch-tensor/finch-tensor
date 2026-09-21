@@ -17,6 +17,7 @@ from finch.symbolic import (
 from finch.util import qual_str
 
 from .buffer import BufferFType, length_type
+from .stages import AssemblyKernelFType
 
 
 class AssemblyNode(Term):
@@ -500,12 +501,10 @@ class IfElse(AssemblyTree, AssemblyStatement):
 @dataclass(eq=True, frozen=True)
 class Function(AssemblyTree):
     """
-    Represents a logical AST statement that defines a function `fun` on the
-    arguments `args...`.
+    A module-level function definition with arguments `args...`.
 
     Attributes:
-        name: The name of the function to define as a variable typed with the
-            return type of this function.
+        name: The function variable, annotated with its AssemblyKernelFType.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
@@ -733,7 +732,7 @@ class AssemblyPrinterContext(Context):
                 feed = self.feed
 
                 match name:
-                    case Variable(func_name, return_t):
+                    case Variable(func_name, AssemblyKernelFType(result_type=return_t)):
                         func_decl = f"{func_name}"
                     case _:
                         raise NotImplementedError(

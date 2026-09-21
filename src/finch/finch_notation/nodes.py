@@ -14,7 +14,7 @@ from finch.algebra import (
     ftype,
     return_type,
 )
-from finch.finch_assembly import AssemblyExpression, AssemblyNode
+from finch.finch_assembly import AssemblyExpression, AssemblyKernelFType, AssemblyNode
 from finch.symbolic import (
     CallTerm,
     Context,
@@ -658,12 +658,10 @@ class Block(NotationTree, NotationStatement):
 @dataclass(eq=True, frozen=True)
 class Function(NotationTree):
     """
-    Represents a logical AST statement that defines a function `fun` on the
-    arguments `args...`.
+    A module-level function definition with arguments `args...`.
 
     Attributes:
-        name: The name of the function to define as a variable typed with the
-            return type of this function.
+        name: The function variable, annotated with its AssemblyKernelFType.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
@@ -850,7 +848,9 @@ class NotationPrinterContext(Context):
                     f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
-            case Function(Variable(func_n, ret_t), args, body):
+            case Function(
+                Variable(func_n, AssemblyKernelFType(result_type=ret_t)), args, body
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:

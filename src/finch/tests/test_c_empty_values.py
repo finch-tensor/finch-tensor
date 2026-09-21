@@ -29,7 +29,20 @@ def test_empty_arguments_skip_serialization(value, monkeypatch):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("apply", dtype),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (
+                            first.result_type,
+                            x.result_type,
+                            buf.result_type,
+                            y.result_type,
+                            last.result_type,
+                        ),
+                        dtype,
+                    ),
+                ),
                 (first, x, buf, y, last),
                 asm.Block(
                     (
@@ -68,7 +81,10 @@ def test_empty_return_reconstructed_from_type(value, monkeypatch):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("identity", fmt),
+                asm.Variable(
+                    "identity",
+                    asm.AssemblyKernelFType("identity", (arg.result_type,), fmt),
+                ),
                 (arg,),
                 asm.Block(
                     (
@@ -107,12 +123,22 @@ def test_empty_fields_omitted_from_structs(named, monkeypatch):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("identity", fmt),
+                asm.Variable(
+                    "identity",
+                    asm.AssemblyKernelFType("identity", (arg.result_type,), fmt),
+                ),
                 (arg,),
                 asm.Block((asm.Return(arg),)),
             ),
             asm.Function(
-                asm.Variable("apply", dtype),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (arg.result_type, x.result_type),
+                        dtype,
+                    ),
+                ),
                 (arg, x),
                 asm.Block(
                     (
@@ -188,7 +214,14 @@ def test_empty_results_preserve_effects(use):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("apply", result.result_type),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (buf.result_type, cond.result_type),
+                        result.result_type,
+                    ),
+                ),
                 (buf, cond),
                 asm.Block(tuple(body)),
             ),

@@ -245,13 +245,25 @@ class AssemblyTypeChecker:
 
     def check_function(self, func: asm.AssemblyNode):
         match func:
-            case asm.Function(asm.Variable(func_name, return_type), args, body):
+            case asm.Function(
+                asm.Variable(
+                    func_name,
+                    asm.AssemblyKernelFType(result_type=return_type) as func_type,
+                ),
+                args,
+                body,
+            ):
                 check_type(return_type)
+                if tuple(arg.result_type for arg in args) != func_type.arg_types:
+                    raise AssemblyTypeError(
+                        f"Function '{func_name}' arguments do not match {func_type}."
+                    )
                 if self.function_state:
                     raise AssemblyTypeError(
                         f"Cannot nest function definitions:  '{func_name}'."
                     )
                 body_scope = self.scope(function_state=FunctionState(return_type))
+                body_scope.ctxt[func_name] = func_type
                 for arg in args:
                     check_type(arg.type)
                     body_scope.ctxt[arg.name] = arg.type
@@ -275,8 +287,10 @@ class AssemblyTypeChecker:
                         raise AssemblyTypeError(
                             f"Two functions defined with the name '{func_name}'."
                         )
-                    self.check_function(func)
+                    self.ctxt[func_name] = func.name.result_type
                     defined_funcs.append(func_name)
+                for func in funcs:
+                    self.check_function(func)
                 return
             case _:
                 raise AssemblyTypeError(f"Expected module, got {type(mod)}.")

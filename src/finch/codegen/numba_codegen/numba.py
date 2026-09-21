@@ -163,6 +163,9 @@ def numba_same(ctx, x, y):
 def numba_function_call(op, ctx, *args: Any) -> str:
     op_type = op.result_type
     match op_type:
+        case asm.AssemblyKernelFType():
+            op_type.return_type(*(arg.result_type for arg in args))
+            return f"{ctx(op)}({', '.join(ctx(arg) for arg in args)})"
         case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
             return ctx(args[0])
         case ffuncs._OverwriteFType():
@@ -306,6 +309,8 @@ def numba_type(t: FType) -> Any:
         The corresponding Numba type.
     """
     match t:
+        case asm.AssemblyKernelFType():
+            return object
         case NumbaArgumentFType():
             return t.numba_type()
         case algebra.ftypes.FDTypeNumpy():
@@ -331,6 +336,15 @@ def numba_jitclass_type(t: FType) -> Any:
         The corresponding Numba jitclass spec type.
     """
     match t:
+        case asm.AssemblyKernelFType():
+            ret = (
+                numba.void
+                if t.result_type == algebra.none_
+                else numba_jitclass_type(t.result_type)
+            )
+            return numba.types.FunctionType(
+                ret(*(numba_jitclass_type(arg) for arg in t.arg_types))
+            )
         case _ if hasattr(t, "numba_jitclass_type"):
             return t.numba_jitclass_type()  # ty: ignore[call-non-callable]
         case algebra.ftypes.FDTypeNumpy():
@@ -409,6 +423,8 @@ def serialize_to_numba(fmt: FType, obj: Any) -> Any:
         A Numba-compatible object.
     """
     match fmt:
+        case asm.AssemblyKernelFType():
+            return obj.numba_func
         case NumbaArgumentFType():
             return fmt.serialize_to_numba(obj)
         case algebra.none_:
@@ -478,6 +494,8 @@ def construct_from_numba(fmt: FType, numba_obj: Any) -> Any:
         An instance of the original object type.
     """
     match fmt:
+        case asm.AssemblyKernelFType():
+            return NumbaKernel(numba_obj, fmt)
         case NumbaArgumentFType():
             return fmt.construct_from_numba(numba_obj)
         case algebra.none_:
@@ -573,10 +591,11 @@ class NumbaLibrary(asm.AssemblyLibrary):
 
 
 class NumbaKernel(asm.AssemblyKernel):
-    def __init__(self, numba_func, ret_type: Any, arg_types):
+    def __init__(self, numba_func, type_):
+        super().__init__(type_)
         self.numba_func = numba_func
-        self.ret_type = ret_type
-        self.arg_types = arg_types
+        self.ret_type = type_.result_type
+        self.arg_types = type_.arg_types
 
     def __call__(self, *args):
         for arg_type, arg in zip(self.arg_types, args, strict=False):
@@ -604,8 +623,7 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
     def lower(self, prgm: asm.Module) -> NumbaLibrary:
         numba_code = self.ctx(prgm).code
         logger.debug(f"Executing Numba code:\n{numba_code}")
-        _globals = globals()
-        _globals |= numba_globals
+        _globals = {**globals(), **numba_globals}
         try:
             exec(numba_code, _globals, None)
         except Exception as e:
@@ -619,10 +637,9 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
         kernels = {}
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, ret_type), args, _):
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
                     kern = _globals[func_name]
-                    arg_ts = [arg.result_type for arg in args]
-                    kernels[func_name] = NumbaKernel(kern, ret_type, arg_ts)
+                    kernels[func_name] = NumbaKernel(kern, func_type)
                 case _:
                     raise NotImplementedError(
                         f"Unrecognized function type: {type(func)}"
@@ -865,7 +882,11 @@ class NumbaContext(Context):
                     f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
-            case asm.Function(asm.Variable(func_name, return_t), args, body):
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:

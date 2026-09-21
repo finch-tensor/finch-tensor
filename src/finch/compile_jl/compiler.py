@@ -109,23 +109,27 @@ class CompiledJLKernel:
     source text, with no Python-side values left to inject."""
 
     def __init__(
-        self, func_name: str, jl_code: str, dynamic_args: tuple[int, ...] = ()
+        self, func_name: str, jl_code: str, type_, dynamic_args: tuple[int, ...] = ()
     ):
         self.func_name = func_name
         self.jl_code = jl_code
+        self.ftype = type_
         self.dynamic_args = dynamic_args
 
     def evaluate(self) -> "FinchJLKernel":
         """Defines the kernel function in the running Julia session,
         returning the now-callable kernel."""
         jl.seval(self.jl_code)
-        return FinchJLKernel(self.func_name, self.jl_code, self.dynamic_args)
+        return FinchJLKernel(
+            self.func_name, self.jl_code, self.ftype, self.dynamic_args
+        )
 
 
 class FinchJLKernel(AssemblyKernel):
     """A kernel already defined (evaluated) in the running Julia session."""
 
-    def __init__(self, func_name, jl_code, dynamic_args: tuple[int, ...] = ()):
+    def __init__(self, func_name, jl_code, type_, dynamic_args: tuple[int, ...] = ()):
+        super().__init__(type_)
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.func_name = func_name
@@ -134,7 +138,6 @@ class FinchJLKernel(AssemblyKernel):
         # Known fills.
         self.dynamic_args = dynamic_args
         self.buffer_context = JuliaBufferContext()
-        jl.seval(self.jl_code)
 
     def __call__(self, *args):
         finch_fn = getattr(jl, self.func_name)
@@ -405,10 +408,18 @@ class FinchJLCompiler(NotationCompiler):
                 compiled = CompiledJLKernel(
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
+                    func.name.result_type,
                     dynamic_args=dynamic_args,
                 )
                 kernel = compiled.evaluate()
                 self._kernels[key] = kernel
+            elif kernel.ftype != func.name.result_type:
+                kernel = FinchJLKernel(
+                    kernel.func_name,
+                    kernel.jl_code,
+                    func.name.result_type,
+                    dynamic_args,
+                )
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)

@@ -17,13 +17,12 @@ class AssemblyInterpreterKernel(AssemblyKernel):
     This is a simple interpreter that executes the assembly code.
     """
 
-    def __init__(self, ctx, func_n, ret_t):
-        self.ctx = ctx
-        self.func = asm.Variable(func_n, ret_t)
+    def __init__(self, func, type_):
+        super().__init__(type_)
+        self.func = func
 
     def __call__(self, *args):
-        args_i = tuple(asm.Literal(arg) for arg in args)
-        return self.ctx(asm.Call(self.func, args_i))
+        return self.func(*args)
 
 
 class AssemblyInterpreterLibrary(AssemblyLibrary):
@@ -291,7 +290,13 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 ctx_2 = self.scope()
                 ctx_2(body)
                 return None
-            case asm.Function(asm.Variable(func_n, ret_t), args, body):
+            case asm.Function(
+                asm.Variable(
+                    func_n, asm.AssemblyKernelFType(result_type=ret_t) as func_type
+                ),
+                args,
+                body,
+            ):
 
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
@@ -327,7 +332,8 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                         f"but expected type {ret_t}."
                     )
 
-                self.bindings[func_n] = my_func
+                self.bindings[func_n] = AssemblyInterpreterKernel(my_func, func_type)
+                self.types[func_n] = func_type
                 return None
             case asm.Return(value):
                 assert self.function_state is not None
@@ -339,19 +345,26 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 self.loop_state.should_halt = True
                 return None
             case asm.Module(funcs):
+                ctx_2 = self.scope()
                 for func in funcs:
-                    self(func)
+                    ctx_2(func)
                 kernels = {}
                 for func in funcs:
                     match func:
-                        case asm.Function(asm.Variable(func_n, ret_t), args, _):
-                            kernel = AssemblyInterpreterKernel(self, func_n, ret_t)
-                            kernels[func_n] = kernel
+                        case asm.Function(
+                            asm.Variable(
+                                func_n,
+                                ret_t,
+                            ),
+                            args,
+                            _,
+                        ):
+                            kernels[func_n] = ctx_2.bindings[func_n]
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return AssemblyInterpreterLibrary(self, kernels)
+                return AssemblyInterpreterLibrary(ctx_2, kernels)
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"

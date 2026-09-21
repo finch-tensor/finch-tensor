@@ -295,13 +295,12 @@ class NotationInterpreterKernel(asm.AssemblyKernel):
     This is a simple interpreter that executes the assembly code.
     """
 
-    def __init__(self, ctx, func_n, ret_t):
-        self.ctx = ctx
-        self.func = ntn.Variable(func_n, ret_t)
+    def __init__(self, func, type_):
+        super().__init__(type_)
+        self.func = func
 
     def __call__(self, *args):
-        args_i = tuple(ntn.Literal(arg) for arg in args)
-        return self.ctx(ntn.Call(self.func, args_i))
+        return self.func(*args)
 
 
 class NotationInterpreterLibrary(asm.AssemblyLibrary):
@@ -548,7 +547,13 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 ctx_2 = self.scope()
                 ctx_2(body)
                 return None
-            case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+            case ntn.Function(
+                ntn.Variable(
+                    func_n, asm.AssemblyKernelFType(result_type=ret_t) as func_type
+                ),
+                args,
+                body,
+            ):
 
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
@@ -579,7 +584,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                         f"but expected type {ret_t}."
                     )
 
-                self.bindings[func_n] = my_func
+                self.bindings[func_n] = NotationInterpreterKernel(my_func, func_type)
+                self.types[func_n] = func_type
                 return None
             case ntn.Return(value):
                 assert self.function_state is not None
@@ -593,9 +599,15 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 kernels = {}
                 for func in funcs:
                     match func:
-                        case ntn.Function(ntn.Variable(func_n, ret_t), args, _):
-                            kernel = NotationInterpreterKernel(ctx_2, func_n, ret_t)
-                            kernels[func_n] = kernel
+                        case ntn.Function(
+                            ntn.Variable(
+                                func_n,
+                                ret_t,
+                            ),
+                            args,
+                            _,
+                        ):
+                            kernels[func_n] = ctx_2.bindings[func_n]
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"

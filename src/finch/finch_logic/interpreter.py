@@ -14,8 +14,9 @@ from finch.algebra import (
 )
 from finch.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from finch.algebra.tensor import TensorFType
-from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finch.finch_assembly import AssemblyKernel, AssemblyKernelFType, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
+from finch.tensor.bufferized_ndarray import BufferizedNDArray
 from finch.tensor.scalar import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
@@ -190,6 +191,32 @@ class LogicMachine:
 
 class MockLogicKernel(AssemblyKernel):
     def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        element_types = prgm.infer_element_type(
+            {var: type_.element_type for var, type_ in bindings.items()}
+        )
+        shape_types = prgm.infer_shape_type(
+            {var: type_.shape_type for var, type_ in bindings.items()}
+        )
+        result_types = dict(bindings)
+        for var, element_type in element_types.items():
+            if var not in result_types:
+                result_types[var] = BufferizedNDArray.from_numpy(
+                    np.empty((0,) * len(shape_types[var]), dtype=np_dtype(element_type))
+                ).ftype
+        outputs = []
+        for arg in prgm.bodies[-1].args:
+            match arg:
+                case lgc.Table(lgc.Alias() as var, _) | (lgc.Alias() as var):
+                    outputs.append(result_types[var])
+                case _:
+                    raise TypeError(f"Expected an output alias or table, got {arg}")
+        super().__init__(
+            AssemblyKernelFType(
+                "main",
+                tuple(bindings.values()),
+                TupleFType.from_tuple(tuple(outputs)),
+            )
+        )
         self.prgm = prgm
         self.bindings = bindings
 
@@ -216,7 +243,8 @@ class MockLogicLibrary(AssemblyLibrary):
 
     def __getattr__(self, name):
         if name == "main":
-            return MockLogicKernel(self.prgm, self.bindings)
+            self.main = MockLogicKernel(self.prgm, self.bindings)
+            return self.main
         if name == "prgm":
             return self.prgm
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")

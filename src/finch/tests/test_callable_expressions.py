@@ -85,7 +85,14 @@ def custom_callable_program():
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("apply", dtype),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (op.result_type, x.result_type),
+                        dtype,
+                    ),
+                ),
                 (op, x),
                 asm.Block((asm.Return(asm.Call(callee, (x,))),)),
             ),
@@ -153,7 +160,14 @@ def test_same_backend_lowering(compiler, x, y, expected):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("compare", call.result_type),
+                asm.Variable(
+                    "compare",
+                    asm.AssemblyKernelFType(
+                        "compare",
+                        (a.result_type, b.result_type),
+                        call.result_type,
+                    ),
+                ),
                 (a, b),
                 asm.Block((asm.Return(call),)),
             ),
@@ -184,7 +198,14 @@ def test_choose_backend_lowering(compiler, tuple_fill, nargs):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("choose", call.result_type),
+                asm.Variable(
+                    "choose",
+                    asm.AssemblyKernelFType(
+                        "choose",
+                        (op.result_type, *(arg.result_type for arg in args)),
+                        call.result_type,
+                    ),
+                ),
                 (op, *args),
                 asm.Block((asm.Return(call),)),
             ),
@@ -202,7 +223,14 @@ def test_mlir_same_uses_unordered_nan_comparison():
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("compare", call.result_type),
+                asm.Variable(
+                    "compare",
+                    asm.AssemblyKernelFType(
+                        "compare",
+                        (a.result_type, b.result_type),
+                        call.result_type,
+                    ),
+                ),
                 (a, b),
                 asm.Block((asm.Return(call),)),
             ),
@@ -236,7 +264,14 @@ def test_callable_expression(compiler, field, fill_type):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("write", ftype(np.int64)),
+                asm.Variable(
+                    "write",
+                    asm.AssemblyKernelFType(
+                        "write",
+                        (op.result_type, x.result_type, y.result_type),
+                        ftype(np.int64),
+                    ),
+                ),
                 (op, x, y),
                 asm.Block((asm.Return(call),)),
             ),
@@ -264,7 +299,14 @@ def test_notation_callable_expression(compiler):
     program = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("write", ftype(np.int64)),
+                ntn.Variable(
+                    "write",
+                    asm.AssemblyKernelFType(
+                        "write",
+                        (op.result_type, x.result_type, y.result_type),
+                        ftype(np.int64),
+                    ),
+                ),
                 (op, x, y),
                 ntn.Block((ntn.Return(call),)),
             ),
@@ -286,7 +328,9 @@ def test_dynamic_operator_literal_cannot_specialize(generator):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("write", ftype(np.int64)),
+                asm.Variable(
+                    "write", asm.AssemblyKernelFType("write", (), ftype(np.int64))
+                ),
                 (),
                 asm.Block((asm.Return(expression),)),
             ),
@@ -310,7 +354,14 @@ def test_builtin_operator_argument(compiler):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("apply", ftype(np.int64)),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (op.result_type, x.result_type, y.result_type),
+                        ftype(np.int64),
+                    ),
+                ),
                 (op, x, y),
                 asm.Block((asm.Return(asm.Call(op, (x, y))),)),
             ),
@@ -341,7 +392,20 @@ def test_call_selects_runtime_operator(compiler, factory):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("apply", dtype),
+                asm.Variable(
+                    "apply",
+                    asm.AssemblyKernelFType(
+                        "apply",
+                        (
+                            first.result_type,
+                            second.result_type,
+                            which.result_type,
+                            x.result_type,
+                            y.result_type,
+                        ),
+                        dtype,
+                    ),
+                ),
                 (first, second, which, x, y),
                 asm.Block((asm.Return(result),)),
             ),
@@ -461,7 +525,14 @@ def test_callable_without_algebraic_properties(ir):
         program = asm.Module(
             (
                 asm.Function(
-                    asm.Variable("apply", dtype),
+                    asm.Variable(
+                        "apply",
+                        asm.AssemblyKernelFType(
+                            "apply",
+                            (op.result_type, x.result_type),
+                            dtype,
+                        ),
+                    ),
                     (op, x),
                     asm.Block((asm.Return(asm.Call(op, (x,))),)),
                 ),

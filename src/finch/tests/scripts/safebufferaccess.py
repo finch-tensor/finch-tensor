@@ -53,7 +53,14 @@ def main(args) -> None:
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("finch_access", ab_safe.ftype.element_type),
+                    asm.Variable(
+                        "finch_access",
+                        asm.AssemblyKernelFType(
+                            "finch_access",
+                            (ab_v.result_type, idx.result_type),
+                            ab_safe.ftype.element_type,
+                        ),
+                    ),
                     (ab_v, idx),
                     asm.Block(
                         (
@@ -74,7 +81,14 @@ def main(args) -> None:
                     ),
                 ),
                 asm.Function(
-                    asm.Variable("finch_change", ab_safe.ftype.element_type),
+                    asm.Variable(
+                        "finch_change",
+                        asm.AssemblyKernelFType(
+                            "finch_change",
+                            (ab_v.result_type, idx.result_type, val.result_type),
+                            ab_safe.ftype.element_type,
+                        ),
+                    ),
                     (ab_v, idx, val),
                     asm.Block(
                         (

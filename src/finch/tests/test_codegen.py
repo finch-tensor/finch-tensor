@@ -119,7 +119,10 @@ def test_buffer_function():
     b = NumpyBuffer(a)
     f = finch.codegen.c_codegen.load_shared_lib(c_code).concat_buffer_with_self
     k = finch.codegen.c_codegen.CKernel(
-        f, finch.none_, [NumpyBufferFType(ftypes.float64)]
+        f,
+        asm.AssemblyKernelFType(
+            "concat_buffer_with_self", (NumpyBufferFType(ftypes.float64),), finch.none_
+        ),
     )
     k(b)
     result = b.arr
@@ -145,7 +148,12 @@ def test_codegen(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("test_function", finch.intp),
+                asm.Variable(
+                    "test_function",
+                    asm.AssemblyKernelFType(
+                        "test_function", (a_var.result_type,), finch.intp
+                    ),
+                ),
                 (a_var,),
                 asm.Block(
                     (
@@ -213,7 +221,14 @@ def test_dot_product_malloc(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -289,7 +304,10 @@ def test_malloc_resize(compiler, new_size):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("length", finch.intp),
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
                 (ab_v,),
                 asm.Block(
                     (
@@ -336,7 +354,14 @@ def test_dot_product(compiler, buffer):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -413,7 +438,14 @@ def test_dot_product_regression_malloc(compiler, extension, buffer, file_regress
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -482,7 +514,14 @@ def test_dot_product_regression(compiler, extension, buffer, file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -542,7 +581,9 @@ def test_if_statement(compiler):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finch.int64),
+                asm.Variable(
+                    "if_else", asm.AssemblyKernelFType("if_else", (), finch.int64)
+                ),
                 (),
                 asm.Block(
                     (
@@ -629,7 +670,14 @@ def test_simple_struct(compiler):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("simple_struct", finch.float64),
+                    asm.Variable(
+                        "simple_struct",
+                        asm.AssemblyKernelFType(
+                            "simple_struct",
+                            (p_var.result_type, x_var.result_type),
+                            finch.float64,
+                        ),
+                    ),
                     (p_var, x_var),
                     asm.Block(
                         (
@@ -694,7 +742,14 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
     mod = asm.Module(
         (
             asm.Function(
-                asm.Variable("finch_access", ab_safe.ftype.element_type),
+                asm.Variable(
+                    "finch_access",
+                    asm.AssemblyKernelFType(
+                        "finch_access",
+                        (ab_v.result_type, idx.result_type),
+                        ab_safe.ftype.element_type,
+                    ),
+                ),
                 (ab_v, idx),
                 asm.Block(
                     (
@@ -714,7 +769,14 @@ def test_safe_loadstore_regression(compiler, extension, platform, file_regressio
                 ),
             ),
             asm.Function(
-                asm.Variable("finch_change", ab_safe.ftype.element_type),
+                asm.Variable(
+                    "finch_change",
+                    asm.AssemblyKernelFType(
+                        "finch_change",
+                        (ab_v.result_type, idx.result_type, val.result_type),
+                        ab_safe.ftype.element_type,
+                    ),
+                ),
                 (ab_v, idx, val),
                 asm.Block(
                     (
@@ -787,7 +849,12 @@ def test_numba_load_safebuffer(size, idx, compiler):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("finch_access", ab.ftype.element_type),
+                    asm.Variable(
+                        "finch_access",
+                        asm.AssemblyKernelFType(
+                            "finch_access", (ab_v.result_type,), ab.ftype.element_type
+                        ),
+                    ),
                     (ab_v,),
                     asm.Block(
                         (
@@ -836,7 +903,12 @@ def test_numba_store_safebuffer(size, idx, value, compiler):
         asm.Module(
             (
                 asm.Function(
-                    asm.Variable("finch_change", ab.ftype.element_type),
+                    asm.Variable(
+                        "finch_change",
+                        asm.AssemblyKernelFType(
+                            "finch_change", (ab_v.result_type,), ab.ftype.element_type
+                        ),
+                    ),
                     (ab_v,),
                     asm.Block(
                         (
@@ -1095,7 +1167,14 @@ def test_matmul_mlir_regression(file_regression):
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("matmul", ftypes.none_),
+                asm.Variable(
+                    "matmul",
+                    asm.AssemblyKernelFType(
+                        "matmul",
+                        (a_v.result_type, b_v.result_type, c_v.result_type),
+                        ftypes.none_,
+                    ),
+                ),
                 (a_v, b_v, c_v),
                 asm.Block(
                     (
@@ -1197,7 +1276,10 @@ def test_mlir_resize_not_supported():
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("grow", ftypes.none_),
+                asm.Variable(
+                    "grow",
+                    asm.AssemblyKernelFType("grow", (b_v.result_type,), ftypes.none_),
+                ),
                 (b_v,),
                 asm.Block(
                     (
@@ -1404,7 +1486,14 @@ def test_mlir_ifelse_branch_local_var():
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("kern", ftypes.none_),
+                asm.Variable(
+                    "kern",
+                    asm.AssemblyKernelFType(
+                        "kern",
+                        (b_v.result_type, c_v.result_type, x_v.result_type),
+                        ftypes.none_,
+                    ),
+                ),
                 (b_v, c_v, x_v),
                 asm.Block(
                     (
@@ -1453,7 +1542,12 @@ def test_mlir_setattr_in_while():
     prgm = asm.Module(
         (
             asm.Function(
-                asm.Variable("advance", ftype(np.float64)),
+                asm.Variable(
+                    "advance",
+                    asm.AssemblyKernelFType(
+                        "advance", (p_var.result_type,), ftype(np.float64)
+                    ),
+                ),
                 (p_var,),
                 asm.Block(
                     (
@@ -1507,7 +1601,14 @@ def test_init_write_preserves_existing_value(compiler):
     program = asm.Module(
         (
             asm.Function(
-                asm.Variable("write", finch.int64),
+                asm.Variable(
+                    "write",
+                    asm.AssemblyKernelFType(
+                        "write",
+                        (x.result_type, y.result_type),
+                        finch.int64,
+                    ),
+                ),
                 (x, y),
                 asm.Block(
                     (

@@ -52,7 +52,14 @@ def test_full_compiler():
     program = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("read_full", buf.ftype),
+                ntn.Variable(
+                    "read_full",
+                    asm.AssemblyKernelFType(
+                        "read_full",
+                        (output.result_type, value.result_type),
+                        buf.ftype,
+                    ),
+                ),
                 (output, value),
                 ntn.Block(
                     (

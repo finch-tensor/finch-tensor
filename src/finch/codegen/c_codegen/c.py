@@ -151,8 +151,10 @@ class CKernel(asm.AssemblyKernel):
     A class to represent a C kernel.
     """
 
-    def __init__(self, c_function, ret_type, argtypes):
+    def __init__(self, c_function, type_):
+        super().__init__(type_)
         self.c_function = c_function
+        ret_type, argtypes = type_.result_type, type_.arg_types
         self.ret_type = ret_type
         self.argtypes = argtypes
         self.c_args = tuple(
@@ -236,10 +238,8 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
             )
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    # return_t = c_type(return_t)
-                    arg_ts = [arg.result_type for arg in args]
-                    kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
+                    kern = CKernel(getattr(lib, func_name), func_type)
                     kernels[func_name] = kern
                 case _:
                     raise NotImplementedError(
@@ -365,6 +365,16 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
     """
     op_type = op.result_type
     match op_type:
+        case asm.AssemblyKernelFType():
+            op_type.return_type(*(arg.result_type for arg in args))
+            callee = ctx.cache("callee", op)
+            values = []
+            for arg in args:
+                if c_type(arg.result_type) is None:
+                    ctx.exec(f"{ctx.feed}(void)({ctx(arg)});")
+                else:
+                    values.append(ctx(arg))
+            return f"{ctx(callee)}({', '.join(values)})"
         case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
             return ctx(args[0])
         case ffuncs._OverwriteFType():
@@ -482,6 +492,11 @@ def c_type(t: FType) -> Any:
         The corresponding ctypes type, or None for values with no runtime data.
     """
     match t:
+        case asm.AssemblyKernelFType():
+            return ctypes.CFUNCTYPE(
+                c_type(t.result_type),
+                *(c_type(arg) for arg in t.arg_types if c_type(arg) is not None),
+            )
         case CArgumentFType():
             return t.c_type()
         case algebra.int_:
@@ -818,11 +833,11 @@ class CContext(Context):
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
                 return buf_t.c_store(self, self.resolve(buf), idx, val)
-            case asm.Resize(buf, len):
+            case asm.Resize(buf, size):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_resize(self, self.resolve(buf), len)
+                return buf_t.c_resize(self, self.resolve(buf), size)
             case asm.Length(buf):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
@@ -906,7 +921,11 @@ class CContext(Context):
                     f"else {{\n{else_body_code}\n{feed}}}"
                 )
                 return None
-            case asm.Function(asm.Variable(func_name, return_t), args, body):
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:
@@ -943,6 +962,20 @@ class CContext(Context):
                 self.exec(f"{feed}break;")
                 return None
             case asm.Module(funcs):
+                if len(funcs) > 1:
+                    for func in funcs:
+                        type_ = func.name.result_type
+                        assert isinstance(type_, asm.AssemblyKernelFType)
+                        ret = self.ctype_name(c_type(type_.result_type))
+                        args = (
+                            ", ".join(
+                                self.ctype_name(c_type(t))
+                                for t in type_.arg_types
+                                if c_type(t) is not None
+                            )
+                            or "void"
+                        )
+                        self.add_header(f"FINCH_EXPORT {ret} {func.name.name}({args});")
                 for func in funcs:
                     if not isinstance(func, asm.Function):
                         raise NotImplementedError(
@@ -1056,6 +1089,8 @@ def serialize_to_c(fmt: FType, obj: Any) -> Any:
     if c_type(fmt) is None:
         return None
     match fmt:
+        case asm.AssemblyKernelFType():
+            return ctypes.cast(obj.c_function, c_type(fmt))
         case CArgumentFType():
             return fmt.serialize_to_c(obj)
         case algebra.ftypes.FDTypeNumpy():
@@ -1129,6 +1164,8 @@ def construct_from_c(fmt: FType, c_obj: Any) -> Any:
         An instance of the original object type.
     """
     match fmt:
+        case asm.AssemblyKernelFType():
+            return CKernel(c_obj, fmt)
         case CArgumentFType():
             return fmt.construct_from_c(c_obj)
         case algebra.ftypes.FDTypeNumpy():

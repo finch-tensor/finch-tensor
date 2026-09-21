@@ -650,7 +650,13 @@ class AssemblyContext(Context):
                     asm.IfElse(cond_e, asm.Block(ctx_2.emit()), asm.Block(ctx_3.emit()))
                 )
                 return None
-            case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+            case ntn.Function(
+                ntn.Variable(
+                    func_n, asm.AssemblyKernelFType(result_type=ret_t) as func_type
+                ),
+                args,
+                body,
+            ):
                 ctx = self.scope()
                 ctx.func_state = HaltState(
                     return_var=asm.Variable(ctx.freshen(f"{func_n}_return"), ret_t)
@@ -659,7 +665,7 @@ class AssemblyContext(Context):
                 blk(body)
                 self.exec(
                     asm.Function(
-                        asm.Variable(func_n, ret_t),
+                        asm.Variable(func_n, func_type),
                         tuple(ctx(arg) for arg in args),
                         asm.Block((*blk.emit(), asm.Return(ctx.func_state.return_var))),
                     )

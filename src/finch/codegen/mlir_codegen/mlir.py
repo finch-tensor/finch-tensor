@@ -89,11 +89,12 @@ class MLIRKernel(asm.AssemblyKernel):
 
     """
 
-    def __init__(self, engine, func_name, ret_type, argtypes):
+    def __init__(self, engine, func_name, type_):
+        super().__init__(type_)
         self.engine = engine
         self.func_name = func_name
-        self.ret_type = ret_type
-        self.argtypes = argtypes
+        self.ret_type = type_.result_type
+        self.argtypes = type_.arg_types
 
     def __call__(self, *args):
         if len(args) != len(self.argtypes):
@@ -193,7 +194,13 @@ class MLIRForm(Form):
     @classmethod
     def validate_function(cls, func):
         match func:
-            case asm.Function(asm.Variable(func_name, return_type), args, body):
+            case asm.Function(
+                asm.Variable(
+                    func_name, asm.AssemblyKernelFType(result_type=return_type)
+                ),
+                args,
+                body,
+            ):
                 pass
             case _:
                 raise TypeError(f"MLIR backend expects asm.Function, got {func}")
@@ -288,13 +295,11 @@ class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
         kernels = {}
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    arg_ts = [arg.result_type for arg in args]
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
                     kernels[func_name] = MLIRKernel(
                         engine,
                         func_name,
-                        return_t,
-                        arg_ts,
+                        func_type,
                     )
                 case _:
                     raise NotImplementedError(
@@ -503,9 +508,39 @@ def mlir_same(ctx, x, y, x_type, y_type):
             raise NotImplementedError(f"Cannot compare {x_type} and {y_type}")
 
 
-def mlir_function_call(op, ctx, *args: Any) -> str:
+def mlir_function_call(op, ctx, *args: Any) -> str | None:
     op_type = op.result_type
     match op_type:
+        case asm.AssemblyKernelFType():
+            ret = op_type.return_type(*(arg.result_type for arg in args))
+            callee = ctx(op)
+            values = [ctx(arg) for arg in args]
+            signature = mlir_type(op_type)
+            if isinstance(ret, StructFType):
+                ptr = ctx.new_ssa()
+                count = ctx.constant(1, "i64")
+                ctx.exec(
+                    f"{ctx.feed}{ptr} = llvm.alloca {count} x {mlir_type(ret)} "
+                    ": (i64) -> !llvm.ptr"
+                )
+                values.append(ptr)
+                ctx.exec(
+                    f"{ctx.feed}func.call_indirect {callee}({', '.join(values)}) "
+                    f": {signature}"
+                )
+                result = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{result} = llvm.load {ptr} "
+                    f": !llvm.ptr -> {mlir_type(ret)}"
+                )
+                return result
+            result = ctx.new_ssa() if ret != algebra.none_ else None
+            assignment = f"{result} = " if result is not None else ""
+            ctx.exec(
+                f"{ctx.feed}{assignment}func.call_indirect {callee}"
+                f"({', '.join(values)}) : {signature}"
+            )
+            return result
         case MLIROperator():
             return op_type.mlir_function_call(op, ctx, *args)
         case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
@@ -685,6 +720,16 @@ def mlir_type(t: FType):
     Convert an FType into the MLIR type string
     """
     match t:
+        case asm.AssemblyKernelFType():
+            args = [mlir_type(arg) for arg in t.arg_types]
+            if isinstance(t.result_type, StructFType):
+                args.append("!llvm.ptr")
+                ret = "()"
+            else:
+                ret = (
+                    "()" if t.result_type == algebra.none_ else mlir_type(t.result_type)
+                )
+            return f"({', '.join(args)}) -> {ret}"
         case MLIRArgumentFType():
             return t.mlir_type()
         case algebra.bool_:
@@ -1014,7 +1059,12 @@ class MLIRContext(Context):
             case asm.Variable(name, _):
                 if name not in self.bindings:
                     raise ValueError(f"Variable does not exist: {name!r}")
-                return self.bindings[name][0]
+                value, type_ = self.bindings[name]
+                if value.startswith("@"):
+                    result = self.new_ssa()
+                    self.exec(f"{feed}{result} = func.constant {value} : {type_}")
+                    return result
+                return value
 
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 v = self(val)
@@ -1425,7 +1475,11 @@ class MLIRContext(Context):
 
                 return None
 
-            case asm.Function(asm.Variable(func_name, return_t), args, body):
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
                 ctx_2 = self.subblock()
                 statement = []
                 for arg in args:
@@ -1462,6 +1516,8 @@ class MLIRContext(Context):
 
             case asm.Return(value):
                 if value.result_type == algebra.none_:
+                    if not isinstance(value, asm.Literal):
+                        self(value)
                     self.exec(f"{feed}func.return")
                 elif isinstance(value.result_type, StructFType):
                     v = self(value)
@@ -1477,6 +1533,11 @@ class MLIRContext(Context):
                 return None
 
             case asm.Module(funcs):
+                for func in funcs:
+                    self.bindings[func.name.name] = (
+                        f"@{func.name.name}",
+                        mlir_type(func.name.result_type),
+                    )
                 for func in funcs:
                     if not isinstance(func, asm.Function):
                         raise NotImplementedError(

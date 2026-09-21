@@ -13,6 +13,8 @@ struct CNumpyBuffer {
     uint64_t length;
     fptr resize;
 };
+FINCH_EXPORT int64_t finch_access(struct CNumpyBuffer*, int64_t);
+FINCH_EXPORT int64_t finch_change(struct CNumpyBuffer*, int64_t, int64_t);
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

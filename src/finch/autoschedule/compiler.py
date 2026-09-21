@@ -16,7 +16,7 @@ from finch.algebra import (
 )
 from finch.algebra.tensor import TensorFType
 from finch.compile.lower import make_extent
-from finch.finch_assembly import AssemblyLibrary
+from finch.finch_assembly import AssemblyKernelFType, AssemblyLibrary
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -421,7 +421,14 @@ class NotationGenerator(LogicNotationLowerer):
         return ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("main", ret_t),
+                    ntn.Variable(
+                        "main",
+                        AssemblyKernelFType(
+                            "main",
+                            tuple(arg.result_type for arg in args.values()),
+                            ret_t,
+                        ),
+                    ),
                     tuple(args.values()),
                     ntn.Block((*preamble, body)),
                 ),

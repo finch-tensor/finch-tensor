@@ -9,7 +9,7 @@ from finch.compile import (
     NotationCompiler,
     make_extent,
 )
-from finch.finch_assembly import AssemblyInterpreter
+from finch.finch_assembly import AssemblyInterpreter, AssemblyKernelFType
 from finch.symbolic import Reflector
 from finch.tensor import BufferizedNDArray
 
@@ -70,7 +70,14 @@ def test_matrix_multiplication(a, b):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", a_format),
+                ntn.Variable(
+                    "matmul",
+                    AssemblyKernelFType(
+                        "matmul",
+                        (C.result_type, A.result_type, B.result_type),
+                        a_format,
+                    ),
+                ),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -190,7 +197,14 @@ def test_matrix_multiplication_regression(file_regression):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", a_format),
+                ntn.Variable(
+                    "matmul",
+                    AssemblyKernelFType(
+                        "matmul",
+                        (C.result_type, A.result_type, B.result_type),
+                        a_format,
+                    ),
+                ),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -295,7 +309,14 @@ def test_if_in_loop_is_lowered():
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("masked_copy", vec_format),
+                ntn.Variable(
+                    "masked_copy",
+                    AssemblyKernelFType(
+                        "masked_copy",
+                        (OUT.result_type, A.result_type),
+                        vec_format,
+                    ),
+                ),
                 (OUT, A),
                 ntn.Block(
                     (
