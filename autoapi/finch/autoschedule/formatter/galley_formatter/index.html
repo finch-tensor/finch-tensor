@@ -9,25 +9,25 @@
       
       
       
-        <link rel="prev" href="../lower/">
+        <link rel="prev" href="../formatter/">
       
       
-        <link rel="next" href="../../compile_jl/">
+        <link rel="next" href="../smart_formatter/">
       
       
         
       
       
-      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <link rel="icon" href="../../../../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>stages - Finch Tensor</title>
+        <title>galley_formatter - Finch Tensor</title>
       
     
     
-      <link rel="stylesheet" href="../../../../assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../../../../assets/stylesheets/main.ec1eaa64.min.css">
       
       
 
@@ -46,9 +46,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../../../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#finch.compile.stages" class="md-skip">
+        <a href="#finch.autoschedule.formatter.galley_formatter" class="md-skip">
           Skip to content
         </a>
       
@@ -82,7 +82,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../.." title="Finch Tensor" class="md-header__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
+    <a href="../../../../.." title="Finch Tensor" class="md-header__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              stages
+              galley_formatter
             
           </span>
         </div>
@@ -152,7 +152,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../.." title="Finch Tensor" class="md-nav__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
+    <a href="../../../../.." title="Finch Tensor" class="md-nav__button md-logo" aria-label="Finch Tensor" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -182,7 +182,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../.." class="md-nav__link">
+      <a href="../../../../.." class="md-nav__link">
         
   
   
@@ -285,7 +285,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../conftest/" class="md-nav__link">
+      <a href="../../../../conftest/" class="md-nav__link">
         
   
   
@@ -409,7 +409,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/algebra/" class="md-nav__link">
+      <a href="../../../algebra/algebra/" class="md-nav__link">
         
   
   
@@ -437,7 +437,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/devices/" class="md-nav__link">
+      <a href="../../../algebra/devices/" class="md-nav__link">
         
   
   
@@ -465,7 +465,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ffuncs/" class="md-nav__link">
+      <a href="../../../algebra/ffuncs/" class="md-nav__link">
         
   
   
@@ -493,7 +493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/fill/" class="md-nav__link">
+      <a href="../../../algebra/fill/" class="md-nav__link">
         
   
   
@@ -521,7 +521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/ftypes/" class="md-nav__link">
+      <a href="../../../algebra/ftypes/" class="md-nav__link">
         
   
   
@@ -549,7 +549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/tensor/" class="md-nav__link">
+      <a href="../../../algebra/tensor/" class="md-nav__link">
         
   
   
@@ -577,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../algebra/utils/" class="md-nav__link">
+      <a href="../../../algebra/utils/" class="md-nav__link">
         
   
   
@@ -613,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../array_namespace_info/" class="md-nav__link">
+      <a href="../../../array_namespace_info/" class="md-nav__link">
         
   
   
@@ -638,18 +638,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2_3" id="__nav_3_2_3_label" tabindex="0">
@@ -670,7 +672,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -688,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/cache/" class="md-nav__link">
+      <a href="../../cache/" class="md-nav__link">
         
   
   
@@ -716,7 +718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/capture/" class="md-nav__link">
+      <a href="../../capture/" class="md-nav__link">
         
   
   
@@ -744,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/compiler/" class="md-nav__link">
+      <a href="../../compiler/" class="md-nav__link">
         
   
   
@@ -772,7 +774,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/default_schedulers/" class="md-nav__link">
+      <a href="../../default_schedulers/" class="md-nav__link">
         
   
   
@@ -800,7 +802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/einsum/" class="md-nav__link">
+      <a href="../../einsum/" class="md-nav__link">
         
   
   
@@ -828,7 +830,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/executor/" class="md-nav__link">
+      <a href="../../executor/" class="md-nav__link">
         
   
   
@@ -950,7 +952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/galley_factorizer/annotated_query/" class="md-nav__link">
+      <a href="../../factorizer/galley_factorizer/annotated_query/" class="md-nav__link">
         
   
   
@@ -978,7 +980,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/galley_factorizer/branch_and_bound/" class="md-nav__link">
+      <a href="../../factorizer/galley_factorizer/branch_and_bound/" class="md-nav__link">
         
   
   
@@ -1006,7 +1008,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/galley_factorizer/galley_optimize/" class="md-nav__link">
+      <a href="../../factorizer/galley_factorizer/galley_optimize/" class="md-nav__link">
         
   
   
@@ -1034,7 +1036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/galley_factorizer/greedy_optimizer/" class="md-nav__link">
+      <a href="../../factorizer/galley_factorizer/greedy_optimizer/" class="md-nav__link">
         
   
   
@@ -1062,7 +1064,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/galley_factorizer/query_normalization/" class="md-nav__link">
+      <a href="../../factorizer/galley_factorizer/query_normalization/" class="md-nav__link">
         
   
   
@@ -1098,7 +1100,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/factorizer/optimize/" class="md-nav__link">
+      <a href="../../factorizer/optimize/" class="md-nav__link">
         
   
   
@@ -1131,18 +1133,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_3_8" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2_3_8" id="__nav_3_2_3_8_label" tabindex="0">
@@ -1163,7 +1167,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_8_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_3_2_3_8_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2_3_8">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1181,7 +1185,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/formatter/formatter/" class="md-nav__link">
+      <a href="../formatter/" class="md-nav__link">
         
   
   
@@ -1206,10 +1210,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../autoschedule/formatter/galley_formatter/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    galley_formatter
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1225,6 +1254,101 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        galley_formatter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.GalleyFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GalleyFormatter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.LevelFormat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LevelFormat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.estimate_nnz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_nnz
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.fully_compat_with_loop_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fully_compat_with_loop_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.query_loop_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        query_loop_order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.select_output_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_output_format
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1237,7 +1361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/formatter/smart_formatter/" class="md-nav__link">
+      <a href="../smart_formatter/" class="md-nav__link">
         
   
   
@@ -1320,7 +1444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/loop_orderer/loop_order_bnb/" class="md-nav__link">
+      <a href="../../loop_orderer/loop_order_bnb/" class="md-nav__link">
         
   
   
@@ -1348,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/loop_orderer/loop_order_cost/" class="md-nav__link">
+      <a href="../../loop_orderer/loop_order_cost/" class="md-nav__link">
         
   
   
@@ -1376,7 +1500,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/loop_orderer/loop_order_greedy/" class="md-nav__link">
+      <a href="../../loop_orderer/loop_order_greedy/" class="md-nav__link">
         
   
   
@@ -1404,7 +1528,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/loop_orderer/loop_ordering/" class="md-nav__link">
+      <a href="../../loop_orderer/loop_ordering/" class="md-nav__link">
         
   
   
@@ -1440,7 +1564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/normalize/" class="md-nav__link">
+      <a href="../../normalize/" class="md-nav__link">
         
   
   
@@ -1468,7 +1592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/stages/" class="md-nav__link">
+      <a href="../../stages/" class="md-nav__link">
         
   
   
@@ -1543,7 +1667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/blocked_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/blocked_stats/" class="md-nav__link">
         
   
   
@@ -1571,7 +1695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/blocked_uniform/" class="md-nav__link">
+      <a href="../../tensor_stats/blocked_uniform/" class="md-nav__link">
         
   
   
@@ -1599,7 +1723,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/bound_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/bound_stats/" class="md-nav__link">
         
   
   
@@ -1627,7 +1751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/dense_stat/" class="md-nav__link">
+      <a href="../../tensor_stats/dense_stat/" class="md-nav__link">
         
   
   
@@ -1655,7 +1779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/dummy_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/dummy_stats/" class="md-nav__link">
         
   
   
@@ -1683,7 +1807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/exact_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/exact_stats/" class="md-nav__link">
         
   
   
@@ -1711,7 +1835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/fd_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/fd_stats/" class="md-nav__link">
         
   
   
@@ -1739,7 +1863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/logic_to_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/logic_to_stats/" class="md-nav__link">
         
   
   
@@ -1767,7 +1891,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/numeric_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/numeric_stats/" class="md-nav__link">
         
   
   
@@ -1795,7 +1919,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/sampling_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/sampling_stats/" class="md-nav__link">
         
   
   
@@ -1823,7 +1947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/stats_interpreter/" class="md-nav__link">
+      <a href="../../tensor_stats/stats_interpreter/" class="md-nav__link">
         
   
   
@@ -1851,7 +1975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/tensor_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/tensor_stats/" class="md-nav__link">
         
   
   
@@ -1879,7 +2003,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/uniform_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/uniform_stats/" class="md-nav__link">
         
   
   
@@ -1907,7 +2031,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/util/" class="md-nav__link">
+      <a href="../../tensor_stats/util/" class="md-nav__link">
         
   
   
@@ -1935,7 +2059,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/tensor_stats/vp_stats/" class="md-nav__link">
+      <a href="../../tensor_stats/vp_stats/" class="md-nav__link">
         
   
   
@@ -1971,7 +2095,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../autoschedule/util/" class="md-nav__link">
+      <a href="../../util/" class="md-nav__link">
         
   
   
@@ -2101,7 +2225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/malloc_buffer/" class="md-nav__link">
+      <a href="../../../codegen/buffers/malloc_buffer/" class="md-nav__link">
         
   
   
@@ -2129,7 +2253,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/numpy_buffer/" class="md-nav__link">
+      <a href="../../../codegen/buffers/numpy_buffer/" class="md-nav__link">
         
   
   
@@ -2157,7 +2281,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
+      <a href="../../../codegen/buffers/safe_buffer/" class="md-nav__link">
         
   
   
@@ -2240,7 +2364,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/c_codegen/c/" class="md-nav__link">
+      <a href="../../../codegen/c_codegen/c/" class="md-nav__link">
         
   
   
@@ -2268,7 +2392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/c_codegen/stages/" class="md-nav__link">
+      <a href="../../../codegen/c_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2351,7 +2475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/mlir/" class="md-nav__link">
+      <a href="../../../codegen/mlir_codegen/mlir/" class="md-nav__link">
         
   
   
@@ -2379,7 +2503,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
+      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
         
   
   
@@ -2407,7 +2531,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/stages/" class="md-nav__link">
+      <a href="../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2490,7 +2614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/numba_codegen/numba/" class="md-nav__link">
+      <a href="../../../codegen/numba_codegen/numba/" class="md-nav__link">
         
   
   
@@ -2518,7 +2642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/numba_codegen/stages/" class="md-nav__link">
+      <a href="../../../codegen/numba_codegen/stages/" class="md-nav__link">
         
   
   
@@ -2559,20 +2683,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_5" >
         
           
           <label class="md-nav__link" for="__nav_3_2_5" id="__nav_3_2_5_label" tabindex="0">
@@ -2593,7 +2715,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_2_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2611,7 +2733,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../extents/" class="md-nav__link">
+      <a href="../../../compile/extents/" class="md-nav__link">
         
   
   
@@ -2639,7 +2761,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../looplets/" class="md-nav__link">
+      <a href="../../../compile/looplets/" class="md-nav__link">
         
   
   
@@ -2667,7 +2789,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lower/" class="md-nav__link">
+      <a href="../../../compile/lower/" class="md-nav__link">
         
   
   
@@ -2692,35 +2814,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    stages
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../../compile/stages/" class="md-nav__link">
         
   
   
@@ -2736,63 +2833,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#finch.compile.stages" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        stages
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#finch.compile.stages.NotationLowerer" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        NotationLowerer
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="NotationLowerer">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile.stages.NotationLowerer.lower" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        lower
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2860,7 +2900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/buffer/" class="md-nav__link">
+      <a href="../../../compile_jl/buffer/" class="md-nav__link">
         
   
   
@@ -2888,7 +2928,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/compiler/" class="md-nav__link">
+      <a href="../../../compile_jl/compiler/" class="md-nav__link">
         
   
   
@@ -2916,7 +2956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/interop/" class="md-nav__link">
+      <a href="../../../compile_jl/interop/" class="md-nav__link">
         
   
   
@@ -2944,7 +2984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/julia/" class="md-nav__link">
+      <a href="../../../compile_jl/julia/" class="md-nav__link">
         
   
   
@@ -2972,7 +3012,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/profiling/" class="md-nav__link">
+      <a href="../../../compile_jl/profiling/" class="md-nav__link">
         
   
   
@@ -3000,7 +3040,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/types/" class="md-nav__link">
+      <a href="../../../compile_jl/types/" class="md-nav__link">
         
   
   
@@ -3083,7 +3123,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/buffer/" class="md-nav__link">
+      <a href="../../../finch_assembly/buffer/" class="md-nav__link">
         
   
   
@@ -3111,7 +3151,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/cfg_builder/" class="md-nav__link">
+      <a href="../../../finch_assembly/cfg_builder/" class="md-nav__link">
         
   
   
@@ -3139,7 +3179,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/dataflow/" class="md-nav__link">
+      <a href="../../../finch_assembly/dataflow/" class="md-nav__link">
         
   
   
@@ -3167,7 +3207,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/interpreter/" class="md-nav__link">
+      <a href="../../../finch_assembly/interpreter/" class="md-nav__link">
         
   
   
@@ -3195,7 +3235,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/nodes/" class="md-nav__link">
+      <a href="../../../finch_assembly/nodes/" class="md-nav__link">
         
   
   
@@ -3223,7 +3263,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/parser/" class="md-nav__link">
+      <a href="../../../finch_assembly/parser/" class="md-nav__link">
         
   
   
@@ -3251,7 +3291,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/simplification/" class="md-nav__link">
+      <a href="../../../finch_assembly/simplification/" class="md-nav__link">
         
   
   
@@ -3279,7 +3319,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/stages/" class="md-nav__link">
+      <a href="../../../finch_assembly/stages/" class="md-nav__link">
         
   
   
@@ -3307,7 +3347,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/struct_slots/" class="md-nav__link">
+      <a href="../../../finch_assembly/struct_slots/" class="md-nav__link">
         
   
   
@@ -3335,7 +3375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/type_checker/" class="md-nav__link">
+      <a href="../../../finch_assembly/type_checker/" class="md-nav__link">
         
   
   
@@ -3363,7 +3403,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_assembly/utils/" class="md-nav__link">
+      <a href="../../../finch_assembly/utils/" class="md-nav__link">
         
   
   
@@ -3446,7 +3486,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/interpreter/" class="md-nav__link">
+      <a href="../../../finch_einsum/interpreter/" class="md-nav__link">
         
   
   
@@ -3474,7 +3514,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/nodes/" class="md-nav__link">
+      <a href="../../../finch_einsum/nodes/" class="md-nav__link">
         
   
   
@@ -3502,7 +3542,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/parser/" class="md-nav__link">
+      <a href="../../../finch_einsum/parser/" class="md-nav__link">
         
   
   
@@ -3530,7 +3570,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_einsum/stages/" class="md-nav__link">
+      <a href="../../../finch_einsum/stages/" class="md-nav__link">
         
   
   
@@ -3613,7 +3653,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/cfg_builder/" class="md-nav__link">
+      <a href="../../../finch_fused/cfg_builder/" class="md-nav__link">
         
   
   
@@ -3641,7 +3681,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/dataflow/" class="md-nav__link">
+      <a href="../../../finch_fused/dataflow/" class="md-nav__link">
         
   
   
@@ -3669,7 +3709,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/jit/" class="md-nav__link">
+      <a href="../../../finch_fused/jit/" class="md-nav__link">
         
   
   
@@ -3697,7 +3737,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/nodes/" class="md-nav__link">
+      <a href="../../../finch_fused/nodes/" class="md-nav__link">
         
   
   
@@ -3725,7 +3765,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_fused/parser/" class="md-nav__link">
+      <a href="../../../finch_fused/parser/" class="md-nav__link">
         
   
   
@@ -3808,7 +3848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/interpreter/" class="md-nav__link">
+      <a href="../../../finch_logic/interpreter/" class="md-nav__link">
         
   
   
@@ -3836,7 +3876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/nodes/" class="md-nav__link">
+      <a href="../../../finch_logic/nodes/" class="md-nav__link">
         
   
   
@@ -3864,7 +3904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/simplification/" class="md-nav__link">
+      <a href="../../../finch_logic/simplification/" class="md-nav__link">
         
   
   
@@ -3892,7 +3932,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/stages/" class="md-nav__link">
+      <a href="../../../finch_logic/stages/" class="md-nav__link">
         
   
   
@@ -3920,7 +3960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_logic/tensor_stats/" class="md-nav__link">
+      <a href="../../../finch_logic/tensor_stats/" class="md-nav__link">
         
   
   
@@ -4003,7 +4043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/cfg_builder/" class="md-nav__link">
+      <a href="../../../finch_notation/cfg_builder/" class="md-nav__link">
         
   
   
@@ -4031,7 +4071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/interpreter/" class="md-nav__link">
+      <a href="../../../finch_notation/interpreter/" class="md-nav__link">
         
   
   
@@ -4059,7 +4099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/nodes/" class="md-nav__link">
+      <a href="../../../finch_notation/nodes/" class="md-nav__link">
         
   
   
@@ -4087,7 +4127,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/proves/" class="md-nav__link">
+      <a href="../../../finch_notation/proves/" class="md-nav__link">
         
   
   
@@ -4115,7 +4155,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/simplification/" class="md-nav__link">
+      <a href="../../../finch_notation/simplification/" class="md-nav__link">
         
   
   
@@ -4143,7 +4183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../finch_notation/stages/" class="md-nav__link">
+      <a href="../../../finch_notation/stages/" class="md-nav__link">
         
   
   
@@ -4226,7 +4266,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/eager/" class="md-nav__link">
+      <a href="../../../interface/eager/" class="md-nav__link">
         
   
   
@@ -4254,7 +4294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/fft/" class="md-nav__link">
+      <a href="../../../interface/fft/" class="md-nav__link">
         
   
   
@@ -4282,7 +4322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/fuse/" class="md-nav__link">
+      <a href="../../../interface/fuse/" class="md-nav__link">
         
   
   
@@ -4310,7 +4350,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/lazy/" class="md-nav__link">
+      <a href="../../../interface/lazy/" class="md-nav__link">
         
   
   
@@ -4338,7 +4378,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../interface/linalg/" class="md-nav__link">
+      <a href="../../../interface/linalg/" class="md-nav__link">
         
   
   
@@ -4421,7 +4461,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/dataflow/" class="md-nav__link">
+      <a href="../../../symbolic/dataflow/" class="md-nav__link">
         
   
   
@@ -4449,7 +4489,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/environment/" class="md-nav__link">
+      <a href="../../../symbolic/environment/" class="md-nav__link">
         
   
   
@@ -4477,7 +4517,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/gensym/" class="md-nav__link">
+      <a href="../../../symbolic/gensym/" class="md-nav__link">
         
   
   
@@ -4505,7 +4545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/rewriters/" class="md-nav__link">
+      <a href="../../../symbolic/rewriters/" class="md-nav__link">
         
   
   
@@ -4533,7 +4573,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/simplification/" class="md-nav__link">
+      <a href="../../../symbolic/simplification/" class="md-nav__link">
         
   
   
@@ -4561,7 +4601,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/stage/" class="md-nav__link">
+      <a href="../../../symbolic/stage/" class="md-nav__link">
         
   
   
@@ -4589,7 +4629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/term/" class="md-nav__link">
+      <a href="../../../symbolic/term/" class="md-nav__link">
         
   
   
@@ -4617,7 +4657,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../symbolic/traversal/" class="md-nav__link">
+      <a href="../../../symbolic/traversal/" class="md-nav__link">
         
   
   
@@ -4700,7 +4740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/bufferized_ndarray/" class="md-nav__link">
+      <a href="../../../tensor/bufferized_ndarray/" class="md-nav__link">
         
   
   
@@ -4728,7 +4768,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/fiber_tensor/" class="md-nav__link">
+      <a href="../../../tensor/fiber_tensor/" class="md-nav__link">
         
   
   
@@ -4803,7 +4843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/dense_level/" class="md-nav__link">
+      <a href="../../../tensor/level/dense_level/" class="md-nav__link">
         
   
   
@@ -4831,7 +4871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/element_level/" class="md-nav__link">
+      <a href="../../../tensor/level/element_level/" class="md-nav__link">
         
   
   
@@ -4859,7 +4899,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/level/" class="md-nav__link">
+      <a href="../../../tensor/level/level/" class="md-nav__link">
         
   
   
@@ -4887,7 +4927,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_bytemap_level/" class="md-nav__link">
+      <a href="../../../tensor/level/sparse_bytemap_level/" class="md-nav__link">
         
   
   
@@ -4915,7 +4955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_coo_level/" class="md-nav__link">
+      <a href="../../../tensor/level/sparse_coo_level/" class="md-nav__link">
         
   
   
@@ -4943,7 +4983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_hash_level/" class="md-nav__link">
+      <a href="../../../tensor/level/sparse_hash_level/" class="md-nav__link">
         
   
   
@@ -4971,7 +5011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/level/sparse_list_level/" class="md-nav__link">
+      <a href="../../../tensor/level/sparse_list_level/" class="md-nav__link">
         
   
   
@@ -5007,7 +5047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/masks/" class="md-nav__link">
+      <a href="../../../tensor/masks/" class="md-nav__link">
         
   
   
@@ -5035,7 +5075,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/np_wrapper/" class="md-nav__link">
+      <a href="../../../tensor/np_wrapper/" class="md-nav__link">
         
   
   
@@ -5063,7 +5103,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/override_tensor/" class="md-nav__link">
+      <a href="../../../tensor/override_tensor/" class="md-nav__link">
         
   
   
@@ -5091,7 +5131,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/patterns/" class="md-nav__link">
+      <a href="../../../tensor/patterns/" class="md-nav__link">
         
   
   
@@ -5119,7 +5159,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/scalar/" class="md-nav__link">
+      <a href="../../../tensor/scalar/" class="md-nav__link">
         
   
   
@@ -5147,7 +5187,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tensor/traits/" class="md-nav__link">
+      <a href="../../../tensor/traits/" class="md-nav__link">
         
   
   
@@ -5230,7 +5270,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/cache/" class="md-nav__link">
+      <a href="../../../util/cache/" class="md-nav__link">
         
   
   
@@ -5258,7 +5298,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/config/" class="md-nav__link">
+      <a href="../../../util/config/" class="md-nav__link">
         
   
   
@@ -5286,7 +5326,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/logging/" class="md-nav__link">
+      <a href="../../../util/logging/" class="md-nav__link">
         
   
   
@@ -5314,7 +5354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../util/print/" class="md-nav__link">
+      <a href="../../../util/print/" class="md-nav__link">
         
   
   
@@ -5383,10 +5423,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#finch.compile.stages" class="md-nav__link">
+  <a href="#finch.autoschedule.formatter.galley_formatter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        stages
+        galley_formatter
       
     </span>
   </a>
@@ -5394,30 +5434,68 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.compile.stages.NotationLowerer" class="md-nav__link">
+  <a href="#finch.autoschedule.formatter.galley_formatter.GalleyFormatter" class="md-nav__link">
     <span class="md-ellipsis">
       
-        NotationLowerer
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="NotationLowerer">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile.stages.NotationLowerer.lower" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        lower
+        GalleyFormatter
       
     </span>
   </a>
   
 </li>
-        
-      </ul>
-    </nav>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.LevelFormat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LevelFormat
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.estimate_nnz" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        estimate_nnz
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.fully_compat_with_loop_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fully_compat_with_loop_prefix
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.query_loop_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        query_loop_order
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.galley_formatter.select_output_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        select_output_format
+      
+    </span>
+  </a>
   
 </li>
       
@@ -5441,14 +5519,21 @@
   
 
 
-  <h1>stages</h1>
+  <h1>galley_formatter</h1>
 
 <div class="doc doc-object doc-module">
 
 
 
-<a id="finch.compile.stages"></a>
+<a id="finch.autoschedule.formatter.galley_formatter"></a>
     <div class="doc doc-contents first">
+
+        <p>Output format selection matching Galley's physical optimizer.</p>
+<p>This is a direct port of <code>select_output_format</code> from
+<code>src/Galley/PhysicalOptimizer/format-selector.jl</code> in Finch.jl.  The Julia
+version stores levels innermost-index-first and therefore walks the output
+indices back to front; here <code>index_order[0]</code> is the outermost level, so the
+walk runs front to back and the resulting formats need no reversal.</p>
 
 
 
@@ -5473,8 +5558,8 @@
 
 
 
-<h2 id="finch.compile.stages.NotationLowerer" class="doc doc-heading">
-            <code>NotationLowerer</code>
+<h2 id="finch.autoschedule.formatter.galley_formatter.GalleyFormatter" class="doc doc-heading">
+            <code>GalleyFormatter</code>
 
 
 </h2>
@@ -5482,9 +5567,14 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="finch.symbolic.Stage">Stage</span></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="LogicFormatter (finch.autoschedule.stages.LogicFormatter)" href="../../stages/#finch.autoschedule.stages.LogicFormatter">LogicFormatter</a></code></p>
 
 
+
+        <p>A formatter which picks output formats the way Galley's physical optimizer
+does, choosing per level between dense, bytemap, hash, and sparse list
+based on the estimated sparsity of the output and the loop order it is
+built under.</p>
 
 
 
@@ -5494,18 +5584,194 @@
 
 
               <details class="mkdocstrings-source">
-                <summary>Source code in <code>src/finch/compile/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
-<span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationLowerer</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
-    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">asm</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Compile the given notation term into an assembly term.</span>
-<span class="sd">        """</span>
+                <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    A formatter which picks output formats the way Galley's physical optimizer</span>
+<span class="sd">    does, choosing per level between dense, bytemap, hash, and sparse list</span>
+<span class="sd">    based on the estimated sparsity of the output and the loop order it is</span>
+<span class="sd">    built under.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loader</span><span class="p">:</span> <span class="n">LogicLoader</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">loader</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">loader</span> <span class="o">=</span> <span class="n">MockLogicLoader</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">loader</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span>
+        <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="n">NumericStats</span><span class="p">,</span>
+        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
+        <span class="n">loop_order</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensorFType</span><span class="p">:</span>
+        <span class="n">output_indices</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">index_order</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape_type</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">output_indices</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shape_type</span><span class="p">)</span><span class="si">}</span><span class="s2"> shape dimensions for "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">output_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> stats dimensions."</span>
+            <span class="p">)</span>
+
+        <span class="n">formats</span> <span class="o">=</span> <span class="n">select_output_format</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">,</span> <span class="n">output_indices</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Galley formats for </span><span class="si">%s</span><span class="s2">: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">output_indices</span><span class="p">,</span> <span class="n">formats</span><span class="p">)</span>
+
+        <span class="n">lvl</span> <span class="o">=</span> <span class="n">element</span><span class="p">(</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">ftype</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">level</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">output_indices</span><span class="p">))):</span>
+            <span class="n">lvl</span> <span class="o">=</span> <span class="n">formats</span><span class="p">[</span><span class="n">level</span><span class="p">]</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">[</span><span class="n">level</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">fiber_tensor</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">NS</span><span class="p">],</span>
+        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
+    <span class="p">):</span>
+        <span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">stats_bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">NS</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">stats</span><span class="p">)</span>
+        <span class="n">stats_interpreter</span> <span class="o">=</span> <span class="n">StatsInterpreter</span><span class="p">(</span><span class="n">stats_factory</span><span class="o">=</span><span class="n">stats_factory</span><span class="p">)</span>
+        <span class="n">shape_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_shape_type</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">shape_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="p">)</span>
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_fill_value</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_value</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">formatter</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">:</span>
+            <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
+                    <span class="n">rhs_stats</span> <span class="o">=</span> <span class="n">stats_interpreter</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs_stats</span><span class="p">,</span> <span class="n">NumericStats</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"GalleyFormatter requires NumericStats."</span><span class="p">)</span>
+                    <span class="n">stats_bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">rhs_stats</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
+
+                    <span class="k">if</span> <span class="n">lhs</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
+                        <span class="n">shape_type</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                            <span class="n">ftype</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
+                            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape_types</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span>
+                        <span class="p">)</span>
+                        <span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tensor_ftype</span><span class="p">(</span>
+                            <span class="n">fill_values</span><span class="p">[</span><span class="n">lhs</span><span class="p">],</span>
+                            <span class="n">shape_type</span><span class="p">,</span>
+                            <span class="n">rhs_stats</span><span class="p">,</span>
+                            <span class="n">stats_factory</span><span class="p">,</span>
+                            <span class="n">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">),</span>
+                        <span class="p">)</span>
+
+                    <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
+                        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
+                            <span class="k">return</span> <span class="n">node</span>
+                        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                            <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">()))</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">():</span>
+                    <span class="k">return</span> <span class="n">node</span>
+                <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"Unsupported logic statement for formatting: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="p">)</span>
+
+        <span class="n">prgm</span> <span class="o">=</span> <span class="n">formatter</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5522,40 +5788,92 @@
 
 
 
-<div class="doc doc-object doc-function">
 
 
-<h3 id="finch.compile.stages.NotationLowerer.lower" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">lower</span><span class="p">(</span><span class="n">term</span><span class="p">)</span></code>
+  </div>
 
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
-  </span>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Compile the given notation term into an assembly term.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/compile/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">asm</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Compile the given notation term into an assembly term.</span>
-<span class="sd">    """</span>
-</code></pre></div></td></tr></table></div>
-            </details>
     </div>
 
 </div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.autoschedule.formatter.galley_formatter.LevelFormat" class="doc doc-heading">
+            <code>LevelFormat</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="enum.Enum" href="https://docs.python.org/3/library/enum.html#enum.Enum">Enum</a></code></p>
+
+
+
+        <p>The level formats Galley's format selector chooses between.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelFormat</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The level formats Galley's format selector chooses between."""</span>
+
+    <span class="n">DENSE</span> <span class="o">=</span> <span class="s2">"dense"</span>
+    <span class="n">BYTEMAP</span> <span class="o">=</span> <span class="s2">"bytemap"</span>
+    <span class="n">HASH</span> <span class="o">=</span> <span class="s2">"hash"</span>
+    <span class="n">SPARSE_LIST</span> <span class="o">=</span> <span class="s2">"sparse_list"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">dimension_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
+        <span class="k">match</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">DENSE</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">dense</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension_type</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">BYTEMAP</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">sparse_bytemap</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension_type</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">HASH</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">sparse_hash</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension_type</span><span class="p">,</span> <span class="n">single_writer</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">SPARSE_LIST</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">sparse_list</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension_type</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5565,6 +5883,279 @@
 
 </div>
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.formatter.galley_formatter.estimate_nnz" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">estimate_nnz</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Estimate the number of non-fill values of <code>stats</code> projected onto <code>indices</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">85</span>
+<span class="normal">86</span>
+<span class="normal">87</span>
+<span class="normal">88</span>
+<span class="normal">89</span>
+<span class="normal">90</span>
+<span class="normal">91</span>
+<span class="normal">92</span>
+<span class="normal">93</span>
+<span class="normal">94</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_nnz</span><span class="p">(</span>
+    <span class="n">stats</span><span class="p">:</span> <span class="n">NS</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span> <span class="n">indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Estimate the number of non-fill values of `stats` projected onto `indices`.</span>
+<span class="sd">    """</span>
+    <span class="n">reduce_fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">stats</span><span class="o">.</span><span class="n">index_order</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">reduce_fields</span><span class="p">:</span>
+        <span class="n">stats</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.formatter.galley_formatter.fully_compat_with_loop_prefix" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fully_compat_with_loop_prefix</span><span class="p">(</span><span class="n">tensor_order</span><span class="p">,</span> <span class="n">loop_prefix</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Whether <code>tensor_order</code> can be written sequentially under <code>loop_prefix</code>.</p>
+<p>Both are given outermost first.  A tensor deeper than the loop prefix is
+still compatible; a mismatch at any shared position is not.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fully_compat_with_loop_prefix</span><span class="p">(</span>
+    <span class="n">tensor_order</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">loop_prefix</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Whether `tensor_order` can be written sequentially under `loop_prefix`.</span>
+
+<span class="sd">    Both are given outermost first.  A tensor deeper than the loop prefix is</span>
+<span class="sd">    still compatible; a mismatch at any shared position is not.</span>
+<span class="sd">    """</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">tensor_order</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">loop_prefix</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="o">!=</span> <span class="n">loop_prefix</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.formatter.galley_formatter.query_loop_order" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The loop order a query's right hand side is evaluated under.</p>
+<p>Loop orders are carried by the <code>Reorder</code> node interior to an aggregate; a
+transpose query is looped in the order its input is stored.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    The loop order a query's right hand side is evaluated under.</span>
+
+<span class="sd">    Loop orders are carried by the `Reorder` node interior to an aggregate; a</span>
+<span class="sd">    transpose query is looped in the order its input is stored.</span>
+<span class="sd">    """</span>
+    <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">idxs</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">idxs</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">))),</span>
+            <span class="n">_</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="n">idxs</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">idxs</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.formatter.galley_formatter.select_output_format" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">select_output_format</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">,</span> <span class="n">output_indices</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Choose a level format for each of <code>output_indices</code>, outermost level first.</p>
+<p><code>loop_order</code> is the loop order the output is built under, also outermost
+first.  Levels which cannot be filled in loop order need random writes and
+so fall back to a hash level rather than a sparse list.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">select_output_format</span><span class="p">(</span>
+    <span class="n">stats</span><span class="p">:</span> <span class="n">NS</span><span class="p">,</span>
+    <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
+    <span class="n">loop_order</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">output_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LevelFormat</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Choose a level format for each of `output_indices`, outermost level first.</span>
+
+<span class="sd">    `loop_order` is the loop order the output is built under, also outermost</span>
+<span class="sd">    first.  Levels which cannot be filled in loop order need random writes and</span>
+<span class="sd">    so fall back to a hash level rather than a sparse list.</span>
+<span class="sd">    """</span>
+    <span class="n">formats</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">LevelFormat</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">level</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">output_indices</span><span class="p">):</span>
+        <span class="n">prefix</span> <span class="o">=</span> <span class="n">output_indices</span><span class="p">[:</span> <span class="n">level</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">needs_random_writes</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">fully_compat_with_loop_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
+        <span class="c1"># Division is used rather than conditional indices because a lower</span>
+        <span class="c1"># estimate is the conservative one here.</span>
+        <span class="n">prev_nnz</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">estimate_nnz</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">prefix</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">new_nnz</span> <span class="o">=</span> <span class="n">estimate_nnz</span><span class="p">(</span><span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">prefix</span><span class="p">)</span>
+        <span class="n">dim_size</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">get_dim_size</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+        <span class="n">approx_nnz_per</span> <span class="o">=</span> <span class="n">new_nnz</span> <span class="o">/</span> <span class="n">prev_nnz</span>
+        <span class="c1"># Scale the sparsity down a bit so that formats stay conservative.</span>
+        <span class="n">approx_sparsity</span> <span class="o">=</span> <span class="n">approx_nnz_per</span> <span class="o">/</span> <span class="n">dim_size</span> <span class="k">if</span> <span class="n">dim_size</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"inf"</span><span class="p">)</span>
+        <span class="n">dense_memory_footprint</span> <span class="o">=</span> <span class="n">prev_nnz</span> <span class="o">*</span> <span class="n">dim_size</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">approx_sparsity</span> <span class="o">&gt;</span> <span class="n">DENSE_SPARSITY_THRESHOLD</span>
+            <span class="ow">and</span> <span class="n">dense_memory_footprint</span> <span class="o">&lt;</span> <span class="n">MAX_DENSE_MEMORY_FOOTPRINT</span>
+        <span class="p">):</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">DENSE</span>
+        <span class="k">elif</span> <span class="p">(</span>
+            <span class="n">approx_sparsity</span> <span class="o">&gt;</span> <span class="n">BYTEMAP_SPARSITY_THRESHOLD</span>
+            <span class="ow">and</span> <span class="n">dense_memory_footprint</span> <span class="o">&lt;</span> <span class="n">MAX_DENSE_MEMORY_FOOTPRINT</span>
+            <span class="c1"># TODO: Check out finch double bytemap bug</span>
+            <span class="ow">and</span> <span class="p">(</span><span class="ow">not</span> <span class="n">formats</span> <span class="ow">or</span> <span class="n">formats</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">BYTEMAP</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">BYTEMAP</span>
+        <span class="k">elif</span> <span class="n">needs_random_writes</span><span class="p">:</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">HASH</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">fmt</span> <span class="o">=</span> <span class="n">LevelFormat</span><span class="o">.</span><span class="n">SPARSE_LIST</span>
+        <span class="n">formats</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fmt</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">formats</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 
@@ -5622,10 +6213,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": [], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../../..", "features": [], "search": "../../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../../../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

@@ -1209,6 +1209,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../autoschedule/formatter/galley_formatter/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    galley_formatter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../autoschedule/formatter/smart_formatter/" class="md-nav__link">
         
   
@@ -5712,7 +5740,8 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">284</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">283</span>
+<span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
 <span class="normal">287</span>
@@ -5798,8 +5827,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">367</span>
 <span class="normal">368</span>
 <span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">370</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia source text constructing a minimal instance of `ftype`, for</span>
 <span class="sd">    embedding directly in generated kernel source (see compiler.py)."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
@@ -5909,7 +5937,8 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">377</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">376</span>
+<span class="normal">377</span>
 <span class="normal">378</span>
 <span class="normal">379</span>
 <span class="normal">380</span>
@@ -5917,8 +5946,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">382</span>
 <span class="normal">383</span>
 <span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">385</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia type as source text (e.g. for a cache key). Cached per ftype."""</span>
     <span class="n">cached</span> <span class="o">=</span> <span class="n">_TYPE_STR_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
