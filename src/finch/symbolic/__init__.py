@@ -10,7 +10,7 @@ from .rewriters import (
     Rewrite,
 )
 from .simplification import simplify_rules
-from .stage import Form, Stage, UnvalidatedForm
+from .stage import CompilerMode, Form, Stage, UnvalidatedForm
 from .term import (
     CallTerm,
     ExpressionTerm,
@@ -25,6 +25,7 @@ __all__ = [
     "BasicBlock",
     "CallTerm",
     "Chain",
+    "CompilerMode",
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",

@@ -9,14 +9,15 @@ from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs, ftype
 from finch.codegen import NumpyBuffer
-from finch.codegen.c_codegen import CCompiler
-from finch.codegen.mlir_codegen import MLIRGenerator
-from finch.codegen.numba_codegen import NumbaCompiler
+from finch.codegen.c_codegen import CCompiler, CContext, CGenerator
+from finch.codegen.mlir_codegen import MLIRContext, MLIRGenerator
+from finch.codegen.numba_codegen import NumbaCompiler, NumbaContext, NumbaGenerator
 from finch.compile import AssemblyContext, CompilerMode, NotationCompiler, make_extent
 from finch.compile.lower import AssemblyGenerator
 from finch.symbolic import PostOrderDFS
 from finch.tensor import (
     BufferizedNDArray,
+    DenseLevel,
     ElementLevel,
     FiberTensor,
     SparseListLevel,
@@ -88,10 +89,11 @@ def sparse_tensor():
     )
 
 
+@pytest.mark.parametrize("mode", [CompilerMode(safe=True), CompilerMode(debug=True)])
 @pytest.mark.parametrize("loader", [asm.AssemblyInterpreter, NumbaCompiler])
-def test_safe_unfurl_bounds(tensor, loader):
+def test_safe_unfurl_bounds(tensor, loader, mode):
     program = sum_program(tensor.ftype)
-    kernel = NotationCompiler(loader(), mode=CompilerMode(safe=True))(program).sum_range
+    kernel = NotationCompiler(loader(), mode=mode)(program).sum_range
     for start, end in [(0, 6), (1, 5), (2, 3)]:
         assert kernel(tensor, np.intp(start), np.intp(end)) == sum(
             tensor.to_numpy()[start:end]
@@ -118,11 +120,170 @@ def test_safe_sparse_subrange(sparse_tensor):
     assert kernel(sparse_tensor, np.intp(1), np.intp(5)) == 6
 
 
-def test_compiler_mode_scopes():
-    mode = CompilerMode(safe=True)
-    ctx = AssemblyContext(mode=mode)
+@pytest.mark.parametrize(
+    "context", [AssemblyContext, CContext, NumbaContext, MLIRContext]
+)
+def test_compiler_mode_scopes(context):
+    mode = CompilerMode(debug=True)
+    ctx = context(mode=mode)
     assert ctx.block().mode is mode
-    assert ctx.scope().mode is mode
+    if context is AssemblyContext:
+        assert ctx.scope().mode is mode
+    else:
+        assert ctx.subblock().mode is mode
+
+
+def buffer_program(buffer_type, *, write=False, resize=False, scan=False):
+    buffer = asm.Variable("buffer", buffer_type)
+    slot = asm.Slot("buffer_slot", buffer_type)
+    index = asm.Variable("index", buffer_type.length_type)
+    result = asm.Variable("result", buffer_type.element_type)
+    offset = asm.Call(asm.Literal(ffuncs.add), (index, asm.Literal(np.intp(0))))
+    body = [asm.Unpack(slot, buffer)]
+    if resize:
+        body.append(asm.Resize(slot, asm.Literal(np.intp(5))))
+    if scan:
+        body.append(
+            asm.WhileLoop(
+                asm.Call(
+                    asm.Literal(ffuncs.ne),
+                    (asm.Load(slot, offset), asm.Literal(np.int64(0))),
+                ),
+                asm.Block(
+                    (
+                        asm.Assign(
+                            index,
+                            asm.Call(
+                                asm.Literal(ffuncs.add),
+                                (index, asm.Literal(np.intp(1))),
+                            ),
+                        ),
+                        asm.If(
+                            asm.Call(
+                                asm.Literal(ffuncs.ge),
+                                (index, asm.Literal(np.intp(4))),
+                            ),
+                            asm.Break(),
+                        ),
+                    )
+                ),
+            )
+        )
+    if write:
+        body.append(asm.Store(slot, offset, asm.Literal(np.int64(42))))
+    body.extend(
+        (
+            asm.Assign(result, index if scan else asm.Load(slot, offset)),
+            asm.Repack(slot),
+            asm.Return(result),
+        )
+    )
+    return asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "access",
+                    asm.AssemblyKernelFType(
+                        "access", (buffer_type, index.result_type), result.result_type
+                    ),
+                ),
+                (buffer, index),
+                asm.Block(tuple(body)),
+            ),
+        )
+    )
+
+
+@pytest.mark.parametrize("loader", [asm.AssemblyInterpreter, NumbaCompiler])
+@pytest.mark.parametrize("write", [False, True])
+def test_debug_buffer_bounds(loader, write):
+    buffer = NumpyBuffer(np.arange(3, dtype=np.int64))
+    program = buffer_program(buffer.ftype, write=write)
+    kernel = loader()(program, mode=CompilerMode(debug=True)).access
+    assert kernel.ftype == program.funcs[0].name.result_type
+    assert kernel(buffer, np.intp(2)) == (42 if write else 2)
+    for index in (-1, 3):
+        with pytest.raises(AssertionError):
+            kernel(buffer, np.intp(index))
+
+
+@pytest.mark.parametrize(
+    "loader",
+    [
+        asm.AssemblyInterpreter,
+        NumbaCompiler,
+        pytest.param(CCompiler, marks=pytest.mark.c_backend),
+    ],
+)
+def test_debug_buffer_resize_and_while(loader):
+    mode = CompilerMode(debug=True)
+    buffer = NumpyBuffer(np.array([1, 1, 0], dtype=np.int64))
+    scan = loader()(buffer_program(buffer.ftype, scan=True), mode=mode).access
+    assert scan(buffer, np.intp(0)) == 2
+    if loader is not CCompiler:
+        with pytest.raises(AssertionError):
+            scan(NumpyBuffer(np.ones(3, dtype=np.int64)), np.intp(0))
+    resize = loader()(
+        buffer_program(buffer.ftype, write=True, resize=True), mode=mode
+    ).access
+    assert resize(buffer, np.intp(4)) == 42
+    assert buffer.length() == 5
+    assert buffer.load(4) == 42
+
+
+@pytest.mark.parametrize("loader", [asm.AssemblyInterpreter, NumbaCompiler])
+def test_debug_mode_checks_storage_bounds(loader):
+    tensor = fiber_tensor(dense(element(np.int64(0)))).from_numpy(
+        np.arange(3, dtype=np.int64)
+    )
+    assert isinstance(tensor.lvl, DenseLevel)
+    tensor.lvl.dimension = np.intp(4)
+    kernel = NotationCompiler(loader(), mode=CompilerMode(debug=True))(
+        sum_program(tensor.ftype)
+    ).sum_range
+    with pytest.raises(AssertionError):
+        kernel(tensor, np.intp(0), np.intp(4))
+
+
+@pytest.mark.parametrize("generator", [CGenerator, NumbaGenerator, MLIRGenerator])
+def test_buffer_checks_only_in_debug_mode(generator):
+    buffer = NumpyBuffer(np.arange(3, dtype=np.int64))
+    program = buffer_program(buffer.ftype, write=True)
+    for mode in (CompilerMode(), CompilerMode(safe=True)):
+        assert "assert" not in generator()(program, mode=mode).code.lower()
+    checked = generator()(program, mode=CompilerMode(debug=True)).code
+    assertion = "cf.assert" if generator is MLIRGenerator else "Finch assertion failed"
+    assert checked.count(assertion) == 2
+
+
+@pytest.mark.c_backend
+@pytest.mark.parametrize("write", [False, True])
+@pytest.mark.parametrize("index", [-1, 3])
+def test_debug_buffer_c_failure(write, index):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            f"""
+import numpy as np
+from finch.codegen import NumpyBuffer
+from finch.codegen.c_codegen import CCompiler
+from finch.compile import CompilerMode
+from finch.tests.test_safe_mode import buffer_program
+
+buffer = NumpyBuffer(np.arange(3, dtype=np.int64))
+kernel = CCompiler()(
+    buffer_program(buffer.ftype, write={write}), mode=CompilerMode(debug=True)
+).access
+kernel(buffer, np.intp({index}))
+""",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1
+    assert "Finch assertion failed" in result.stderr
 
 
 def test_fast_unfurl_omits_checks(tensor):

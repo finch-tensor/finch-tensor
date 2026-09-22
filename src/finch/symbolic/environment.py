@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Generic, Optional, TypeVar
 
+from .stage import CompilerMode
 from .term import Term
 from .traversal import PostOrderDFS
 
@@ -127,10 +128,11 @@ variable names in the generated code of the executing environment.
 
 
 class Context(ABC):
-    def __init__(self, namespace=None, preamble=None, epilogue=None):
+    def __init__(self, namespace=None, preamble=None, epilogue=None, mode=None):
         self.namespace = namespace if namespace is not None else Namespace()
         self.preamble = preamble if preamble is not None else []
         self.epilogue = epilogue if epilogue is not None else []
+        self.mode = mode if mode is not None else CompilerMode()
 
     def exec(self, thunk: Any):
         self.preamble.append(thunk)
@@ -152,6 +154,7 @@ class Context(ABC):
         blk.namespace = self.namespace
         blk.preamble = []
         blk.epilogue = []
+        blk.mode = self.mode
         return blk
 
     @abstractmethod
@@ -163,5 +166,5 @@ class Context(ABC):
 
 
 class Reflector:
-    def __call__(self, prgm):
+    def __call__(self, prgm, **options):
         return prgm

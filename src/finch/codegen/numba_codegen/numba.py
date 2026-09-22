@@ -20,7 +20,7 @@ from finch.algebra import (
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util.logging import LOG_BACKEND_NUMBA
 
 from .stages import NumbaCode, NumbaLowerer
@@ -620,8 +620,10 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
             ctx = NumbaGenerator()
         self.ctx: NumbaLowerer = ctx
 
-    def lower(self, prgm: asm.Module) -> NumbaLibrary:
-        numba_code = self.ctx(prgm).code
+    def lower(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> NumbaLibrary:
+        numba_code = self.ctx(prgm, mode=mode).code
         logger.debug(f"Executing Numba code:\n{numba_code}")
         _globals = {**globals(), **numba_globals}
         try:
@@ -649,20 +651,24 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
 
 
 class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
-    def lower(self, prgm: asm.AssemblyNode) -> NumbaCode:
-        ctx = NumbaContext()
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> NumbaCode:
+        ctx = NumbaContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
         ctx(prgm)
         return NumbaCode(ctx.emit_global())
 
 
 class NumbaContext(Context):
-    def __init__(self, tab="    ", indent=0, types=None, slots=None):
+    def __init__(self, tab="    ", indent=0, types=None, slots=None, *, mode=None):
         if types is None:
             types = ScopedDict()
         if slots is None:
             slots = ScopedDict()
 
-        super().__init__()
+        super().__init__(mode=mode)
 
         self.tab = tab
         self.indent = indent
@@ -825,11 +831,49 @@ class NumbaContext(Context):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.numba_load(self, self.resolve(buf), idx)
             case asm.Store(buf, idx, val):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, NumbaBufferFType):
                     raise TypeError(f"Expected numba buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 buf_t.numba_store(self, self.resolve(buf), idx, val)
                 return None
             case asm.Resize(buf, size):
@@ -865,8 +909,14 @@ class NumbaContext(Context):
             case asm.BufferLoop(buf, var, body):
                 raise NotImplementedError
             case asm.WhileLoop(cond, body):
-                cond_code = self(cond)
                 ctx_2 = self.subblock()
+                cond_code = ctx_2(cond)
+                if ctx_2.preamble or ctx_2.epilogue:
+                    # Checks and cached indices in the condition must run on
+                    # every iteration, including the final condition evaluation.
+                    ctx_2.exec(f"{ctx_2.feed}if not ({cond_code}):")
+                    ctx_2.exec(f"{ctx_2.feed}{self.tab}break")
+                    cond_code = "True"
                 ctx_2(body)
                 body_code = ctx_2.emit()
                 self.exec(f"{feed}while {cond_code}:\n{body_code}")

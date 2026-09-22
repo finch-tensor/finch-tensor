@@ -29,7 +29,7 @@ from finch.algebra import (
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util import config, file_cache
 from finch.util.logging import LOG_BACKEND_C
 
@@ -223,8 +223,8 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def lower(self, prgm: asm.Module) -> CLibrary:
-        c_code = self.ctx(prgm).code
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None) -> CLibrary:
+        c_code = self.ctx(prgm, mode=mode).code
         logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
@@ -584,8 +584,12 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 
 
 class CGenerator(UnvalidatedForm, CLowerer):
-    def lower(self, prgm: asm.AssemblyNode) -> CCode:
-        ctx = CContext()
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> CCode:
+        ctx = CContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
         ctx(prgm)
         return CCode(ctx.emit_global())
 
@@ -840,11 +844,49 @@ class CContext(Context):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.c_load(self, self.resolve(buf), idx)
             case asm.Store(buf, idx, val):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.c_store(self, self.resolve(buf), idx, val)
             case asm.Resize(buf, size):
                 buf_t = buf.result_type

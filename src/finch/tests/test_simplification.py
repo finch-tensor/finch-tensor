@@ -403,9 +403,9 @@ class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
         self.ctx = ctx
         self.last: asm.Module
 
-    def lower(self, term: asm.Module):
+    def lower(self, term: asm.Module, *, mode=None):
         self.last = term
-        return self.ctx(term)
+        return self.ctx(term, mode=mode)
 
 
 def _assembly_for(build):

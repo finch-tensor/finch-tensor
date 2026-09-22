@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from finch.algebra import CallableFType, FType, FTyped
-from finch.symbolic import Stage
+from finch.symbolic import CompilerMode, Stage
 
 if TYPE_CHECKING:
     from . import nodes as asm
@@ -75,7 +75,9 @@ class AssemblyLibrary(ABC):
 
 class AssemblyLoader(Stage):
     @abstractmethod
-    def lower(self, term: asm.Module) -> AssemblyLibrary:
+    def lower(
+        self, term: asm.Module, *, mode: CompilerMode | None = None
+    ) -> AssemblyLibrary:
         """
         Load the given assembly program into a runnable module.
         """

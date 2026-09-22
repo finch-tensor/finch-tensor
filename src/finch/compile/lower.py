@@ -27,6 +27,7 @@ from finch.finch_assembly import (
 )
 from finch.finch_notation.stages import NotationLoader
 from finch.symbolic import (
+    CompilerMode,
     Context,
     PostOrderDFS,
     PostWalk,
@@ -332,11 +333,6 @@ class HaltState:
     return_var: Any = None
 
 
-@dataclass(frozen=True)
-class CompilerMode:
-    safe: bool = False
-
-
 class NotationCompiler(UnvalidatedForm, NotationLoader):
     def __init__(
         self,
@@ -363,7 +359,7 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
         for transform in self.ctx_transforms:
             asm_code = transform(asm_code)
         logger.debug(asm_code)
-        return self.ctx_load(asm_code)
+        return self.ctx_load(asm_code, mode=self.ctx_lower.mode)
 
 
 class AssemblyGenerator(UnvalidatedForm, NotationLowerer):
@@ -397,7 +393,9 @@ class AssemblyContext(Context):
         func_state: HaltState | None = None,
         mode: CompilerMode | None = None,
     ):
-        super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
+        super().__init__(
+            namespace=namespace, preamble=preamble, epilogue=epilogue, mode=mode
+        )
         if bindings is None:
             bindings = ScopedDict()
         if slots is None:
@@ -411,7 +409,6 @@ class AssemblyContext(Context):
         self.access_modes = access_modes
         self.types = types
         self.func_state = func_state
-        self.mode = mode if mode is not None else CompilerMode()
 
     def _slot_expr(self, slot):
         match slot:
@@ -446,7 +443,6 @@ class AssemblyContext(Context):
         blk.access_modes = self.access_modes
         blk.types = self.types
         blk.func_state = self.func_state
-        blk.mode = self.mode
         return blk
 
     def scope(self):
@@ -748,7 +744,7 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
-                    if ctx.mode.safe:
+                    if ctx.mode.safe or ctx.mode.debug:
                         start = ctx_2(ext.get_start())
                         end = ctx_2(ext.get_end())
                         size = ctx_2(ntn.Dimension(tns, ntn.Literal(0)))

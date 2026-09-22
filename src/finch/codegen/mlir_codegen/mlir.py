@@ -25,7 +25,7 @@ from finch.algebra import (
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import Context, Form, ScopedDict
+from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
 from .scansearch import SCANSEARCH
@@ -285,13 +285,15 @@ class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
     def __init__(self, ctx: MLIRLowerer | None = None):
         self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
 
-    def lower(self, prgm: asm.Module) -> MLIRLibrary:
+    def lower(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> MLIRLibrary:
         if prgm.head() != asm.Module:
             raise ValueError(
                 "MLIRCompiler expects a Module as the head of the program, "
                 f"got {type(prgm.head())}"
             )
-        mlir_code = self.ctx(prgm).code
+        mlir_code = self.ctx(prgm, mode=mode).code
         logger.debug(f"Compiling MLIR code:\n{mlir_code}")
         context, module, engine = load_mlir_engine(mlir_code)
         kernels = {}
@@ -697,8 +699,12 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
 
 
 class MLIRGenerator(MLIRForm, MLIRLowerer):
-    def lower(self, prgm: asm.AssemblyNode) -> MLIRCode:
-        ctx = MLIRContext()
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> MLIRCode:
+        ctx = MLIRContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
         ctx(prgm)
         return MLIRCode(ctx.emit_global())
 
@@ -976,13 +982,15 @@ class MLIRContext(Context):
         indent=1,
         bindings=None,
         slots=None,
+        *,
+        mode=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
         if slots is None:
             slots = ScopedDict()
 
-        super().__init__()
+        super().__init__(mode=mode)
         self.tab = tab
         self.indent = indent
         self.bindings = bindings
@@ -1012,6 +1020,13 @@ class MLIRContext(Context):
                 raise KeyError(f"Slot {var_n} not found in context")
             case _:
                 raise ValueError(f"Expected Slot, got: {type(node)}")
+
+    def cache(self, name, val):
+        if isinstance(val, asm.Literal | asm.Variable):
+            return val
+        var = asm.Variable(self.freshen(name), val.result_type)
+        self(asm.Assign(var, val))
+        return var
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -1091,12 +1106,50 @@ class MLIRContext(Context):
                 buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.mlir_load(self, self.resolve(buffer), index)
 
             case asm.Store(buffer, index, value):
                 buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.mlir_store(self, self.resolve(buffer), index, value)
 
             case asm.Resize(_, _):

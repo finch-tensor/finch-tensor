@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, overload
 
 from finch.algebra import fisinstance
-from finch.symbolic import ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, ScopedDict, UnvalidatedForm
 
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
@@ -68,6 +68,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         loop_state: HaltState | None = None,
         function_state: HaltState | None = None,
         stdout=None,
+        mode: CompilerMode | None = None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -83,6 +84,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         if stdout is None:
             stdout = sys.stdout
         self.stdout = stdout
+        self.mode = mode if mode is not None else CompilerMode()
 
     def scope(
         self,
@@ -92,6 +94,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         loop_state=None,
         function_state=None,
         stdout=None,
+        mode=None,
     ):
         """
         Create a new scope for the interpreter.
@@ -116,6 +119,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             loop_state=loop_state,
             function_state=function_state,
             stdout=stdout,
+            mode=self.mode if mode is None else mode,
         )
 
     def should_halt(self):
@@ -131,21 +135,24 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             and self.function_state.should_halt
         )
 
-    def lower(self, prgm: asm.Module):
-        return self._dispatch(prgm)
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None):
+        ctx = self if mode is None else self.scope(mode=mode)
+        return ctx._dispatch(prgm)
 
     @overload
-    def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
+    def __call__(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> AssemblyLibrary: ...
 
     @overload
     def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
 
-    def __call__(self, prgm):
+    def __call__(self, prgm, *, mode=None):
         """
         Run the program.
         """
         if isinstance(prgm, asm.Module):
-            return super().__call__(prgm)
+            return super().__call__(prgm, mode=mode)
         return self._dispatch(prgm)
 
     def _dispatch(self, prgm):
@@ -224,11 +231,15 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             case asm.Load(buf, idx):
                 buf_e = self(buf)
                 idx_e = self(idx)
+                if self.mode.debug and not 0 <= idx_e < buf_e.length():
+                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
+                if self.mode.debug and not 0 <= idx_e < buf_e.length():
+                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
                 buf_e.store(idx_e, val_e)
                 return None
             case asm.Resize(buf, len_):
