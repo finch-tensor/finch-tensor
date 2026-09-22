@@ -1156,7 +1156,6 @@ def test_sparse_matmul_mlir_regression(file_regression, caplog):
                 ),
                 arr.shape,
                 np.intp(0),
-                False,
             )
         )
 
@@ -1219,7 +1218,6 @@ def test_sddmm_mlir_regression(file_regression, caplog):
         ),
         s.shape,
         np.intp(0),
-        False,
     )
 
     with caplog.at_level(logging.DEBUG):
