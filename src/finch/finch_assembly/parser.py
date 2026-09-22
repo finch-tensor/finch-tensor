@@ -45,7 +45,7 @@ assembly_parser = Lark(
          | if_else
          | resize
          | _COMMENT
-    ?access_expr: access_expr INFIX_OP access_expr | reference | INT
+    ?access_expr: access_expr INFIX_OP access_expr | reference | call | INT
     ?reference: CNAME | attribute
     attribute: reference "." CNAME
     access: reference "[" access_expr "]"
@@ -85,7 +85,7 @@ _OPS = {
 
 def parse_assembly(
     code: str, vars: dict[str, asm.AssemblyExpression], position_type: type = np.intp
-) -> asm.AssemblyStatement:
+) -> asm.Block:
     """
     Parse Finch Assembly code and convert it to assembly node objects.
 

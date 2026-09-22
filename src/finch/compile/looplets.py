@@ -34,18 +34,26 @@ class ThunkPass(LoopletPass):
         return 8
 
     def __call__(self, ctx: LoopletContext, idx, ext, body):
+        thunks = {}
+
         def thunk_body(ctx, node: ntn.NotationNode):
             match node:
                 case ntn.Access(
                     ntn.Looplet(Thunk() as thnk, type_), mode, (j, *idxs)
                 ) if j == idx:
+                    if id(thnk) in thunks:
+                        return ntn.Access(thunks[id(thnk)], mode, (j, *idxs))
                     if (preamble := thnk.preamble) is not None:
-                        ctx.exec(preamble(ctx, idx))
+                        match preamble(ctx, idx):
+                            case asm.Block(bodies):
+                                for statement in bodies:
+                                    ctx.exec(statement)
+                            case statement:
+                                ctx.exec(statement)
                     if (epilogue := thnk.epilogue) is not None:
                         ctx.post(epilogue(ctx, idx))
-                    return ntn.Access(
-                        ntn.Looplet(thnk.body(ctx, ext), type_), mode, (j, *idxs)
-                    )
+                    thunks[id(thnk)] = ntn.Looplet(thnk.body(ctx, ext), type_)
+                    return ntn.Access(thunks[id(thnk)], mode, (j, *idxs))
 
         ctx_2 = ctx.scope()
         body = Rewrite(PostWalk(lambda x: thunk_body(ctx_2, x)))(body)
@@ -156,8 +164,11 @@ class StepperPass(LoopletPass):
         for node in PostOrderDFS(body):
             match node:
                 case ntn.Looplet(Stepper() as st, _):
-                    ctx.exec(st.seek(ctx, ext))
                     steppers.append(st)
+
+        steppers = list({id(stepper): stepper for stepper in steppers}.values())
+        for stepper in steppers:
+            ctx.exec(stepper.seek(ctx, ext))
 
         full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
 
@@ -277,6 +288,8 @@ class SequencePass(LoopletPass):
                 case ntn.Looplet(Sequence() as seq, _):
                     found_seqs.append(seq)
 
+        found_seqs = list({id(seq): seq for seq in found_seqs}.values())
+
         def sequence_node(
             node: ntn.NotationNode, heads: set[Sequence], tails: set[Sequence]
         ):
@@ -370,19 +383,20 @@ class LookupPass(LoopletPass):
 
     def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
         ctx_2 = ctx.scope()
+        lookups = {}
 
         def lookup_node(node):
             match node:
                 case ntn.Access(
-                    ntn.Looplet(Lookup(lookup), type_), mode, (j, *idxs)
+                    ntn.Looplet(Lookup(lookup) as looplet, type_), mode, (j, *idxs)
                 ) if j == idx:
-                    return ntn.Access(
-                        ntn.Looplet(lookup(ctx_2, idx), type_), mode, (j, *idxs)
-                    )
+                    if id(looplet) not in lookups:
+                        lookups[id(looplet)] = ntn.Looplet(lookup(ctx_2, idx), type_)
+                    return ntn.Access(lookups[id(looplet)], mode, (j, *idxs))
             return None
 
         body_2 = PostWalk(lookup_node)(body)
-        ctx_2(SymbolicExtent(idx, idx), body_2)
+        ctx_2(SymbolicExtent.point(idx), body_2)
         body_3 = asm.Block(ctx_2.emit())
 
         if ext.is_sym_point():

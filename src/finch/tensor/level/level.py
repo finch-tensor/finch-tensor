@@ -128,6 +128,12 @@ class LevelFType(FType, ABC):
         """
         ...
 
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        """Assemble parent positions in the half-open range [start, stop)."""
+        raise NotImplementedError(
+            f"Assembly is not implemented for {type(self).__name__}"
+        )
+
     @abstractmethod
     def level_lower_thaw(self, ctx, lvl, op, pos):
         """

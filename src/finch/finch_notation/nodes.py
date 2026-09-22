@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 from finch import tensor
@@ -535,6 +535,21 @@ class Fiber(NotationTree, NotationExpression):
     @classmethod
     def from_children(cls, lvl, pos, *idxs):
         return cls(lvl, pos, idxs)
+
+
+@dataclass(eq=True, frozen=True)
+class HollowFiber(Fiber):
+    """A candidate sparse fiber, recording whether a non-fill value was written."""
+
+    dirty: Variable = field(kw_only=True)
+
+    @property
+    def children(self):
+        return [self.lvl, self.pos, self.dirty, *self.idxs]
+
+    @classmethod
+    def from_children(cls, lvl, pos, dirty, *idxs):
+        return cls(lvl, pos, idxs, dirty=dirty)
 
 
 @dataclass(eq=True, frozen=True)

@@ -163,34 +163,25 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
-        ptr = asm.GetAttr(tns, asm.Literal("ptr"))
         p_t = self.ptr_type.length_type
         p = asm.Variable(ctx.freshen("p"), p_t)
-        stop = asm.Call(
-            asm.Literal(ffuncs.add),
-            (asm.Call(asm.Literal(ffuncs.astype(p_t)), (pos,)), asm.Literal(p_t(1))),
-        )
-        ctx.exec(asm.Resize(ptr, stop))
-        ctx.exec(
-            asm.ForLoop(
-                p,
-                asm.Literal(p_t(0)),
-                stop,
-                asm.Store(ptr, p, asm.Literal(self.position_type(0))),
-            )
-        )
-        for name in ("qos_fill", "qos_stop", "prev_pos"):
-            ctx.exec(
-                asm.SetAttr(tns, asm.Literal(name), asm.Literal(self.position_type(0)))
-            )
-        ctx.exec(asm.SetAttr(tns, asm.Literal("frozen"), asm.Literal(False)))
+        stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        zero = asm.Literal(self.position_type(0))
+        expr = """finch
+        stop = to_size(pos) + 1
+        resize(tns.ptr, stop)
+        for (p in 0:stop)
+            tns.ptr[p] = zero
+        end
+        tns.qos_fill = zero
+        tns.qos_stop = zero
+        tns.prev_pos = zero
+        tns.frozen = false
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_declare(
-            ctx,
-            asm.GetAttr(tns, asm.Literal("lvl")),
-            init,
-            op,
-            shape,
-            asm.Literal(self.position_type(0)),
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, zero
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
@@ -262,6 +253,26 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
             "SparseListLevelFType does not support level_lower_increment."
         )
 
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        p_t = self.ptr_type.length_type
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        p_start = asm.Variable(ctx.freshen("p_start"), p_t)
+        p_stop = asm.Variable(ctx.freshen("p_stop"), p_t)
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        length = asm.Length(asm.GetAttr(lvl, asm.Literal("ptr")))
+        zero = asm.Literal(self.position_type(0))
+        expr = """finch
+        p_start = to_size(start) + 1
+        p_stop = to_size(stop) + 1
+        if (length < p_stop)
+            resize(lvl.ptr, p_stop)
+        end
+        for (p in p_start:p_stop)
+            lvl.ptr[p] = zero
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
+
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError(
             "SparseListLevelFType does not support level_lower_unwrap."
@@ -270,6 +281,9 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
     def level_unfurl(
         self, ctx, fiber: ntn.Fiber, ext, mode: ntn.AccessMode, proto, pos
     ):
+        match mode:
+            case ntn.Update():
+                return self.level_unfurl_update(ctx, fiber, ext, mode, proto, pos)
         tns = fiber
         level = tns.lvl
         lvl_asm = ctx(level)
@@ -298,12 +312,11 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
             expr = """finch
             q = ptr_s[pos]
             q_stop = ptr_s[pos + 1]
+            i_stop = 1
+            i_last = 0
             if (q < q_stop)
                 i_stop = idx_s[q]
                 i_last = idx_s[q_stop - 1]
-            else
-                i_stop = 1
-                i_last = 0
             end
             """
             return parse_assembly(expr, tmp_locals, position_type=self.position_type)
@@ -376,6 +389,131 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 ),
                 tail=lambda ctx, idx: lplt.Run(full),
             ),
+        )
+
+    def level_unfurl_update(self, ctx, fiber, ext, mode, proto, pos):
+        lvl = ctx(fiber.lvl)
+        child = asm.GetAttr(lvl, asm.Literal("lvl"))
+        p_t = self.position_type
+        qos = asm.Variable(ctx.freshen("qos"), p_t)
+        dirty = ntn.Variable(ctx.freshen("dirty"), ftypes.bool_)
+        dirty_asm = ctx(dirty)
+        to_ptr_size = asm.Literal(ffuncs.astype(self.ptr_type.length_type))
+        to_idx_size = asm.Literal(ffuncs.astype(self.idx_type.length_type))
+        to_index = asm.Literal(ffuncs.astype(self.dimension_type))
+        to_pos = asm.Literal(ffuncs.astype(p_t))
+        bindings = locals()
+
+        def preamble(ctx, idx):
+            body = parse_assembly(
+                """finch
+            qos = lvl.qos_fill
+            """,
+                bindings,
+                position_type=p_t,
+            )
+            if ctx.mode.safe or ctx.mode.debug:
+                return asm.Block(
+                    (
+                        *body.bodies,
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.not_),
+                                (asm.GetAttr(lvl, asm.Literal("frozen")),),
+                            )
+                        ),
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.le),
+                                (asm.GetAttr(lvl, asm.Literal("prev_pos")), pos),
+                            )
+                        ),
+                    )
+                )
+            return body
+
+        def lookup(ctx, idx):
+            idx_asm = ctx.ctx(idx)
+
+            def prepare(ctx, _):
+                grow = ctx.ctx.block()
+                grow.exec(
+                    parse_assembly(
+                        """finch
+                if (lvl.qos_stop == 0)
+                    lvl.qos_stop = 1
+                else
+                    lvl.qos_stop += lvl.qos_stop
+                end
+                resize(lvl.idx, to_idx_size(lvl.qos_stop))
+                """,
+                        bindings,
+                        position_type=p_t,
+                    )
+                )
+                self.lvl_t.level_lower_assemble(
+                    grow, child, qos, asm.GetAttr(lvl, asm.Literal("qos_stop"))
+                )
+                return asm.Block(
+                    (
+                        asm.If(
+                            asm.Call(
+                                asm.Literal(ffuncs.ge),
+                                (qos, asm.GetAttr(lvl, asm.Literal("qos_stop"))),
+                            ),
+                            asm.Block(tuple(grow.emit())),
+                        ),
+                        asm.Assign(dirty_asm, asm.Literal(False)),
+                    )
+                )
+
+            def finish(ctx, _):
+                written = parse_assembly(
+                    """finch
+                lvl.idx[to_idx_size(qos)] = to_index(idx_asm)
+                qos += 1
+                lvl.prev_pos = to_pos(pos + 1)
+                """,
+                    bindings | {"idx_asm": idx_asm},
+                    position_type=p_t,
+                )
+                match fiber:
+                    case ntn.HollowFiber(dirty=parent_dirty):
+                        written = asm.Block(
+                            (
+                                *written.bodies,
+                                asm.Assign(ctx.ctx(parent_dirty), asm.Literal(True)),
+                            )
+                        )
+                return asm.If(dirty_asm, written)
+
+            return lplt.Thunk(
+                preamble=prepare,
+                body=lambda ctx, ext: lplt.Run(
+                    ntn.HollowFiber(
+                        ntn.Child(fiber.lvl),
+                        ntn.Value(qos, p_t),
+                        (*fiber.idxs, idx),
+                        dirty=dirty,
+                    )
+                ),
+                epilogue=finish,
+            )
+
+        def epilogue(ctx, idx):
+            return parse_assembly(
+                """finch
+            lvl.ptr[to_ptr_size(pos + 1)] += qos - lvl.qos_fill
+            lvl.qos_fill = qos
+            """,
+                bindings,
+                position_type=p_t,
+            )
+
+        return lplt.Thunk(
+            preamble=preamble,
+            body=lambda ctx, ext: lplt.Lookup(lookup),
+            epilogue=epilogue,
         )
 
     def from_fields(

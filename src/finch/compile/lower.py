@@ -226,9 +226,8 @@ class SymbolicExtent(FTyped):
         one = ntn.Literal(idx.result_type(1))
         return SymbolicExtent(idx, ntn.Call(ntn.Literal(ffuncs.add), (idx, one)))
 
-    # TODO: Make it more robust
     def is_sym_point(self):
-        return self.start_sym == self.end_sym
+        return self.end_sym == SymbolicExtent.point(self.start_sym).end_sym
 
     def get_measure(self):
         return ntn.Call(ntn.Literal(ffuncs.sub), (self.end_sym, self.start_sym))
@@ -737,12 +736,16 @@ def lower_looplets(
     ctx_2 = ctx.scope()
 
     looplets = comp.looplets  # ty: ignore[possibly-missing-submodule]
+    unfurled = {}
 
     def unfurl_node(node):
         match node:
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
+                    key = (tns, mode)
+                    if key in unfurled:
+                        return ntn.Access(unfurled[key], mode, (j, *idxs))
                     if ctx.mode.safe or ctx.mode.debug:
                         start = ctx_2(ext.get_start())
                         end = ctx_2(ext.get_end())
@@ -768,9 +771,8 @@ def lower_looplets(
                             tns_2 = tns.result_type.unfurl(
                                 ctx_2, tns, ext, mode, proto=None
                             )
-                    return ntn.Access(
-                        ntn.Looplet(tns_2, tns.result_type), mode, (j, *idxs)
-                    )
+                    unfurled[key] = ntn.Looplet(tns_2, tns.result_type)
+                    return ntn.Access(unfurled[key], mode, (j, *idxs))
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)

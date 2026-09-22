@@ -160,6 +160,10 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
 
     def level_lower_unwrap(self, ctx, obj, pos):
         buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
         return asm.Load(buf, pos)
 
     def level_lower_increment(
@@ -171,6 +175,10 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         pos: asm.AssemblyExpression,
     ):
         buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
         pos_e, op_e, val_e = pos, ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
@@ -179,6 +187,52 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
                 asm.Call(op_e, (asm.Load(buf, pos_e), val_e)),
             )
         )
+        match obj:
+            case ntn.HollowFiber(dirty=dirty):
+                fill = (
+                    self.lower_fill(ctx(obj.lvl))
+                    if is_dynamic(self.fill_value)
+                    else asm.Literal(self.fill_value.value)
+                )
+                ctx.exec(
+                    asm.If(
+                        asm.Call(
+                            asm.Literal(ffuncs.not_),
+                            (
+                                asm.Call(
+                                    asm.Literal(ffuncs.same),
+                                    (asm.Load(buf, pos_e), fill),
+                                ),
+                            ),
+                        ),
+                        asm.Assign(ctx(dirty), asm.Literal(True)),
+                    )
+                )
+
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        p_t = self.buffer_type.length_type
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        p_start = asm.Variable(ctx.freshen("p_start"), p_t)
+        p_stop = asm.Variable(ctx.freshen("p_stop"), p_t)
+        length = asm.Length(buf)
+        fill = (
+            self.lower_fill(lvl)
+            if is_dynamic(self.fill_value)
+            else asm.Literal(self.fill_value.value)
+        )
+        expr = """finch
+        p_start = to_size(start)
+        p_stop = to_size(stop)
+        if (length < p_stop)
+            resize(buf, p_stop)
+        end
+        for (p in p_start:p_stop)
+            buf[p] = fill
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
         buf = asm.GetAttr(lvl, asm.Literal("val"))

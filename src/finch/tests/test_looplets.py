@@ -7,8 +7,16 @@ from finch.compile.looplets import Lookup, Run, Switch, Thunk
 from finch.compile.lower import AssemblyContext, LoopletContext, SymbolicExtent
 
 
-@pytest.mark.parametrize("start, end, expected", [(2, 5, 39), (2, 2, 12)])
-def test_lookup_and_run(start, end, expected):
+@pytest.mark.parametrize(
+    "start, end, expected, point",
+    [
+        (2, 5, 39, False),
+        (2, 2, 0, False),
+        (2, 3, 12, False),
+        (2, 3, 12, True),
+    ],
+)
+def test_lookup_and_run(start, end, expected, point):
     idx = ntn.Variable("i", ftype(int))
     result = ntn.Variable("result", ftype(int))
     position = ntn.Variable("position", ftype(int))
@@ -43,14 +51,24 @@ def test_lookup_and_run(start, end, expected):
         ),
     )
     ext = SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
+    if point:
+        ext = SymbolicExtent.point(ntn.Literal(start))
     LoopletContext(ctx, idx)(ext, body)
     interpreter = asm.AssemblyInterpreter()
     interpreter(asm.Block(ctx.emit()))
     assert interpreter(ctx(result)) == expected
 
 
-@pytest.mark.parametrize("start, end, expected", [(2, 5, 26), (2, 2, 4)])
-def test_lookup_switch_thunk(start, end, expected):
+@pytest.mark.parametrize(
+    "start, end, expected, point",
+    [
+        (2, 5, 26, False),
+        (2, 2, 0, False),
+        (2, 3, 4, False),
+        (2, 3, 4, True),
+    ],
+)
+def test_lookup_switch_thunk(start, end, expected, point):
     idx = ntn.Variable("i", ftype(int))
     result = ntn.Variable("result", ftype(int))
     value = ntn.Variable("value", ftype(int))
@@ -85,7 +103,10 @@ def test_lookup_switch_thunk(start, end, expected):
             ),
         ),
     )
-    LoopletContext(ctx, idx)(SymbolicExtent(ntn.Literal(start), ntn.Literal(end)), body)
+    ext = SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
+    if point:
+        ext = SymbolicExtent.point(ntn.Literal(start))
+    LoopletContext(ctx, idx)(ext, body)
     interpreter = asm.AssemblyInterpreter()
     interpreter(asm.Block(ctx.emit()))
     assert interpreter(ctx(result)) == expected

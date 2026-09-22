@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
@@ -153,6 +153,15 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
         )
 
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        dimension = asm.GetAttr(lvl, asm.Literal("dimension"))
+        self.lvl_t.level_lower_assemble(
+            ctx,
+            asm.GetAttr(lvl, asm.Literal("lvl")),
+            asm.Call(asm.Literal(ffuncs.mul), (start, dimension)),
+            asm.Call(asm.Literal(ffuncs.mul), (stop, dimension)),
+        )
+
     def level_lower_increment(self, ctx, obj, op, val, pos):
         raise NotImplementedError(
             "DenseLevelFType does not support level_lower_increment."
@@ -182,31 +191,27 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             pos_2 = asm.Variable(
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
-            ctx.exec(
-                asm.Assign(
-                    pos_2,
+            child_pos = asm.Call(
+                asm.Literal(ffuncs.add),
+                (
                     asm.Call(
-                        asm.Literal(ffuncs.add),
-                        (
-                            pos,
-                            asm.Call(
-                                asm.Literal(ffuncs.mul),
-                                (
-                                    asm.GetAttr(lvl, asm.Literal("stride")),
-                                    asm.Variable(
-                                        idx.name, idx.type_
-                                    ),  # TODO: lower with ctx.ctx
-                                ),
-                            ),
-                        ),
+                        asm.Literal(ffuncs.mul),
+                        (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
                     ),
-                )
+                    ctx.ctx(idx),
+                ),
             )
+            if child_pos.result_type != self.position_type:
+                child_pos = asm.Call(
+                    asm.Literal(ffuncs.astype(self.position_type)), (child_pos,)
+                )
+            ctx.exec(asm.Assign(pos_2, child_pos))
             return lplt.Run(
-                ntn.Fiber(
-                    ntn.Child(level),
-                    ntn.Value(pos_2, self.position_type),
-                    (*tns.idxs, idx),
+                replace(
+                    tns,
+                    lvl=ntn.Child(level),
+                    pos=ntn.Value(pos_2, self.position_type),
+                    idxs=(*tns.idxs, idx),
                 )
             )
 
