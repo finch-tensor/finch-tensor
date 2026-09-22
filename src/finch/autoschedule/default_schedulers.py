@@ -157,7 +157,11 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicFactorizer(
             LogicSimplify(
-                BFSLoopOrderer(GalleyFormatter(LogicCompiler(FinchJLCompiler())))
+                BFSLoopOrderer(
+                    GalleyFormatter(
+                        LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime()))
+                    )
+                )
             )
         ),
         stats_factory=DCStatsFactory(),
@@ -190,7 +194,9 @@ NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
         LogicSimplify(
             DefaultLogicFormatter(
                 LogicCompiler(
-                    FinchJLCompiler() if julia_available() else NotationInterpreter()
+                    FinchJLCompiler(DefaultFinchJLRuntime())
+                    if julia_available()
+                    else NotationInterpreter()
                 )
             )
         ),
