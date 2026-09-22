@@ -8,7 +8,6 @@ from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs
 from finch.compile.lower import DefaultPass, LoopletContext, LoopletPass, SymbolicExtent
-from finch.finch_notation.proves import prove
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
 
 
@@ -224,41 +223,6 @@ class Sequence(Looplet):
     @property
     def pass_request(self):
         return SequencePass()
-
-    def truncate(
-        self,
-        ctx: LoopletContext,
-        current_ext: SymbolicExtent,
-        remaining_ext: SymbolicExtent,
-    ):
-        if prove(
-            ntn.Call(
-                ntn.L(ffuncs.ge),
-                (
-                    ntn.Call(
-                        ntn.L(ffuncs.sub),
-                        (current_ext.get_end(), current_ext.get_unit()),
-                    ),
-                    remaining_ext.get_end(),
-                ),
-            )
-        ):
-            return self.head(ctx, ctx.idx)
-        if prove(
-            ntn.Call(
-                ntn.L(ffuncs.eq),
-                (current_ext.get_end(), remaining_ext.get_end()),
-            )
-        ):
-            return self
-        return Switch(
-            asm.Call(
-                asm.L(ffuncs.lt),
-                (ctx.ctx(remaining_ext.get_end()), ctx.ctx(current_ext.get_end())),
-            ),
-            self,
-            self.head(ctx, ctx.idx),
-        )
 
 
 class SequencePass(LoopletPass):

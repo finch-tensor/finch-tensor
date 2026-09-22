@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -264,6 +265,7 @@ class MLIRForm(Form):
                 | asm.SetAttr(_, _, _)
                 | asm.Store(_, _, _)
                 | asm.Return(_)
+                | asm.Assert(_)
             ):
                 pass
 
@@ -1046,6 +1048,11 @@ class MLIRContext(Context):
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
         match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = json.dumps(f"Finch assertion failed: {exp}")
+                self.exec(f"{feed}cf.assert {condition}, {message}")
+                return None
             case asm.Literal(value):
                 # A Scalar-wrapped literal (a sparse gap read) carries its dtype
                 # in element_type; the Scalar's own ftype is a struct, which is

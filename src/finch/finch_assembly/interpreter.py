@@ -150,6 +150,10 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
 
     def _dispatch(self, prgm):
         match prgm:
+            case asm.Assert(exp):
+                if not self(exp):
+                    raise AssertionError(f"Finch assertion failed: {exp}")
+                return None
             case asm.Literal(value):
                 return value
             case asm.Variable(var_n, var_t):

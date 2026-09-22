@@ -737,6 +737,14 @@ class NumbaContext(Context):
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
         match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = f"Finch assertion failed: {exp}"
+                self.exec(
+                    f"{feed}if not ({condition}):\n"
+                    f"{feed}{self.tab}raise AssertionError({message!r})"
+                )
+                return None
             case asm.Literal(value):
                 if is_dynamic(value):
                     # str() would silently emit broken source.

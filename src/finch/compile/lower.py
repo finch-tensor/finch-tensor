@@ -332,17 +332,26 @@ class HaltState:
     return_var: Any = None
 
 
+@dataclass(frozen=True)
+class CompilerMode:
+    safe: bool = False
+
+
 class NotationCompiler(UnvalidatedForm, NotationLoader):
     def __init__(
         self,
         ctx_load: AssemblyLoader | None = None,
         ctx_transforms: tuple[AssemblyTransform, ...] | None = None,
         ctx_lower: NotationLowerer | None = None,
+        *,
+        mode: CompilerMode | None = None,
     ):
         if ctx_load is None:
             ctx_load = AssemblyInterpreter()
         if ctx_lower is None:
-            ctx_lower = AssemblyGenerator()
+            ctx_lower = AssemblyGenerator(mode=mode)
+        elif mode is not None:
+            raise ValueError("Configure mode on ctx_lower when supplying a lowerer.")
         self.ctx_load: AssemblyLoader = ctx_load
         if ctx_transforms is None:
             ctx_transforms = (LowerPackedStructSlots(),)
@@ -362,11 +371,11 @@ class AssemblyGenerator(UnvalidatedForm, NotationLowerer):
     Compiles Finch Notation to Finch Assembly.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, *, mode: CompilerMode | None = None):
+        self.mode = mode if mode is not None else CompilerMode()
 
     def lower(self, term: ntn.Module) -> asm.Module:
-        ctx = AssemblyContext()
+        ctx = AssemblyContext(mode=self.mode)
         return ctx(term)
 
 
@@ -386,6 +395,7 @@ class AssemblyContext(Context):
         access_modes=None,
         types=None,
         func_state: HaltState | None = None,
+        mode: CompilerMode | None = None,
     ):
         super().__init__(namespace=namespace, preamble=preamble, epilogue=epilogue)
         if bindings is None:
@@ -401,6 +411,7 @@ class AssemblyContext(Context):
         self.access_modes = access_modes
         self.types = types
         self.func_state = func_state
+        self.mode = mode if mode is not None else CompilerMode()
 
     def _slot_expr(self, slot):
         match slot:
@@ -435,6 +446,7 @@ class AssemblyContext(Context):
         blk.access_modes = self.access_modes
         blk.types = self.types
         blk.func_state = self.func_state
+        blk.mode = self.mode
         return blk
 
     def scope(self):
@@ -736,6 +748,24 @@ def lower_looplets(
             case ntn.Access(tns, mode, (j, *idxs)):
                 if j == idx:
                     tns = ctx_2.resolve(tns)
+                    if ctx.mode.safe:
+                        start = ctx_2(ext.get_start())
+                        end = ctx_2(ext.get_end())
+                        size = ctx_2(ntn.Dimension(tns, ntn.Literal(0)))
+                        ctx.exec(
+                            asm.Assert(
+                                asm.Call(
+                                    asm.Literal(ffuncs.and_),
+                                    (
+                                        asm.Call(
+                                            asm.Literal(ffuncs.ge),
+                                            (start, asm.Literal(start.result_type(0))),
+                                        ),
+                                        asm.Call(asm.Literal(ffuncs.le), (end, size)),
+                                    ),
+                                )
+                            )
+                        )
                     match tns:
                         case ntn.Full(val, (_, *shape)) if mode == ntn.Read():
                             tns_2 = looplets.Run(ntn.Full(val, tuple(shape)))
@@ -785,6 +815,10 @@ class LoopletContext(Context):
     def __init__(self, ctx: AssemblyContext, idx):
         self.ctx: AssemblyContext = ctx
         self.idx = idx
+
+    @property
+    def mode(self) -> CompilerMode:
+        return self.ctx.mode
 
     def freshen(self, *tags):
         return self.ctx.freshen(*tags)

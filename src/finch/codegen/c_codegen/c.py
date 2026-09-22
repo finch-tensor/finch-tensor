@@ -1,4 +1,5 @@
 import ctypes
+import json
 import logging
 import shutil
 import subprocess
@@ -740,6 +741,18 @@ class CContext(Context):
         lower the program to C code.
         """
         match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = json.dumps(f"Finch assertion failed: {exp}\n")
+                self.add_header("#include <stdio.h>")
+                self.add_header("#include <stdlib.h>")
+                self.exec(
+                    f"{feed}if (!({condition})) {{\n"
+                    f"{feed}{self.tab}fputs({message}, stderr);\n"
+                    f"{feed}{self.tab}exit(1);\n"
+                    f"{feed}}}"
+                )
+                return None
             case asm.Literal(value):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
