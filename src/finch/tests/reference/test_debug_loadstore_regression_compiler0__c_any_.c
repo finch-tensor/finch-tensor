@@ -22,18 +22,16 @@ FINCH_EXPORT int64_t finch_access(struct CNumpyBuffer* a, int64_t idx) {
     struct CNumpyBuffer* a_ = a;
     int64_t* a__data = (int64_t*)a_->data;
     size_t a__length = a_->length;
-    size_t computed = (idx);
-    if (computed < 0 || computed >= (a__length)) {
-        fprintf(stderr, "Index out of bounds error!");
+    if (!(idx >= (int64_t)0 & idx < a__length)) {
+        fputs("Finch assertion failed: and_(ge(idx, 0), lt(idx, length(slot(a_, np_buf_t(int64)))))\n", stderr);
         exit(1);
     }
-    int64_t val = (a__data)[computed];
-    size_t computed_2 = (idx);
-    if (computed_2 < 0 || computed_2 >= (a__length)) {
-        fprintf(stderr, "Index out of bounds error!");
+    int64_t val = (a__data)[idx];
+    if (!(idx >= (int64_t)0 & idx < a__length)) {
+        fputs("Finch assertion failed: and_(ge(idx, 0), lt(idx, length(slot(a_, np_buf_t(int64)))))\n", stderr);
         exit(1);
     }
-    int64_t val2 = (a__data)[computed_2];
+    int64_t val2 = (a__data)[idx];
     return val;
 }
 
@@ -41,11 +39,10 @@ FINCH_EXPORT int64_t finch_change(struct CNumpyBuffer* a, int64_t idx, int64_t v
     struct CNumpyBuffer* a_ = a;
     int64_t* a__data_2 = (int64_t*)a_->data;
     size_t a__length_2 = a_->length;
-    size_t computed_3 = (idx);
-    if (computed_3 < 0 || computed_3 >= (a__length_2)) {
-        fprintf(stderr, "Index out of bounds error!");
+    if (!(idx >= (int64_t)0 & idx < a__length_2)) {
+        fputs("Finch assertion failed: and_(ge(idx, 0), lt(idx, length(slot(a_, np_buf_t(int64)))))\n", stderr);
         exit(1);
     }
-    (a__data_2)[computed_3] = val;
+    (a__data_2)[idx] = val;
     return (int64_t)0;
 }

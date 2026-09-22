@@ -194,17 +194,28 @@ def buffer_program(buffer_type, *, write=False, resize=False, scan=False):
     )
 
 
-@pytest.mark.parametrize("loader", [asm.AssemblyInterpreter, NumbaCompiler])
+@pytest.mark.parametrize(
+    "loader",
+    [
+        asm.AssemblyInterpreter,
+        NumbaCompiler,
+        pytest.param(CCompiler, marks=pytest.mark.c_backend),
+    ],
+)
 @pytest.mark.parametrize("write", [False, True])
-def test_debug_buffer_bounds(loader, write):
-    buffer = NumpyBuffer(np.arange(3, dtype=np.int64))
+@pytest.mark.parametrize("size", [0, 1, 3])
+def test_debug_buffer_bounds(loader, write, size):
+    buffer = NumpyBuffer(np.arange(size, dtype=np.int64))
     program = buffer_program(buffer.ftype, write=write)
     kernel = loader()(program, mode=CompilerMode(debug=True)).access
     assert kernel.ftype == program.funcs[0].name.result_type
-    assert kernel(buffer, np.intp(2)) == (42 if write else 2)
-    for index in (-1, 3):
-        with pytest.raises(AssertionError):
-            kernel(buffer, np.intp(index))
+    for index in range(size):
+        assert kernel(buffer, np.intp(index)) == (42 if write else index)
+        assert buffer.load(index) == (42 if write else index)
+    if loader is not CCompiler:
+        for index in (-1, size, size + 1):
+            with pytest.raises(AssertionError):
+                kernel(buffer, np.intp(index))
 
 
 @pytest.mark.parametrize(
@@ -258,8 +269,10 @@ def test_buffer_checks_only_in_debug_mode(generator):
 
 @pytest.mark.c_backend
 @pytest.mark.parametrize("write", [False, True])
-@pytest.mark.parametrize("index", [-1, 3])
-def test_debug_buffer_c_failure(write, index):
+@pytest.mark.parametrize("size", [0, 1, 3])
+@pytest.mark.parametrize("side", ["lower", "upper"])
+def test_debug_buffer_c_failure(write, size, side):
+    index = -1 if side == "lower" else size
     result = subprocess.run(
         [
             sys.executable,
@@ -271,7 +284,7 @@ from finch.codegen.c_codegen import CCompiler
 from finch.compile import CompilerMode
 from finch.tests.test_safe_mode import buffer_program
 
-buffer = NumpyBuffer(np.arange(3, dtype=np.int64))
+buffer = NumpyBuffer(np.arange({size}, dtype=np.int64))
 kernel = CCompiler()(
     buffer_program(buffer.ftype, write={write}), mode=CompilerMode(debug=True)
 ).access
