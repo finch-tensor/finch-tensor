@@ -282,10 +282,10 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                     before_item = args[:idx]
                     after_item = args[idx + 1 :]
                     match unwrap_reorder(item):
-                        case Aggregate(Literal(g), Literal(init), arg, idxs) as agg if (
+                        case Aggregate(Literal(g), Literal(init), arg, idxs) if (
                             is_distributive(f.ftype, g.ftype)
                             and is_annihilator(f.ftype, init)
-                            and len(agg.fields())
+                            and len(arg.fields())
                             == len(
                                 MapJoin(
                                     Literal(f), (*before_item, arg, *after_item)
