@@ -3,7 +3,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from typing import TypeVar
 
 from finch.algebra import StaticFill, ffuncs, is_annihilator
-from finch.autoschedule.galley.logical_optimizer import insert_statistics
+from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
     Aggregate,

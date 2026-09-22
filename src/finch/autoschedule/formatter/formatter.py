@@ -1,12 +1,12 @@
 import logging
 import random
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 import numpy as np
 
 from finch import finch_logic as lgc
 from finch.algebra import AbstractFill, FType, TensorFType, TupleFType, ftype
-from finch.autoschedule.stages import LoopOrderedForm
+from finch.autoschedule.stages import LogicFormatter
 from finch.codegen import NumpyBufferFType
 from finch.finch_logic import (
     LogicLoader,
@@ -22,18 +22,13 @@ from finch.util.logging import LOG_LOGIC_POST_OPT
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-class LogicFormatter(LoopOrderedForm, LogicLoader, ABC):
-    def __init__(
-        self,
-        loader: LogicLoader | None = None,
-    ):
+class MonoLogicFormatter(LogicFormatter):
+    def __init__(self, loader: LogicLoader | None = None):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
         self.ctx = loader
 
-
-class MonoLogicFormatter(LogicFormatter):
     @abstractmethod
     def get_tensor_ftype(
         self, fill_value: AbstractFill, shape_type: tuple[FType, ...]

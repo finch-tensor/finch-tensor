@@ -4,14 +4,12 @@ import finch
 from finch.algebra import ffuncs
 from finch.algebra.ftypes import ftype
 from finch.autoschedule import (
-    DefaultLogicOptimizer,
+    DefaultLogicFactorizer,
     DefaultLoopOrderer,
     LogicCapture,
     normalize_names,
 )
-from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_ordering import concordize, heuristic_loop_order
-from finch.autoschedule.optimize import (
+from finch.autoschedule.factorizer.optimize import (
     isolate_aggregates,
     lift_fields,
     optimize,
@@ -19,6 +17,11 @@ from finch.autoschedule.optimize import (
     propagate_map_queries,
     propagate_map_queries_backward,
     propagate_transpose_queries,
+)
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_ordering import (
+    concordize,
+    heuristic_loop_order,
 )
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import flatten_plans, push_fields
@@ -129,17 +132,17 @@ def test_propagate_map_queries_backward():
             Query(Alias("table-1"), Table(Alias("A1"), (Field("i0"), Field("i1")))),
             Query(
                 Alias("map-join-1"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Literal(10), (Field("i2"),)),
-                        Aggregate(
-                            Literal(ffuncs.add),
-                            Literal(0),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Table(Literal(10), (Field("i2"),)),
                             Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
-                            (Field("i3"),),
                         ),
                     ),
+                    (Field("i3"),),
                 ),
             ),
             Query(
@@ -815,7 +818,7 @@ def test_scheduler_e2e_sddmm(file_regression):
     )
 
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(
+    scheduler = DefaultLogicFactorizer(
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
     bindings = {
@@ -894,7 +897,7 @@ def test_scheduler_inplace(file_regression):
         ),
     )
     capture = LogicCapture()
-    scheduler = DefaultLogicOptimizer(
+    scheduler = DefaultLogicFactorizer(
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
 

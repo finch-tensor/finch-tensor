@@ -1,6 +1,7 @@
 import threading
 from contextlib import contextmanager
 
+from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
@@ -22,24 +23,23 @@ from finch.finch_notation.interpreter import NotationInterpreter
 
 from .compiler import LogicCompiler
 from .executor import LogicExecutor
-from .formatter import DefaultLogicFormatter
-from .galley_optimize import GalleyLogicalOptimizer
-from .loop_ordering import DefaultLoopOrderer
+from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
+from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .optimize import DefaultLogicOptimizer
-from .smart_formatter import FDFormatter
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader())))
         )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
@@ -50,7 +50,7 @@ INTERPRET_NOTATION = LogicNormalizer(
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -63,7 +63,7 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -85,7 +85,7 @@ COMPILE_NUMBA = LogicNormalizer(
 
 COMPILE_NUMBA_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -107,7 +107,7 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
 
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
@@ -119,7 +119,7 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
 
 COMPILE_MLIR = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
@@ -141,7 +141,7 @@ COMPILE_MLIR = LogicNormalizer(
 
 COMPILE_JULIA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     FDFormatter(LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime())))
@@ -149,6 +149,18 @@ COMPILE_JULIA = LogicNormalizer(
             )
         ),
         stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+COMPILE_JULIA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                BFSLoopOrderer(GalleyFormatter(LogicCompiler(FinchJLCompiler())))
+            )
+        ),
+        stats_factory=DCStatsFactory(),
         cache=True,
     )
 )
@@ -164,8 +176,23 @@ _NON_RECURSIVE_BACKEND = (
 
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND))
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+# Accept already ordered, concordant statistics plans and use dense outputs.
+NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        LogicSimplify(
+            DefaultLogicFormatter(
+                LogicCompiler(
+                    FinchJLCompiler() if julia_available() else NotationInterpreter()
+                )
+            )
         ),
         stats_factory=FDStatsFactory(),
         cache=True,

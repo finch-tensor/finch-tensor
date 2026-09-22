@@ -11,7 +11,7 @@ from finch.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFacto
 from finch.finch_logic.nodes import TableValue
 from finch.symbolic import Namespace, PostWalk, Rewrite, UnvalidatedForm
 
-from .formatter import BufferizedNDArrayFormatter
+from .formatter.formatter import BufferizedNDArrayFormatter
 
 
 def extract_tensors(
