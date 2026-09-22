@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Generic, Self, TypeVar
 
+from .hashcons import HashCons
+
 """
 This module contains definitions for common functions that are useful for symbolic
 expression manipulation. Its purpose is to provide a shared interface between various
@@ -48,7 +50,7 @@ Notes:
 T = TypeVar("T")
 
 
-class Term:
+class Term(HashCons):
     @abstractmethod
     def head(self) -> Callable[..., Self]:
         """Return the head type of the S-expression."""
@@ -65,7 +67,7 @@ class Term:
         ...
 
 
-@dataclass(frozen=True, eq=True)
+@dataclass(frozen=True, eq=False)
 class TermTree(Term, ABC):
     @property
     @abstractmethod
@@ -73,14 +75,30 @@ class TermTree(Term, ABC):
         """Return the children (AKA tail) of the S-expression."""
         ...
 
+    def __hash_keys__(self) -> tuple:
+        return tuple(self.children)
 
-@dataclass(eq=True, frozen=True)
+
+@dataclass(eq=False, frozen=True)
 class LiteralTerm(Term, ABC, Generic[T]):
     """
     A leaf term which wraps the constant `val`.
     """
 
     val: T
+
+    def __hash_keys__(self) -> tuple:
+        return literal_keys(self.val)
+
+
+def literal_keys(val: Any) -> tuple:
+    """Hash keys identifying a literal value: its type and the value itself."""
+    try:
+        hash(val)
+    except TypeError:
+        # Unhashable values (e.g. arrays) are identified by pointer.
+        return (type(val), id(val))
+    return (type(val), val)
 
 
 class CallTerm(TermTree, ABC):

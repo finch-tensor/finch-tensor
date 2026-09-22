@@ -18,7 +18,7 @@ from finch.symbolic import (
 from finch.util import qual_str
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class NotationNode(Term, ABC):
     """
     NotationNode
@@ -46,7 +46,7 @@ class NotationNode(Term, ABC):
         return res if res is not None else ctx.emit()
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class NotationTree(NotationNode, TermTree):
     @property
     @abstractmethod
@@ -79,7 +79,7 @@ class NotationStatement(NotationNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Literal(NotationExpression, LiteralTerm):
     """
     Notation AST expression for the literal value `val`.
@@ -96,7 +96,7 @@ class Literal(NotationExpression, LiteralTerm):
 L = Literal
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Value(NotationExpression):
     """
     Notation AST expression for host code `val` expected to evaluate to a value of
@@ -106,6 +106,9 @@ class Value(NotationExpression):
     ex: AssemblyNode
     type_: FType
 
+    def __hash_keys__(self) -> tuple:
+        return (self.ex, self.type_)
+
     @property
     def result_type(self):
         return self.type_
@@ -114,7 +117,7 @@ class Value(NotationExpression):
         return literal_repr(type(self).__name__, {"ex": self.ex, "type_": self.type_})
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Variable(NotationExpression, NamedTerm):
     """
     Notation AST expression for a variable named `name`.
@@ -130,6 +133,9 @@ class Variable(NotationExpression, NamedTerm):
     def __post_init__(self):
         assert isinstance(self.type_, FType)
 
+    def __hash_keys__(self) -> tuple:
+        return (self.name, self.type_)
+
     @property
     def result_type(self):
         return self.type_
@@ -144,7 +150,7 @@ class Variable(NotationExpression, NamedTerm):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Call(NotationTree, NotationExpression, CallTerm):
     """
     Notation AST expression for the result of calling the function `op` on
@@ -203,7 +209,7 @@ class AccessFType(FType):
         return self.obj(val)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Dimension(NotationTree, NotationExpression):
     """
     Notation AST expression representing the dimension of tensor `tns` in
@@ -227,7 +233,7 @@ class Dimension(NotationTree, NotationExpression):
         return [self.tns, self.r]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
     Notation AST expression representing the value of tensor `tns` at the indices
@@ -253,19 +259,22 @@ class Access(NotationTree, NotationExpression):
         return [self.tns, self.mode, *self.idxs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Read(AccessMode):
     """
     Notation AST node representing a read-only access mode for a tensor.
     This mode allows reading the value of a tensor without modifying it.
     """
 
+    def __hash_keys__(self) -> tuple:
+        return ()
+
     @property
     def children(self):
         return []
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Update(AccessMode, NotationTree):
     """
     Notation AST node representing an update access mode for a tensor.  This
@@ -284,7 +293,7 @@ class Update(AccessMode, NotationTree):
         return [self.op]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Increment(NotationTree, NotationStatement):
     """
     Notation AST statement that updates the value `lhs` using `rhs`.
@@ -298,7 +307,7 @@ class Increment(NotationTree, NotationStatement):
         return [self.lhs, self.rhs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Unwrap(NotationTree, NotationExpression):
     """
     Notation AST statement that unwraps the scalar value from a 0-dimensional
@@ -320,7 +329,7 @@ class Unwrap(NotationTree, NotationExpression):
         return self.arg.result_type.element_type
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Cached(NotationTree, NotationExpression):
     """
     Notation AST expression `arg`, equivalent to the quoted expression `ref`.
@@ -342,7 +351,7 @@ class Cached(NotationTree, NotationExpression):
         return [self.arg, self.ref]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Loop(NotationTree, NotationStatement):
     """
     Notation AST statement that runs `body` for each value of `idx` in `ext`.
@@ -357,7 +366,7 @@ class Loop(NotationTree, NotationStatement):
         return [self.idx, self.ext, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class If(NotationTree, NotationStatement):
     """
     Notation AST statement that only executes `body` if `cond` is true.
@@ -371,7 +380,7 @@ class If(NotationTree, NotationStatement):
         return [self.cond, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class IfElse(NotationTree, NotationStatement):
     """
     Notation AST statement that executes `then_body` if `cond` is true, otherwise
@@ -387,7 +396,7 @@ class IfElse(NotationTree, NotationStatement):
         return [self.cond, self.then_body, self.else_body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Assign(NotationTree, NotationStatement):
     """
     Notation AST statement that defines `lhs` as having the value `rhs`.
@@ -407,14 +416,17 @@ class Cursor(NotationNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Root(Cursor):
     """
     The root level of a fiber tensor.
     """
 
+    def __hash_keys__(self) -> tuple:
+        return ()
 
-@dataclass(eq=True, frozen=True)
+
+@dataclass(eq=False, frozen=True)
 class Child(Cursor):
     """
     A child level reached from another cursor path.
@@ -423,8 +435,11 @@ class Child(Cursor):
     parent: Cursor
     attr: str = "lvl"
 
+    def __hash_keys__(self) -> tuple:
+        return (self.parent, self.attr)
 
-@dataclass(eq=True, frozen=True)
+
+@dataclass(eq=False, frozen=True)
 class Fiber(NotationExpression):
     """
     A lowering cursor for fiber-tree access.
@@ -437,12 +452,15 @@ class Fiber(NotationExpression):
     idxs: tuple[Any, ...] = ()
     dirty: bool = False
 
+    def __hash_keys__(self) -> tuple:
+        return (self.root, self.lvl, self.pos, self.type, self.idxs, self.dirty)
+
     @property
     def result_type(self):
         return self.type
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Slot(NotationExpression, NamedTerm):
     """
     Represents a register to a symbolic object. Using a register in an
@@ -455,6 +473,9 @@ class Slot(NotationExpression, NamedTerm):
 
     name: str
     type: Any
+
+    def __hash_keys__(self) -> tuple:
+        return (self.name, self.type)
 
     @property
     def result_type(self):
@@ -469,7 +490,7 @@ class Slot(NotationExpression, NamedTerm):
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Unpack(NotationTree, NotationStatement):
     """
     Attempts to convert `rhs` into a symbolic, which can be registerd with
@@ -490,7 +511,7 @@ class Unpack(NotationTree, NotationStatement):
         return [self.lhs, self.rhs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Repack(NotationTree, NotationStatement):
     """
     Registers updates from a symbolic object `val` with the original
@@ -510,7 +531,7 @@ class Repack(NotationTree, NotationStatement):
         return [self.val, self.obj]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
@@ -534,7 +555,7 @@ class Declare(NotationTree, NotationStatement):
         return cls(tns, init, op, shape)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Freeze(NotationTree, NotationStatement):
     """
     Notation AST statement that freezes `tns` in the current scope after
@@ -549,7 +570,7 @@ class Freeze(NotationTree, NotationStatement):
         return [self.tns, self.op]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Thaw(NotationTree, NotationStatement):
     """
     Notation AST statement that thaws `tns` in the current scope, moving the tensor
@@ -564,7 +585,7 @@ class Thaw(NotationTree, NotationStatement):
         return [self.tns, self.op]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Block(NotationTree, NotationStatement):
     """
     Notation AST statement that executes each of its arguments in turn.
@@ -581,7 +602,7 @@ class Block(NotationTree, NotationStatement):
         return list(self.bodies)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Function(NotationTree):
     """
     Represents a logical AST statement that defines a function `fun` on the
@@ -611,7 +632,7 @@ class Function(NotationTree):
         return cls(name, tuple(args), body)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Return(NotationTree, NotationStatement):
     """
     Notation AST statement that returns the value of `val` from the current
@@ -630,7 +651,7 @@ class Return(NotationTree, NotationStatement):
         return cls(val)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Module(NotationTree):
     """
     Represents a group of functions. This is the toplevel translation unit for

@@ -19,7 +19,7 @@ from .nodes import (
 )
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class NumberedStatement(FusedTree, FusedStatement):
     """
     Wrapper for AssemblyStatement that assigns a unique id to each statement
