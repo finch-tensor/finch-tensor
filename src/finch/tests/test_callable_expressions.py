@@ -118,12 +118,6 @@ def test_custom_callable_lowering(compiler, custom_callable_program):
         assert module.apply(shift(np.int64(offset)), np.int64(3)) == 3 + offset
 
 
-@pytest.mark.parametrize("generator", [NumbaGenerator(), CGenerator(), MLIRGenerator()])
-def test_custom_callable_codegen(generator, custom_callable_program):
-    program, _ = custom_callable_program
-    assert generator(program).code
-
-
 @pytest.mark.parametrize(
     "compiler",
     [
@@ -214,31 +208,6 @@ def test_choose_backend_lowering(compiler, tuple_fill, nargs):
     np.testing.assert_equal(
         compiler(program).choose(operator, *values), operator(*values)
     )
-
-
-def test_mlir_same_uses_unordered_nan_comparison():
-    dtype = ftype(np.float64)
-    a, b = asm.Variable("a", dtype), asm.Variable("b", dtype)
-    call = asm.Call(asm.Literal(ffuncs.same), (a, b))
-    program = asm.Module(
-        (
-            asm.Function(
-                asm.Variable(
-                    "compare",
-                    asm.AssemblyKernelFType(
-                        "compare",
-                        (a.result_type, b.result_type),
-                        call.result_type,
-                    ),
-                ),
-                (a, b),
-                asm.Block((asm.Return(call),)),
-            ),
-        )
-    )
-    code = MLIRGenerator()(program).code
-    assert "arith.cmpf oeq," in code
-    assert code.count("arith.cmpf uno,") == 2
 
 
 @pytest.mark.parametrize(

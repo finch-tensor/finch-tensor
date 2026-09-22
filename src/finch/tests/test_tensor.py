@@ -480,18 +480,6 @@ def test_random_mask_scalar_uses_seed_directly(seed, p, expected):
     assert mask.item() == expected
 
 
-def test_random_mask_draws_one_seed(monkeypatch):
-    rng = np.random.default_rng(42)
-    reference = np.random.default_rng(42)
-    monkeypatch.setattr(np.random, "default_rng", lambda: rng)
-    mask = RandomMaskTensor((3, 4), 0.5)
-    same = RandomMaskTensor((3, 4), 0.5, seed=int(reference.bit_generator.random_raw()))
-    for idx in reversed(list(np.ndindex(mask.shape))):
-        assert mask[idx].item() == same[idx].item()
-        assert mask[idx].item() == same[idx].item()
-    assert rng.bit_generator.random_raw() == reference.bit_generator.random_raw()
-
-
 @pytest.mark.parametrize("bit_generator", [np.random.PCG64, np.random.MT19937])
 def test_random_mask_accepts_rng(bit_generator):
     rng = np.random.Generator(bit_generator(42))

@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 
 import numpy as np
@@ -118,31 +116,6 @@ def test_kernel_module_bindings_are_independent(backend):
     assert first.apply_increment(np.int64(4)) == 5
     assert second.increment(np.int64(4)) == 99
     assert ftype(first.increment) != ftype(second.increment)
-
-
-def test_julia_cache_preserves_definition_type(monkeypatch):
-    from finch.compile_jl import compiler as jl_compiler
-
-    evaluated = []
-    monkeypatch.setattr(jl_compiler, "jl", SimpleNamespace(seval=evaluated.append))
-    monkeypatch.setattr(jl_compiler.FinchJLCompiler, "_kernels", {})
-    first = ntn.Function(
-        ntn.Variable("constant", asm.AssemblyKernelFType("constant", (), int64)),
-        (),
-        ntn.Block((ntn.Return(ntn.Literal(np.int64(1))),)),
-    )
-    second = ntn.Function(
-        ntn.Variable("constant", asm.AssemblyKernelFType("constant", (), int64)),
-        first.args,
-        first.body,
-    )
-    compiler = jl_compiler.FinchJLCompiler()
-    a = compiler(ntn.Module((first,))).constant
-    b = compiler(ntn.Module((second,))).constant
-    assert ftype(a) == first.name.result_type
-    assert ftype(b) == second.name.result_type
-    assert ftype(a) != ftype(b)
-    assert len(evaluated) == 1
 
 
 @pytest.mark.parametrize("callee_kind", ["direct", "alias", "call", "argument"])

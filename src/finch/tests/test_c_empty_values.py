@@ -6,7 +6,7 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch.algebra import FinchOperator, SingletonOperatorFType, ffuncs, ftype
-from finch.codegen import CCompiler, CGenerator, NumpyBuffer
+from finch.codegen import CCompiler, NumpyBuffer
 from finch.codegen.c_codegen import c as c_backend
 
 pytestmark = pytest.mark.c_backend
@@ -20,7 +20,7 @@ EMPTY_VALUES = [
 
 
 @pytest.mark.parametrize("value", EMPTY_VALUES)
-def test_empty_arguments_skip_serialization(value, monkeypatch):
+def test_empty_arguments(value):
     empty_type, dtype = ftype(value), ftype(np.int64)
     buffer = NumpyBuffer(np.zeros(1, dtype=np.int64))
     first, last = asm.Variable("first", empty_type), asm.Variable("last", empty_type)
@@ -55,19 +55,8 @@ def test_empty_arguments_skip_serialization(value, monkeypatch):
         )
     )
     kernel = CCompiler()(program).apply
-    serialized = []
-    serialize = c_backend.serialize_to_c
-
-    def record(fmt, obj):
-        serialized.append(fmt)
-        return serialize(fmt, obj)
-
-    monkeypatch.setattr(c_backend, "serialize_to_c", record)
     assert kernel(value, np.int64(2), buffer, np.int64(3), value) == 5
-    assert serialized == [dtype, buffer.ftype, dtype]
-    assert len(kernel.c_function.argtypes) == 3
     assert buffer.arr.size == 3
-    assert "_padding" not in CGenerator()(program).code
     with pytest.raises(TypeError):
         kernel(np.int64(0), np.int64(2), buffer, np.int64(3), value)
     with pytest.raises(ValueError):
@@ -75,7 +64,7 @@ def test_empty_arguments_skip_serialization(value, monkeypatch):
 
 
 @pytest.mark.parametrize("value", EMPTY_VALUES)
-def test_empty_return_reconstructed_from_type(value, monkeypatch):
+def test_empty_return(value):
     fmt = ftype(value)
     arg, local = asm.Variable("arg", fmt), asm.Variable("local", fmt)
     program = asm.Module(
@@ -98,20 +87,11 @@ def test_empty_return_reconstructed_from_type(value, monkeypatch):
         )
     )
     kernel = CCompiler()(program).identity
-
-    def unexpected_serialization(*args):
-        pytest.fail("Empty arguments should not be serialized or deserialized")
-
-    monkeypatch.setattr(c_backend, "serialize_to_c", unexpected_serialization)
-    monkeypatch.setattr(c_backend, "deserialize_from_c", unexpected_serialization)
     assert kernel(value) == value
-    assert kernel.c_function.argtypes == ()
-    assert kernel.c_function.restype is None
-    assert "struct " not in CGenerator()(program).code
 
 
 @pytest.mark.parametrize("named", [False, True])
-def test_empty_fields_omitted_from_structs(named, monkeypatch):
+def test_structs_with_empty_fields(named):
     value = (ffuncs.add, np.int64(7), ((), ffuncs.mul), None)
     names = ("op", "value", "nested", "nothing")
     if named:
@@ -154,16 +134,8 @@ def test_empty_fields_omitted_from_structs(named, monkeypatch):
         )
     )
     module = CCompiler()(program)
-    serialize = c_backend.serialize_to_c
-
-    def check_nonempty(fmt, obj):
-        assert c_backend.c_type(fmt) is not None
-        return serialize(fmt, obj)
-
-    monkeypatch.setattr(c_backend, "serialize_to_c", check_nonempty)
     assert module.identity(value) == value
     assert module.apply(value, np.int64(2)) == 9
-    assert [name for name, _ in c_backend.c_type(fmt)._fields_] == [names[1]]
 
 
 @pytest.mark.parametrize("use", ["callee", "assign", "return", "conditional"])

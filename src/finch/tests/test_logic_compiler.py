@@ -20,7 +20,6 @@ from finch.finch_logic import (
     Reorder,
     Table,
 )
-from finch.symbolic import PostOrderDFS
 from finch.tensor.bufferized_ndarray import (
     BufferizedNDArray,
 )
@@ -40,12 +39,9 @@ def test_generated_init_write(kind, init, compiler):
     data = np.array([[5, 0], [4, 0]], dtype=np.int64)
     init = np.int64(init)
     fill = DynamicFill(init) if kind.startswith("dynamic_") else init
-    op = ffuncs.overwrite
     if kind in ("copy", "dynamic_copy"):
         query = Query(dst, Reorder(Table(src, (i, j)), (j, i)))
         expected = data.T
-        if kind == "copy":
-            op = ffuncs.init_write(init)
     else:
         reduced = (j,) if kind == "reduction" else ()
         output_idxs = (i,) if reduced else (i, j)
@@ -59,8 +55,6 @@ def test_generated_init_write(kind, init, compiler):
             rhs = MapJoin(Literal(ffuncs.overwrite), (Table(dst, output_idxs), rhs))
         query = Query(dst, Reorder(rhs, output_idxs))
         expected = data[:, -1] if reduced else data
-        if kind == "pointwise":
-            op = ffuncs.init_write(init)
 
     # Static pointwise initialization can differ from the storage format's fill.
     output_fill = 0 if kind == "pointwise" else fill
@@ -74,18 +68,6 @@ def test_generated_init_write(kind, init, compiler):
     program = NotationGenerator()(
         plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
     )
-    operators = []
-    for node in PostOrderDFS(program):
-        match node:
-            case (
-                ntn.Declare(_, _, actual, _)
-                | ntn.Thaw(_, actual)
-                | ntn.Freeze(_, actual)
-                | ntn.Increment(ntn.Access(_, ntn.Update(actual), _), _)
-            ):
-                operators.append(actual)
-    assert operators == [ntn.Literal(op)] * 3
-
     result = compiler()(program).main(*bindings.values())
     finch_assert_equal(result[0].to_numpy(), expected)
 

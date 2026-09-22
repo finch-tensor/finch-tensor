@@ -61,6 +61,36 @@ def _requires_julia_backend():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
 
 
+def test_compile_julia_preserves_definition_type():
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLCompiler
+    from finch.finch_assembly import AssemblyKernelFType
+
+    tensor = ft.asarray(np.arange(6, dtype=np.int64).reshape(2, 3))
+    arg = ntn.Variable("tensor", tensor.ftype)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (arg,))
+    definitions = tuple(
+        ntn.Function(
+            ntn.Variable(
+                "identity",
+                AssemblyKernelFType("identity", (arg.result_type,), result.result_type),
+            ),
+            (arg,),
+            ntn.Block((ntn.Return(result),)),
+        )
+        for _ in range(2)
+    )
+    compiler = FinchJLCompiler()
+    first, second = (
+        compiler(ntn.Module((definition,))).identity for definition in definitions
+    )
+    assert ftype(first) == definitions[0].name.result_type
+    assert ftype(second) == definitions[1].name.result_type
+    assert ftype(first) != ftype(second)
+    for kernel in (first, second):
+        np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
+
+
 @pytest.mark.parametrize(
     "mask",
     [

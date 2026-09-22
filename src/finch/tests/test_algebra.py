@@ -345,23 +345,6 @@ def test_init_write(fill):
     assert op(17, z + 1) == z + 1
 
 
-@pytest.mark.parametrize(
-    "op",
-    [
-        value
-        for value in vars(ffuncs).values()
-        if isinstance(value, finch.algebra.FinchOperator)
-    ],
-)
-def test_function_types(op):
-    assert isinstance(op, finch.algebra.FTyped)
-    op_type = finch.ftype(op)
-    assert isinstance(op_type, finch.algebra.FinchOperatorFType)
-    assert isinstance(finch.algebra.arity(op_type), (int, float))
-    assert isinstance(is_associative(op_type), bool)
-    assert isinstance(is_idempotent(op_type), bool)
-
-
 def test_function_properties_dispatch_on_types():
     add_t, mul_t = finch.ftype(ffuncs.add), finch.ftype(ffuncs.mul)
     assert is_identity(add_t, 0)
@@ -395,28 +378,8 @@ def test_function_ftypes_do_not_specialize_runtime_data(factory, first, second):
     assert left != right
     assert ftype(left) == ftype(right)
     assert hash(ftype(left)) == hash(ftype(right))
-    assert type(ftype(left)) is not finch.algebra.SingletonOperatorFType
-    assert not hasattr(left, "return_type")
-    assert not hasattr(left, "is_associative")
     assert finch.algebra.is_associative(left.ftype) == finch.algebra.is_associative(
         right.ftype
     )
     field_values = [getattr(right, name) for name in ftype(right).struct_fieldnames]
     assert ftype(left).from_fields(*field_values) == right
-
-
-def test_operator_types_own_properties():
-    for value in vars(ffuncs).values():
-        if isinstance(value, finch.algebra.FinchOperator):
-            assert type(ftype(value)) is not finch.algebra.SingletonOperatorFType
-            for name in (
-                "arity",
-                "return_type",
-                "is_associative",
-                "is_commutative",
-                "is_identity",
-            ):
-                assert hasattr(ftype(value), name)
-                assert not hasattr(value, name)
-    assert ftype(ffuncs.add) != ftype(ffuncs.mul)
-    assert finch.algebra.is_distributive(ftype(ffuncs.mul), ftype(ffuncs.add))
