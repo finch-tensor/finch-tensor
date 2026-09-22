@@ -24,7 +24,9 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                     match arg:
                         case ntn.Unwrap(
                             ntn.Access(
-                                looplets.Run(ntn.Full(ntn.Literal(val))) as tns,
+                                ntn.Looplet(
+                                    looplets.Run(ntn.Full(ntn.Literal(val))), _
+                                ) as tns,
                                 ntn.Read(),
                                 idxs,
                             )

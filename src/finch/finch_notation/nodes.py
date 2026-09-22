@@ -14,7 +14,7 @@ from finch.algebra import (
     ftype,
     return_type,
 )
-from finch.finch_assembly import AssemblyExpression, AssemblyKernelFType, AssemblyNode
+from finch.finch_assembly import AssemblyExpression, AssemblyKernelFType
 from finch.symbolic import (
     CallTerm,
     Context,
@@ -28,6 +28,7 @@ from finch.symbolic import (
 from finch.util import qual_str
 
 if TYPE_CHECKING:
+    from finch.compile.looplets import Looplet as LoopletImpl
     from finch.compile.lower import FinchTensorFType
     from finch.tensor.level import LevelFType
 
@@ -117,7 +118,7 @@ class Value(NotationExpression):
     type `type_`.
     """
 
-    ex: AssemblyNode
+    ex: AssemblyExpression
     type_: FType
 
     @property
@@ -126,6 +127,18 @@ class Value(NotationExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"ex": self.ex, "type_": self.type_})
+
+
+@dataclass(eq=True, frozen=True)
+class Looplet(NotationExpression):
+    """A typed tensor expression being lowered by a looplet pass."""
+
+    body: LoopletImpl
+    type_: TensorFType
+
+    @property
+    def result_type(self) -> TensorFType:
+        return self.type_
 
 
 @dataclass(eq=True, frozen=True)
@@ -448,7 +461,7 @@ class Cursor(NotationExpression, ABC):
 
     @property
     @abstractmethod
-    def root(self) -> NotationExpression | AssemblyExpression: ...
+    def root(self) -> NotationExpression: ...
 
     @property
     @abstractmethod
@@ -459,7 +472,7 @@ class Cursor(NotationExpression, ABC):
 class Root(NotationTree, Cursor):
     """The first level of a tensor."""
 
-    tns: NotationExpression | AssemblyExpression
+    tns: NotationExpression
 
     @property
     def root(self):
@@ -499,12 +512,12 @@ class Child(NotationTree, Cursor):
 
 
 @dataclass(eq=True, frozen=True)
-class Fiber(NotationExpression):
+class Fiber(NotationTree, NotationExpression):
     """A positioned level view, retaining the owning tensor type at the root."""
 
     lvl: Cursor
-    pos: Any
-    idxs: tuple[Any, ...] = ()
+    pos: NotationExpression
+    idxs: tuple[NotationExpression, ...] = ()
 
     @property
     def result_type(self):
@@ -514,6 +527,14 @@ class Fiber(NotationExpression):
         root_type = self.lvl.root.result_type
         assert isinstance(root_type, TensorFType)
         return tensor.FiberTensorFType(self.lvl.result_type, root_type.device)
+
+    @property
+    def children(self):
+        return [self.lvl, self.pos, *self.idxs]
+
+    @classmethod
+    def from_children(cls, lvl, pos, *idxs):
+        return cls(lvl, pos, idxs)
 
 
 @dataclass(eq=True, frozen=True)
@@ -528,7 +549,7 @@ class Slot(NotationExpression, NamedTerm):
     """
 
     name: str
-    type: Any
+    type: FType
 
     @property
     def result_type(self):
@@ -757,6 +778,8 @@ class NotationPrinterContext(Context):
                 return str(name)
             case Value(name, _):
                 return str(name)
+            case Looplet(body, _):
+                return f"looplet({body})"
             case Slot(name, _):
                 return str(name)
             case Root(tns):

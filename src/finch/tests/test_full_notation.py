@@ -106,7 +106,10 @@ def test_full_compiler():
 
 
 def test_full_run_annihilator():
-    access = ntn.Unwrap(ntn.Access(Run(ntn.Full(ntn.Literal(0))), ntn.Read(), ()))  # ty: ignore[invalid-argument-type]
+    full = ntn.Full(ntn.Literal(0))
+    access = ntn.Unwrap(
+        ntn.Access(ntn.Looplet(Run(full), full.result_type), ntn.Read(), ())
+    )
     term = ntn.Call(ntn.Literal(ffuncs.mul), (access, ntn.Literal(5)))
     assert ntn.LoopletSimplify.simplify(term) == access
     dynamic = ntn.Unwrap(

@@ -213,7 +213,6 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         q_stop = asm.Variable(ctx.freshen("q_stop"), self.position_type)
         i_stop = asm.Variable(ctx.freshen("i_stop"), self.position_type)
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
-        pos = tns.pos
         fill = (
             ntn.Value(self.lower_fill(lvl_asm), self.element_type)
             if is_dynamic(self.fill_value)
@@ -265,7 +264,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             return lplt.Run(
                 ntn.Fiber(
                     ntn.Child(level),
-                    pos_2,
+                    ntn.Value(pos_2, self.position_type),
                     (*tns.idxs, idx),
                 )
             )

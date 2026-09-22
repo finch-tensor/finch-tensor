@@ -14,6 +14,8 @@ def test_lookup_and_run(start, end, expected):
     position = ntn.Variable("position", ftype(int))
     ctx = AssemblyContext()
     ctx(ntn.Assign(result, ntn.Literal(0)))
+    lookup_type = ntn.Full(position, (ntn.Literal(end - start),)).result_type
+    run_type = ntn.Full(ntn.Literal(10), (ntn.Literal(end - start),)).result_type
 
     def lookup(ctx, idx):
         ctx.exec(asm.Assign(ctx.ctx(position), ctx.ctx(idx)))
@@ -25,9 +27,17 @@ def test_lookup_and_run(start, end, expected):
             ntn.Literal(ffuncs.add),
             (
                 result,
-                ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,))),  # ty: ignore[invalid-argument-type]
                 ntn.Unwrap(
-                    ntn.Access(Run(ntn.Full(ntn.Literal(10))), ntn.Read(), (idx,))  # ty: ignore[invalid-argument-type]
+                    ntn.Access(
+                        ntn.Looplet(Lookup(lookup), lookup_type), ntn.Read(), (idx,)
+                    )
+                ),
+                ntn.Unwrap(
+                    ntn.Access(
+                        ntn.Looplet(Run(ntn.Full(ntn.Literal(10))), run_type),
+                        ntn.Read(),
+                        (idx,),
+                    )
                 ),
             ),
         ),
@@ -46,6 +56,7 @@ def test_lookup_switch_thunk(start, end, expected):
     value = ntn.Variable("value", ftype(int))
     ctx = AssemblyContext()
     ctx(ntn.Assign(result, ntn.Literal(0)))
+    lookup_type = ntn.Full(value, (ntn.Literal(end - start),)).result_type
 
     def lookup(ctx, idx):
         return Switch(
@@ -64,7 +75,14 @@ def test_lookup_switch_thunk(start, end, expected):
         result,
         ntn.Call(
             ntn.Literal(ffuncs.add),
-            (result, ntn.Unwrap(ntn.Access(Lookup(lookup), ntn.Read(), (idx,)))),  # ty: ignore[invalid-argument-type]
+            (
+                result,
+                ntn.Unwrap(
+                    ntn.Access(
+                        ntn.Looplet(Lookup(lookup), lookup_type), ntn.Read(), (idx,)
+                    )
+                ),
+            ),
         ),
     )
     LoopletContext(ctx, idx)(SymbolicExtent(ntn.Literal(start), ntn.Literal(end)), body)

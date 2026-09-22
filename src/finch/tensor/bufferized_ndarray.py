@@ -479,7 +479,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     def unfurl(self, ctx, tns, ext, mode, proto):
         tns = ctx.resolve(tns)
-        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, tns.pos)
+        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, ctx(tns.pos))
 
     def reshape(self, arr: BufferizedNDArray, new_shape: tuple[np.intp, ...]):
         old_size = functools.reduce(operator.mul, arr.shape, np.intp(1))
@@ -505,10 +505,10 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         )
 
     def lower_unwrap(self, ctx, obj):
-        return self.lvl_t.level_lower_unwrap(ctx, obj, obj.pos)
+        return self.lvl_t.level_lower_unwrap(ctx, obj, ctx(obj.pos))
 
     def lower_increment(self, ctx, obj, op, val):
-        return self.lvl_t.level_lower_increment(ctx, obj, op, val, obj.pos)
+        return self.lvl_t.level_lower_increment(ctx, obj, op, val, ctx(obj.pos))
 
 
 class BufferizedNDArrayAccessor(Tensor):
@@ -798,7 +798,7 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
             return lplt.Run(
                 ntn.Fiber(
                     ntn.Child(level),
-                    pos_2,
+                    ntn.Value(pos_2, self.position_type),
                     (*tns.idxs, idx),
                 )
             )

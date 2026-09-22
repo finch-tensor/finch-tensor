@@ -193,7 +193,7 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             return lplt.Run(
                 ntn.Fiber(
                     ntn.Child(level),
-                    pos_2,
+                    ntn.Value(pos_2, self.position_type),
                     (*tns.idxs, idx),
                 )
             )

@@ -6,9 +6,9 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import DynamicFill, ffuncs
+from finch.algebra import DynamicFill, ffuncs, ftype
 from finch.compile.lower import AssemblyContext
-from finch.symbolic import ScopedDict
+from finch.symbolic import PostWalk, Rewrite, ScopedDict
 from finch.tensor import (
     BufferizedNDArray,
     DenseLevel,
@@ -45,7 +45,7 @@ def test_stored_levels():
         lowered = compiler(level)
         assert lowered.result_type == expected.ftype
         assert asm.AssemblyInterpreter()(lowered) is expected
-        fiber = ntn.Fiber(level, asm.Literal(np.intp(0)))
+        fiber = ntn.Fiber(level, ntn.Literal(np.intp(0)))
         assert fiber.result_type == FiberTensorFType(expected.ftype, tensor.device)
         if depth < 2:
             level = ntn.Child(level)
@@ -57,7 +57,7 @@ def test_stored_levels():
 def test_virtual_root():
     tensor = FiberTensor(DenseLevel(ElementLevel(element(0)), np.intp(3)))
     root = asm.Variable("root", VirtualChildrenFType(tensor.lvl.ftype))
-    level = ntn.Root(root)
+    level = ntn.Root(ntn.Value(root, root.result_type))
     ctx = AssemblyContext()
     interpreter = asm.AssemblyInterpreter(bindings={"level": tensor.lvl})
     assert level.result_type == tensor.lvl.ftype
@@ -92,7 +92,7 @@ def test_named_child():
 @pytest.mark.parametrize("shape", [(), (3,), (2, 3)])
 def test_ndarray_child_levels(shape):
     tensor = BufferizedNDArray.from_numpy(np.zeros(shape, dtype=np.int64))
-    root = asm.Literal(tensor)
+    root = ntn.Literal(tensor)
     level = ntn.Root(root)
     ctx = AssemblyContext()
     interpreter = ntn.NotationInterpreter()
@@ -108,7 +108,7 @@ def test_ndarray_child_levels(shape):
         assert view.ftype == level.result_type
         assert view.shape == shape[consumed:]
         assert view.tns is tensor
-        fiber = ntn.Fiber(level, asm.Literal(np.intp(0)))
+        fiber = ntn.Fiber(level, ntn.Literal(np.intp(0)))
         assert fiber.result_type.lvl_t == level.result_type
         level = ntn.Child(level)
     with pytest.raises(TypeError, match="does not support child"):
@@ -119,9 +119,9 @@ def test_ndarray_child_levels(shape):
 
 def test_ndarray_child_position_and_operation():
     tensor = BufferizedNDArray.from_numpy(np.arange(6).reshape(2, 3))
-    root = asm.Literal(tensor)
+    root = ntn.Literal(tensor)
     level = ntn.Child(ntn.Child(ntn.Root(root)))
-    fiber = ntn.Fiber(level, asm.Literal(np.intp(3)))
+    fiber = ntn.Fiber(level, ntn.Literal(np.intp(3)))
     ctx = AssemblyContext()
     load = ctx(ntn.Unwrap(ntn.Access(fiber, ntn.Read(), ())))
     interpreter = asm.AssemblyInterpreter()
@@ -136,11 +136,30 @@ def test_ndarray_child_position_and_operation():
     assert tensor.to_numpy()[1, 0] == 13
 
 
+def test_fiber_position_and_index_rewriting():
+    tensor = BufferizedNDArray.from_numpy(np.arange(6).reshape(2, 3))
+    root = ntn.Variable("tensor", tensor.ftype)
+    idx = ntn.Variable("i", ftype(np.intp))
+    pos = ntn.Call(ntn.Literal(ffuncs.mul), (idx, ntn.Literal(np.intp(3))))
+    fiber = ntn.Fiber(
+        ntn.Child(ntn.Child(ntn.Root(root))),
+        pos,
+        (idx, ntn.Literal(np.intp(0))),
+    )
+    rewritten = Rewrite(
+        PostWalk(lambda node: ntn.Literal(np.intp(1)) if node == idx else None)
+    )(fiber)
+    assert rewritten.idxs == (ntn.Literal(np.intp(1)), ntn.Literal(np.intp(0)))
+    assert rewritten.result_type == fiber.result_type
+    load = AssemblyContext()(ntn.Unwrap(ntn.Access(rewritten, ntn.Read(), ())))
+    assert asm.AssemblyInterpreter(bindings={"tensor": tensor})(load) == 3
+
+
 def test_ndarray_level_dynamic_fill():
     tensor = BufferizedNDArray.from_numpy(np.zeros((2, 3)), fill_value=DynamicFill(4.0))
-    root = asm.Literal(tensor)
+    root = ntn.Literal(tensor)
     level = ntn.Child(ntn.Root(root))
-    fiber = ntn.Fiber(level, asm.Literal(np.intp(0)))
+    fiber = ntn.Fiber(level, ntn.Literal(np.intp(0)))
     changed = fiber.result_type.with_fill(DynamicFill(9.0))
     assert changed.shape_type == fiber.result_type.shape_type
     assert changed.fill_value.value == 9.0
@@ -151,8 +170,8 @@ def test_ndarray_level_dynamic_fill():
 
 def test_owning_tensor_cursor():
     tensor = BufferizedNDArray.from_numpy(np.zeros((2, 3)))
-    root = asm.Literal(tensor)
-    fiber = ntn.Fiber(ntn.Root(root), asm.Literal(np.intp(0)))
+    root = ntn.Literal(tensor)
+    fiber = ntn.Fiber(ntn.Root(root), ntn.Literal(np.intp(0)))
     assert fiber.result_type == tensor.ftype
     assert fiber.lvl == ntn.Root(root)
 

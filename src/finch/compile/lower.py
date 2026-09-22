@@ -422,7 +422,7 @@ class AssemblyContext(Context):
             pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")
-        return ntn.Fiber(ntn.Root(slot), asm.Literal(pos_t(0)))
+        return ntn.Fiber(ntn.Root(ntn.Value(slot, type_)), ntn.Literal(pos_t(0)))
 
     def block(self):
         """
@@ -526,7 +526,7 @@ class AssemblyContext(Context):
         node.
         """
         match prgm:
-            case ntn.Literal(value) | asm.Literal(value):
+            case ntn.Literal(value):
                 return asm.Literal(value)
             case ntn.Value(expr, _):
                 return expr
@@ -534,8 +534,6 @@ class AssemblyContext(Context):
                 return tns.result_type.get_child(self(tns), "lvl")
             case ntn.Child(parent, attr):
                 return parent.result_type.level_get_child(self(parent), attr)
-            case asm.AssemblyExpression():
-                return prgm
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = tuple(self(arg) for arg in args)
@@ -543,7 +541,7 @@ class AssemblyContext(Context):
             case ntn.Assign(var, val):
                 self.exec(asm.Assign(self(var), self(val)))
                 return None
-            case ntn.Variable(var_n, var_t) | asm.Variable(var_n, var_t):
+            case ntn.Variable(var_n, var_t):
                 return asm.Variable(var_n, var_t)
             case ntn.Slot(var_n, var_t):
                 if var_n in self.types:
@@ -745,7 +743,9 @@ def lower_looplets(
                             tns_2 = tns.result_type.unfurl(
                                 ctx_2, tns, ext, mode, proto=None
                             )
-                    return ntn.Access(tns_2, mode, (j, *idxs))
+                    return ntn.Access(
+                        ntn.Looplet(tns_2, tns.result_type), mode, (j, *idxs)
+                    )
         return None
 
     body = Rewrite(PostWalk(unfurl_node))(body)
@@ -808,7 +808,7 @@ class LoopletContext(Context):
     def select_pass(self, body):
         def pass_request(node):
             match node:
-                case ntn.Access(tns, _, (j, *_)):
+                case ntn.Access(ntn.Looplet(tns, _), _, (j, *_)):
                     if j == self.idx:
                         return tns.pass_request
             return DefaultPass()

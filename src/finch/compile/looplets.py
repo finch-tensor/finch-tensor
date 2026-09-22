@@ -37,12 +37,16 @@ class ThunkPass(LoopletPass):
     def __call__(self, ctx: LoopletContext, idx, ext, body):
         def thunk_body(ctx, node: ntn.NotationNode):
             match node:
-                case ntn.Access(Thunk() as thnk, mode, (j, *idxs)) if j == idx:
+                case ntn.Access(
+                    ntn.Looplet(Thunk() as thnk, type_), mode, (j, *idxs)
+                ) if j == idx:
                     if (preamble := thnk.preamble) is not None:
                         ctx.exec(preamble(ctx, idx))
                     if (epilogue := thnk.epilogue) is not None:
                         ctx.post(epilogue(ctx, idx))
-                    return ntn.Access(thnk.body(ctx, ext), mode, (j, *idxs))
+                    return ntn.Access(
+                        ntn.Looplet(thnk.body(ctx, ext), type_), mode, (j, *idxs)
+                    )
 
         ctx_2 = ctx.scope()
         body = Rewrite(PostWalk(lambda x: thunk_body(ctx_2, x)))(body)
@@ -71,17 +75,21 @@ class SwitchPass(LoopletPass):
 
         def switch_node_if(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Switch):
+                case ntn.Access(ntn.Looplet(Switch() as tns, type_), mode, (j, *idxs)):
+                    if j == idx:
                         conditions.append(tns.cond)
-                        return ntn.Access(tns.if_true, mode, (j, *idxs))
+                        return ntn.Access(
+                            ntn.Looplet(tns.if_true, type_), mode, (j, *idxs)
+                        )
             return None
 
         def switch_node_else(node):
             match node:
-                case ntn.Access(tns, mode, (j, *idxs)):
-                    if j == idx and isinstance(tns, Switch):
-                        return ntn.Access(tns.if_false, mode, (j, *idxs))
+                case ntn.Access(ntn.Looplet(Switch() as tns, type_), mode, (j, *idxs)):
+                    if j == idx:
+                        return ntn.Access(
+                            ntn.Looplet(tns.if_false, type_), mode, (j, *idxs)
+                        )
             return None
 
         body_if = PostWalk(switch_node_if)(body)
@@ -134,9 +142,12 @@ class StepperPass(LoopletPass):
 
         def stepper_body(ctx, node: ntn.NotationNode):
             match node:
-                case ntn.Access(Stepper() as st, mode, (j, *idxs)) if j == idx:
+                case ntn.Access(
+                    ntn.Looplet(Stepper() as st, type_), mode, (j, *idxs)
+                ) if j == idx:
+                    assert st.chunk is not None
                     return ntn.Access(
-                        st.chunk,  # ty: ignore[invalid-argument-type]
+                        ntn.Looplet(st.chunk, type_),
                         mode,
                         (j, *idxs),
                     )
@@ -145,7 +156,7 @@ class StepperPass(LoopletPass):
 
         for node in PostOrderDFS(body):
             match node:
-                case Stepper() as st:
+                case ntn.Looplet(Stepper() as st, _):
                     ctx.exec(st.seek(ctx, ext))
                     steppers.append(st)
 
@@ -299,21 +310,23 @@ class SequencePass(LoopletPass):
 
         for node in PostOrderDFS(body):
             match node:
-                case Sequence() as seq:
+                case ntn.Looplet(Sequence() as seq, _):
                     found_seqs.append(seq)
 
         def sequence_node(
             node: ntn.NotationNode, heads: set[Sequence], tails: set[Sequence]
         ):
             match node:
-                case ntn.Access(Sequence() as tns, mode, (j, *idxs)) if j == idx:
+                case ntn.Access(
+                    ntn.Looplet(Sequence() as tns, type_), mode, (j, *idxs)
+                ) if j == idx:
                     if tns in heads:
                         new_tns = tns.head(ctx, idx)  # type: ignore[call-arg]
                     elif tns in tails:
                         new_tns = tns.tail(ctx, idx)
                     else:
                         raise Exception(f"Seq: {tns} not present.")
-                    return ntn.Access(new_tns, mode, (j, *idxs))
+                    return ntn.Access(ntn.Looplet(new_tns, type_), mode, (j, *idxs))
 
         variations = self.get_sequence_variations(ctx, found_seqs, [], [], ext)
         blocks = []
@@ -346,7 +359,9 @@ class RunPass(LoopletPass):
     def __call__(self, ctx, idx, ext, body):
         def run_node(node):
             match node:
-                case ntn.Access(Run(body), mode, (j, *idxs)) if j == idx:
+                case ntn.Access(ntn.Looplet(Run(body), _), mode, (j, *idxs)) if (
+                    j == idx
+                ):
                     return ntn.Access(body, mode, tuple(idxs))
             return None
 
@@ -394,8 +409,12 @@ class LookupPass(LoopletPass):
 
         def lookup_node(node):
             match node:
-                case ntn.Access(Lookup(lookup), mode, (j, *idxs)) if j == idx:
-                    return ntn.Access(lookup(ctx_2, idx), mode, (j, *idxs))
+                case ntn.Access(
+                    ntn.Looplet(Lookup(lookup), type_), mode, (j, *idxs)
+                ) if j == idx:
+                    return ntn.Access(
+                        ntn.Looplet(lookup(ctx_2, idx), type_), mode, (j, *idxs)
+                    )
             return None
 
         body_2 = PostWalk(lookup_node)(body)

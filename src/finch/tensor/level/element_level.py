@@ -166,10 +166,10 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         obj,
         op: ntn.Literal,
         val: ntn.NotationExpression,
-        pos: ntn.Variable,
+        pos: asm.AssemblyExpression,
     ):
         buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
-        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
+        pos_e, op_e, val_e = pos, ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf,
