@@ -350,6 +350,8 @@ def tensor_to_jl(obj, pin_fill: bool = False):
     """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
     forced to a zero of their dtype so the argument types line up with a
     kernel compiled under `zero_dynamic_fills`."""
+    if hasattr(obj, "raw_julia_obj"):
+        return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, FiberTensor):
