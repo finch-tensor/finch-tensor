@@ -366,6 +366,8 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
     """
     op_type = op.result_type
     match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            return f"(({ctx.ctype_name(c_type(dtype))})({ctx(args[0])}))"
         case asm.AssemblyKernelFType():
             op_type.return_type(*(arg.result_type for arg in args))
             callee = ctx.cache("callee", op)
@@ -1168,7 +1170,8 @@ def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
         for name, field in fmt.struct_fields
         if c_type(field) is not None
     ]
-    return struct_c_type(fmt)(*args)
+    value = struct_c_type(fmt)(*args)
+    return ctypes.pointer(value) if fmt.is_mutable else value
 
 
 def serialize_tuple_to_c(fmt: TupleFType, obj):
@@ -1201,10 +1204,12 @@ def deserialize_from_c(fmt: FType, obj: Any, c_obj: Any) -> None:
 
 def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
     if fmt.is_mutable:
-        for name, field in fmt.struct_fields:
-            if c_type(field) is not None:
-                setattr(obj, name, getattr(c_struct, name))
-        return
+        c_struct = c_struct.contents
+    for name, field in fmt.struct_fields:
+        value = getattr(c_struct, name) if c_type(field) is not None else None
+        deserialize_from_c(field, fmt.struct_getattr(obj, name), value)
+        if fmt.is_mutable:
+            fmt.struct_setattr(obj, name, construct_from_c(field, value))
 
 
 def construct_from_c(fmt: FType, c_obj: Any) -> Any:
@@ -1242,6 +1247,8 @@ def construct_from_c(fmt: FType, c_obj: Any) -> Any:
 
 
 def struct_construct_from_c(fmt: StructFType, c_struct):
+    if fmt.is_mutable:
+        c_struct = c_struct.contents
     args = [
         construct_from_c(
             field, getattr(c_struct, name) if c_type(field) is not None else None

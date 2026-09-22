@@ -502,7 +502,6 @@ class AssemblyContext(Context):
         self.access_modes[tns_var] = ntn.Update(op)
 
     def _rm_tensor_from_accesses(self, tns_var: str) -> None:
-        assert self.access_modes[tns_var] == ntn.Read()
         del self.access_modes[tns_var]
 
     # TODO: Move to .pyi file

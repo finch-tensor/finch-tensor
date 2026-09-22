@@ -40,20 +40,25 @@ assembly_parser = Lark(
     _stmt: assign
          | increment
          | for_loop
+         | while_loop
          | if
          | if_else
          | resize
          | _COMMENT
-    ?access_expr: access_expr INFIX_OP access_expr | CNAME | INT
-    access: CNAME "[" access_expr "]"
-    ?expr: CNAME | INT | DECIMAL | access | scansearch | bin_op | expr INFIX_OP expr
-    ?lhs: CNAME | access
+    ?access_expr: access_expr INFIX_OP access_expr | reference | INT
+    ?reference: CNAME | attribute
+    attribute: reference "." CNAME
+    access: reference "[" access_expr "]"
+    call: CNAME "(" expr ("," expr)* ")"
+    ?expr: reference | INT | DECIMAL | access | scansearch | bin_op | call | expr INFIX_OP expr
+    ?lhs: reference | access
     assign: lhs "=" expr
     increment: lhs INFIX_OP "=" expr
-    resize: "resize" "(" CNAME "," access_expr ")"
+    resize: "resize" "(" reference "," expr ")"
     scansearch: "scansearch" "(" CNAME "," expr "," expr "," expr ")"
     bin_op: OP "(" expr "," expr ")"
     for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
+    while_loop: "while" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
     if_else: "if" "(" expr ")" _NEWLINE+ block _NEWLINE+ "else" _NEWLINE+ block _NEWLINE+ "end"
 """  # noqa: E501
@@ -68,6 +73,8 @@ _OPS = {
     "<=": ffuncs.le,
     ">": ffuncs.gt,
     ">=": ffuncs.ge,
+    "==": ffuncs.eq,
+    "!=": ffuncs.ne,
     "min": ffuncs.min,
     "max": ffuncs.max,
     "add": ffuncs.add,
@@ -77,19 +84,19 @@ _OPS = {
 
 
 def parse_assembly(
-    code: str, vars: dict[str, asm.Variable], position_type: type = np.intp
+    code: str, vars: dict[str, asm.AssemblyExpression], position_type: type = np.intp
 ) -> asm.AssemblyStatement:
     """
     Parse Finch Assembly code and convert it to assembly node objects.
 
     Takes a string containing Finch Assembly code and transforms it into a structured
     representation using assembly nodes. The parser supports assignments, increments,
-    for loops, if/if-else statements, array accesses, and arithmetic/logical operations.
+    for/while loops, if/if-else statements, buffer and field accesses, and calls.
 
     Args:
         code: The Finch Assembly code to parse. Should start with "finch" or "finch-asm"
             followed by assembly statements. Comments (C/C++ style) are supported.
-        vars: Dictionary mapping variable names (as strings) to Variable objects.
+        vars: Dictionary mapping names to Assembly expressions.
             Used to resolve variable references in the assembly code.
         position_type: NumPy integer type to use for integer literals. Affects the dtype
             of parsed integer constants. (default: np.intp)
@@ -112,6 +119,10 @@ def parse_assembly(
 
     def ctx(tree: Tree):
         match tree:
+            case Token("CNAME", "true"):
+                return asm.Literal(True)
+            case Token("CNAME", "false"):
+                return asm.Literal(False)
             case Token("CNAME", val):
                 return vars[val]
             case Token("OP" | "INFIX_OP", val):
@@ -131,6 +142,10 @@ def parse_assembly(
                 )
             case Tree("if", [cond, Tree("block", bodies)]):
                 return asm.If(ctx(cond), asm.Block(tuple(ctx(b) for b in bodies)))
+            case Tree("while_loop", [cond, Tree("block", bodies)]):
+                return asm.WhileLoop(
+                    ctx(cond), asm.Block(tuple(ctx(b) for b in bodies))
+                )
             case Tree(
                 "if_else", [cond, Tree("block", bodies), Tree("block", else_bodies)]
             ):
@@ -140,7 +155,11 @@ def parse_assembly(
                     asm.Block(tuple(ctx(b) for b in else_bodies)),
                 )
             case Tree("resize", [arr, size]):
-                return asm.Call(asm.Literal(np.resize), (ctx(arr), ctx(size)))
+                return asm.Resize(ctx(arr), ctx(size))
+            case Tree("attribute", [obj, Token("CNAME", name)]):
+                return asm.GetAttr(ctx(obj), asm.Literal(name))
+            case Tree("call", [op, *args]):
+                return asm.Call(ctx(op), tuple(ctx(arg) for arg in args))
             case Tree("scansearch", [arr, x, lo, hi]):
                 return asm.Call(
                     asm.Literal(ffuncs.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
@@ -148,22 +167,26 @@ def parse_assembly(
             case Tree("bin_op", [op, expr1, expr2]):
                 return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))
             case Tree("assign", [lhs, expr]):
-                return asm.Assign(ctx(lhs), ctx(expr))
+                return assign(ctx(lhs), ctx(expr))
             case Tree("access", [tns, access_expr]):
                 return asm.Load(ctx(tns), ctx(access_expr))
-            case Tree("increment", [Tree("access", [tns, access_expr]), op, expr]):
-                expr_e: asm.AssemblyExpression = ctx(access_expr)
-                tns_e: asm.Slot = ctx(tns)
-                return asm.Store(
-                    tns_e,
-                    expr_e,
-                    asm.Call(
-                        asm.Literal(ctx(op)), (asm.Load(tns_e, expr_e), ctx(expr))
-                    ),
-                )
+            case Tree("increment", [lhs, op, expr]):
+                lhs_e = ctx(lhs)
+                return assign(lhs_e, asm.Call(asm.Literal(ctx(op)), (lhs_e, ctx(expr))))
             case Tree("expr" | "access_expr", [expr1, op, expr2]):
                 return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))
             case other:
                 raise Exception(f"{other} not recognized.")
+
+    def assign(lhs, rhs):
+        match lhs:
+            case asm.Variable():
+                return asm.Assign(lhs, rhs)
+            case asm.Load(buffer, index):
+                return asm.Store(buffer, index, rhs)
+            case asm.GetAttr(obj, attr):
+                return asm.SetAttr(obj, attr, rhs)
+            case _:
+                raise TypeError(f"Invalid assembly assignment target: {lhs}")
 
     return ctx(tree)

@@ -6,7 +6,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
-    ImmutableStructFType,
+    MutableStructFType,
     ffuncs,
     ftype,
     ftypes,
@@ -20,7 +20,7 @@ from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevel
 
 
 @dataclass(unsafe_hash=True)
-class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
+class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
@@ -42,6 +42,10 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ("dimension", self.dimension_type),
             ("ptr", self.ptr_type),
             ("idx", self.idx_type),
+            ("qos_fill", self.position_type),
+            ("qos_stop", self.position_type),
+            ("prev_pos", self.position_type),
+            ("frozen", ftypes.bool_),
         ]
 
     def __str__(self):
@@ -159,35 +163,98 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        ptr = asm.GetAttr(tns, asm.Literal("ptr"))
+        p_t = self.ptr_type.length_type
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        stop = asm.Call(
+            asm.Literal(ffuncs.add),
+            (asm.Call(asm.Literal(ffuncs.astype(p_t)), (pos,)), asm.Literal(p_t(1))),
+        )
+        ctx.exec(asm.Resize(ptr, stop))
+        ctx.exec(
+            asm.ForLoop(
+                p,
+                asm.Literal(p_t(0)),
+                stop,
+                asm.Store(ptr, p, asm.Literal(self.position_type(0))),
+            )
+        )
+        for name in ("qos_fill", "qos_stop", "prev_pos"):
+            ctx.exec(
+                asm.SetAttr(tns, asm.Literal(name), asm.Literal(self.position_type(0)))
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("frozen"), asm.Literal(False)))
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
+            ctx,
+            asm.GetAttr(tns, asm.Literal("lvl")),
+            init,
+            op,
+            shape,
+            asm.Literal(self.position_type(0)),
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
+        p_t = self.ptr_type.length_type
+        pos_stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        to_pos = asm.Literal(ffuncs.astype(self.position_type))
+        zero = asm.Literal(self.position_type(0))
+        expr = """finch
+        pos_stop = to_size(pos)
+        if (lvl.frozen)
+            lvl.qos_fill = lvl.ptr[pos_stop]
+            lvl.qos_stop = lvl.qos_fill
+            lvl.prev_pos = zero
+            p = pos_stop
+            // Difference backwards while preceding entries are still prefix sums.
+            while (p > 0)
+                lvl.ptr[p] -= lvl.ptr[p - 1]
+                if (lvl.ptr[p] != zero)
+                    if (lvl.prev_pos == zero)
+                        lvl.prev_pos = to_pos(p)
+                    end
+                end
+                p -= 1
+            end
+            lvl.frozen = false
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_thaw(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+            ctx,
+            asm.GetAttr(lvl, asm.Literal("lvl")),
+            op,
+            asm.GetAttr(lvl, asm.Literal("qos_fill")),
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
-        p_t = self.position_type
-        lvl_ptr = asm.GetAttr(lvl, asm.Literal("ptr"))
-        lvl_idx = asm.GetAttr(lvl, asm.Literal("idx"))
-        pos_stop = asm.Variable("pos_stop", p_t)
-        qos_stop = asm.Variable("qos_stop", p_t)
-        p = asm.Variable("p", p_t)
-
+        p_t = self.ptr_type.length_type
+        pos_stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
+        qos_stop = asm.Variable(ctx.freshen("qos_stop"), self.position_type)
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        to_idx_size = asm.Literal(ffuncs.astype(self.idx_type.length_type))
         expr = """finch
-        resize(lvl_ptr, pos_stop + 1)
-        for (p in 0:pos_stop)
-            lvl_ptr[p + 1] += lvl_ptr[p]
+        pos_stop = to_size(pos)
+        resize(lvl.ptr, pos_stop + 1)
+        if (lvl.frozen == false)
+            for (p in 0:pos_stop)
+                lvl.ptr[p + 1] += lvl.ptr[p]
+            end
         end
-        qos_stop = lvl_ptr[pos_stop] - 1
-        resize(lvl_idx, qos_stop)
+        qos_stop = lvl.ptr[pos_stop]
+        resize(lvl.idx, to_idx_size(qos_stop))
+        lvl.qos_fill = qos_stop
+        lvl.qos_stop = qos_stop
+        lvl.frozen = true
         """
-
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_freeze(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+            ctx,
+            asm.GetAttr(lvl, asm.Literal("lvl")),
+            op,
+            asm.GetAttr(lvl, asm.Literal("qos_fill")),
         )
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -311,8 +378,20 @@ class SparseListLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ),
         )
 
-    def from_fields(self, lvl, dimension, ptr, idx) -> "SparseListLevel":
-        return SparseListLevel(lvl, dimension, ptr, idx)
+    def from_fields(
+        self,
+        lvl,
+        dimension,
+        ptr,
+        idx,
+        qos_fill=None,
+        qos_stop=None,
+        prev_pos=0,
+        frozen=True,
+    ) -> "SparseListLevel":
+        return SparseListLevel(
+            lvl, dimension, ptr, idx, qos_fill, qos_stop, prev_pos, frozen
+        )
 
 
 def sparse_list(lvl_t, dimension_type=None):
@@ -331,6 +410,12 @@ class SparseListLevel(SingleDimensionLevel):
     dimension: np.integer
     ptr: Any = None
     idx: Any = None
+    # These cursors must survive serialization while ptr holds per-parent counts.
+    qos_fill: Any = None
+    qos_stop: Any = None
+    # One past the last occupied parent position; zero means none.
+    prev_pos: Any = 0
+    frozen: bool = True
 
     @property
     def shape(self) -> tuple:
@@ -341,6 +426,14 @@ class SparseListLevel(SingleDimensionLevel):
             self.ptr = self.lvl.buffer_factory(self.lvl.position_type)(1)
         if self.idx is None:
             self.idx = self.lvl.buffer_factory(ftype(self.dimension))(0)
+        p_t = self.lvl.position_type
+        self.qos_fill = p_t(
+            self.idx.length() if self.qos_fill is None else self.qos_fill
+        )
+        self.qos_stop = p_t(
+            self.idx.length() if self.qos_stop is None else self.qos_stop
+        )
+        self.prev_pos = p_t(self.prev_pos)
 
     @property
     def ftype(self) -> SparseListLevelFType:

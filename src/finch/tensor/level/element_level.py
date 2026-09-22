@@ -12,12 +12,14 @@ from finch.algebra import (
     ImmutableStructFType,
     StaticFill,
     as_fill,
+    ffuncs,
     ftype,
     is_dynamic,
     np_dtype,
 )
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
+from finch.finch_assembly import parse_assembly
 
 from .level import Level, LevelFType
 
@@ -179,10 +181,20 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
-        return asm.GetAttr(lvl, asm.Literal("val"))
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        size = asm.Call(
+            asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+        )
+        length = asm.Length(buf)
+        expr = """finch
+        if (length != size)
+            resize(buf, size)
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals()))
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
-        return asm.GetAttr(lvl, asm.Literal("val"))
+        pass
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")

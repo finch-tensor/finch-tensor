@@ -17,6 +17,7 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     is_dynamic,
+    np_dtype,
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
@@ -163,6 +164,8 @@ def numba_same(ctx, x, y):
 def numba_function_call(op, ctx, *args: Any) -> str:
     op_type = op.result_type
     match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            return f"{ctx.full_name(np_dtype(dtype).type)}({ctx(args[0])})"
         case asm.AssemblyKernelFType():
             op_type.return_type(*(arg.result_type for arg in args))
             return f"{ctx(op)}({', '.join(ctx(arg) for arg in args)})"
@@ -522,10 +525,11 @@ def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
 def _deserialize_asm_struct_from_numba(
     fmt: StructFType, obj, numba_struct: Any
 ) -> None:
-    if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(numba_struct, name))
-        return
+    for i, (name, field) in enumerate(fmt.struct_fields):
+        value = getattr(numba_struct, name) if fmt.is_mutable else numba_struct[i]
+        deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
+        if fmt.is_mutable:
+            fmt.struct_setattr(obj, name, construct_from_numba(field, value))
 
 
 def struct_construct_from_numba(fmt: StructFType, numba_struct):

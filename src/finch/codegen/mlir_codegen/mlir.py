@@ -264,6 +264,7 @@ class MLIRForm(Form):
                 | asm.Repack(_)
                 | asm.SetAttr(_, _, _)
                 | asm.Store(_, _, _)
+                | asm.Resize(_, _)
                 | asm.Return(_)
                 | asm.Assert(_)
             ):
@@ -515,6 +516,34 @@ def mlir_same(ctx, x, y, x_type, y_type):
 def mlir_function_call(op, ctx, *args: Any) -> str | None:
     op_type = op.result_type
     match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            arg = args[0]
+            value = ctx(arg)
+            src, dst = mlir_type(arg.result_type), mlir_type(dtype)
+            if src == dst:
+                return value
+            if (
+                src == "index"
+                and dst.startswith("i")
+                or dst == "index"
+                and src.startswith("i")
+            ):
+                instruction = "arith.index_cast"
+            elif src.startswith("i") and dst.startswith("i"):
+                instruction = (
+                    "arith.trunci"
+                    if int(src[1:]) > int(dst[1:])
+                    else (
+                        "arith.extui"
+                        if np_dtype(arg.result_type).kind == "u"
+                        else "arith.extsi"
+                    )
+                )
+            else:
+                raise NotImplementedError(f"MLIR cast from {src} to {dst}")
+            result = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{result} = {instruction} {value} : {src} to {dst}")
+            return result
         case asm.AssemblyKernelFType():
             ret = op_type.return_type(*(arg.result_type for arg in args))
             callee = ctx(op)
@@ -1152,10 +1181,15 @@ class MLIRContext(Context):
                     )
                 return buf_t.mlir_store(self, self.resolve(buffer), index, value)
 
-            case asm.Resize(_, _):
+            case asm.Resize(buffer, size):
                 # memref.realloc frees memory owned by the source numpy array,
-                # and the slot would keep referring to the stale memref
-                raise NotImplementedError("MLIR backend does not yet support Resize")
+                # so only a resize that preserves the length is supported yet.
+                self(
+                    asm.Assert(
+                        asm.Call(asm.Literal(ffuncs.eq), (asm.Length(buffer), size))
+                    )
+                )
+                return None
 
             case asm.GetAttr(obj, attr):
                 attrs = [attr.val]

@@ -1088,7 +1088,7 @@ def test_dense_matmul_mlir_regression(file_regression, caplog):
 
 
 @mlir_backend
-def test_mlir_resize_not_supported():
+def test_mlir_resize_same_length():
     buf = NumpyBuffer(np.array([1.0, 2.0, 3.0], dtype=np.float64))
     b_v, b_slt = asm.Variable("b", buf.ftype), asm.Slot("b_", buf.ftype)
     prgm = asm.Module(
@@ -1102,7 +1102,7 @@ def test_mlir_resize_not_supported():
                 asm.Block(
                     (
                         asm.Unpack(b_slt, b_v),
-                        asm.Resize(b_slt, asm.Literal(np.intp(6))),
+                        asm.Resize(b_slt, asm.Literal(np.intp(3))),
                         asm.Repack(b_slt),
                         asm.Return(asm.Literal(None)),
                     )
@@ -1110,8 +1110,8 @@ def test_mlir_resize_not_supported():
             ),
         )
     )
-    with pytest.raises(NotImplementedError, match="Resize"):
-        MLIRCompiler()(prgm)
+    MLIRCompiler()(prgm).grow(buf)
+    np.testing.assert_array_equal(buf.arr, [1.0, 2.0, 3.0])
 
 
 @mlir_backend

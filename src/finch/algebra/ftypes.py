@@ -792,11 +792,6 @@ class ImmutableStructFType(StructFType):
 
 
 class MutableStructFType(StructFType):
-    """
-    Class for a mutable struct type.
-    It is currently not used anywhere, but maybe it will be useful in the future?
-    """
-
     @property
     def is_mutable(self) -> builtins.bool:
         return True

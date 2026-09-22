@@ -127,16 +127,28 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(tns, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_declare(
             ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_freeze(
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_thaw(
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
         )

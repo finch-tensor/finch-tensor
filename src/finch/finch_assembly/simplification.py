@@ -16,6 +16,10 @@ class AssemblySimplify(UnvalidatedForm, AssemblyTransform):
         from finch.tensor.scalar import Scalar
 
         match term:
+            case asm.Call(
+                asm.AssemblyExpression(result_type=ffuncs._CastFType(dtype)), (arg,)
+            ) if arg.result_type == dtype:
+                return arg
             # overwrite(x, y) => y
             case asm.Call(op, (_, y)) if op.result_type == ffuncs.overwrite.ftype:
                 return y

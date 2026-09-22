@@ -404,10 +404,14 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, ctx(tns.pos))
 
     def lower_freeze(self, ctx, tns, op):
-        return self.lvl_t.level_lower_freeze(ctx, ctx(tns.lvl), op, ctx(tns.pos))
+        return self.lvl_t.level_lower_freeze(
+            ctx, ctx(tns.lvl), op, asm.Literal(self.position_type(1))
+        )
 
     def lower_thaw(self, ctx, tns, op):
-        return self.lvl_t.level_lower_thaw(ctx, ctx(tns.lvl), op, ctx(tns.pos))
+        return self.lvl_t.level_lower_thaw(
+            ctx, ctx(tns.lvl), op, asm.Literal(self.position_type(1))
+        )
 
     def lower_unwrap(self, ctx, obj):
         return self.lvl_t.level_lower_unwrap(ctx, obj, ctx(obj.pos))
@@ -417,7 +421,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_declare(self, ctx, tns, init, op, shape):
         return self.lvl_t.level_lower_declare(
-            ctx, ctx(tns.lvl), init, op, shape, ctx(tns.pos)
+            ctx, ctx(tns.lvl), init, op, shape, asm.Literal(self.position_type(1))
         )
 
     def lower_dim(self, ctx, obj, r):
