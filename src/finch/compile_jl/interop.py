@@ -429,7 +429,7 @@ class JuliaBufferContext:
         if cached is not None:
             return cached[1]
 
-        jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
+        jl_obj = python_tensor_to_jl(obj, pin_fill=pin_fill)
         self._tensors[key] = (obj, jl_obj)
         return jl_obj
 
