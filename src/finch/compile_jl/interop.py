@@ -388,7 +388,16 @@ def scalar_to_jl(val, pin_fill: bool = False):
 def jl_tensor_to_python(obj):
     if not (is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor)):
         return obj
-    return FiberTensor(jl_level_to_python(obj.lvl))
+    lvl = jl_level_to_python(obj.lvl)
+    if isinstance(lvl, ElementLevel):
+        # A julia tensor whose root is the element level has no dimensions, so
+        # it is a scalar rather than a zero dimensional fiber tensor.
+        val = lvl.val
+        return Scalar(
+            val.load(0) if val.length() else lvl.fill_value,
+            fill_value=lvl.fill_value,
+        )
+    return FiberTensor(lvl)
 
 
 class JuliaBufferContext:

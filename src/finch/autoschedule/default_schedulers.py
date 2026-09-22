@@ -1,6 +1,7 @@
 import threading
 from contextlib import contextmanager
 
+from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
@@ -23,7 +24,7 @@ from .compiler import LogicCompiler
 from .executor import LogicExecutor
 from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
 from .factorizer.optimize import DefaultLogicFactorizer
-from .formatter import DefaultLogicFormatter, FDFormatter, StorageCostFormatter
+from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
 
@@ -153,10 +154,10 @@ COMPILE_JULIA_GALLEY = LogicNormalizer(
     LogicExecutor(
         GalleyLogicFactorizer(
             LogicSimplify(
-                BFSLoopOrderer(StorageCostFormatter(LogicCompiler(FinchJLCompiler())))
+                BFSLoopOrderer(GalleyFormatter(LogicCompiler(FinchJLCompiler())))
             )
         ),
-        stats_factory=FDStatsFactory(),
+        stats_factory=DCStatsFactory(),
         cache=True,
     )
 )
