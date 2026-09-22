@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import weakref
+from abc import ABC, abstractmethod
+from typing import Any, Self
+
+"""
+Hash consing: constructing an object returns the canonical instance for its
+`__hash_keys__`, so structurally equal objects are the same object and equality
+is pointer equality.
+
+The table holds weak references, so an object is dropped from it as soon as
+nothing else refers to it.
+
+To intern a class, inherit from `HashCons` and define `__hash_keys__`, which
+returns the fields that identify an instance. Dataclasses must use `eq=False`
+so that the generated structural `__eq__`/`__hash__` do not replace the
+pointer-based ones defined here.
+"""
+
+_table: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
+
+
+class HashCons(ABC):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        obj = object.__new__(cls)
+        # Fill the fields so that __hash_keys__ can read them. Python calls
+        # __init__ once more on the object we return; for a frozen dataclass
+        # that only re-assigns equal field values.
+        obj.__init__(*args, **kwargs)
+        return _table.setdefault((cls, *obj.__hash_keys__()), obj)
+
+    @abstractmethod
+    def __hash_keys__(self) -> tuple:
+        """Return the tuple of values which identify this object."""
+        ...
+
+    __eq__ = object.__eq__
+    __hash__ = object.__hash__
+
+    def __copy__(self) -> Self:
+        return self
+
+    def __deepcopy__(self, memo: dict) -> Self:
+        return self
