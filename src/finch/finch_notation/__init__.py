@@ -2,6 +2,7 @@ from .cfg_builder import (
     NotationCFGBuilder,
     NumberedStatement,
 )
+from .dataflow import NotationCopyPropagationTransform, notation_copy_propagation
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
@@ -65,6 +66,7 @@ __all__ = [
     "LoopletSimplify",
     "Module",
     "NotationCFGBuilder",
+    "NotationCopyPropagationTransform",
     "NotationExpression",
     "NotationInterpreter",
     "NotationLoader",
@@ -84,4 +86,5 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
+    "notation_copy_propagation",
 ]

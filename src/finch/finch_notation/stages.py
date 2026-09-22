@@ -18,5 +18,5 @@ class NotationTransform(Stage):
     @abstractmethod
     def lower(self, term: ntn.Module) -> ntn.Module:
         """
-        Transform the given assembly term into another assembly term.
+        Transform the given notation term into another notation term.
         """
