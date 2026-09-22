@@ -346,7 +346,7 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
     return mask
 
 
-def python_tensor_to_jl(obj, pin_fill: bool = False):
+def tensor_to_jl(obj, pin_fill: bool = False):
     """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
     forced to a zero of their dtype so the argument types line up with a
     kernel compiled under `zero_dynamic_fills`."""
@@ -429,7 +429,7 @@ class JuliaBufferContext:
         if cached is not None:
             return cached[1]
 
-        jl_obj = python_tensor_to_jl(obj, pin_fill=pin_fill)
+        jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         self._tensors[key] = (obj, jl_obj)
         return jl_obj
 

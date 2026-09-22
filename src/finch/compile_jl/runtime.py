@@ -6,12 +6,14 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
 from finch.algebra import Tensor, TensorFType
 from finch.tensor import BufferizedNDArray
 from finch.tensor.np_wrapper import NumPyWrapper
 
 from .analyze import reset_argument_positions, returned_argument_positions
-from .interop import jl_tensor_to_python, python_tensor_to_jl
+from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
 
 
@@ -108,6 +110,16 @@ class JuliaOwnedTensor(Tensor):
     def to_numpy(self):
         return self._as_tensor().to_numpy()
 
+    def __array__(self, dtype=None, copy=None):
+        out = np.asarray(self.to_numpy())
+        if dtype is not None and out.dtype != dtype:
+            if copy is not None and not copy:
+                raise ValueError(
+                    "Unable to avoid copy while creating an array as requested."
+                )
+            out = out.astype(dtype)
+        return out
+
     def to_scipy(self):
         return self._as_tensor().to_scipy()
 
@@ -192,7 +204,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         if owned is not None:
             return owned
 
-        raw = python_tensor_to_jl(tensor, pin_fill=pin_fill)
+        raw = tensor_to_jl(tensor, pin_fill=pin_fill)
         owned = JuliaOwnedTensor(
             tensor.ftype,
             tuple(int(dimension) for dimension in tensor.shape),
@@ -272,7 +284,7 @@ class _BufferPool:
             return self._free[key].popitem()[1]
         tensor = ftype.construct(shape)
         return _BufferLease(
-            python_tensor_to_jl(tensor, pin_fill=pin_fill),
+            tensor_to_jl(tensor, pin_fill=pin_fill),
             key,
         )
 

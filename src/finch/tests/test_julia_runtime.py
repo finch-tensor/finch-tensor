@@ -65,7 +65,7 @@ def _runtime(monkeypatch, metadata):
         return raw
 
     julia = RecordingJulia()
-    monkeypatch.setattr(runtime_module, "python_tensor_to_jl", tensor_to_julia)
+    monkeypatch.setattr(runtime_module, "tensor_to_jl", tensor_to_julia)
     monkeypatch.setattr(runtime_module, "jl", julia)
     runtime = DefaultFinchJLRuntime()
     runtime._kernels_by_name = {

@@ -201,9 +201,11 @@ def test_compile_julia_pattern_lowering(file_regression):
         FinchJLGenerator,
         handle_fills,
     )
+    from finch.compile_jl.runtime import DefaultFinchJLRuntime
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__(DefaultFinchJLRuntime())
             self.sources = []
 
         def __call__(self, prgm):
@@ -245,10 +247,12 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
         handle_fills,
     )
     from finch.compile_jl.julia import jl
+    from finch.compile_jl.runtime import DefaultFinchJLRuntime
     from finch.finch_logic import Field, LogicSimplify
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__(DefaultFinchJLRuntime())
             self.sources = []
 
         def __call__(self, prgm):
@@ -297,10 +301,12 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
         handle_fills,
     )
     from finch.compile_jl.julia import jl
+    from finch.compile_jl.runtime import DefaultFinchJLRuntime
     from finch.finch_logic import Field, LogicSimplify
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__(DefaultFinchJLRuntime())
             self.sources = []
 
         def __call__(self, prgm):
@@ -474,10 +480,10 @@ def _compile_julia_fd(formatter):
 def _to_csr(fbr: FiberTensor) -> FiberTensor:
     """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
     own reformat, regardless of its current level structure (e.g. SparseHash)."""
-    from finch.compile_jl import jl_tensor_to_python, python_tensor_to_jl
+    from finch.compile_jl import jl_tensor_to_python, tensor_to_jl
     from finch.compile_jl.julia import jl
 
-    jl_obj = python_tensor_to_jl(fbr)
+    jl_obj = tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
     return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
 
@@ -522,9 +528,11 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
         handle_fills,
     )
     from finch.compile_jl.julia import jl
+    from finch.compile_jl.runtime import DefaultFinchJLRuntime
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__(DefaultFinchJLRuntime())
             self.sources = []
 
         def __call__(self, prgm):
