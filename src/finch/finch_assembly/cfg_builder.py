@@ -39,7 +39,7 @@ from .nodes import (
 )
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class NumberedStatement(AssemblyStatement):
     """
     Wrapper for AssemblyStatement that assigns a unique id to each statement
@@ -52,6 +52,9 @@ class NumberedStatement(AssemblyStatement):
 
     stmt: AssemblyStatement
     sid: int
+
+    def __hash_keys__(self) -> tuple:
+        return (self.stmt, self.sid)
 
     def __str__(self) -> str:
         return f"[{self.sid}] {str(self.stmt)}"

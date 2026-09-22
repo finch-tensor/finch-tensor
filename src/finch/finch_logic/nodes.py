@@ -129,7 +129,7 @@ class TableValue(FTyped):
         return hash((self.tns, self.idxs))
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class LogicNode(Term, ABC):
     """
     LogicNode
@@ -160,7 +160,7 @@ class LogicNode(Term, ABC):
         return res if res is not None else ctx.emit()
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class LogicTree(LogicNode, TermTree, ABC):
     @property
     @abstractmethod
@@ -290,7 +290,7 @@ class LogicStatement(LogicNode):
         return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Literal(LogicExpression, LiteralTerm):
     """
     Represents a logical AST expression for the literal value `val`.
@@ -301,26 +301,6 @@ class Literal(LogicExpression, LiteralTerm):
     Attributes:
         val: The literal value.
     """
-
-    def __hash__(self):
-        try:
-            return hash((type(self.val), self.val))
-        except TypeError:
-            return hash(id(self.val))
-
-    def __eq__(self, value):
-        if not isinstance(value, Literal):
-            return False
-        if type(self.val) is not type(value.val):
-            return False
-        # For consistency with __hash__, we fall back to pointer equality
-        # when the value is unhashable
-        try:
-            hash(value.val)
-            hash(self.val)
-            return self.val == value.val
-        except TypeError:
-            return id(self.val) == id(value.val)
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"val": self.val})
@@ -345,7 +325,7 @@ class Literal(LogicExpression, LiteralTerm):
         return self.val
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Value(LogicNode):
     """
     Represents a logical AST expression for an expression `ex` of type `type`,
@@ -359,8 +339,11 @@ class Value(LogicNode):
     ex: Any
     type_: Any
 
+    def __hash_keys__(self) -> tuple:
+        return (self.ex, self.type_)
 
-@dataclass(eq=True, frozen=True)
+
+@dataclass(eq=False, frozen=True)
 class Field(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for a field named `name`.
@@ -373,12 +356,15 @@ class Field(LogicNode, NamedTerm):
 
     name: str
 
+    def __hash_keys__(self) -> tuple:
+        return (self.name,)
+
     @property
     def symbol(self) -> str:
         return self.name
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Alias(LogicNode, NamedTerm):
     """
     Represents a logical AST expression for an alias named `name`. Aliases are used to
@@ -389,6 +375,9 @@ class Alias(LogicNode, NamedTerm):
     """
 
     name: str
+
+    def __hash_keys__(self) -> tuple:
+        return (self.name,)
 
     @property
     def symbol(self) -> str:
@@ -420,7 +409,7 @@ class Alias(LogicNode, NamedTerm):
         return bindings[self]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Table(LogicTree, LogicExpression):
     """
     Represents a logical AST expression for a tensor object `tns`, indexed by fields
@@ -473,7 +462,7 @@ class Table(LogicTree, LogicExpression):
         return cls(tns, idxs)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class MapJoin(LogicTree, LogicExpression, CallTerm):
     """
     Represents a logical AST expression for mapping the function `op` across `args...`.
@@ -528,7 +517,7 @@ class MapJoin(LogicTree, LogicExpression, CallTerm):
         return cls(op, args)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
@@ -579,7 +568,7 @@ class Aggregate(LogicTree, LogicExpression):
         return cls(op, init, arg, idxs)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Reorder(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reorders the dimensions of `arg` to be
@@ -628,7 +617,7 @@ class Reorder(LogicTree, LogicExpression):
         return cls(arg, idxs)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Relabel(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that relabels the dimensions of `arg` to be
@@ -669,7 +658,7 @@ class Relabel(LogicTree, LogicExpression):
         return cls(arg, idxs)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Query(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that evaluates `rhs`, binding the result to
@@ -725,7 +714,7 @@ class Query(LogicTree, LogicStatement):
         return bindings
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Produces(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
@@ -766,7 +755,7 @@ class Produces(LogicTree, LogicStatement):
         return bindings
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Plan(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that executes a sequence of statements

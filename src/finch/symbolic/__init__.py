@@ -1,6 +1,7 @@
 from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .gensym import gensym
+from .hashcons import HashCons
 from .rewriters import (
     Chain,
     Fixpoint,
@@ -16,6 +17,7 @@ from .term import (
     LiteralTerm,
     Term,
     TermTree,
+    literal_keys,
     literal_repr,
 )
 from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
@@ -29,6 +31,7 @@ __all__ = [
     "DataFlowAnalysis",
     "Fixpoint",
     "Form",
+    "HashCons",
     "LiteralTerm",
     "Memo",
     "NamedTerm",
@@ -47,6 +50,7 @@ __all__ = [
     "gensym",
     "intree",
     "isdescendant",
+    "literal_keys",
     "literal_repr",
     "simplify_rules",
 ]

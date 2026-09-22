@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from typing import Any, Self
 
 from finch.algebra import ftype, return_type
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.symbolic import (
+    Context,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_keys,
+    literal_repr,
+)
 from finch.util import qual_str
 
 """
@@ -22,7 +29,7 @@ Nested function declarations are intentionally not representable in this IR.
 """
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class FusedNode(Term, ABC):
     @classmethod
     def head(cls):
@@ -42,7 +49,7 @@ class FusedNode(Term, ABC):
         return res if res is not None else ctx.emit()
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class FusedTree(FusedNode, TermTree, ABC):
     @property
     @abstractmethod
@@ -60,9 +67,12 @@ class FusedStatement(FusedNode, ABC):
     pass
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Literal(FusedExpression):
     val: Any
+
+    def __hash_keys__(self) -> tuple:
+        return literal_keys(self.val)
 
     @property
     def result_type(self):
@@ -72,10 +82,13 @@ class Literal(FusedExpression):
         return literal_repr(type(self).__name__, {"val": self.val})
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Variable(FusedExpression, NamedTerm):
     name: str
     type_: Any = None
+
+    def __hash_keys__(self) -> tuple:
+        return (self.name, self.type_)
 
     @property
     def result_type(self):
@@ -91,7 +104,7 @@ class Variable(FusedExpression, NamedTerm):
         )
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Keyword(FusedTree, FusedNode):
     arg: str
     value: FusedExpression
@@ -115,7 +128,7 @@ class Keyword(FusedTree, FusedNode):
         return self.value.result_type
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Call(FusedTree, FusedExpression):
     fn: FusedExpression
     args: tuple[FusedExpression, ...] = ()
@@ -146,7 +159,7 @@ class Call(FusedTree, FusedExpression):
         return None
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Compare(FusedTree, FusedExpression):
     left: FusedExpression
     op: Literal
@@ -161,7 +174,7 @@ class Compare(FusedTree, FusedExpression):
         return bool
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class BinaryOp(FusedTree, FusedExpression):
     left: FusedExpression
     op: Literal
@@ -180,7 +193,7 @@ class BinaryOp(FusedTree, FusedExpression):
         return None
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Block(FusedTree, FusedStatement):
     body: tuple[FusedStatement, ...] = ()
 
@@ -193,7 +206,7 @@ class Block(FusedTree, FusedStatement):
         return cls(tuple(children))
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Assign(FusedTree, FusedStatement):
     lhs: FusedExpression
     rhs: FusedExpression
@@ -203,7 +216,7 @@ class Assign(FusedTree, FusedStatement):
         return [self.lhs, self.rhs]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class ExprStmt(FusedTree, FusedStatement):
     value: FusedExpression
 
@@ -212,7 +225,7 @@ class ExprStmt(FusedTree, FusedStatement):
         return [self.value]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class If(FusedTree, FusedStatement):
     cond: FusedExpression
     then_body: Block
@@ -229,7 +242,7 @@ class If(FusedTree, FusedStatement):
         return cls(cond, then_body, else_body)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class While(FusedTree, FusedStatement):
     cond: FusedExpression
     body: Block
@@ -239,7 +252,7 @@ class While(FusedTree, FusedStatement):
         return [self.cond, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class For(FusedTree, FusedStatement):
     target: Variable
     iterable: FusedExpression
@@ -250,7 +263,7 @@ class For(FusedTree, FusedStatement):
         return [self.target, self.iterable, self.body]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Return(FusedTree, FusedStatement):
     values: tuple[FusedExpression, ...] = ()
 
@@ -263,14 +276,14 @@ class Return(FusedTree, FusedStatement):
         return cls(tuple(values))
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Break(FusedTree, FusedStatement):
     @property
     def children(self):
         return []
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Function(FusedTree):
     name: Literal
     params: tuple[Variable, ...]
@@ -288,7 +301,7 @@ class Function(FusedTree):
         return cls(name, tuple(params), body)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=False, frozen=True)
 class Module(FusedTree):
     functions: tuple[Function, ...]
 

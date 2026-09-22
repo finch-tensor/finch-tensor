@@ -59,7 +59,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
         (fzd.Variable("fn"), fzd.Variable("n")),
         fzd.Block(
             (
-                fzd.Assign(fzd.Variable("total"), fzd.Literal(ConstantScalar(0))),
+                fzd.Assign(fzd.Variable("total"), fzd.Literal(0)),
                 fzd.For(
                     fzd.Variable("i"),
                     fzd.Call(fzd.Literal(range), (fzd.Variable("n"),)),
@@ -98,7 +98,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
                                             fzd.BinaryOp(
                                                 fzd.Variable("total"),
                                                 fzd.Literal(operator.sub),
-                                                fzd.Literal(ConstantScalar(1)),
+                                                fzd.Literal(1),
                                             ),
                                         ),
                                     )
@@ -120,7 +120,7 @@ def test_parse_simple_function_with_control_flow_and_calls():
                                 fzd.BinaryOp(
                                     fzd.Variable("total"),
                                     fzd.Literal(operator.add),
-                                    fzd.Literal(ConstantScalar(1)),
+                                    fzd.Literal(1),
                                 ),
                             ),
                         )

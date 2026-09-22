@@ -18,7 +18,7 @@ class Looplet(ABC):
     def pass_request(self): ...
 
 
-@dataclass
+@dataclass(eq=False)
 class Thunk(Looplet):
     preamble: Any = None
     body: Any = None
@@ -50,7 +50,7 @@ class ThunkPass(LoopletPass):
         ctx.exec(asm.Block(ctx_2.emit()))
 
 
-@dataclass
+@dataclass(eq=False)
 class Switch(Looplet):
     cond: Any
     if_true: Any
@@ -101,7 +101,7 @@ class SwitchPass(LoopletPass):
         )
 
 
-@dataclass
+@dataclass(eq=False)
 class Stepper(Looplet):
     preamble: Any = None
     stop: Callable = lambda ctx, ext: None
@@ -204,7 +204,7 @@ class StepperPass(LoopletPass):
         ctx.exec(asm.WhileLoop(final_cond, asm.Block(tuple(stepper_blocks))))
 
 
-@dataclass
+@dataclass(eq=False)
 class Sequence(Looplet):
     head: Callable
     split: Callable
@@ -329,7 +329,7 @@ class SequencePass(LoopletPass):
         ctx.exec(asm.Block(tuple(blocks)))
 
 
-@dataclass
+@dataclass(eq=False)
 class Run(Looplet):
     body: Any
 
@@ -367,7 +367,7 @@ class RunPass(LoopletPass):
         ctx.exec(asm.Block(ctx_2.emit()))
 
 
-@dataclass
+@dataclass(eq=False)
 class AcceptRun(Looplet):
     body: Any
 
@@ -382,7 +382,7 @@ class AcceptRunPass(LoopletPass):
         return 1
 
 
-@dataclass
+@dataclass(eq=False)
 class Lookup(Looplet):
     body: Callable
 
@@ -431,7 +431,7 @@ class LookupPass(LoopletPass):
             )
 
 
-@dataclass
+@dataclass(eq=False)
 class Jumper(Looplet):
     preamble: Any = None
     stop: Callable = lambda ctx, ext: None
@@ -453,7 +453,7 @@ class JumperPass(LoopletPass):
         return 0
 
 
-@dataclass
+@dataclass(eq=False)
 class Leaf(Looplet):
     body: Callable
 
