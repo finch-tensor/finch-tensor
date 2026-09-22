@@ -18,6 +18,7 @@ from .capture import LogicCapture
 from .compiler import LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_JULIA,
+    COMPILE_JULIA_GALLEY,
     COMPILE_MLIR,
     COMPILE_NUMBA,
     COMPILE_NUMBA_GALLEY,
@@ -44,6 +45,7 @@ from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
     "COMPILE_JULIA",
+    "COMPILE_JULIA_GALLEY",
     "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "COMPILE_NUMBA_GALLEY",

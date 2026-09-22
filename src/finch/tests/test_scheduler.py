@@ -132,17 +132,17 @@ def test_propagate_map_queries_backward():
             Query(Alias("table-1"), Table(Alias("A1"), (Field("i0"), Field("i1")))),
             Query(
                 Alias("map-join-1"),
-                MapJoin(
-                    Literal(ffuncs.mul),
-                    (
-                        Table(Literal(10), (Field("i2"),)),
-                        Aggregate(
-                            Literal(ffuncs.add),
-                            Literal(0),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    MapJoin(
+                        Literal(ffuncs.mul),
+                        (
+                            Table(Literal(10), (Field("i2"),)),
                             Table(Literal(10), (Field("i2"), Field("i3"), Field("i4"))),
-                            (Field("i3"),),
                         ),
                     ),
+                    (Field("i3"),),
                 ),
             ),
             Query(
