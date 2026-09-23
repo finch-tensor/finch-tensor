@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
@@ -12,16 +13,19 @@ import numpy as np
 from finch import algebra
 from finch import finch_assembly as asm
 from finch.algebra import (
+    DynamicFillError,
     FType,
     StructFType,
     TupleFType,
     ffuncs,
     fisinstance,
+    is_dynamic,
     np_dtype,
     promote_type,
 )
+from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import Context, Form, ScopedDict
+from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
 from .scansearch import SCANSEARCH
@@ -52,7 +56,9 @@ class MLIROperator(ABC):
     def mlir_name(self) -> str: ...
 
     @abstractmethod
-    def mlir_function_call(self, ctx: Any, *args: Any) -> Any: ...
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any: ...
 
     @staticmethod
     def is_float(arg) -> bool:
@@ -64,12 +70,16 @@ class MLIROperator(ABC):
 
 
 class MLIRNAryOperator(MLIROperator):
-    def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any:
         return mlir_nary_function_call(self.mlir_name(), ctx, *args)
 
 
 class MLIRBinaryOperator(MLIROperator):
-    def mlir_function_call(self, ctx: Any, *args: Any) -> Any:
+    def mlir_function_call(
+        self, op: asm.AssemblyExpression, ctx: Any, *args: Any
+    ) -> Any:
         return mlir_binary_function_call(self.mlir_name(), ctx, *args)
 
 
@@ -80,11 +90,12 @@ class MLIRKernel(asm.AssemblyKernel):
 
     """
 
-    def __init__(self, engine, func_name, ret_type, argtypes):
+    def __init__(self, engine, func_name, type_):
+        super().__init__(type_)
         self.engine = engine
         self.func_name = func_name
-        self.ret_type = ret_type
-        self.argtypes = argtypes
+        self.ret_type = type_.result_type
+        self.argtypes = type_.arg_types
 
     def __call__(self, *args):
         if len(args) != len(self.argtypes):
@@ -184,7 +195,13 @@ class MLIRForm(Form):
     @classmethod
     def validate_function(cls, func):
         match func:
-            case asm.Function(asm.Variable(func_name, return_type), args, body):
+            case asm.Function(
+                asm.Variable(
+                    func_name, asm.AssemblyKernelFType(result_type=return_type)
+                ),
+                args,
+                body,
+            ):
                 pass
             case _:
                 raise TypeError(f"MLIR backend expects asm.Function, got {func}")
@@ -247,7 +264,9 @@ class MLIRForm(Form):
                 | asm.Repack(_)
                 | asm.SetAttr(_, _, _)
                 | asm.Store(_, _, _)
+                | asm.Resize(_, _)
                 | asm.Return(_)
+                | asm.Assert(_)
             ):
                 pass
 
@@ -267,25 +286,25 @@ class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
     def __init__(self, ctx: MLIRLowerer | None = None):
         self.ctx: MLIRLowerer = MLIRGenerator() if ctx is None else ctx
 
-    def lower(self, prgm: asm.Module) -> MLIRLibrary:
+    def lower(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> MLIRLibrary:
         if prgm.head() != asm.Module:
             raise ValueError(
                 "MLIRCompiler expects a Module as the head of the program, "
                 f"got {type(prgm.head())}"
             )
-        mlir_code = self.ctx(prgm).code
+        mlir_code = self.ctx(prgm, mode=mode).code
         logger.debug(f"Compiling MLIR code:\n{mlir_code}")
         context, module, engine = load_mlir_engine(mlir_code)
         kernels = {}
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    arg_ts = [arg.result_type for arg in args]
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
                     kernels[func_name] = MLIRKernel(
                         engine,
                         func_name,
-                        return_t,
-                        arg_ts,
+                        func_type,
                     )
                 case _:
                     raise NotImplementedError(
@@ -296,25 +315,25 @@ class MLIRCompiler(MLIRForm, asm.AssemblyLoader):
 
 def mlir_function_name(op, arg: FType) -> str:
     match op:
-        case ffuncs.add:
+        case ffuncs._AddFType():
             if MLIROperator.is_float(arg):
                 return "arith.addf"
             return "arith.addi"
-        case ffuncs.sub:
+        case ffuncs._SubFType():
             if MLIROperator.is_float(arg):
                 return "arith.subf"
             return "arith.subi"
-        case ffuncs.mul:
+        case ffuncs._MulFType():
             if MLIROperator.is_float(arg):
                 return "arith.mulf"
             return "arith.muli"
-        case ffuncs.truediv:
+        case ffuncs._TrueDivFType():
             if MLIROperator.is_float(arg):
                 return "arith.divf"
             if MLIROperator.is_unsigned(arg):
                 return "arith.divui"
             return "arith.divsi"
-        case ffuncs.floordiv:
+        case ffuncs._FloorDivFType():
             if MLIROperator.is_float(arg):
                 raise NotImplementedError(
                     f"MLIR backend does not yet support floordiv on {arg}"
@@ -322,71 +341,71 @@ def mlir_function_name(op, arg: FType) -> str:
             if MLIROperator.is_unsigned(arg):
                 return "arith.divui"
             return "arith.floordivsi"
-        case ffuncs.mod:
+        case ffuncs._ModFType():
             if MLIROperator.is_unsigned(arg):
                 return "arith.remui"
             raise NotImplementedError(f"MLIR backend does not yet support mod on {arg}")
-        case ffuncs.min:
+        case ffuncs._MinFType():
             if MLIROperator.is_float(arg):
                 return "arith.minimumf"
             if MLIROperator.is_unsigned(arg):
                 return "arith.minui"
             return "arith.minsi"
-        case ffuncs.max:
+        case ffuncs._MaxFType():
             if MLIROperator.is_float(arg):
                 return "arith.maximumf"
             if MLIROperator.is_unsigned(arg):
                 return "arith.maxui"
             return "arith.maxsi"
-        case ffuncs.scansearch:
+        case ffuncs._ScansearchFType():
             return "scansearch"
-        case ffuncs.and_:
+        case ffuncs._AndFType():
             return "arith.andi"
-        case ffuncs.or_:
+        case ffuncs._OrFType():
             return "arith.ori"
-        case ffuncs.xor:
+        case ffuncs._XorFType():
             return "arith.xori"
-        case ffuncs.lshift:
+        case ffuncs._LShiftFType():
             return "arith.shli"
-        case ffuncs.rshift:
+        case ffuncs._RShiftFType():
             if MLIROperator.is_unsigned(arg):
                 return "arith.shrui"
             return "arith.shrsi"
-        case ffuncs.eq:
+        case ffuncs._EqFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf oeq,"
             return "arith.cmpi eq,"
-        case ffuncs.ne:
+        case ffuncs._NeFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf one,"
             return "arith.cmpi ne,"
-        case ffuncs.lt:
+        case ffuncs._LtFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf olt,"
             if MLIROperator.is_unsigned(arg):
                 return "arith.cmpi ult,"
             return "arith.cmpi slt,"
-        case ffuncs.le:
+        case ffuncs._LeFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf ole,"
             if MLIROperator.is_unsigned(arg):
                 return "arith.cmpi ule,"
             return "arith.cmpi sle,"
-        case ffuncs.gt:
+        case ffuncs._GtFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf ogt,"
             if MLIROperator.is_unsigned(arg):
                 return "arith.cmpi ugt,"
             return "arith.cmpi sgt,"
-        case ffuncs.ge:
+        case ffuncs._GeFType():
             if MLIROperator.is_float(arg):
                 return "arith.cmpf oge,"
             if MLIROperator.is_unsigned(arg):
                 return "arith.cmpi uge,"
             return "arith.cmpi sge,"
-        case ffuncs.invert:
+        case ffuncs._InvertFType():
             return "arith.xori -1"
-        case ffuncs.not_:
+        case ffuncs._NotFType():
             return "arith.xori 1"
         case MLIROperator():
             return op.mlir_name()
@@ -453,15 +472,154 @@ def mlir_call_function_call(
     return res
 
 
-def mlir_function_call(op, ctx, *args: Any) -> str:
-    match op:
-        case MLIROperator():
-            return op.mlir_function_call(ctx, *args)
+def mlir_same(ctx, x, y, x_type, y_type):
+    match x_type, y_type:
+        case TupleFType(), TupleFType():
+            if x_type.struct_fieldnames != y_type.struct_fieldnames:
+                return ctx.constant(0, "i1")
+            result = None
+            for field in x_type.struct_fieldnames:
+                comparison = mlir_same(
+                    ctx,
+                    mlir_getattr(x_type, ctx, x, [field]),
+                    mlir_getattr(y_type, ctx, y, [field]),
+                    x_type.struct_attrtype(field),
+                    y_type.struct_attrtype(field),
+                )
+                if result is None:
+                    result = comparison
+                else:
+                    combined = ctx.new_ssa()
+                    ctx.exec(
+                        f"{ctx.feed}{combined} = arith.andi {result}, {comparison} : i1"
+                    )
+                    result = combined
+            return ctx.constant(1, "i1") if result is None else result
+        case FDType(), FDType():
+            dtype = promote_type(x_type, y_type)
+            t = mlir_type(dtype)
+            equal = ctx.new_ssa()
+            comparison = mlir_function_name(ffuncs.eq.ftype, dtype)
+            ctx.exec(f"{ctx.feed}{equal} = {comparison} {x}, {y} : {t}")
+            if not MLIROperator.is_float(dtype):
+                return equal
+            x_nan, y_nan, both_nan, result = (ctx.new_ssa() for _ in range(4))
+            ctx.exec(f"{ctx.feed}{x_nan} = arith.cmpf uno, {x}, {x} : {t}")
+            ctx.exec(f"{ctx.feed}{y_nan} = arith.cmpf uno, {y}, {y} : {t}")
+            ctx.exec(f"{ctx.feed}{both_nan} = arith.andi {x_nan}, {y_nan} : i1")
+            ctx.exec(f"{ctx.feed}{result} = arith.ori {equal}, {both_nan} : i1")
+            return result
+        case _:
+            raise NotImplementedError(f"Cannot compare {x_type} and {y_type}")
 
-    match op:
-        case ffuncs._InitWrite():
+
+def mlir_function_call(op, ctx, *args: Any) -> str | None:
+    op_type = op.result_type
+    match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            arg = args[0]
+            value = ctx(arg)
+            src, dst = mlir_type(arg.result_type), mlir_type(dtype)
+            if src == dst:
+                return value
+            if (
+                src == "index"
+                and dst.startswith("i")
+                or dst == "index"
+                and src.startswith("i")
+            ):
+                instruction = "arith.index_cast"
+            elif src.startswith("i") and dst.startswith("i"):
+                instruction = (
+                    "arith.trunci"
+                    if int(src[1:]) > int(dst[1:])
+                    else (
+                        "arith.extui"
+                        if np_dtype(arg.result_type).kind == "u"
+                        else "arith.extsi"
+                    )
+                )
+            else:
+                raise NotImplementedError(f"MLIR cast from {src} to {dst}")
+            result = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{result} = {instruction} {value} : {src} to {dst}")
+            return result
+        case asm.AssemblyKernelFType():
+            ret = op_type.return_type(*(arg.result_type for arg in args))
+            callee = ctx(op)
+            values = [ctx(arg) for arg in args]
+            signature = mlir_type(op_type)
+            if isinstance(ret, StructFType):
+                ptr = ctx.new_ssa()
+                count = ctx.constant(1, "i64")
+                ctx.exec(
+                    f"{ctx.feed}{ptr} = llvm.alloca {count} x {mlir_type(ret)} "
+                    ": (i64) -> !llvm.ptr"
+                )
+                values.append(ptr)
+                ctx.exec(
+                    f"{ctx.feed}func.call_indirect {callee}({', '.join(values)}) "
+                    f": {signature}"
+                )
+                result = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{result} = llvm.load {ptr} "
+                    f": !llvm.ptr -> {mlir_type(ret)}"
+                )
+                return result
+            result = ctx.new_ssa() if ret != algebra.none_ else None
+            assignment = f"{result} = " if result is not None else ""
+            ctx.exec(
+                f"{ctx.feed}{assignment}func.call_indirect {callee}"
+                f"({', '.join(values)}) : {signature}"
+            )
+            return result
+        case MLIROperator():
+            return op_type.mlir_function_call(op, ctx, *args)
+        case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
+            return ctx(args[0])
+        case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs.make_tuple:
+        case ffuncs._InitWriteFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            return ctx(args[1])
+        case ffuncs._SameFType():
+            x, y = args
+            return mlir_same(ctx, ctx(x), ctx(y), x.result_type, y.result_type)
+        case ffuncs._ChooseFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError("Pass a dynamic choose as a runtime operator")
+            value = (
+                asm.GetAttr(op, asm.Literal("fill_value"))
+                if is_dynamic(fill)
+                else asm.Literal(fill.value)
+            )
+            fill_value = ctx(value)
+            arg_values = [ctx(arg) for arg in args]
+            result = fill_value
+            for arg, arg_value in reversed(list(zip(args, arg_values, strict=True))):
+                cond = mlir_same(
+                    ctx, arg_value, fill_value, arg.result_type, value.result_type
+                )
+                selected = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{selected} = arith.select {cond}, {result},"
+                    f" {arg_value} : {mlir_type(arg.result_type)}"
+                )
+                result = selected
+            return result
+        case ffuncs._WhereFType():
+            cond, x, y = (ctx(arg) for arg in args)
+            res = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{res} = arith.select {cond}, {x}, {y}"
+                f" : {mlir_type(args[1].result_type)}"
+            )
+            return res
+        case ffuncs._MakeTupleFType():
             t = TupleFType.from_tuple(tuple(a.result_type for a in args))
             st = mlir_type(t)
             acc = ctx.new_ssa()
@@ -472,37 +630,43 @@ def mlir_function_call(op, ctx, *args: Any) -> str:
                 ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
                 acc = nxt
             return acc
-        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+        case (
+            ffuncs._AddFType()
+            | ffuncs._MulFType()
+            | ffuncs._AndFType()
+            | ffuncs._XorFType()
+            | ffuncs._OrFType()
+        ):
             return mlir_nary_function_call(
-                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
         case (
-            ffuncs.sub
-            | ffuncs.truediv
-            | ffuncs.floordiv
-            | ffuncs.mod
-            | ffuncs.lshift
-            | ffuncs.rshift
-            | ffuncs.min
-            | ffuncs.max
-            | ffuncs.eq
-            | ffuncs.ne
-            | ffuncs.gt
-            | ffuncs.lt
-            | ffuncs.ge
-            | ffuncs.le
+            ffuncs._SubFType()
+            | ffuncs._TrueDivFType()
+            | ffuncs._FloorDivFType()
+            | ffuncs._ModFType()
+            | ffuncs._LShiftFType()
+            | ffuncs._RShiftFType()
+            | ffuncs._MinFType()
+            | ffuncs._MaxFType()
+            | ffuncs._EqFType()
+            | ffuncs._NeFType()
+            | ffuncs._GtFType()
+            | ffuncs._LtFType()
+            | ffuncs._GeFType()
+            | ffuncs._LeFType()
         ):
             return mlir_binary_function_call(
-                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
-        case ffuncs.not_ | ffuncs.invert:
+        case ffuncs._NotFType() | ffuncs._InvertFType():
             return mlir_new_function_call(
-                mlir_function_name(op, _promote_type_helper(args)), ctx, *args
+                mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
-        case ffuncs.scansearch:
+        case ffuncs._ScansearchFType():
             return mlir_call_function_call(
-                mlir_function_name(op, _promote_type_helper(args)),
-                op.return_type(*(arg.result_type for arg in args)),
+                mlir_function_name(op_type, _promote_type_helper(args)),
+                op_type.return_type(*(arg.result_type for arg in args)),
                 ctx,
                 *args,
             )
@@ -552,8 +716,12 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
 
 
 class MLIRGenerator(MLIRForm, MLIRLowerer):
-    def lower(self, prgm: asm.AssemblyNode) -> MLIRCode:
-        ctx = MLIRContext()
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> MLIRCode:
+        ctx = MLIRContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
         ctx(prgm)
         return MLIRCode(ctx.emit_global())
 
@@ -577,6 +745,16 @@ def mlir_type(t: FType):
     Convert an FType into the MLIR type string
     """
     match t:
+        case asm.AssemblyKernelFType():
+            args = [mlir_type(arg) for arg in t.arg_types]
+            if isinstance(t.result_type, StructFType):
+                args.append("!llvm.ptr")
+                ret = "()"
+            else:
+                ret = (
+                    "()" if t.result_type == algebra.none_ else mlir_type(t.result_type)
+                )
+            return f"({', '.join(args)}) -> {ret}"
         case MLIRArgumentFType():
             return t.mlir_type()
         case algebra.bool_:
@@ -821,13 +999,15 @@ class MLIRContext(Context):
         indent=1,
         bindings=None,
         slots=None,
+        *,
+        mode=None,
     ):
         if bindings is None:
             bindings = ScopedDict()
         if slots is None:
             slots = ScopedDict()
 
-        super().__init__()
+        super().__init__(mode=mode)
         self.tab = tab
         self.indent = indent
         self.bindings = bindings
@@ -857,6 +1037,13 @@ class MLIRContext(Context):
                 raise KeyError(f"Slot {var_n} not found in context")
             case _:
                 raise ValueError(f"Expected Slot, got: {type(node)}")
+
+    def cache(self, name, val):
+        if isinstance(val, asm.Literal | asm.Variable):
+            return val
+        var = asm.Variable(self.freshen(name), val.result_type)
+        self(asm.Assign(var, val))
+        return var
 
     def emit(self):
         return "\n".join([*self.preamble, *self.epilogue])
@@ -893,6 +1080,11 @@ class MLIRContext(Context):
     def __call__(self, prgm: asm.AssemblyNode):
         feed = self.feed
         match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = json.dumps(f"Finch assertion failed: {exp}")
+                self.exec(f"{feed}cf.assert {condition}, {message}")
+                return None
             case asm.Literal(value):
                 # A Scalar-wrapped literal (a sparse gap read) carries its dtype
                 # in element_type; the Scalar's own ftype is a struct, which is
@@ -906,14 +1098,19 @@ class MLIRContext(Context):
             case asm.Variable(name, _):
                 if name not in self.bindings:
                     raise ValueError(f"Variable does not exist: {name!r}")
-                return self.bindings[name][0]
+                value, type_ = self.bindings[name]
+                if value.startswith("@"):
+                    result = self.new_ssa()
+                    self.exec(f"{feed}{result} = func.constant {value} : {type_}")
+                    return result
+                return value
 
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 v = self(val)
                 self.bindings[var_n] = (v, mlir_type(var_t))
                 return None
 
-            case asm.Call(asm.Literal(op), args):
+            case asm.Call(op, args):
                 return mlir_function_call(op, self, *args)
 
             case asm.Length(buffer):
@@ -926,18 +1123,61 @@ class MLIRContext(Context):
                 buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.mlir_load(self, self.resolve(buffer), index)
 
             case asm.Store(buffer, index, value):
                 buf_t = buffer.result_type
                 if not isinstance(buf_t, MLIRBufferFType):
                     raise TypeError(f"Expected MLIR buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    index = self.cache("index", index)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (index, asm.Literal(index.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (index, asm.Length(buffer)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.mlir_store(self, self.resolve(buffer), index, value)
 
-            case asm.Resize(_, _):
+            case asm.Resize(buffer, size):
                 # memref.realloc frees memory owned by the source numpy array,
-                # and the slot would keep referring to the stale memref
-                raise NotImplementedError("MLIR backend does not yet support Resize")
+                # so only a resize that preserves the length is supported yet.
+                self(
+                    asm.Assert(
+                        asm.Call(asm.Literal(ffuncs.eq), (asm.Length(buffer), size))
+                    )
+                )
+                return None
 
             case asm.GetAttr(obj, attr):
                 attrs = [attr.val]
@@ -1317,7 +1557,11 @@ class MLIRContext(Context):
 
                 return None
 
-            case asm.Function(asm.Variable(func_name, return_t), args, body):
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
                 ctx_2 = self.subblock()
                 statement = []
                 for arg in args:
@@ -1354,6 +1598,8 @@ class MLIRContext(Context):
 
             case asm.Return(value):
                 if value.result_type == algebra.none_:
+                    if not isinstance(value, asm.Literal):
+                        self(value)
                     self.exec(f"{feed}func.return")
                 elif isinstance(value.result_type, StructFType):
                     v = self(value)
@@ -1369,6 +1615,11 @@ class MLIRContext(Context):
                 return None
 
             case asm.Module(funcs):
+                for func in funcs:
+                    self.bindings[func.name.name] = (
+                        f"@{func.name.name}",
+                        mlir_type(func.name.result_type),
+                    )
                 for func in funcs:
                     if not isinstance(func, asm.Function):
                         raise NotImplementedError(

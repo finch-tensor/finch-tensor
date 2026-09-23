@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from finch import finch_assembly as asm
-from finch.symbolic import Stage
+from finch.symbolic import CompilerMode, Stage
 
 
 class MLIRCode:
@@ -14,7 +14,7 @@ class MLIRCode:
 
 class MLIRLowerer(Stage):
     @abstractmethod
-    def lower(self, prgm: asm.Module) -> MLIRCode:
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None) -> MLIRCode:
         """
         Lower the given assembly program to textual MLIR.
 

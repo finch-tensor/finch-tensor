@@ -1,5 +1,6 @@
 from .lower import (
     AssemblyContext,
+    CompilerMode,
     Extent,
     ExtentFType,
     LoopletContext,
@@ -10,6 +11,7 @@ from .lower import (
 
 __all__ = [
     "AssemblyContext",
+    "CompilerMode",
     "Extent",
     "ExtentFType",
     "LoopletContext",

@@ -401,7 +401,14 @@ def test_ifelse_basic():
 def test_function_basic():
     checker = asm.AssemblyTypeChecker()
     fun = asm.Function(
-        asm.Variable("add", finch.int64),
+        asm.Variable(
+            "add",
+            asm.AssemblyKernelFType(
+                "add",
+                (finch.int64, finch.int64),
+                finch.int64,
+            ),
+        ),
         (
             asm.Variable("x", finch.int64),
             asm.Variable("y", finch.int64),
@@ -419,7 +426,14 @@ def test_function_basic():
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("add", finch.float64),
+            asm.Variable(
+                "add",
+                asm.AssemblyKernelFType(
+                    "add",
+                    (finch.int64, finch.int64),
+                    finch.float64,
+                ),
+            ),
             (
                 asm.Variable("x", finch.int64),
                 asm.Variable("y", finch.int64),
@@ -437,7 +451,14 @@ def test_function_basic():
         checker(fun)
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("sub", finch.float64),
+            asm.Variable(
+                "sub",
+                asm.AssemblyKernelFType(
+                    "sub",
+                    (finch.int64, finch.int64),
+                    finch.float64,
+                ),
+            ),
             (
                 asm.Variable("x", finch.int64),
                 asm.Variable("y", finch.int64),
@@ -462,18 +483,20 @@ def test_function_basic():
 def test_return_basic():
     checker = asm.AssemblyTypeChecker()
     fun = asm.Function(
-        asm.Variable("foo", finch.int64), (), asm.Return(asm.Literal(np.int64(0)))
+        asm.Variable("foo", asm.AssemblyKernelFType("foo", (), finch.int64)),
+        (),
+        asm.Return(asm.Literal(np.int64(0))),
     )
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("foo", finch.int64),
+            asm.Variable("foo", asm.AssemblyKernelFType("foo", (), finch.int64)),
             (),
             asm.If(asm.Literal(True), asm.Return(asm.Literal(np.int64(0)))),
         )
         checker(fun)
     fun = asm.Function(
-        asm.Variable("foo", finch.int64),
+        asm.Variable("foo", asm.AssemblyKernelFType("foo", (), finch.int64)),
         (),
         asm.Block(
             (
@@ -485,7 +508,7 @@ def test_return_basic():
     assert checker(fun) is None
     with pytest.raises(asm.AssemblyTypeError):
         fun = asm.Function(
-            asm.Variable("foo", finch.int64),
+            asm.Variable("foo", asm.AssemblyKernelFType("foo", (), finch.int64)),
             (),
             asm.Block(
                 (
@@ -523,7 +546,14 @@ def test_dot_product(a, b):
     mod = asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -576,7 +606,9 @@ def test_if_statement():
     root = asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finch.int64),
+                asm.Variable(
+                    "if_else", asm.AssemblyKernelFType("if_else", (), finch.int64)
+                ),
                 (),
                 asm.Block(
                     (
@@ -648,7 +680,14 @@ def test_simple_struct():
     mod = asm.Module(
         (
             asm.Function(
-                asm.Variable("simple_struct", finch.float64),
+                asm.Variable(
+                    "simple_struct",
+                    asm.AssemblyKernelFType(
+                        "simple_struct",
+                        (p_var.result_type, x_var.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (p_var, x_var),
                 asm.Block(
                     (

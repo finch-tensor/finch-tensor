@@ -223,8 +223,8 @@ class AnnotatedQuery(Generic[TS]):
                     connected_idxs[idx1].add(idx2)
                 mergeable_agg_op = (
                     idx1_op == idx2_op
-                    and is_associative(idx1_op)
-                    and is_commutative(idx1_op)
+                    and is_associative(idx1_op.ftype)
+                    and is_commutative(idx1_op.ftype)
                 )
                 # If idx1 isn't a parent of idx2, then idx2 can't restrict the
                 # summation of idx1. idx2 is a parent when its starting root
@@ -550,13 +550,13 @@ class AnnotatedQuery(Generic[TS]):
                     (i, arg) for i, arg in enumerate(args) if idx not in arg.fields()
                 ]
 
-                if len(with_idx) == 1 and is_distributive(mj_op, op):
+                if len(with_idx) == 1 and is_distributive(mj_op.ftype, op.ftype):
                     i, arg = with_idx[0]
                     return AnnotatedQuery.find_lowest_roots(
                         op, idx, arg, (*base, i + 1)
                     )
 
-                if cansplitpush(op, mj_op):
+                if op == mj_op and cansplitpush(op.ftype):
                     roots_without = [(*base, i + 1) for i, _ in without_idx]
                     roots_with: list[Path] = []
                     for i, arg in with_idx:
@@ -619,7 +619,7 @@ class AnnotatedQuery(Generic[TS]):
         use_root = False
         match root_node:
             case MapJoin(Literal(FinchOperator() as op), args) if is_distributive(
-                op, reduce_op
+                op.ftype, reduce_op.ftype
             ):
                 # If you're already reducing one index, then it may
                 # make sense to reduce others as well.
@@ -691,7 +691,7 @@ class AnnotatedQuery(Generic[TS]):
         # applying the operator over |Dom(idx)| identical values is the repeat
         # operator, i.e. sum_i B = B * |Dom(i)|.
         kernel_order = stats_cache[query_expr].index_order
-        repeat_op = repeat_operator(agg_op)
+        repeat_op = repeat_operator(agg_op.ftype)
         repeated = (
             []
             if repeat_op is None

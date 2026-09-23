@@ -132,10 +132,10 @@ def test_apply_fill_annihilator_refinement():
 
 def test_predicates_conservative_on_dynamic():
     d = DynamicFill(np.float64(0.0))
-    assert not is_annihilator(ffuncs.mul, d)
-    assert not is_identity(ffuncs.mul, d)
-    assert is_annihilator(ffuncs.mul, 0.0)
-    assert is_identity(ffuncs.mul, 1.0)
+    assert not is_annihilator(ffuncs.mul.ftype, d)
+    assert not is_identity(ffuncs.mul.ftype, d)
+    assert is_annihilator(ffuncs.mul.ftype, 0.0)
+    assert is_identity(ffuncs.mul.ftype, 1.0)
 
 
 @pytest.mark.parametrize(

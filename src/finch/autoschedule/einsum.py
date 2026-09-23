@@ -30,7 +30,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 arg=generate_einsum_expr(arg),
             )
             if operation != ffuncs.overwrite and init != init_value(
-                operation, ftype(init)
+                operation.ftype, ftype(init)
             ):
                 return ein.Plan(
                     (

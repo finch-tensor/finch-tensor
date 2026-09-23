@@ -229,16 +229,16 @@ class BlockedUniformStatsFactory(
             shape[axis] = -1
             k = k * stats.block_sizes[idx].reshape(shape)
 
-        if is_annihilator(op, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_value):
             local_p = np.power(density, k)
-        elif is_identity(op, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_value):
             local_p = 1 - np.power(1 - density, k)
         else:
             local_p = np.ones_like(density)
 
-        if is_annihilator(op, base.fill_value):
+        if is_annihilator(op.ftype, base.fill_value):
             combined_p = np.prod(local_p, axis=reduce_axes)
-        elif is_identity(op, base.fill_value):
+        elif is_identity(op.ftype, base.fill_value):
             combined_p = 1 - np.prod(1 - local_p, axis=reduce_axes)
         else:
             combined_p = np.mean(local_p, axis=reduce_axes)

@@ -76,7 +76,9 @@ def get_conjunctive_and_disjunctive_inputs(
                 arg_stats = insert_statistics(
                     stats_factory, arg, stats_bindings, replace=False, cache=cache
                 )
-                arg_is_conjunct = is_annihilator(op_node.val, arg_stats.fill_value)
+                arg_is_conjunct = is_annihilator(
+                    op_node.val.ftype, arg_stats.fill_value
+                )
                 arg_conjuncts, arg_disjuncts = get_conjunctive_and_disjunctive_inputs(
                     arg,
                     stats_factory,

@@ -122,7 +122,7 @@ def _push_aggregate_up(expr: LogicExpression) -> LogicExpression | None:
                     isinstance(arg, Aggregate)
                     and isinstance(arg.op, Literal)
                     and isinstance(arg.init, Literal)
-                    and is_distributive(mj_op, arg.op.val)
+                    and is_distributive(mj_op.ftype, arg.op.val.ftype)
                 ):
                     new_args = args[:i] + (arg.arg,) + args[i + 1 :]
                     return Aggregate(
@@ -147,7 +147,7 @@ def _merge_adjacent_aggregates(expr: LogicExpression) -> LogicExpression | None:
             Aggregate(Literal(inner_op), Literal(inner_init), arg, idxs1),
             idxs2,
         ) if op == inner_op and init == inner_init:
-            if is_associative(op) and is_commutative(op):
+            if is_associative(op.ftype) and is_commutative(op.ftype):
                 return Aggregate(expr.op, expr.init, arg, idxs1 + idxs2)
             return None
         case _:
@@ -360,7 +360,7 @@ def normalize_reorders_in_plan(plan: Plan) -> Plan:
 
 def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
     match node:
-        case MapJoin(Literal(op1), args) if is_associative(op1):
+        case MapJoin(Literal(op1), args) if is_associative(op1.ftype):
             new_args: list[LogicExpression] = []
             for arg in args:
                 if isinstance(arg, MapJoin) and arg.op == node.op:
@@ -400,7 +400,9 @@ def preprocess_plan_for_galley(plan: Plan) -> Plan:
 # TODO: Remove this when we get n-ary operators working.
 def split_mapjoin(node: LogicExpression) -> LogicExpression:
     match node:
-        case MapJoin(Literal(mj_op), args) if is_associative(mj_op) and len(args) > 2:
+        case MapJoin(Literal(mj_op), args) if (
+            is_associative(mj_op.ftype) and len(args) > 2
+        ):
             return MapJoin(Literal(mj_op), (args[0], MapJoin(Literal(mj_op), args[1:])))
         case _:
             return node

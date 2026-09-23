@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-
 from finch.algebra import (
     AbstractFill,
     FType,
@@ -145,9 +143,6 @@ class SparseCOOLevelFType(ImmutableStructFType, MultiDimensionLevelFType):
             tbl,
         )
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("SparseCOOLevelFType has no from_numpy yet.")
-
     def __call__(
         self, lvl, shape=None, ptr=None, idx=None, tbl=None
     ) -> "SparseCOOLevel":
@@ -252,10 +247,6 @@ class SparseCOOLevel(MultiDimensionLevel):
     @property
     def shape(self) -> tuple[Any, ...]:
         return (*self.lvl.shape, *self.coo_shape)
-
-    @property
-    def stride(self) -> np.intp:
-        return np.intp(0)
 
     @property
     def ftype(self) -> SparseCOOLevelFType:

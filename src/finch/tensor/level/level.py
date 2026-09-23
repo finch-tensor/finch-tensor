@@ -4,13 +4,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
 from typing import Any, Self
 
-import numpy as np
-
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
     FType,
     FTyped,
+    StructFType,
     ftypes,
 )
 
@@ -20,6 +19,21 @@ class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
+
+    def level_get_child_type(self, attr: str) -> LevelFType:
+        match self:
+            case StructFType() if self.struct_hasattr(attr):
+                child = self.struct_attrtype(attr)
+                match child:
+                    case LevelFType():
+                        return child
+        raise TypeError(f"{self} does not support child {attr!r}")
+
+    def level_get_child(
+        self, obj: asm.AssemblyExpression, attr: str
+    ) -> asm.AssemblyExpression:
+        self.level_get_child_type(attr)
+        return asm.GetAttr(obj, asm.Literal(attr))
 
     def with_fill(self, fill_value: Any) -> LevelFType:
         """Rebuild this level ftype with the leaf fill value replaced."""
@@ -114,6 +128,12 @@ class LevelFType(FType, ABC):
         """
         ...
 
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        """Assemble parent positions in the half-open range [start, stop)."""
+        raise NotImplementedError(
+            f"Assembly is not implemented for {type(self).__name__}"
+        )
+
     @abstractmethod
     def level_lower_thaw(self, ctx, lvl, op, pos):
         """
@@ -158,14 +178,6 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def from_numpy(self, shape, val):
-        """
-        Construct level from numpy array
-        (TODO not strictly safe, only works for dense, replace later)
-        """
-        ...
-
-    @abstractmethod
     def level_format_properties(self, n):
         """
         Return the format properties contributed by this level type and children.
@@ -191,10 +203,6 @@ class Level(FTyped, ABC):
         Shape of the fibers in the structure.
         """
         ...
-
-    @property
-    @abstractmethod
-    def stride(self) -> np.integer: ...
 
     @property
     @abstractmethod

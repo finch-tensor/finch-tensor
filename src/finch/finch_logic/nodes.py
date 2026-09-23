@@ -7,6 +7,7 @@ from typing import Any, Self, TypeVar
 
 from finch.algebra import (
     AbstractFill,
+    FinchOperator,
     FType,
     FTyped,
     apply_fill,
@@ -21,6 +22,7 @@ from finch.algebra import (
 from finch.symbolic import (
     CallTerm,
     Context,
+    ExpressionTerm,
     LiteralTerm,
     NamedTerm,
     Term,
@@ -46,15 +48,15 @@ def merge_dim(d1, d2):
     return d1 or d2
 
 
-def merge_element_type(op, *args: FType) -> FType:
-    return return_type(op, *args)
+def merge_element_type(op: FinchOperator, *args: FType) -> FType:
+    return return_type(op.ftype, *args)
 
 
-def reduce_element_type(op, z: Any, t: FType) -> FType:
-    return fixpoint_type(op, z, t)
+def reduce_element_type(op: FinchOperator, z: Any, t: FType) -> FType:
+    return fixpoint_type(op.ftype, z, t)
 
 
-def merge_fill_value(op, *args) -> AbstractFill:
+def merge_fill_value(op: FinchOperator, *args) -> AbstractFill:
     return apply_fill(op, *args)
 
 
@@ -64,7 +66,7 @@ def reduce_fill_value(op, z, t) -> AbstractFill:
     z = as_fill(z)
     # An overwrite reduction's background is the argument's background when
     # the init is not compile-time data.
-    if is_dynamic(z) and op is ffuncs.overwrite:
+    if is_dynamic(z) and op == ffuncs.overwrite:
         return t
     return z
 
@@ -291,7 +293,7 @@ class LogicStatement(LogicNode):
 
 
 @dataclass(eq=True, frozen=True)
-class Literal(LogicExpression, LiteralTerm):
+class Literal(LogicExpression, LiteralTerm, ExpressionTerm):
     """
     Represents a logical AST expression for the literal value `val`.
 
@@ -301,6 +303,10 @@ class Literal(LogicExpression, LiteralTerm):
     Attributes:
         val: The literal value.
     """
+
+    @property
+    def result_type(self) -> FType:
+        return ftype(self.val)
 
     def __hash__(self):
         try:

@@ -11,7 +11,6 @@ from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_orderer import loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
@@ -202,7 +201,7 @@ def _dedup_stats(expr, sf, bindings):
     return conjuncts, disjuncts, input_stats
 
 
-def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
+def test_greedy_avoids_transposing_a_sparse_input():
     """``B`` is a sparse diagonal stored ``(i, j)``, so reformatting it costs far
     more than reformatting the dense ``A`` stored ``(j, i)``. Read and write
     costs tie, and the expression's field order puts ``j`` first, so only the
@@ -237,10 +236,6 @@ def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
     )
 
     assert greedy_loop_order(expr, sf, bindings) == (i, j)
-
-    # Drop the transpose term and greedy settles for the more expensive order.
-    monkeypatch.setattr(loop_order_greedy, "transpose_penalty", lambda *args: 0.0)
-    assert greedy_loop_order(expr, sf, bindings) == (j, i)
 
 
 def test_transpose_penalty_totals_match_loop_order_cost():

@@ -6,6 +6,7 @@ import numpy as np
 import finch  # noqa: F401
 import finch.finch_notation as ntn
 from finch import ffuncs
+from finch.finch_assembly import AssemblyKernelFType
 from finch.finch_notation import (  # noqa: F401
     Access,
     Assign,
@@ -68,7 +69,14 @@ def test_matrix_multiplication(a, b):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", finch.ftype(a)),
+                ntn.Variable(
+                    "matmul",
+                    AssemblyKernelFType(
+                        "matmul",
+                        (C.result_type, A.result_type, B.result_type),
+                        finch.ftype(a),
+                    ),
+                ),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -186,7 +194,12 @@ def test_count_nonfill_vector(a):
     prgm = ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("count_nonfill_vector", finch.int64),
+                ntn.Variable(
+                    "count_nonfill_vector",
+                    AssemblyKernelFType(
+                        "count_nonfill_vector", (A.result_type,), finch.int64
+                    ),
+                ),
                 (A,),
                 ntn.Block(
                     (

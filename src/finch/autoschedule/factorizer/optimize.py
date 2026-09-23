@@ -283,8 +283,8 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                     after_item = args[idx + 1 :]
                     match unwrap_reorder(item):
                         case Aggregate(Literal(g), Literal(init), arg, idxs) if (
-                            is_distributive(f, g)
-                            and is_annihilator(f, init)
+                            is_distributive(f.ftype, g.ftype)
+                            and is_annihilator(f.ftype, init)
                             and len(arg.fields())
                             == len(
                                 MapJoin(
@@ -303,14 +303,14 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                 Literal() as init_1,
                 Aggregate(op_2, Literal() as init_2, arg, idxs_1),
                 idxs_2,
-            ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
+            ) if op_1 == op_2 and is_identity(op_2.val.ftype, init_2.val):
                 return Aggregate(op_1, init_1, arg, idxs_1 + idxs_2)
             case Aggregate(
                 Literal() as op_1,
                 Literal() as init_1,
                 Reorder(Aggregate(op_2, Literal() as init_2, arg, idxs_1), idxs_3),
                 idxs_2,
-            ) if op_1 == op_2 and is_identity(op_2.val, init_2.val):
+            ) if op_1 == op_2 and is_identity(op_2.val.ftype, init_2.val):
                 return Reorder(
                     Aggregate(op_1, init_1, arg, idxs_1 + idxs_2),
                     setdiff(idxs_3, idxs_2),
