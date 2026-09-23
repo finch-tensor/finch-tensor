@@ -25,7 +25,8 @@ from finch.finch_logic import (
     compute_shape_vars,
 )
 from finch.finch_notation import NotationInterpreter
-from finch.finch_notation.stages import NotationLoader
+from finch.finch_notation.dataflow import NotationCopyPropagationTransform
+from finch.finch_notation.stages import NotationLoader, NotationTransform
 from finch.symbolic import gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
@@ -441,6 +442,7 @@ class LogicCompiler(FormattedForm, LogicLoader):
         self,
         ctx_load: NotationLoader | None = None,
         ctx_lower: LogicNotationLowerer | None = None,
+        ctx_transforms: tuple[NotationTransform, ...] | None = None,
     ):
         if ctx_load is None:
             ctx_load = NotationInterpreter()
@@ -448,6 +450,9 @@ class LogicCompiler(FormattedForm, LogicLoader):
             ctx_lower = NotationGenerator()
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
+        if ctx_transforms is None:
+            ctx_transforms = (NotationCopyPropagationTransform(),)
+        self.ctx_transforms: tuple[NotationTransform, ...] = ctx_transforms
 
     def lower(
         self,
@@ -462,6 +467,8 @@ class LogicCompiler(FormattedForm, LogicLoader):
         lgc.LogicStatement,
     ]:
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
+        for transform in self.ctx_transforms:
+            mod = transform(mod)
         logger.debug(mod)
         lib = self.ctx_load(mod)
         shape_vars = compute_shape_vars(prgm, bindings)
