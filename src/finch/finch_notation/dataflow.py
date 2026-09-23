@@ -142,7 +142,11 @@ class NotationCopyPropagation(DataFlowAnalysis):
                     for node in PostOrderDFS(entry.stmt):
                         match node:
                             case Variable(name, _) if name in copies:
-                                replacements[(entry.sid, name)] = copies[name]
+                                src = copies[name]
+                                # transitively follow the copy chain to find the source
+                                while src in copies and src != name:
+                                    src = copies[src]
+                                replacements[(entry.sid, name)] = src
 
                 # advance state to the next statement in the block
                 state = self.transfer([entry], state)
