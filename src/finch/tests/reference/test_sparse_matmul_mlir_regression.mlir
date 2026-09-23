@@ -107,7 +107,7 @@ module {
       } else {
         scf.yield %v_39 : index
       }
-      %v_92:3 = scf.while (%v_53 = %v_33, %v_54 = %v_52, %v_55 = %v_46) : (index, index, index) -> (index, index, index) {
+      %v_88:3 = scf.while (%v_53 = %v_33, %v_54 = %v_52, %v_55 = %v_46) : (index, index, index) -> (index, index, index) {
         %v_56 = arith.addi %v_35, %v_47 : index
         %v_57 = arith.minsi %v_10, %v_56 : index
         %v_58 = arith.cmpi slt, %v_55, %v_57 : index
@@ -140,135 +140,131 @@ module {
             %v_80 = arith.addi %v_75, %v_79 : index
             %v_81 = arith.cmpi eq, %v_76, %v_38 : index
             scf.if %v_81 {
-              %v_82 = memref.load %v_22[%v_80] : memref<?xf64>
-              %v_83 = memref.load %v_2[%v_54] : memref<?xf64>
-              %v_84 = arith.constant 0.0 : f64
-              %v_85 = arith.cmpf oeq, %v_83, %v_84 : f64
-              %v_86 = arith.select %v_85, %v_82, %v_83 : f64
-              memref.store %v_86, %v_22[%v_80] : memref<?xf64>
+              %v_82 = memref.load %v_2[%v_54] : memref<?xf64>
+              memref.store %v_82, %v_22[%v_80] : memref<?xf64>
             }
           }
         }
-        %v_87 = arith.addi %v_35, %v_55 : index
-        %v_88 = arith.addi %v_35, %v_54 : index
-        %v_89 = arith.cmpi slt, %v_88, %v_41 : index
-        %v_91 = scf.if %v_89 -> (index) {
-          %v_90 = memref.load %v_6[%v_88] : memref<?xindex>
-          scf.yield %v_90 : index
+        %v_83 = arith.addi %v_35, %v_55 : index
+        %v_84 = arith.addi %v_35, %v_54 : index
+        %v_85 = arith.cmpi slt, %v_84, %v_41 : index
+        %v_87 = scf.if %v_85 -> (index) {
+          %v_86 = memref.load %v_6[%v_84] : memref<?xindex>
+          scf.yield %v_86 : index
         } else {
           scf.yield %v_10 : index
         }
-        scf.yield %v_87, %v_88, %v_91 : index, index, index
+        scf.yield %v_83, %v_84, %v_87 : index, index, index
       }
-      %v_93 = arith.addi %v_35, %v_47 : index
-      %v_94 = arith.maxsi %v_33, %v_93 : index
-      scf.for %v_95 = %v_94 to %v_10 step %v_35 {
-        %v_96 = llvm.extractvalue %_A_18[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-        %v_97 = arith.index_cast %v_96 : i64 to index
-        %v_98 = arith.muli %v_97, %v_95 : index
-        scf.for %v_99 = %v_33 to %v_8 step %v_35 {
-          %v_100 = llvm.extractvalue %_A_18[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-          %v_101 = arith.index_cast %v_100 : i64 to index
-          %v_102 = arith.muli %v_101, %v_99 : index
-          %v_103 = arith.addi %v_98, %v_102 : index
+      %v_89 = arith.addi %v_35, %v_47 : index
+      %v_90 = arith.maxsi %v_33, %v_89 : index
+      scf.for %v_91 = %v_90 to %v_10 step %v_35 {
+        %v_92 = llvm.extractvalue %_A_18[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+        %v_93 = arith.index_cast %v_92 : i64 to index
+        %v_94 = arith.muli %v_93, %v_91 : index
+        scf.for %v_95 = %v_33 to %v_8 step %v_35 {
+          %v_96 = llvm.extractvalue %_A_18[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+          %v_97 = arith.index_cast %v_96 : i64 to index
+          %v_98 = arith.muli %v_97, %v_95 : index
+          %v_99 = arith.addi %v_94, %v_98 : index
         }
       }
     }
-    %v_104 = memref.dim %v_28, %v_33 : memref<?xf64>
-    scf.for %v_105 = %v_33 to %v_104 step %v_35 {
-      %v_106 = arith.constant 0.0 : f64
-      memref.store %v_106, %v_28[%v_105] : memref<?xf64>
+    %v_100 = memref.dim %v_28, %v_33 : memref<?xf64>
+    scf.for %v_101 = %v_33 to %v_100 step %v_35 {
+      %v_102 = arith.constant 0.0 : f64
+      memref.store %v_102, %v_28[%v_101] : memref<?xf64>
     }
-    scf.for %v_107 = %v_33 to %v_18 step %v_35 {
-      %v_108 = llvm.extractvalue %_A_18[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-      %v_109 = arith.index_cast %v_108 : i64 to index
-      %v_110 = arith.muli %v_109, %v_107 : index
-      scf.for %v_111 = %v_33 to %v_26 step %v_35 {
-        %v_112 = llvm.extractvalue %_A_7[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-        %v_113 = arith.index_cast %v_112 : i64 to index
-        %v_114 = arith.muli %v_113, %v_111 : index
-        %v_115 = llvm.extractvalue %_A_18[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-        %v_116 = arith.index_cast %v_115 : i64 to index
-        %v_117 = arith.muli %v_116, %v_111 : index
-        %v_118 = arith.addi %v_110, %v_117 : index
-        %v_119 = memref.load %v_14[%v_107] : memref<?xindex>
-        %v_120 = arith.addi %v_35, %v_107 : index
-        %v_121 = memref.load %v_14[%v_120] : memref<?xindex>
-        %v_122 = arith.cmpi slt, %v_119, %v_121 : index
-        %v_126, %v_127 = scf.if %v_122 -> (index, index) {
-          %v_123 = memref.load %v_16[%v_119] : memref<?xindex>
-          %v_124 = arith.subi %v_121, %v_35 : index
-          %v_125 = memref.load %v_16[%v_124] : memref<?xindex>
-          scf.yield %v_123, %v_125 : index, index
+    scf.for %v_103 = %v_33 to %v_18 step %v_35 {
+      %v_104 = llvm.extractvalue %_A_18[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+      %v_105 = arith.index_cast %v_104 : i64 to index
+      %v_106 = arith.muli %v_105, %v_103 : index
+      scf.for %v_107 = %v_33 to %v_26 step %v_35 {
+        %v_108 = llvm.extractvalue %_A_7[2, 0] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+        %v_109 = arith.index_cast %v_108 : i64 to index
+        %v_110 = arith.muli %v_109, %v_107 : index
+        %v_111 = llvm.extractvalue %_A_18[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+        %v_112 = arith.index_cast %v_111 : i64 to index
+        %v_113 = arith.muli %v_112, %v_107 : index
+        %v_114 = arith.addi %v_106, %v_113 : index
+        %v_115 = memref.load %v_14[%v_103] : memref<?xindex>
+        %v_116 = arith.addi %v_35, %v_103 : index
+        %v_117 = memref.load %v_14[%v_116] : memref<?xindex>
+        %v_118 = arith.cmpi slt, %v_115, %v_117 : index
+        %v_122, %v_123 = scf.if %v_118 -> (index, index) {
+          %v_119 = memref.load %v_16[%v_115] : memref<?xindex>
+          %v_120 = arith.subi %v_117, %v_35 : index
+          %v_121 = memref.load %v_16[%v_120] : memref<?xindex>
+          scf.yield %v_119, %v_121 : index, index
         } else {
           scf.yield %v_35, %v_33 : index, index
         }
-        %v_128 = memref.load %v_16[%v_119] : memref<?xindex>
-        %v_129 = arith.cmpi slt, %v_128, %v_33 : index
-        %v_132 = scf.if %v_129 -> (index) {
-          %v_130 = arith.subi %v_121, %v_35 : index
-          %v_131 = func.call @scansearch(%v_16, %v_33, %v_119, %v_130) : (memref<?xindex>, index, index, index) -> index
-          scf.yield %v_131 : index
+        %v_124 = memref.load %v_16[%v_115] : memref<?xindex>
+        %v_125 = arith.cmpi slt, %v_124, %v_33 : index
+        %v_128 = scf.if %v_125 -> (index) {
+          %v_126 = arith.subi %v_117, %v_35 : index
+          %v_127 = func.call @scansearch(%v_16, %v_33, %v_115, %v_126) : (memref<?xindex>, index, index, index) -> index
+          scf.yield %v_127 : index
         } else {
-          scf.yield %v_119 : index
+          scf.yield %v_115 : index
         }
-        %v_164:3 = scf.while (%v_133 = %v_33, %v_134 = %v_132, %v_135 = %v_126) : (index, index, index) -> (index, index, index) {
-          %v_136 = arith.addi %v_35, %v_127 : index
-          %v_137 = arith.minsi %v_20, %v_136 : index
-          %v_138 = arith.cmpi slt, %v_135, %v_137 : index
-          scf.condition(%v_138) %v_133, %v_134, %v_135 : index, index, index
+        %v_160:3 = scf.while (%v_129 = %v_33, %v_130 = %v_128, %v_131 = %v_122) : (index, index, index) -> (index, index, index) {
+          %v_132 = arith.addi %v_35, %v_123 : index
+          %v_133 = arith.minsi %v_20, %v_132 : index
+          %v_134 = arith.cmpi slt, %v_131, %v_133 : index
+          scf.condition(%v_134) %v_129, %v_130, %v_131 : index, index, index
         } do {
-          ^bb_2(%v_133: index, %v_134: index, %v_135: index):
-          %v_139 = arith.addi %v_35, %v_135 : index
-          %v_140 = arith.minsi %v_139, %v_135 : index
-          scf.for %v_141 = %v_133 to %v_140 step %v_35 {
-            %v_142 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-            %v_143 = arith.index_cast %v_142 : i64 to index
-            %v_144 = arith.muli %v_143, %v_141 : index
-            %v_145 = arith.addi %v_114, %v_144 : index
-            %v_146 = memref.load %v_28[%v_145] : memref<?xf64>
-            memref.store %v_146, %v_28[%v_145] : memref<?xf64>
+          ^bb_2(%v_129: index, %v_130: index, %v_131: index):
+          %v_135 = arith.addi %v_35, %v_131 : index
+          %v_136 = arith.minsi %v_135, %v_131 : index
+          scf.for %v_137 = %v_129 to %v_136 step %v_35 {
+            %v_138 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+            %v_139 = arith.index_cast %v_138 : i64 to index
+            %v_140 = arith.muli %v_139, %v_137 : index
+            %v_141 = arith.addi %v_110, %v_140 : index
+            %v_142 = memref.load %v_28[%v_141] : memref<?xf64>
+            memref.store %v_142, %v_28[%v_141] : memref<?xf64>
           }
-          %v_147 = arith.maxsi %v_133, %v_135 : index
-          %v_148 = arith.addi %v_35, %v_135 : index
-          scf.for %v_149 = %v_147 to %v_148 step %v_35 {
-            %v_150 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-            %v_151 = arith.index_cast %v_150 : i64 to index
-            %v_152 = arith.muli %v_151, %v_149 : index
-            %v_153 = arith.addi %v_114, %v_152 : index
-            %v_154 = memref.load %v_28[%v_153] : memref<?xf64>
-            %v_155 = memref.load %v_22[%v_118] : memref<?xf64>
-            %v_156 = memref.load %v_12[%v_134] : memref<?xf64>
-            %v_157 = arith.mulf %v_155, %v_156 : f64
-            %v_158 = arith.addf %v_154, %v_157 : f64
-            memref.store %v_158, %v_28[%v_153] : memref<?xf64>
+          %v_143 = arith.maxsi %v_129, %v_131 : index
+          %v_144 = arith.addi %v_35, %v_131 : index
+          scf.for %v_145 = %v_143 to %v_144 step %v_35 {
+            %v_146 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+            %v_147 = arith.index_cast %v_146 : i64 to index
+            %v_148 = arith.muli %v_147, %v_145 : index
+            %v_149 = arith.addi %v_110, %v_148 : index
+            %v_150 = memref.load %v_28[%v_149] : memref<?xf64>
+            %v_151 = memref.load %v_22[%v_114] : memref<?xf64>
+            %v_152 = memref.load %v_12[%v_130] : memref<?xf64>
+            %v_153 = arith.mulf %v_151, %v_152 : f64
+            %v_154 = arith.addf %v_150, %v_153 : f64
+            memref.store %v_154, %v_28[%v_149] : memref<?xf64>
           }
-          %v_159 = arith.addi %v_35, %v_135 : index
-          %v_160 = arith.addi %v_35, %v_134 : index
-          %v_161 = arith.cmpi slt, %v_160, %v_121 : index
-          %v_163 = scf.if %v_161 -> (index) {
-            %v_162 = memref.load %v_16[%v_160] : memref<?xindex>
-            scf.yield %v_162 : index
+          %v_155 = arith.addi %v_35, %v_131 : index
+          %v_156 = arith.addi %v_35, %v_130 : index
+          %v_157 = arith.cmpi slt, %v_156, %v_117 : index
+          %v_159 = scf.if %v_157 -> (index) {
+            %v_158 = memref.load %v_16[%v_156] : memref<?xindex>
+            scf.yield %v_158 : index
           } else {
             scf.yield %v_20 : index
           }
-          scf.yield %v_159, %v_160, %v_163 : index, index, index
+          scf.yield %v_155, %v_156, %v_159 : index, index, index
         }
-        %v_165 = arith.addi %v_35, %v_127 : index
-        %v_166 = arith.maxsi %v_33, %v_165 : index
-        scf.for %v_167 = %v_166 to %v_20 step %v_35 {
-          %v_168 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
-          %v_169 = arith.index_cast %v_168 : i64 to index
-          %v_170 = arith.muli %v_169, %v_167 : index
-          %v_171 = arith.addi %v_114, %v_170 : index
-          %v_172 = memref.load %v_28[%v_171] : memref<?xf64>
-          memref.store %v_172, %v_28[%v_171] : memref<?xf64>
+        %v_161 = arith.addi %v_35, %v_123 : index
+        %v_162 = arith.maxsi %v_33, %v_161 : index
+        scf.for %v_163 = %v_162 to %v_20 step %v_35 {
+          %v_164 = llvm.extractvalue %_A_7[2, 1] : !llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>
+          %v_165 = arith.index_cast %v_164 : i64 to index
+          %v_166 = arith.muli %v_165, %v_163 : index
+          %v_167 = arith.addi %v_110, %v_166 : index
+          %v_168 = memref.load %v_28[%v_167] : memref<?xf64>
+          memref.store %v_168, %v_28[%v_167] : memref<?xf64>
         }
       }
     }
-    %v_173 = llvm.mlir.undef : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>
-    %v_174 = llvm.insertvalue %_A_7, %v_173[0] : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>
-    llvm.store %v_174, %_ret : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>, !llvm.ptr
+    %v_169 = llvm.mlir.undef : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>
+    %v_170 = llvm.insertvalue %_A_7, %v_169[0] : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>
+    llvm.store %v_170, %_ret : !llvm.struct<(!llvm.struct<(!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>, !llvm.struct<(i64, i64)>, !llvm.struct<(i64, i64)>)>)>, !llvm.ptr
     func.return
   }
 }

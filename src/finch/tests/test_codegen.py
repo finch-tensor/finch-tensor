@@ -1411,7 +1411,7 @@ def test_mlir_setattr_in_while():
         pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
     ],
 )
-def test_init_write_preserves_existing_value(compiler):
+def test_init_write_returns_rhs(compiler):
     x = asm.Variable("x", finch.int64)
     y = asm.Variable("y", finch.int64)
     program = asm.Module(
@@ -1440,6 +1440,5 @@ def test_init_write_preserves_existing_value(compiler):
         )
     )
     module = compiler(program)
-    assert module.write(np.int64(7), np.int64(0)) == 7
-    assert module.write(np.int64(7), np.int64(3)) == 3
+    assert module.write(np.int64(0), np.int64(0)) == 0
     assert module.write(np.int64(0), np.int64(3)) == 3

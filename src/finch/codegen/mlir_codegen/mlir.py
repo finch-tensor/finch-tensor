@@ -585,19 +585,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
                 )
-            value = (
-                asm.GetAttr(op, asm.Literal("value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value)
-            )
-            x, y = args
-            xv, yv, fill_value = ctx(x), ctx(y), ctx(value)
-            t = mlir_type(y.result_type)
-            comparison = mlir_function_name(ffuncs.eq.ftype, y.result_type)
-            cond, result = ctx.new_ssa(), ctx.new_ssa()
-            ctx.exec(f"{ctx.feed}{cond} = {comparison} {yv}, {fill_value} : {t}")
-            ctx.exec(f"{ctx.feed}{result} = arith.select {cond}, {xv}, {yv} : {t}")
-            return result
+            return ctx(args[1])
         case ffuncs._SameFType():
             x, y = args
             return mlir_same(ctx, ctx(x), ctx(y), x.result_type, y.result_type)

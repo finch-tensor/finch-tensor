@@ -2266,7 +2266,9 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
         return _InitWrite(fill)
 
     def is_identity(self, val):
-        return not is_dynamic(self.fill) and val == self.fill.value
+        return not is_dynamic(self.fill) and builtins.bool(
+            np.all(same(val, self.fill.value))
+        )
 
     def return_type(self, *args: FType) -> FType:
         if len(args) != 2:
@@ -2276,11 +2278,11 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
 class _InitWrite(FinchOperator):
     """
-    Write a non-fill value, preserving the existing value when given the fill.
+    Write a value to a destination that is assumed to contain the fill.
 
-    init_write(z)(x, z) = x; otherwise init_write(z)(x, y) = y.
-    A store of the fill value may therefore be omitted, regardless of the
-    existing value. This operator makes no assumption that x equals z.
+    init_write(z)(x, y) returns y and may assume that x equals z, matching
+    Julia's initwrite. Under this precondition, a store of z may be omitted.
+    Use overwrite when the destination may already contain a non-fill value.
 
     StaticFill permits specialization on z. DynamicFill keeps z as a runtime
     field; pass such operators through callable expressions in compiled code.
@@ -2308,7 +2310,7 @@ class _InitWrite(FinchOperator):
         return hash((type(self), self.fill, StaticFill(self.value)))
 
     def __call__(self, x: Any, y: Any):
-        return x if y == self.value else y
+        return y
 
     def __repr__(self) -> str:
         return "_initwrite"

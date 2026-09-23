@@ -5,7 +5,7 @@ import numpy as np
 
 import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
-from finch.algebra.ffuncs import make_tuple, overwrite
+from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
     DynamicFill,
@@ -296,11 +296,15 @@ class FinchJLGenerator:
                 tab_str = "    " * nestingLvl
                 lhs_str = self.generate_julia(lhs, nestingLvl)
                 rhs_str = self.generate_julia(rhs, nestingLvl)
-                if lhs.mode.op.result_type == overwrite.ftype:
-                    stmt = f"{lhs_str} = {rhs_str}"
-                else:
-                    op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
-                    stmt = f"{lhs_str} {op}= {rhs_str}"
+                match lhs.mode.op.result_type:
+                    case ffuncs._InitWriteFType():
+                        op = self.generate_julia(lhs.mode.op, nestingLvl)
+                        stmt = f"{lhs_str} <<{op}>>= {rhs_str}"
+                    case ffuncs._OverwriteFType():
+                        stmt = f"{lhs_str} := {rhs_str}"
+                    case _:
+                        op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
+                        stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):
@@ -329,6 +333,12 @@ class FinchJLGenerator:
                 if name not in self.pack_dict:
                     raise Exception(f"{name} Slot does not exist in registry.")
                 return self.pack_dict[name]
+
+            case ntn.Literal(ffuncs._InitWrite(fill=fill)):
+                if is_dynamic(fill):
+                    raise DynamicFillError("Julia init_write requires a static fill")
+                value = self.generate_julia(ntn.Literal(fill.value), nestingLvl)
+                return f"Finch.initwrite({value})"
 
             case ntn.Literal(val):
                 if isinstance(val, AbstractFill):

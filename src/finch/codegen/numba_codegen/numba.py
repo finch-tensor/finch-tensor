@@ -178,14 +178,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
                 )
-            value = (
-                asm.GetAttr(op, asm.Literal("value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value)
-            )
-            x, y = args
-            y = ctx.cache("write_y", y)
-            return f"({ctx(x)} if ({ctx(y)} == {ctx(value)}) else {ctx(y)})"
+            return ctx(args[1])
         case ffuncs._SameFType():
             return numba_same(ctx, *args)
         case ffuncs._ChooseFType(fill=fill):

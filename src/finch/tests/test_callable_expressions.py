@@ -253,8 +253,8 @@ def test_callable_expression(compiler, field, fill_type):
         value = ffuncs.init_write(fill_type(np.int64(fill)))
         assert ftype(value) == op_type
         arg = (value,) if field else value
-        assert module.write(arg, np.int64(9), np.int64(fill)) == 9
-        assert module.write(arg, np.int64(9), np.int64(7)) == 7
+        assert module.write(arg, np.int64(fill), np.int64(fill)) == fill
+        assert module.write(arg, np.int64(fill), np.int64(7)) == 7
 
 
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter(), NotationCompiler()])
@@ -284,8 +284,8 @@ def test_notation_callable_expression(compiler):
     module = compiler(program)
     for fill in (0, 3):
         operator = ffuncs.init_write(DynamicFill(np.int64(fill)))
-        assert module.write(operator, np.int64(9), np.int64(fill)) == 9
-        assert module.write(operator, np.int64(9), np.int64(7)) == 7
+        assert module.write(operator, np.int64(fill), np.int64(fill)) == fill
+        assert module.write(operator, np.int64(fill), np.int64(7)) == 7
 
 
 @pytest.mark.parametrize("generator", [NumbaGenerator(), CGenerator(), MLIRGenerator()])
@@ -388,6 +388,8 @@ def test_call_selects_runtime_operator(compiler, factory):
         for choice in (True, False):
             selected = first_value if choice else second_value
             for x_value, y_value in [(0, 3), (7, 0), (3, 9)]:
+                if factory is ffuncs.init_write:
+                    x_value = selected.value
                 x_value, y_value = np.int64(x_value), np.int64(y_value)
                 assert module.apply(
                     first_value, second_value, np.bool_(choice), x_value, y_value
@@ -420,10 +422,10 @@ def test_logic_lowering_preserves_literal_callee(compiler, fill):
     from finch.autoschedule import NotationGenerator
     from finch.tensor import BufferizedNDArray
 
-    op = lgc.Literal(ffuncs.init_write(StaticFill(np.int64(fill))))
+    op = lgc.Literal(ffuncs.choose(StaticFill(np.int64(fill))))
     source, output, index = lgc.Alias("source"), lgc.Alias("output"), lgc.Field("i")
     expression = lgc.MapJoin(
-        op, (lgc.Literal(np.int64(9)), lgc.Table(source, (index,)))
+        op, (lgc.Table(source, (index,)), lgc.Literal(np.int64(9)))
     )
     plan = lgc.Plan(
         (

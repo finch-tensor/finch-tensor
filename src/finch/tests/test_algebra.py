@@ -337,12 +337,13 @@ def test_samehash():
     assert ffuncs.samehash(SameHash()) == ("samehash", 1)
 
 
-@pytest.mark.parametrize("fill", [0, 5, finch.algebra.StaticFill(5)])
+@pytest.mark.parametrize("fill", [0, 5, np.nan, finch.algebra.StaticFill(5)])
 def test_init_write(fill):
     op = ffuncs.init_write(fill)
     z = fill.value if isinstance(fill, finch.algebra.StaticFill) else fill
-    assert op(17, z) == 17
-    assert op(17, z + 1) == z + 1
+    np.testing.assert_equal(op(z, z), z)
+    assert op(z, 17) == 17
+    assert is_identity(ftype(op), z)
 
 
 def test_function_properties_dispatch_on_types():

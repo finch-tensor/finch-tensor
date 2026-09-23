@@ -387,14 +387,7 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
                 )
-            value = (
-                asm.GetAttr(op, asm.Literal("value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value)
-            )
-            x, y = args
-            y = ctx.cache("write_y", y)
-            return f"(({ctx(y)} == {ctx(value)}) ? {ctx(x)} : {ctx(y)})"
+            return ctx(args[1])
         case ffuncs._SameFType():
             return c_same(ctx, *args)
         case ffuncs._ChooseFType(fill=fill):
