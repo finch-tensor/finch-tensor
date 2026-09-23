@@ -2154,34 +2154,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -7844,7 +7816,7 @@ q = n/N</p>
         <span class="n">reduce_fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">reduce_set</span><span class="p">)</span>
 
         <span class="c1"># check is_annihilator</span>
-        <span class="k">if</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="n">new_sketch</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="n">Aggregate</span><span class="p">(</span>
                     <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
@@ -7856,7 +7828,7 @@ q = n/N</p>
                 <span class="k">else</span> <span class="n">stats</span><span class="o">.</span><span class="n">sketch</span>
             <span class="p">)</span>
 
-        <span class="k">elif</span> <span class="n">is_annihilator</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
+        <span class="k">elif</span> <span class="n">is_annihilator</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="n">exists</span><span class="p">:</span> <span class="n">LogicExpression</span> <span class="o">=</span> <span class="n">MapJoin</span><span class="p">(</span>
                 <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">gt</span><span class="p">),</span> <span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
             <span class="p">)</span>
@@ -8031,7 +8003,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
     <span class="n">reduce_fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">reduce_set</span><span class="p">)</span>
 
     <span class="c1"># check is_annihilator</span>
-    <span class="k">if</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
         <span class="n">new_sketch</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">Aggregate</span><span class="p">(</span>
                 <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
@@ -8043,7 +8015,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
             <span class="k">else</span> <span class="n">stats</span><span class="o">.</span><span class="n">sketch</span>
         <span class="p">)</span>
 
-    <span class="k">elif</span> <span class="n">is_annihilator</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
+    <span class="k">elif</span> <span class="n">is_annihilator</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">stats</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
         <span class="n">exists</span><span class="p">:</span> <span class="n">LogicExpression</span> <span class="o">=</span> <span class="n">MapJoin</span><span class="p">(</span>
             <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">gt</span><span class="p">),</span> <span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
         <span class="p">)</span>

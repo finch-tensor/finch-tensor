@@ -2150,34 +2150,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -6132,7 +6104,7 @@ specialize on the value (and recompile per distinct value), unlike plain
         <span class="k">match</span> <span class="n">obj</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">():</span>
                 <span class="c1"># A slot-bound scalar argument: read the value struct field.</span>
-                <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">root</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">root</span><span class="p">),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="c1"># An inline scalar value (e.g. a sparse gap read).</span>
                 <span class="k">return</span> <span class="n">ctx</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>

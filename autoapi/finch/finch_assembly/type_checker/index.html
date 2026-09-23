@@ -2150,34 +2150,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -5723,7 +5695,21 @@
 <span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
-<span class="normal">296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyTypeChecker</span><span class="p">:</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyTypeChecker</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A type checker for FinchAssembly</span>
 <span class="sd">    """</span>
@@ -5805,17 +5791,17 @@
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">attr</span><span class="p">)):</span>
                 <span class="n">obj_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_struct</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">check_attrtype</span><span class="p">(</span><span class="n">obj_type</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
-            <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">args</span><span class="p">):</span>
-                <span class="n">arg_types</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">check_expr</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+            <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+                <span class="n">op_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_expr</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op_type</span><span class="p">,</span> <span class="n">algebra</span><span class="o">.</span><span class="n">CallableFType</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected a callable type, got </span><span class="si">{</span><span class="n">op_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+                <span class="n">arg_types</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">check_expr</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">algebra</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">arg_types</span><span class="p">)</span>
-                <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">op_type</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="o">*</span><span class="n">arg_types</span><span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AssertionError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span>
-                        <span class="s2">"Return type of function is not registered."</span>
-                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">AttributeError</span>
-                    <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span>
-                        <span class="s2">"Operation not defined on given types."</span>
-                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">TypeError</span>
+                        <span class="sa">f</span><span class="s2">"Cannot call </span><span class="si">{</span><span class="n">op_type</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">arg_types</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Load</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
                 <span class="n">buffer_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_buffer</span><span class="p">(</span><span class="n">buffer</span><span class="p">)</span>
                 <span class="n">index_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_expr</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
@@ -5937,13 +5923,25 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">check_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">:</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">func</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_name</span><span class="p">,</span> <span class="n">return_type</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+                    <span class="n">func_name</span><span class="p">,</span>
+                    <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernelFType</span><span class="p">(</span><span class="n">result_type</span><span class="o">=</span><span class="n">return_type</span><span class="p">)</span> <span class="k">as</span> <span class="n">func_type</span><span class="p">,</span>
+                <span class="p">),</span>
+                <span class="n">args</span><span class="p">,</span>
+                <span class="n">body</span><span class="p">,</span>
+            <span class="p">):</span>
                 <span class="n">check_type</span><span class="p">(</span><span class="n">return_type</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">result_type</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span> <span class="o">!=</span> <span class="n">func_type</span><span class="o">.</span><span class="n">arg_types</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"Function '</span><span class="si">{</span><span class="n">func_name</span><span class="si">}</span><span class="s2">' arguments do not match </span><span class="si">{</span><span class="n">func_type</span><span class="si">}</span><span class="s2">."</span>
+                    <span class="p">)</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">"Cannot nest function definitions:  '</span><span class="si">{</span><span class="n">func_name</span><span class="si">}</span><span class="s2">'."</span>
                     <span class="p">)</span>
                 <span class="n">body_scope</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">function_state</span><span class="o">=</span><span class="n">FunctionState</span><span class="p">(</span><span class="n">return_type</span><span class="p">))</span>
+                <span class="n">body_scope</span><span class="o">.</span><span class="n">ctxt</span><span class="p">[</span><span class="n">func_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">func_type</span>
                 <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
                     <span class="n">check_type</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">type</span><span class="p">)</span>
                     <span class="n">body_scope</span><span class="o">.</span><span class="n">ctxt</span><span class="p">[</span><span class="n">arg</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">arg</span><span class="o">.</span><span class="n">type</span>
@@ -5967,8 +5965,10 @@
                         <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span>
                             <span class="sa">f</span><span class="s2">"Two functions defined with the name '</span><span class="si">{</span><span class="n">func_name</span><span class="si">}</span><span class="s2">'."</span>
                         <span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">check_function</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">ctxt</span><span class="p">[</span><span class="n">func_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">result_type</span>
                     <span class="n">defined_funcs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func_name</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">check_function</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
                 <span class="k">return</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">AssemblyTypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected module, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">mod</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>

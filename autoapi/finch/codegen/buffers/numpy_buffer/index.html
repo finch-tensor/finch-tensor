@@ -12,7 +12,7 @@
         <link rel="prev" href="../malloc_buffer/">
       
       
-        <link rel="next" href="../safe_buffer/">
+        <link rel="next" href="../../c_codegen/">
       
       
         
@@ -2380,34 +2380,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -6353,7 +6325,7 @@ of the BufferFType class.</p>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Construct a NumpyBuffer from a C-compatible structure.</span>
 <span class="sd">        """</span>
-        <span class="k">return</span> <span class="n">NumpyBuffer</span><span class="p">(</span><span class="n">c_buffer</span><span class="o">.</span><span class="n">contents</span><span class="o">.</span><span class="n">arr</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">c_buffer</span><span class="o">.</span><span class="n">contents</span><span class="o">.</span><span class="n">arr</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">numba_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">list</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]</span>
@@ -6670,7 +6642,7 @@ This is typically the same as the dtype used to create the buffer.</p>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct a NumpyBuffer from a C-compatible structure.</span>
 <span class="sd">    """</span>
-    <span class="k">return</span> <span class="n">NumpyBuffer</span><span class="p">(</span><span class="n">c_buffer</span><span class="o">.</span><span class="n">contents</span><span class="o">.</span><span class="n">arr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">c_buffer</span><span class="o">.</span><span class="n">contents</span><span class="o">.</span><span class="n">arr</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

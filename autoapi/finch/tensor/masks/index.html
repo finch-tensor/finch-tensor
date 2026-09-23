@@ -2150,34 +2150,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -5528,12 +5500,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">166</span>
 <span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
@@ -5554,7 +5521,8 @@
 <span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
-<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">187</span>
+<span class="normal">188</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LoTriMask</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower triangular mask level.</span>
@@ -5573,10 +5541,6 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">shape</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">stride</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">stride</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">body</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5640,7 +5604,8 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 19</span>
+<span class="normal"> 20</span>
 <span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
@@ -5778,7 +5743,12 @@
 <span class="normal">155</span>
 <span class="normal">156</span>
 <span class="normal">157</span>
-<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LoTriMaskFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">SingleDimensionLevelFType</span> <span class="o">|</span> <span class="n">MultiDimensionLevelFType</span>
 
@@ -5832,9 +5802,6 @@
             <span class="sa">f</span><span class="s2">"Level conversion not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">LoTriMask</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">from_numpy</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">val</span><span class="p">))</span>
-
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_lower_freeze</span><span class="p">(</span>
             <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"body"</span><span class="p">)),</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span>
@@ -5847,10 +5814,8 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="n">body</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span>
-            <span class="n">obj</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
             <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">),</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span>
-            <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">),</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_lower_unwrap</span><span class="p">(</span>
@@ -5861,10 +5826,8 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_increment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="n">body</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span>
-            <span class="n">obj</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
             <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">),</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span>
-            <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">),</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_lower_increment</span><span class="p">(</span>
@@ -5880,25 +5843,38 @@
             <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"body"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
         <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_unfurl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">fiber</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+        <span class="n">tns</span> <span class="o">=</span> <span class="n">fiber</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="n">tns</span><span class="o">.</span><span class="n">lvl</span>
+
         <span class="k">def</span><span class="w"> </span><span class="nf">child_accessor</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
             <span class="n">body_view</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">(</span>
-                <span class="n">lvl</span><span class="o">.</span><span class="n">root</span><span class="p">,</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">lvl</span><span class="o">.</span><span class="n">lvl</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">),</span>
-                <span class="n">lvl</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span>
-                <span class="n">FiberTensorFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">),</span>
-                <span class="n">lvl</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span>
+                <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="s2">"body"</span><span class="p">),</span>
+                <span class="n">tns</span><span class="o">.</span><span class="n">pos</span><span class="p">,</span>
+                <span class="n">tns</span><span class="o">.</span><span class="n">idxs</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_unfurl</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">body_view</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">proto</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
 
-        <span class="n">scalar</span> <span class="o">=</span> <span class="n">Scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-        <span class="n">visited_idxs</span> <span class="o">=</span> <span class="n">lvl</span><span class="o">.</span><span class="n">idxs</span>
+        <span class="n">lvl</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">tns</span><span class="o">.</span><span class="n">lvl</span><span class="p">),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"body"</span><span class="p">))</span>
+        <span class="n">fill</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">ntn</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">lvl</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
+            <span class="k">else</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">full</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Full</span><span class="p">(</span>
+            <span class="n">fill</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span>
+                <span class="n">ntn</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">level_lower_dim</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">r</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="n">r</span><span class="p">])</span>
+                <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">visited_idxs</span> <span class="o">=</span> <span class="n">tns</span><span class="o">.</span><span class="n">idxs</span>
         <span class="k">return</span> <span class="n">lplt</span><span class="o">.</span><span class="n">Sequence</span><span class="p">(</span>
             <span class="n">head</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">child_accessor</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span>
             <span class="n">split</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
                 <span class="n">ntn</span><span class="o">.</span><span class="n">L</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span> <span class="p">(</span><span class="n">visited_idxs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ext</span><span class="o">.</span><span class="n">get_unit</span><span class="p">())</span>
             <span class="p">),</span>
-            <span class="n">tail</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">lplt</span><span class="o">.</span><span class="n">Run</span><span class="p">(</span><span class="n">scalar</span><span class="p">),</span>
+            <span class="n">tail</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">lplt</span><span class="o">.</span><span class="n">Run</span><span class="p">(</span><span class="n">full</span><span class="p">),</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_dim</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
@@ -5916,7 +5892,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">[(</span><span class="s2">"body"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">),</span> <span class="p">(</span><span class="s2">"stride"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="p">[(</span><span class="s2">"body"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">)]</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5982,7 +5958,8 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">61</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">60</span>
+<span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
 <span class="normal">64</span>
@@ -5992,8 +5969,7 @@
 <span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"LoTriMask"</span><span class="p">:</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"LoTriMask"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this lower triangular mask level type.</span>
 

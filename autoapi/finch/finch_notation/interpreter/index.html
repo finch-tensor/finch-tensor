@@ -2150,34 +2150,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../codegen/buffers/safe_buffer/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    safe_buffer
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -4016,6 +3988,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.finch_notation.interpreter.FullView" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FullView
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.finch_notation.interpreter.HaltState" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5681,6 +5664,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.finch_notation.interpreter.FullView" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FullView
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.finch_notation.interpreter.HaltState" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6047,6 +6041,141 @@
 
 
 
+<h2 id="finch.finch_notation.interpreter.FullView" class="doc doc-heading">
+            <code>FullView</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Tensor (finch.algebra.Tensor)" href="../../algebra/#finch.algebra.Tensor">Tensor</a></code></p>
+
+
+
+        <p>An interpreter view of a read-only tensor filled with one value.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FullView</span><span class="p">(</span><span class="n">Tensor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""An interpreter view of a read-only tensor filled with one value."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">val</span> <span class="o">=</span> <span class="n">val</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="n">shape</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_type</span> <span class="o">=</span> <span class="n">type_</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_type</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Full views are read-only"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">FullView</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">idxs</span><span class="p">)</span> <span class="p">:],</span>
+            <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span> <span class="n">_shape_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">idxs</span><span class="p">)</span> <span class="p">:]),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot convert non-scalar tensor to Python scalar."</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> does not support to_scipy."</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
 <h2 id="finch.finch_notation.interpreter.HaltState" class="doc doc-heading">
             <code>HaltState</code>
 
@@ -6074,15 +6203,15 @@ These programs can't break, but calling return sets a special return value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">281</span>
-<span class="normal">282</span>
-<span class="normal">283</span>
-<span class="normal">284</span>
-<span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">HaltState</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent the halt state of a notation program.</span>
@@ -6143,50 +6272,7 @@ These programs can't break, but calling return sets a special return value.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
 <span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
@@ -6408,7 +6494,69 @@ These programs can't break, but calling return sets a special return value.</p>
 <span class="normal">554</span>
 <span class="normal">555</span>
 <span class="normal">556</span>
-<span class="normal">557</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">NotationLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An interpreter for FinchNotation.</span>
 <span class="sd">    """</span>
@@ -6509,6 +6657,14 @@ These programs can't break, but calling return sets a special return value.</p>
                 <span class="n">f_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
                 <span class="n">args_e</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
                 <span class="k">return</span> <span class="n">f_e</span><span class="p">(</span><span class="o">*</span><span class="n">args_e</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Root</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span><span class="o">.</span><span class="n">lvl</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Child</span><span class="p">(</span><span class="n">parent</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+                <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">parent</span><span class="p">),</span> <span class="n">attr</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Full</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">FullView</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="p">(</span><span class="n">val</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape</span><span class="p">),</span> <span class="n">prgm</span><span class="o">.</span><span class="n">result_type</span>
+                <span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Unwrap</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">tns</span><span class="p">))</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
@@ -6554,7 +6710,6 @@ These programs can't break, but calling return sets a special return value.</p>
                     <span class="k">return</span> <span class="kc">None</span>
                 <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized repack obj target: </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">mode</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
-                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">)</span>
                 <span class="n">tns_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
                 <span class="n">idxs_e</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">]</span>
                 <span class="k">match</span> <span class="n">mode</span><span class="p">:</span>
@@ -6567,7 +6722,6 @@ These programs can't break, but calling return sets a special return value.</p>
                         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized access mode: </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Dimension</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">r</span><span class="p">):</span>
-                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Slot</span><span class="p">)</span>
                 <span class="n">tns_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">tns</span><span class="p">)</span>
                 <span class="n">r_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
                 <span class="n">shape_ft</span> <span class="o">=</span> <span class="n">tns_e</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">shape_type</span><span class="p">[</span><span class="n">r_e</span><span class="p">]</span>
@@ -6617,7 +6771,13 @@ These programs can't break, but calling return sets a special return value.</p>
                 <span class="n">ctx_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">()</span>
                 <span class="n">ctx_2</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
-            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
+                <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+                    <span class="n">func_n</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernelFType</span><span class="p">(</span><span class="n">result_type</span><span class="o">=</span><span class="n">ret_t</span><span class="p">)</span> <span class="k">as</span> <span class="n">func_type</span>
+                <span class="p">),</span>
+                <span class="n">args</span><span class="p">,</span>
+                <span class="n">body</span><span class="p">,</span>
+            <span class="p">):</span>
 
                 <span class="k">def</span><span class="w"> </span><span class="nf">my_func</span><span class="p">(</span><span class="o">*</span><span class="n">args_e</span><span class="p">):</span>
                     <span class="n">ctx_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scope</span><span class="p">(</span><span class="n">function_state</span><span class="o">=</span><span class="n">HaltState</span><span class="p">())</span>
@@ -6648,7 +6808,8 @@ These programs can't break, but calling return sets a special return value.</p>
                         <span class="sa">f</span><span class="s2">"but expected type </span><span class="si">{</span><span class="n">ret_t</span><span class="si">}</span><span class="s2">."</span>
                     <span class="p">)</span>
 
-                <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">my_func</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">NotationInterpreterKernel</span><span class="p">(</span><span class="n">my_func</span><span class="p">,</span> <span class="n">func_type</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">types</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">func_type</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
                 <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">function_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
@@ -6662,9 +6823,15 @@ These programs can't break, but calling return sets a special return value.</p>
                 <span class="n">kernels</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">funcs</span><span class="p">:</span>
                     <span class="k">match</span> <span class="n">func</span><span class="p">:</span>
-                        <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">),</span> <span class="n">args</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
-                            <span class="n">kernel</span> <span class="o">=</span> <span class="n">NotationInterpreterKernel</span><span class="p">(</span><span class="n">ctx_2</span><span class="p">,</span> <span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">)</span>
-                            <span class="n">kernels</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span>
+                        <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">(</span>
+                            <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span>
+                                <span class="n">func_n</span><span class="p">,</span>
+                                <span class="n">ret_t</span><span class="p">,</span>
+                            <span class="p">),</span>
+                            <span class="n">args</span><span class="p">,</span>
+                            <span class="n">_</span><span class="p">,</span>
+                        <span class="p">):</span>
+                            <span class="n">kernels</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span> <span class="o">=</span> <span class="n">ctx_2</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">func_n</span><span class="p">]</span>
                         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                                 <span class="sa">f</span><span class="s2">"Unrecognized function definition: </span><span class="si">{</span><span class="n">func</span><span class="si">}</span><span class="s2">"</span>
@@ -6710,13 +6877,13 @@ These programs can't break, but calling return sets a special return value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationNode</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyNode</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Run the program.</span>
 <span class="sd">    """</span>
@@ -6746,35 +6913,35 @@ This allows for nested scopes and variable shadowing.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">bindings</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -6846,31 +7013,29 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A kernel for interpreting FinchNotation code.</span>
 <span class="sd">    This is a simple interpreter that executes the assembly code.</span>
 <span class="sd">    """</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">func</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">func_n</span><span class="p">,</span> <span class="n">ret_t</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="p">,</span> <span class="n">type_</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">type_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">func</span> <span class="o">=</span> <span class="n">func</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
-        <span class="n">args_i</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">,</span> <span class="n">args_i</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6923,22 +7088,22 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationInterpreterLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent an interpreted module of FinchNotation.</span>
 <span class="sd">    """</span>
@@ -7783,14 +7948,14 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">access</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unfurl a tensor along an index.</span>
 <span class="sd">    This is used to create a tensor view for a specific slice of the tensor.</span>
@@ -7820,17 +7985,17 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Declare a tensor.</span>
 <span class="sd">    """</span>
@@ -7863,13 +8028,13 @@ This is used to create a tensor view for a specific slice of the tensor.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Freeze a tensor.</span>
 <span class="sd">    """</span>
@@ -7899,14 +8064,14 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">increment</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Increment a tensor view with an operation and value.</span>
 <span class="sd">    This updates the tensor at the specified index with the operation and value.</span>
@@ -7936,13 +8101,13 @@ This updates the tensor at the specified index with the operation and value.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Thaw a tensor.</span>
 <span class="sd">    """</span>
@@ -7972,14 +8137,14 @@ This is used to get the original tensor from a tensor view.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">unwrap</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unwrap a tensor view to get the underlying tensor.</span>
 <span class="sd">    This is used to get the original tensor from a tensor view.</span>
