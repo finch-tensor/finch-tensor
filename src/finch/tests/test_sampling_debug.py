@@ -36,7 +36,7 @@ rng = np.random.default_rng(0)
 
 def materialize(sketch):
     out = Alias("sketch_out")
-    prgm = Plan((Query(out, sketch), Produces((out,))))
+    prgm = Plan((Query(Table(out, sketch.fields()), sketch), Produces((out,))))
     result = NON_RECURSIVE_SCHEDULER(prgm)[0]
     if isinstance(result, fl.FiberTensor):
         from finch.compile_jl.interop import tensor_to_jl

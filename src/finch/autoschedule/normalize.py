@@ -80,8 +80,8 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
 
     def gather(node: LogicNode) -> None:
         match node:
-            case Query(Alias() as lhs, Table(Literal(val), ())) if isinstance(
-                val, ConstantScalar
+            case Query(Table(Alias() as lhs, ()), Table(Literal(val), ())) if (
+                isinstance(val, ConstantScalar)
             ):
                 constants[lhs] = val.val
             case Produces(args):
@@ -118,10 +118,10 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
         match stmt:
             case Plan(bodies):
                 return Plan(tuple(inline_stmt(body) for body in bodies))
-            case Query(Alias() as lhs, rhs) if lhs in produced and (
+            case Query(Table(Alias() as lhs, _), rhs) if lhs in produced and (
                 ref := constant_ref(rhs)
             ):
-                # `Query(a, Literal(v))` names no tensor to produce, so a
+                # `Query(Table(a, ()), Literal(v))` names no tensor to produce, so a
                 # produced query that is *only* a constant reference is left
                 # alone -- and the binding it reads has to stay.
                 live.add(ref)
@@ -141,8 +141,8 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
                     for body in bodies
                     if not (
                         isinstance(body, Query)
-                        and body.lhs in constants
-                        and body.lhs not in live
+                        and body.lhs.tns in constants
+                        and body.lhs.tns not in live
                     )
                 )
                 return Plan(kept) if kept != bodies else None

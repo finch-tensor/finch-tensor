@@ -165,18 +165,17 @@ class LogicMachine:
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
                     result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
-            case Query(lhs, rhs):
-                rhs = self(rhs)
-                if lhs not in self.bindings:
-                    tns = self.make_tensor(
+            case Query(Table(Alias() as var, idxs), rhs):
+                rhs = self(Reorder(rhs, idxs))
+                if var not in self.bindings:
+                    self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
                         rhs.tns.fill_value,
                         dtype=rhs.tns.element_type,
                     )
-                    self.bindings[lhs] = tns
-                lhs = self(lhs)
+                tns = self.bindings[var]
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs[*crds] = rhs.tns[*crds].item()
+                    tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()

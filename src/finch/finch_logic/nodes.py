@@ -90,8 +90,10 @@ logic program.
 Tables may be referenced using "aliases", which are symbolic names that refer to
 specific tables within the program. Evaluators for Finch logic may accept a list
 of bindings from aliases to tables, allowing the logic program to modify the
-state of tensors. Queries in Finch Logic IR can bind the result of an expression
-to an alias for later use, or update the value of an existing alias.
+state of tensors. Queries in Finch Logic IR write the result of an expression
+to a table on their left-hand side, binding the table's alias for later use or
+updating the value of an existing alias. The fields of the left-hand table fix
+the order in which the result's dimensions are stored.
 """
 
 
@@ -678,15 +680,17 @@ class Relabel(LogicTree, LogicExpression):
 @dataclass(eq=True, frozen=True)
 class Query(LogicTree, LogicStatement):
     """
-    Represents a logical AST statement that evaluates `rhs`, binding the result to
-    `lhs`.
+    Represents a logical AST statement that evaluates `rhs`, storing the result
+    in the table `lhs`. The alias `lhs.tns` is bound to a tensor whose
+    dimensions are ordered as `lhs.idxs`, so a query behaves as though its
+    right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`.
 
     Attributes:
-        lhs: The left-hand side of the binding.
+        lhs: The table to write, a `Table` wrapping an `Alias`.
         rhs: The right-hand side to evaluate.
     """
 
-    lhs: Alias
+    lhs: Table
     rhs: LogicExpression
 
     @property
@@ -699,15 +703,16 @@ class Query(LogicTree, LogicStatement):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> dict[Alias, tuple[T | None, ...]]:
-        if self.lhs in dim_bindings:
-            for dim1, dim2 in zip(
-                self.rhs.dimmap(op, dim_bindings), dim_bindings[self.lhs], strict=True
-            ):
-                op(dim1, dim2)
-        else:
-            dim_bindings[self.lhs] = self.rhs.dimmap(op, dim_bindings)
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
+        var = self.lhs.tns
+        assert isinstance(var, Alias)
+        dims = Reorder(self.rhs, self.lhs.idxs).dimmap(op, dim_bindings)
+        if var in dim_bindings:
+            for dim1, dim2 in zip(dims, dim_bindings[var], strict=True):
+                op(dim1, dim2)
+        else:
+            dim_bindings[var] = dims
         return dim_bindings
 
     def infer_valmap(
@@ -718,16 +723,16 @@ class Query(LogicTree, LogicStatement):
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        if self.lhs in bindings:
+        var = self.lhs.tns
+        assert isinstance(var, Alias)
+        if var in bindings:
             val = self.rhs.valmap(f, g, bindings)
-            prev = bindings[self.lhs]
+            prev = bindings[var]
             # A dynamic value is compatible with any value of its dtype.
             if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
-                raise ValueError(
-                    f"Cannot rebind alias {self.lhs} to a different values"
-                )
+                raise ValueError(f"Cannot rebind alias {var} to a different values")
         else:
-            bindings[self.lhs] = self.rhs.valmap(f, g, bindings)
+            bindings[var] = self.rhs.valmap(f, g, bindings)
         return bindings
 
 
@@ -869,8 +874,9 @@ class LogicPrinterContext(Context):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Reorder({self(arg)}, {idxs_e})"
-            case Query(lhs, rhs):
-                self.exec(f"{feed}{self(lhs)} = {self(rhs)}")
+            case Query(Table(Alias() as tns, idxs), rhs):
+                idxs_e = ", ".join([self(idx) for idx in idxs])
+                self.exec(f"{feed}{self(tns)}[{idxs_e}] = {self(rhs)}")
                 return None
             case Plan(bodies):
                 ctx_2 = self.block()
