@@ -11,6 +11,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
@@ -128,6 +129,10 @@ def inline_constant_scalars(prgm: LogicNode) -> LogicNode:
                 return stmt
             case Query(lhs, rhs):
                 return Query(lhs, cast(LogicExpression, Rewrite(PostWalk(inline))(rhs)))
+            case QueryInto(lhs, op, rhs):
+                return QueryInto(
+                    lhs, op, cast(LogicExpression, Rewrite(PostWalk(inline))(rhs))
+                )
             case _:
                 return stmt
 

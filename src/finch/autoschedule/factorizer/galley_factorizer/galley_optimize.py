@@ -8,10 +8,12 @@ from __future__ import annotations
 import logging
 
 from finch.algebra.tensor import TensorFType
+from finch.autoschedule.factorizer.optimize import with_unique_lhs
 from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.tensor_stats.logic_to_stats import (
     insert_statistics,
 )
+from finch.autoschedule.util import desugar_query_into, flatten_plans
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -127,11 +129,21 @@ class GalleyLogicFactorizer(LogicFactorizer):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)
-        term = optimize_plan(
-            term,
-            stats_factory,
-            stats,
-            use_components=self.use_components,
-            optimizer=self.optimizer,
-        )
-        return self.ctx(term, bindings, stats, stats_factory)
+
+        def transform(prgm, bindings):
+            prgm = optimize_plan(
+                prgm,
+                stats_factory,
+                stats,
+                use_components=self.use_components,
+                optimizer=self.optimizer,
+            )
+            return prgm, bindings
+
+        # Galley only keeps the queries that compute produced aliases, so each
+        # write to a bound tensor, including an in-place update, is renamed and
+        # produced, then copied back to the tensor it updates.
+        term = desugar_query_into(term)
+        term, bindings = with_unique_lhs(transform, term, bindings)
+        assert isinstance(term, Plan)
+        return self.ctx(flatten_plans(term), bindings, stats, stats_factory)

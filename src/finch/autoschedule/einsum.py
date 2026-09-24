@@ -41,6 +41,17 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                     )
                 )
             return body
+        case lgc.QueryInto(
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Literal(operation),
+            lgc.Aggregate(_, _, rhs, _) | rhs,
+        ):
+            return ein.Einsum(
+                op=ein.Literal(operation),
+                tns=ein.Alias(name),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
+                arg=generate_einsum_expr(rhs),
+            )
         case lgc.Query(lgc.Table(lgc.Alias(name), output_idxs), rhs):
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)

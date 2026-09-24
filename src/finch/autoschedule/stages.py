@@ -2,7 +2,7 @@ from abc import abstractmethod
 
 from finch import finch_einsum as ein
 from finch import finch_notation as ntn
-from finch.algebra import ffuncs
+from finch.algebra.algebra import is_identity
 from finch.algebra.tensor import TensorFType
 from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
@@ -15,6 +15,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Reorder,
     Table,
 )
@@ -45,7 +46,12 @@ class AliasedForm(Form):
             match node:
                 case Query(Table(Alias() as lhs, _), _):
                     defined_aliases.add(lhs)
-                case Query(lhs, _):
+                case QueryInto(Table(Alias() as lhs, _), _, _):
+                    if lhs not in defined_aliases:
+                        raise ValueError(
+                            f"QueryInto updates alias {lhs.name}, which is not defined."
+                        )
+                case Query(lhs, _) | QueryInto(lhs, _, _):
                     raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
                 case Alias(name):
                     if node not in defined_aliases:
@@ -61,15 +67,18 @@ class AliasedForm(Form):
 class SingleAggregateForm(AliasedForm):
     """
     SingleAggregateForm assumes that the fusion strategy has
-    already been optimized for this query. There are three valid kinds of input query:
+    already been optimized for this query. There are four valid kinds of input query:
     1) transpose queries
         Query(Table(_, output_order), Table(_, _))
     2) aggregate queries
         Query(Table(_, output_order), Aggregate(_, _, arg, _))
-    3) in-place queries
-        Query(Table(lhs, output_order), MapJoin(op1, (Table(lhs, output_order),
-            Aggregate(op2, _, arg, _))))
-    (Here, op2 can be ffunc.overwrite or it can be equal to op1).
+    3) in-place aggregate queries
+        QueryInto(Table(_, output_order), op, Aggregate(op, init, arg, _))
+    (Here, the aggregate reduces with the update operator op, starting from an
+    identity init, so each value can be folded directly into the output.)
+    4) in-place pointwise queries
+        QueryInto(Table(_, output_order), op, arg)
+    (Here, arg has no aggregates.)
     """
 
     @classmethod
@@ -95,26 +104,18 @@ class SingleAggregateForm(AliasedForm):
                     return None
                 case Query(Table(), Aggregate(_, _, arg, _)):
                     return validate(arg, False)
-                case Query(
-                    Table(lhs1, output_order1),
-                    MapJoin(
-                        op1, (Table(lhs2, output_order2), Aggregate(op2, _, arg, _))
-                    ),
+                case QueryInto(
+                    Table(),
+                    Literal(op1),
+                    Aggregate(Literal(op2), Literal(init), arg, _),
                 ):
-                    if lhs1 != lhs2:
+                    if op2 != op1 or not is_identity(op1.ftype, init):
                         raise ValueError(
-                            "In-place queries must have the same alias on the \
-                                left-hand side and inside the MapJoin."
+                            "The aggregate of an in-place query must reduce with "
+                            "the update operator, starting from its identity."
                         )
-                    if output_order1 != output_order2:
-                        raise ValueError(
-                            "In-place queries must read and write in the same order."
-                        )
-                    if op2 not in (ffuncs.overwrite, op1):
-                        raise ValueError(
-                            "The aggregate operator in an in-place query must be\
-                            either ffunc.overwrite or the same as the MapJoin operator."
-                        )
+                    return validate(arg, False)
+                case QueryInto(Table(), _, arg):
                     return validate(arg, False)
                 case Query(_, rhs):
                     raise ValueError(f"Unsupported query right-hand side: {rhs}")
@@ -145,9 +146,12 @@ class LoopOrderedForm(SingleAggregateForm):
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
             Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
-        3) in-place queries
-            Query(Table(lhs, lhs_idxs), MapJoin(_, (Table(lhs, lhs_idxs),
-                Aggregate(_, _, Reorder(agg_arg, loop_order), _))))
+        3) in-place aggregate queries
+            QueryInto(Table(_, lhs_idxs), _,
+                Aggregate(_, _, Reorder(arg, loop_order), _))
+        4) in-place pointwise queries
+            QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
+    (Here, the loop order visits the fields of lhs_idxs in order.)
     """
 
     @staticmethod
@@ -179,23 +183,24 @@ class LoopOrderedForm(SingleAggregateForm):
                         "All aggregates must wrap a Reorder node specifying\
                              the loop order."
                     )
-                case Query(
-                    Table(),
-                    MapJoin(
-                        _,
-                        (
-                            Table(_, lhs_idxs),
-                            Aggregate(_, _, Reorder(agg_arg, idxs_1), _),
-                        ),
-                    ),
+                case QueryInto(
+                    Table(_, lhs_idxs), _, Aggregate(_, _, Reorder(arg, idxs_1), _)
                 ):
                     if not cls._check_loop_order(lhs_idxs, idxs_1):
                         raise ValueError("Table index order does not match loop order.")
-                    return validate(agg_arg, idxs_1)
-                case Query(Table(), MapJoin(_, (Table(), Aggregate()))):
+                    return validate(arg, idxs_1)
+                case QueryInto(Table(), _, Aggregate()):
                     raise ValueError(
                         "In-place queries must have an interior loop order!"
                     )
+                case QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs_1)):
+                    # A pointwise update has no aggregate to hold its loop order,
+                    # so its right-hand side is wrapped in a Reorder instead.
+                    if not cls._check_loop_order(lhs_idxs, idxs_1):
+                        raise ValueError("Table index order does not match loop order.")
+                    return validate(arg, idxs_1)
+                case QueryInto():
+                    raise ValueError("In-place queries must have a loop order!")
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
@@ -239,7 +244,7 @@ class FormattedForm(LoopOrderedForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body)
-                case Query(lhs, rhs):
+                case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
                 case Aggregate(_, _, arg, _) | Reorder(arg, _):

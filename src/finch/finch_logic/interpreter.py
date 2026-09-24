@@ -30,6 +30,7 @@ from .nodes import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
@@ -177,6 +178,8 @@ class LogicMachine:
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
+            case QueryInto() as stmt:
+                return self(stmt.as_query())
             case Plan(bodies):
                 res = ()
                 for body in bodies:

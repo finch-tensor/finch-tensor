@@ -4,6 +4,7 @@ from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
 from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.util import (
+    desugar_query_into,
     drop_query_reorders,
     flatten_plans,
     propagate_copy_queries,
@@ -177,6 +178,7 @@ def optimize(
         prgm = add_aggregates(prgm, bindings)
         return prgm, bindings
 
+    prgm = desugar_query_into(prgm)
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
     assert isinstance(prgm, Plan)
     return flatten_plans(prgm), bindings
