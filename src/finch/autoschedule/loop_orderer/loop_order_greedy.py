@@ -12,7 +12,7 @@ from finch.finch_logic import (
     LogicExpression,
     Plan,
     Query,
-    Reorder,
+    QueryInto,
     StatsFactory,
     Table,
 )
@@ -23,7 +23,7 @@ from .loop_order_cost import (
     get_prefix_cost,
     get_reformat_set,
 )
-from .loop_ordering import AbstractLoopOrderer
+from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
 TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)
@@ -123,11 +123,14 @@ def set_greedy_loop_order(
         # The query's result layout decides whether writing an index is
         # sequential or random, so pass it to the cost model.
         match query:
-            case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+            case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+            ):
                 idxs_2 = greedy_loop_order(arg, stats_factory, stats_bindings, out_idxs)
-                new_queries.append(
-                    Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
-                )
+                new_queries.append(with_loop_order(query, idxs_2))
+            case QueryInto(Table(_, out_idxs), _, _):
+                # A pointwise update loops in the order of the table it updates.
+                new_queries.append(with_loop_order(query, out_idxs))
             case Query(_, Table(Alias(), _)) as q:
                 new_queries.append(q)
             case _:

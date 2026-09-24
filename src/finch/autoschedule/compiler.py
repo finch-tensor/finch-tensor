@@ -315,22 +315,15 @@ class NotationContext:
                         ),
                     )
                 )
-            case lgc.Query(
+            case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs_2),
-                lgc.MapJoin(
-                    lgc.Literal(op),
-                    (
-                        lgc.Table(lhs_1, idxs_1),
-                        lgc.Aggregate(
-                            lgc.Literal(op_1),
-                            lgc.Literal(init),
-                            lgc.Reorder() as agg_arg,
-                            _,
-                        ),
-                    ),
-                ),
-            ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
-                body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)
+                lgc.Literal(op),
+                lgc.Aggregate(_, _, lgc.Reorder() as arg, _) | (lgc.Reorder() as arg),
+            ):
+                # An aggregate reduces with `op` from its identity, so both
+                # forms fold each value into the output with `op`, in the loop
+                # order given by the Reorder.
+                body = self._lower_query_of_aggregate(lhs, op, arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Thaw(

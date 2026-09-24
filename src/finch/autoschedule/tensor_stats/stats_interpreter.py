@@ -20,6 +20,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     StatsFactory,
@@ -93,6 +94,9 @@ class StatsMachine(Generic[TS]):
                 rhs_stats = self(rhs)
                 self.bindings[var] = rhs_stats
                 return rhs_stats
+
+            case QueryInto():
+                return self(node.as_query())
 
             case Alias():
                 stats = self.bindings.get(node)

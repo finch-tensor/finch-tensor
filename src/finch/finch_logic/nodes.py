@@ -683,7 +683,9 @@ class Query(LogicTree, LogicStatement):
     Represents a logical AST statement that evaluates `rhs`, storing the result
     in the table `lhs`. The alias `lhs.tns` is bound to a tensor whose
     dimensions are ordered as `lhs.idxs`, so a query behaves as though its
-    right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`.
+    right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`. A query is not
+    in place: the previous value of `lhs.tns` is replaced, and is only read if
+    `rhs` refers to it. See `QueryInto` for in-place updates.
 
     Attributes:
         lhs: The table to write, a `Table` wrapping an `Alias`.
@@ -734,6 +736,57 @@ class Query(LogicTree, LogicStatement):
         else:
             bindings[var] = self.rhs.valmap(f, g, bindings)
         return bindings
+
+
+@dataclass(eq=True, frozen=True)
+class QueryInto(LogicTree, LogicStatement):
+    """
+    Represents a logical AST statement that updates the table `lhs` in place,
+    using the reduction operator `op` to combine each of its elements with the
+    matching element of `rhs`. The alias `lhs.tns` must already be bound. Like
+    a `Query`, a `QueryInto` behaves as though its right-hand side were wrapped
+    in `Reorder(rhs, lhs.idxs)`, so it does not reduce any dimensions of `rhs`.
+    A `QueryInto` is equivalent to
+    `Query(lhs, MapJoin(op, (lhs, Reorder(rhs, lhs.idxs))))`.
+
+    Attributes:
+        lhs: The table to update, a `Table` wrapping an `Alias`.
+        op: The reduction operator used to combine old and new values.
+        rhs: The right-hand side to evaluate.
+    """
+
+    lhs: Table
+    op: Literal
+    rhs: LogicExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.op, self.rhs]
+
+    def as_query(self) -> Query:
+        """The equivalent statement which is not in place."""
+        rhs = Reorder(self.rhs, self.lhs.idxs)
+        return Query(self.lhs, MapJoin(self.op, (self.lhs, rhs)))
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.as_query().infer_dimmap(op, dim_bindings)
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.as_query().infer_valmap(f, g, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -877,6 +930,10 @@ class LogicPrinterContext(Context):
             case Query(Table(Alias() as tns, idxs), rhs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 self.exec(f"{feed}{self(tns)}[{idxs_e}] = {self(rhs)}")
+                return None
+            case QueryInto(Table(tns, idxs), op, rhs):
+                idxs_e = ", ".join([self(idx) for idx in idxs])
+                self.exec(f"{feed}{self(tns)}[{idxs_e}] <<{self(op)}>>= {self(rhs)}")
                 return None
             case Plan(bodies):
                 ctx_2 = self.block()

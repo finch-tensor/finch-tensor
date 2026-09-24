@@ -20,12 +20,12 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
 )
-from finch.finch_logic.nodes import MapJoin
 from finch.symbolic import Namespace, PostOrderDFS, PostWalk, Rewrite
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
@@ -65,7 +65,10 @@ def concordize(
 
     def rule_1(ex):
         match ex:
-            case Query(Table(Alias() as lhs, _), _) as q if lhs in needed_swizzles:
+            case (
+                Query(Table(Alias() as lhs, _), _)
+                | QueryInto(Table(Alias() as lhs, _), _, _)
+            ) as q if lhs in needed_swizzles:
                 swizzle_queries = _get_swizzle_queries(lhs)
                 return Plan((q, *swizzle_queries))
 
@@ -100,28 +103,28 @@ def drop_internal_reorders(
             case Query(lhs, Aggregate(op, init, arg, idxs_2)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Aggregate(op, init, arg_1, idxs_2))
-            case Query(lhs, MapJoin(op, (tbl, Aggregate(op1, init, arg, ag_idxs)))):
+            case QueryInto(lhs, op, Aggregate(op1, init, arg, ag_idxs)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return Query(
-                    lhs, MapJoin(op, (tbl, Aggregate(op1, init, arg_1, ag_idxs)))
-                )
+                return QueryInto(lhs, op, Aggregate(op1, init, arg_1, ag_idxs))
+            case QueryInto(lhs, op, arg):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return QueryInto(lhs, op, arg_1)
 
     def rule_2(stmt):
         match stmt:
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Aggregate(op, init, Reorder(arg_1, idxs_1), idxs_2))
-            case Query(
-                lhs,
-                MapJoin(op, (tbl, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs))),
+            case QueryInto(
+                lhs, op, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs)
             ):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return Query(
-                    lhs,
-                    MapJoin(
-                        op, (tbl, Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs))
-                    ),
+                return QueryInto(
+                    lhs, op, Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs)
                 )
+            case QueryInto(lhs, op, Reorder(arg, idxs_1)):
+                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
+                return QueryInto(lhs, op, Reorder(arg_1, idxs_1))
 
     if keep_loop_orders:
         return Rewrite(PostWalk(rule_2))(root)
@@ -181,15 +184,41 @@ def _heuristic_loop_order(root: LogicExpression) -> tuple[Field, ...]:
     return result
 
 
+def with_loop_order(
+    stmt: LogicStatement, loop_order: tuple[Field, ...]
+) -> LogicStatement:
+    """
+    Set the loop order of a query. An aggregate query holds its loop order in
+    a Reorder of the aggregate's argument, and a pointwise in-place update
+    holds it in a Reorder of its right-hand side.
+    """
+    match stmt:
+        case Query(lhs, Aggregate(op, init, arg, idxs)):
+            return Query(lhs, Aggregate(op, init, Reorder(arg, loop_order), idxs))
+        case QueryInto(lhs, update_op, Aggregate(op, init, arg, idxs)):
+            return QueryInto(
+                lhs, update_op, Aggregate(op, init, Reorder(arg, loop_order), idxs)
+            )
+        case QueryInto(lhs, op, arg):
+            return QueryInto(lhs, op, Reorder(arg, loop_order))
+        case _:
+            raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
+
+
 def heuristic_loop_order(plan: Plan) -> Plan:
     new_queries = []
     for query in plan.bodies[:-1]:
 
         def rule_1(query):
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs)):
-                    idxs_2 = _heuristic_loop_order(arg)
-                    return Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
+                case Query(_, Aggregate(_, _, arg, _)) | QueryInto(
+                    _, _, Aggregate(_, _, arg, _)
+                ):
+                    return with_loop_order(query, _heuristic_loop_order(arg))
+                case QueryInto(Table(_, idxs), _, _):
+                    # A pointwise update loops in the order of the table it
+                    # updates.
+                    return with_loop_order(query, idxs)
                 case Query(_, Table(Alias(), _)) as q:
                     return q
                 case _:

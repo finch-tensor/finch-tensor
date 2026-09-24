@@ -287,11 +287,15 @@ def merge_queries(plan: Plan) -> Plan:
     produced_aliases: tuple[Alias, ...] = produces_stmt.args  # ty: ignore[invalid-assignment]
     produced_alias_set: set[Alias] = set(produced_aliases)
 
+    # Emit the queries in the order they were defined, since a produced alias
+    # may read another produced alias.
+    ordered_aliases = sorted(
+        (alias for alias in produced_alias_set if alias in alias_to_query),
+        key=lambda alias: bodies.index(alias_to_query[alias]),
+    )
     new_queries: list[Query] = []
-    for alias in produced_aliases:
-        defining_query = alias_to_query.get(alias)
-        if defining_query is None:
-            continue
+    for alias in ordered_aliases:
+        defining_query = alias_to_query[alias]
         # Don't inline other produced aliases, resue them
         other_produced = produced_alias_set - {alias}
         merged_rhs = _inline_tables_in_expr(
