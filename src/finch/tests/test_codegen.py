@@ -21,7 +21,7 @@ from finch import (
     ftype,
     sparse_list,
 )
-from finch.algebra import ftypes
+from finch.algebra import DynamicFill, ftypes
 from finch.codegen import (
     CCompiler,
     CGenerator,
@@ -1347,6 +1347,113 @@ def test_mlir_ifelse_branch_local_var():
     assert buf.arr[0] == 42.0
     mod.kern(buf, False, np.float64(7.0))
     assert buf.arr[0] == 7.0
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "fill,values,expected",
+    [
+        (np.int8(0), (np.int8(0), np.int16(5), np.int32(7)), np.int32(5)),
+        (np.int8(0), (np.int8(0), np.float32(5), np.float64(7)), np.float64(5)),
+    ],
+)
+def test_mlir_choose(fill, values, expected):
+    operator = ffuncs.choose(DynamicFill(fill))
+    op = asm.Variable("op", ftype(operator))
+    args = tuple(
+        asm.Variable(name, ftype(value))
+        for name, value in zip(("x", "y", "z"), values, strict=True)
+    )
+    call = asm.Call(op, args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "choose_mixed",
+                    asm.AssemblyKernelFType(
+                        "choose_mixed",
+                        (op.result_type, *(arg.result_type for arg in args)),
+                        call.result_type,
+                    ),
+                ),
+                (op, *args),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).choose_mixed(operator, *values)
+    assert result == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "condition,expected",
+    [
+        (True, np.int32(1)),
+        (False, np.int32(2)),
+    ],
+)
+def test_mlir_where(condition, expected):
+    cond = asm.Variable("cond", ftype(np.bool_))
+    x = asm.Variable("x", ftype(np.int8))
+    y = asm.Variable("y", ftype(np.int32))
+    call = asm.Call(asm.Literal(ffuncs.where), (cond, x, y))
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "where_mixed",
+                    asm.AssemblyKernelFType(
+                        "where_mixed",
+                        (cond.result_type, x.result_type, y.result_type),
+                        call.result_type,
+                    ),
+                ),
+                (cond, x, y),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).where_mixed(
+        np.bool_(condition), np.int8(1), np.int32(2)
+    )
+    assert result == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "operator,values,expected",
+    [
+        (ffuncs.add, (np.int8(1), np.int16(2), np.int32(3)), np.int32(6)),
+        (ffuncs.mul, (np.int8(1), np.float32(2.5)), np.float32(2.5)),
+        (ffuncs.lt, (np.int8(1), np.int32(2)), np.bool_(True)),
+    ],
+)
+def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
+    args = tuple(
+        asm.Variable(f"arg{i}", ftype(value)) for i, value in enumerate(values)
+    )
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "apply_mixed",
+                    asm.AssemblyKernelFType(
+                        "apply_mixed",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    assert MLIRCompiler()(program).apply_mixed(*values) == expected
 
 
 @mlir_backend
