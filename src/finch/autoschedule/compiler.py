@@ -262,7 +262,9 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
+            case lgc.Query(
+                lgc.Table(lgc.Alias() as lhs, idxs_2), lgc.Table(lgc.Alias(), _) as arg
+            ):
                 match self.bindings[lhs].fill_value:
                     case DynamicFill() as fill:
                         init = ntn.Literal(fill)
@@ -287,15 +289,12 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.Aggregate(
-                        lgc.Literal(op),
-                        lgc.Literal(init),
-                        lgc.Reorder(arg, _) as arg_2,
-                        idxs_2,
-                    ),
-                    output_idxs,
+                lgc.Table(lgc.Alias() as lhs, output_idxs),
+                lgc.Aggregate(
+                    lgc.Literal(op),
+                    lgc.Literal(init),
+                    lgc.Reorder(arg, _) as arg_2,
+                    idxs_2,
                 ),
             ):
                 if op == ffuncs.overwrite and not idxs_2 and not is_dynamic(init):
@@ -317,21 +316,18 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.MapJoin(
-                        lgc.Literal(op),
-                        (
-                            lgc.Table(lhs_1, idxs_1),
-                            lgc.Aggregate(
-                                lgc.Literal(op_1),
-                                lgc.Literal(init),
-                                lgc.Reorder() as agg_arg,
-                                _,
-                            ),
+                lgc.Table(lgc.Alias() as lhs, idxs_2),
+                lgc.MapJoin(
+                    lgc.Literal(op),
+                    (
+                        lgc.Table(lhs_1, idxs_1),
+                        lgc.Aggregate(
+                            lgc.Literal(op_1),
+                            lgc.Literal(init),
+                            lgc.Reorder() as agg_arg,
+                            _,
                         ),
                     ),
-                    idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)

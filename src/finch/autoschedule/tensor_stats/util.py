@@ -66,7 +66,7 @@ def get_lp_norms(
         degrees = Alias(f"degrees_{dim}")
         bodies.append(
             Query(
-                degrees,
+                Table(degrees, (field,)),
                 Aggregate(
                     Literal(ffuncs.add),
                     int_zero,
@@ -100,7 +100,7 @@ def get_lp_norms(
                     ),
                     (field,),
                 )
-            bodies.append(Query(out, rhs))
+            bodies.append(Query(Table(out, ()), rhs))
             outputs.append(out)
 
     prgm = Plan((*bodies, Produces(tuple(outputs))))

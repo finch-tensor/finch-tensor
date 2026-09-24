@@ -214,7 +214,7 @@ class EffectBlob:
 
     def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
         var = Alias(gensym("A"))
-        return var, self.exec(Query(var, ex))
+        return var, self.exec(Query(Table(var, ex.fields()), ex))
 
     def join(self, *blobs: EffectBlob) -> EffectBlob:
         return EffectBlob(blobs=(self, *blobs))
@@ -554,7 +554,7 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
+    ctx = EffectBlob(stmt=Query(Table(tns, idxs), Table(Literal(arr), idxs)))
     return LazyTensor(
         tns, ctx, shape, arr.ftype.fill_value, arr.element_type, arr.device
     )

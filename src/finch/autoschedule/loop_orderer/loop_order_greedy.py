@@ -114,11 +114,7 @@ def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
-    *,
-    output_fields: dict[Alias, tuple[Field, ...]] | None = None,
 ) -> Plan:
-    if output_fields is None:
-        output_fields = {}
     stats_bindings = dict(stats)
     cache: dict[object, NS] = {}
 
@@ -127,27 +123,12 @@ def set_greedy_loop_order(
         # The query's result layout decides whether writing an index is
         # sequential or random, so pass it to the cost model.
         match query:
-            case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
-                idxs_2 = greedy_loop_order(
-                    arg, stats_factory, stats_bindings, rhs.fields()
+            case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+                idxs_2 = greedy_loop_order(arg, stats_factory, stats_bindings, out_idxs)
+                new_queries.append(
+                    Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
                 )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                aggregate_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, aggregate_2))
-            case Query(lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs):
-                idxs_2 = greedy_loop_order(
-                    arg, stats_factory, stats_bindings, rhs.fields()
-                )
-                output_idxs = output_fields.get(lhs, rhs.fields())
-                reorder_2 = Reorder(
-                    Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                    output_idxs,
-                )
-                new_queries.append(Query(lhs, reorder_2))
-            case Query(_, Reorder(Table(Alias(), _), _)) as q:
+            case Query(_, Table(Alias(), _)) as q:
                 new_queries.append(q)
             case _:
                 raise Exception(f"Invalid node: {query} in set_greedy_loop_order")
@@ -165,9 +146,5 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: dict[Alias, NS],
         stats_factory: StatsFactory[NS],
-        *,
-        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        return set_greedy_loop_order(
-            prgm, stats_factory, stats, output_fields=output_fields
-        )
+        return set_greedy_loop_order(prgm, stats_factory, stats)

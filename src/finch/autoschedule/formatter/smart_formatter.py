@@ -165,8 +165,10 @@ class SmartFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
-                case lgc.Query(lhs, rhs):
-                    rhs_stats = stats_interpreter(rhs, stats_bindings)
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _):
+                    # Evaluating the query gives the stats of the stored result,
+                    # in the order of its left-hand table.
+                    rhs_stats = stats_interpreter(node, stats_bindings)
                     if not isinstance(rhs_stats, TensorStats):
                         raise TypeError("Expected query RHS to produce TensorStats.")
                     assert isinstance(rhs_stats, TensorStats)
@@ -183,11 +185,7 @@ class SmartFormatter(LogicFormatter):
                             rhs_stats,
                         )
 
-                    match rhs:
-                        case lgc.Reorder():
-                            return node
-                        case _:
-                            return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
+                    return node
                 case lgc.Produces():
                     return node
                 case _:

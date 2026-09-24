@@ -13,7 +13,6 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reorder,
     Table,
 )
 from finch.tensor.level import ElementLevelFType
@@ -32,13 +31,15 @@ def level_ftypes(tensor_ftype):
     return levels
 
 
-def format_query(rhs, array):
+def format_query(rhs, array, idxs=None):
     """Run `GalleyFormatter` over a single query and return the output ftype."""
+    if idxs is None:
+        idxs = rhs.fields()
     tensor = fl.asarray(array)
     stats_factory = DCStatsFactory()
     capture = LogicCapture()
     GalleyFormatter(capture).lower(
-        Plan((Query(B, rhs), Produces((B,)))),
+        Plan((Query(Table(B, idxs), rhs), Produces((B,)))),
         {A: tensor.ftype},
         {A: stats_factory(tensor, (i, j))},
         stats_factory,
@@ -71,6 +72,6 @@ def test_galley_formatter_uses_sparse_lists_for_a_sparse_matrix():
 def test_galley_formatter_uses_hash_levels_when_writes_are_random():
     # A transpose is looped in the order its input is stored, so every level of
     # the output is written out of order.
-    ftype = format_query(Reorder(Table(A, (i, j)), (j, i)), sparse_matrix())
+    ftype = format_query(Table(A, (i, j)), sparse_matrix(), (j, i))
 
     assert level_ftypes(ftype) == [fl.SparseHashLevelFType, fl.SparseHashLevelFType]

@@ -246,7 +246,7 @@ def test_constant_scalar_inlines_to_literal():
         == 0
     )
     assert all(isinstance(q, Query) for q in inlined.bodies)
-    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs == y.data]  # ty: ignore[unresolved-attribute]
+    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs.tns == y.data]  # ty: ignore[unresolved-attribute]
     assert isinstance(mapjoin_q, Query)
     match mapjoin_q.rhs:
         case Reorder(MapJoin(Literal(_), args), _):
@@ -257,7 +257,7 @@ def test_constant_scalar_inlines_to_literal():
 
 def test_a_produced_constant_keeps_its_binding():
     """
-    We shouldn't create `Query(a, Literal(v))` via inlining of constants.
+    We shouldn't create `Query(Table(a, ()), Literal(v))` via inlining of constants.
     """
     out = finch.compute(finch.defer(ConstantScalar(1)))
     assert float(np.asarray(out)) == float(np.asarray(ConstantScalar(1)))

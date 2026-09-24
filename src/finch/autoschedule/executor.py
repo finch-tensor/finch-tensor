@@ -73,7 +73,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         if isinstance(prgm, lgc.LogicExpression):
             var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(
-                (lgc.Query(var, prgm), lgc.Produces((var,)))
+                (lgc.Query(lgc.Table(var, prgm.fields()), prgm), lgc.Produces((var,)))
             )
         elif isinstance(prgm, lgc.LogicStatement):
             stmt = prgm
