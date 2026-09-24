@@ -14,11 +14,12 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
 )
-from finch.symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite
+from finch.symbolic import Chain, Fixpoint, PostOrderDFS, PostWalk, PreWalk, Rewrite
 
 
 def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
@@ -94,11 +95,15 @@ def push_fields(root):
                 )
 
     # A query stores its result in the order of its left-hand table, so we
-    # expose that order to `rule_2` as a Reorder and strip it afterwards.
+    # expose that order to `rule_2` as a Reorder and strip it afterwards. The
+    # Reorder at the root of a pointwise in-place update is its loop order,
+    # which must follow the order of the table it updates, so that one is kept.
     def wrap_query(stmt):
         match stmt:
             case Query(Table(_, idxs) as lhs, rhs) if rhs.fields() != idxs:
                 return Query(lhs, Reorder(rhs, idxs))
+            case QueryInto(Table(_, idxs) as lhs, op, rhs) if rhs.fields() != idxs:
+                return QueryInto(lhs, op, Reorder(rhs, idxs))
 
     root = Rewrite(PostWalk(wrap_query))(root)
     root = Rewrite(PreWalk(Fixpoint(rule_2)))(root)
@@ -119,6 +124,22 @@ def drop_query_reorders(root):
         match stmt:
             case Query(lhs, Reorder(arg, _)):
                 return Query(lhs, arg)
+            case QueryInto(lhs, op, Reorder(Aggregate() as arg, _)):
+                return QueryInto(lhs, op, arg)
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def desugar_query_into(root: LogicStatement) -> LogicStatement:
+    """
+    Replace each in-place `QueryInto` with the equivalent `Query`, which reads
+    the previous value of its left-hand side explicitly.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case QueryInto() as q:
+                return q.as_query()
 
     return Rewrite(PostWalk(rule))(root)
 
@@ -152,12 +173,21 @@ def flatten_plans(root: Plan) -> Plan:
 
 def propagate_copy_queries(root, bindings):
     copies = {}
+    # A copy can't share storage with its source if either is updated in place.
+    updated = {
+        node.lhs.tns for node in PostOrderDFS(root) if isinstance(node, QueryInto)
+    }
 
     def rule_1(node):
         match node:
             case Query(
                 Table(Alias() as lhs, idxs_1), Table(Alias(_) as rhs, idxs_2)
-            ) if idxs_1 == idxs_2 and lhs not in bindings:
+            ) if (
+                idxs_1 == idxs_2
+                and lhs not in bindings
+                and lhs not in updated
+                and rhs not in updated
+            ):
                 copies[lhs] = copies.get(rhs, rhs)
                 return Plan()
 

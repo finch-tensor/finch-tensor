@@ -15,7 +15,7 @@ from finch.finch_logic import (
     LogicLoader,
     Plan,
     Query,
-    Reorder,
+    QueryInto,
     StatsFactory,
     Table,
 )
@@ -28,7 +28,7 @@ from .loop_order_cost import (
     needs_reformat,
 )
 from .loop_order_greedy import connected_loop_candidates, greedy_loop_order
-from .loop_ordering import AbstractLoopOrderer
+from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
 TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)
@@ -208,13 +208,16 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+                case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                ):
                     idxs_2 = loop_order_bfs(
                         arg, stats_factory, stats_bindings, out_idxs, k=self.k
                     )
-                    new_queries.append(
-                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
-                    )
+                    new_queries.append(with_loop_order(query, idxs_2))
+                case QueryInto(Table(_, out_idxs), _, _):
+                    # A pointwise update loops in the order of the table it updates.
+                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
@@ -240,13 +243,16 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+                case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                ):
                     idxs_2 = loop_order_dfs(
                         arg, stats_factory, stats_bindings, out_idxs
                     )
-                    new_queries.append(
-                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
-                    )
+                    new_queries.append(with_loop_order(query, idxs_2))
+                case QueryInto(Table(_, out_idxs), _, _):
+                    # A pointwise update loops in the order of the table it updates.
+                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
@@ -272,13 +278,16 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+                case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                ):
                     idxs_2 = loop_order_brute_force(
                         arg, stats_factory, stats_bindings, out_idxs
                     )
-                    new_queries.append(
-                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
-                    )
+                    new_queries.append(with_loop_order(query, idxs_2))
+                case QueryInto(Table(_, out_idxs), _, _):
+                    # A pointwise update loops in the order of the table it updates.
+                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:

@@ -10,6 +10,7 @@ from finch.finch_logic import (
     LogicNode,
     MapJoin,
     Query,
+    QueryInto,
     Reorder,
     StatsFactory,
     Table,
@@ -52,6 +53,12 @@ def insert_statistics(
                 rhs = Reorder(rhs, idxs)
             stats = insert_statistics(stats_factory, rhs, bindings, replace, cache)
             bindings[var] = stats
+            cache[node] = stats
+            return stats
+        case QueryInto():
+            stats = insert_statistics(
+                stats_factory, node.as_query(), bindings, replace, cache
+            )
             cache[node] = stats
             return stats
 

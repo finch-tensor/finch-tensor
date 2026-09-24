@@ -145,17 +145,14 @@ def query_loop_order(rhs: lgc.LogicExpression) -> tuple[Field, ...]:
     """
     The loop order a query's right hand side is evaluated under.
 
-    Loop orders are carried by the `Reorder` node interior to an aggregate; a
-    transpose query is looped in the order its input is stored.
+    Loop orders are carried by the `Reorder` node interior to an aggregate, or
+    at the root of an in-place update; a transpose query is looped in the order
+    its input is stored.
     """
     match rhs:
         case lgc.Table(_, idxs):
             return idxs
-        case lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _):
-            return idxs
-        case lgc.MapJoin(
-            _, (lgc.Table(), lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _))
-        ):
+        case lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _) | lgc.Reorder(_, idxs):
             return idxs
         case _:
             return rhs.fields()
@@ -219,7 +216,9 @@ class GalleyFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs):
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, rhs
+                ):
                     # Evaluating the query gives the stats of the stored result,
                     # in the order of its left-hand table.
                     rhs_stats = stats_interpreter(node, stats_bindings)
