@@ -1,9 +1,9 @@
 import numpy as np
 
-from finch.algebra import ffuncs
+from finch.algebra import TupleFType, ffuncs
 from finch.algebra.ftypes import fisinstance
 from finch.algebra.tensor import TensorFType
-from finch.finch_assembly.stages import AssemblyKernel, AssemblyLibrary
+from finch.finch_assembly import AssemblyKernel, AssemblyKernelFType, AssemblyLibrary
 from finch.finch_einsum.stages import (
     EinsumEvaluator,
     EinsumLoader,
@@ -170,6 +170,15 @@ class EinsumMachine:
 
 class MockEinsumKernel(AssemblyKernel):
     def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+        super().__init__(
+            AssemblyKernelFType(
+                "main",
+                tuple(bindings.values()),
+                TupleFType.from_tuple(
+                    tuple(bindings[arg] for arg in prgm.bodies[-1].args)
+                ),
+            )
+        )
         self.prgm = prgm
         self.bindings = bindings
 
@@ -193,7 +202,8 @@ class MockEinsumLibrary(AssemblyLibrary):
 
     def __getattr__(self, name):
         if name == "main":
-            return MockEinsumKernel(self.prgm, self.bindings)
+            self.main = MockEinsumKernel(self.prgm, self.bindings)
+            return self.main
         if name == "prgm":
             return self.prgm
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")

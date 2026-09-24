@@ -1,8 +1,13 @@
+import pytest
+
 import numpy as np
 
 import finch.finch_logic as logic
+import finch.finch_notation as ntn
 from finch import ffuncs, ftype
+from finch.algebra import DynamicFill
 from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
+from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -20,6 +25,51 @@ from finch.tensor.bufferized_ndarray import (
 )
 
 from .conftest import finch_assert_equal, reset_name_counts
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+@pytest.mark.parametrize("init", [0, 7])
+@pytest.mark.parametrize(
+    "kind",
+    ["copy", "dynamic_copy", "pointwise", "dynamic_pointwise", "reduction", "inplace"],
+)
+def test_generated_init_write(kind, init, compiler):
+    i, j = Field("i"), Field("j")
+    src, dst = Alias("src"), Alias("dst")
+    data = np.array([[5, 0], [4, 0]], dtype=np.int64)
+    init = np.int64(init)
+    fill = DynamicFill(init) if kind.startswith("dynamic_") else init
+    if kind in ("copy", "dynamic_copy"):
+        query = Query(dst, Reorder(Table(src, (i, j)), (j, i)))
+        expected = data.T
+    else:
+        reduced = (j,) if kind == "reduction" else ()
+        output_idxs = (i,) if reduced else (i, j)
+        rhs = Aggregate(
+            Literal(ffuncs.overwrite),
+            Literal(fill),
+            Reorder(Table(src, (i, j)), (i, j)),
+            reduced,
+        )
+        if kind == "inplace":
+            rhs = MapJoin(Literal(ffuncs.overwrite), (Table(dst, output_idxs), rhs))
+        query = Query(dst, Reorder(rhs, output_idxs))
+        expected = data[:, -1] if reduced else data
+
+    # Static pointwise initialization can differ from the storage format's fill.
+    output_fill = 0 if kind == "pointwise" else fill
+    bindings = {
+        src: BufferizedNDArray.from_numpy(data),
+        dst: BufferizedNDArray.from_numpy(
+            np.full(expected.shape, 9, dtype=np.int64), fill_value=output_fill
+        ),
+    }
+    plan = Plan((query, Produces((dst,))))
+    program = NotationGenerator()(
+        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+    )
+    result = compiler()(program).main(*bindings.values())
+    finch_assert_equal(result[0].to_numpy(), expected)
 
 
 def test_logic_compiler(file_regression):

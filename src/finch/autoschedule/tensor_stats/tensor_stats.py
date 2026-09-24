@@ -12,7 +12,7 @@ import numpy as np
 from finch.algebra import (
     AbstractFill,
     FinchOperator,
-    NAryFinchOperator,
+    NAryFinchOperatorFType,
     apply_fill,
     as_fill,
     is_annihilator,
@@ -144,14 +144,14 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
-            if is_annihilator(op, s.fill_value):
+            if is_annihilator(op.ftype, s.fill_value):
                 join_args.append(s)
             else:
                 union_args.append(s)
         if (
-            op.is_associative
-            and op.is_commutative
-            and isinstance(op, NAryFinchOperator)
+            op.ftype.is_associative
+            and op.ftype.is_commutative
+            and isinstance(op.ftype, NAryFinchOperatorFType)
         ):
             if union_args:
                 join_args.append(self._mapjoin_union(op, *union_args))
@@ -219,11 +219,11 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                 # A dynamic background must stay dynamic through the reduction.
                 # NOTE: the computed d.fill_value.value is not necessarily correct.
                 new_fill = apply_fill(op, d.fill_value, d.fill_value)
-            elif is_identity(op, old_fill) or is_idempotent(op):
+            elif is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):
                 new_fill = as_fill(op(old_fill, old_fill))
             else:
                 try:
-                    new_fill = as_fill(repeat_operator(op)(old_fill, n))
+                    new_fill = as_fill(repeat_operator(op.ftype)(old_fill, n))
                 except AttributeError:
                     # This is going to be VERY SLOW. Should raise a warning about
                     #  reductions over non-identity fill values. Depending on the

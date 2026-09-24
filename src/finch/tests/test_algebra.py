@@ -6,9 +6,11 @@ import numpy as np
 
 import finch
 from finch.algebra import (
+    DynamicFill,
     TupleFType,
     cansplitpush,
     ffuncs,
+    ftype,
     init_value,
     is_annihilator,
     is_associative,
@@ -100,69 +102,68 @@ def test_numpy_dtype_rejects_non_data_types():
 
 
 def test_algebra_selected():
-    assert is_distributive(ffuncs.mul, ffuncs.add)
-    assert is_distributive(ffuncs.mul, ffuncs.sub)
-    assert is_distributive(ffuncs.and_, ffuncs.or_)
-    assert is_distributive(ffuncs.and_, ffuncs.xor)
-    assert is_distributive(ffuncs.or_, ffuncs.and_)
-    assert is_distributive(ffuncs.logical_and, ffuncs.logical_or)
-    assert is_distributive(ffuncs.logical_and, ffuncs.logical_xor)
-    assert is_distributive(ffuncs.logical_or, ffuncs.logical_and)
-    assert is_annihilator(ffuncs.add, math.inf)
-    assert is_annihilator(ffuncs.mul, 0)
-    assert is_annihilator(ffuncs.or_, -1)
-    assert is_annihilator(ffuncs.and_, 0)
-    assert is_annihilator(ffuncs.logaddexp, math.inf)
-    assert is_annihilator(ffuncs.logical_or, True)
-    assert is_annihilator(ffuncs.logical_and, False)
-    assert is_identity(ffuncs.add, 0)
-    assert is_identity(ffuncs.mul, 1)
-    assert is_identity(ffuncs.or_, False)
-    assert is_identity(ffuncs.and_, -1)
-    assert is_identity(ffuncs.truediv, 1)
-    assert is_identity(ffuncs.lshift, 0)
-    assert is_identity(ffuncs.rshift, 0)
-    assert is_identity(ffuncs.pow, 1)
-    assert is_identity(ffuncs.truediv, 1)
-    assert is_identity(ffuncs.logaddexp, -math.inf)
-    assert is_identity(ffuncs.logical_or, False)
-    assert is_identity(ffuncs.logical_and, True)
-    assert is_identity(ffuncs.max, -math.inf)
-    assert is_identity(ffuncs.min, math.inf)
-    assert is_identity(ffuncs.choose(0), 0)
-    assert is_associative(ffuncs.add)
-    assert is_associative(ffuncs.mul)
-    assert is_associative(ffuncs.choose(0))
-    assert is_associative(ffuncs.logical_and)
-    assert is_associative(ffuncs.logical_xor)
-    assert is_associative(ffuncs.logical_or)
-    assert is_associative(ffuncs.logaddexp)
-    assert init_value(ffuncs.and_, finch.bool) is np.True_
-    assert init_value(ffuncs.or_, finch.bool) is np.False_
-    assert init_value(ffuncs.xor, finch.bool) is np.False_
-    assert init_value(ffuncs.logaddexp, finch.float64) == -math.inf
-    assert init_value(ffuncs.logical_and, finch.bool_) is True
-    assert init_value(ffuncs.logical_or, finch.bool_) is False
-    assert init_value(ffuncs.logical_xor, finch.bool_) is False
-    assert is_idempotent(ffuncs.and_)
-    assert is_idempotent(ffuncs.or_)
-    assert is_idempotent(ffuncs.logical_and)
-    assert is_idempotent(ffuncs.logical_or)
-    assert is_idempotent(ffuncs.min)
-    assert is_idempotent(ffuncs.max)
-    assert is_idempotent(ffuncs.minby)
-    assert is_idempotent(ffuncs.maxby)
-    assert is_idempotent(ffuncs.add) is False
-    assert is_idempotent(ffuncs.mul) is False
-    assert is_idempotent(ffuncs.xor) is False
-    assert is_idempotent(ffuncs.logical_xor) is False
-    assert is_idempotent(ffuncs.logaddexp) is False
-    assert repeat_operator(ffuncs.add) is ffuncs.mul
-    assert repeat_operator(ffuncs.mul) is ffuncs.pow
-    assert repeat_operator(ffuncs.and_) is None
-    assert cansplitpush(ffuncs.add, ffuncs.add) is True
-    assert cansplitpush(ffuncs.add, ffuncs.mul) is False
-    assert cansplitpush(ffuncs.and_, ffuncs.and_) is False
+    assert is_distributive(ffuncs.mul.ftype, ffuncs.add.ftype)
+    assert is_distributive(ffuncs.mul.ftype, ffuncs.sub.ftype)
+    assert is_distributive(ffuncs.and_.ftype, ffuncs.or_.ftype)
+    assert is_distributive(ffuncs.and_.ftype, ffuncs.xor.ftype)
+    assert is_distributive(ffuncs.or_.ftype, ffuncs.and_.ftype)
+    assert is_distributive(ffuncs.logical_and.ftype, ffuncs.logical_or.ftype)
+    assert is_distributive(ffuncs.logical_and.ftype, ffuncs.logical_xor.ftype)
+    assert is_distributive(ffuncs.logical_or.ftype, ffuncs.logical_and.ftype)
+    assert is_annihilator(ffuncs.add.ftype, math.inf)
+    assert is_annihilator(ffuncs.mul.ftype, 0)
+    assert is_annihilator(ffuncs.or_.ftype, -1)
+    assert is_annihilator(ffuncs.and_.ftype, 0)
+    assert is_annihilator(ffuncs.logaddexp.ftype, math.inf)
+    assert is_annihilator(ffuncs.logical_or.ftype, True)
+    assert is_annihilator(ffuncs.logical_and.ftype, False)
+    assert is_identity(ffuncs.add.ftype, 0)
+    assert is_identity(ffuncs.mul.ftype, 1)
+    assert is_identity(ffuncs.or_.ftype, False)
+    assert is_identity(ffuncs.and_.ftype, -1)
+    assert is_identity(ffuncs.truediv.ftype, 1)
+    assert is_identity(ffuncs.lshift.ftype, 0)
+    assert is_identity(ffuncs.rshift.ftype, 0)
+    assert is_identity(ffuncs.pow.ftype, 1)
+    assert is_identity(ffuncs.truediv.ftype, 1)
+    assert is_identity(ffuncs.logaddexp.ftype, -math.inf)
+    assert is_identity(ffuncs.logical_or.ftype, False)
+    assert is_identity(ffuncs.logical_and.ftype, True)
+    assert is_identity(ffuncs.max.ftype, -math.inf)
+    assert is_identity(ffuncs.min.ftype, math.inf)
+    assert is_identity(ffuncs.choose(0).ftype, 0)
+    assert is_associative(ffuncs.add.ftype)
+    assert is_associative(ffuncs.mul.ftype)
+    assert is_associative(ffuncs.choose(0).ftype)
+    assert is_associative(ffuncs.logical_and.ftype)
+    assert is_associative(ffuncs.logical_xor.ftype)
+    assert is_associative(ffuncs.logical_or.ftype)
+    assert is_associative(ffuncs.logaddexp.ftype)
+    assert init_value(ffuncs.and_.ftype, finch.bool) is np.True_
+    assert init_value(ffuncs.or_.ftype, finch.bool) is np.False_
+    assert init_value(ffuncs.xor.ftype, finch.bool) is np.False_
+    assert init_value(ffuncs.logaddexp.ftype, finch.float64) == -math.inf
+    assert init_value(ffuncs.logical_and.ftype, finch.bool_) is True
+    assert init_value(ffuncs.logical_or.ftype, finch.bool_) is False
+    assert init_value(ffuncs.logical_xor.ftype, finch.bool_) is False
+    assert is_idempotent(ffuncs.and_.ftype)
+    assert is_idempotent(ffuncs.or_.ftype)
+    assert is_idempotent(ffuncs.logical_and.ftype)
+    assert is_idempotent(ffuncs.logical_or.ftype)
+    assert is_idempotent(ffuncs.min.ftype)
+    assert is_idempotent(ffuncs.max.ftype)
+    assert is_idempotent(ffuncs.minby.ftype)
+    assert is_idempotent(ffuncs.maxby.ftype)
+    assert is_idempotent(ffuncs.add.ftype) is False
+    assert is_idempotent(ffuncs.mul.ftype) is False
+    assert is_idempotent(ffuncs.xor.ftype) is False
+    assert is_idempotent(ffuncs.logical_xor.ftype) is False
+    assert is_idempotent(ffuncs.logaddexp.ftype) is False
+    assert repeat_operator(ffuncs.add.ftype) is ffuncs.mul
+    assert repeat_operator(ffuncs.mul.ftype) is ffuncs.pow
+    assert repeat_operator(ffuncs.and_.ftype) is None
+    assert cansplitpush(ffuncs.add.ftype) is True
+    assert cansplitpush(ffuncs.and_.ftype) is False
     assert ffuncs.choose(0)(0, 2, 3) == 2
     assert ffuncs.choose(0)(0, 0) == 0
     assert ffuncs.choose(np.nan)(np.nan, 4.0) == 4.0
@@ -239,7 +240,7 @@ def test_python_scalar_promotion_uses_weak_bottom():
         == promoted_tuple_type
     )
     assert (
-        ffuncs.where.return_type(
+        ffuncs.where.ftype.return_type(
             finch.bool,
             tuple_type,
             TupleFType.from_tuple((finch.int64, finch.int_)),
@@ -247,7 +248,7 @@ def test_python_scalar_promotion_uses_weak_bottom():
         == promoted_tuple_type
     )
     assert (
-        ffuncs.choose((0, 0)).return_type(
+        ffuncs.choose((0, 0)).ftype.return_type(
             tuple_type,
             TupleFType.from_tuple((finch.int64, finch.int_)),
         )
@@ -292,7 +293,7 @@ def test_floor_divide_return_type_handles_all_integer_dtypes():
 
     for x1 in dtypes:
         for x2 in dtypes:
-            assert isinstance(ffuncs.floordiv.return_type(x1, x2), FDType)
+            assert isinstance(ffuncs.floordiv.ftype.return_type(x1, x2), FDType)
 
 
 def test_same_ffunc():
@@ -334,3 +335,52 @@ def test_samehash():
     assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finch.float64)
     assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finch.float32)
     assert ffuncs.samehash(SameHash()) == ("samehash", 1)
+
+
+@pytest.mark.parametrize("fill", [0, 5, np.nan, finch.algebra.StaticFill(5)])
+def test_init_write(fill):
+    op = ffuncs.init_write(fill)
+    z = fill.value if isinstance(fill, finch.algebra.StaticFill) else fill
+    np.testing.assert_equal(op(z, z), z)
+    assert op(z, 17) == 17
+    assert is_identity(ftype(op), z)
+
+
+def test_function_properties_dispatch_on_types():
+    add_t, mul_t = finch.ftype(ffuncs.add), finch.ftype(ffuncs.mul)
+    assert is_identity(add_t, 0)
+    assert is_annihilator(mul_t, 0)
+    assert is_distributive(mul_t, add_t)
+    assert not is_distributive(add_t, mul_t)
+    assert repeat_operator(add_t) is ffuncs.mul
+    assert init_value(add_t, finch.int64) == 0
+    assert cansplitpush(add_t)
+    assert finch.algebra.return_type(add_t, finch.int64, finch.int64) == finch.int64
+    static = finch.ftype(ffuncs.init_write(finch.algebra.StaticFill(0)))
+    dynamic = finch.ftype(ffuncs.init_write(finch.algebra.DynamicFill(0)))
+    assert is_identity(static, 0)
+    assert not is_identity(dynamic, 0)
+
+
+@pytest.mark.parametrize(
+    "factory, first, second",
+    [
+        (ffuncs.choose, DynamicFill(np.int64(0)), DynamicFill(np.int64(3))),
+        (ffuncs.scaled_power, 3.0, 4.0),
+        (ffuncs.add_scaled_power, 3.0, 4.0),
+        (ffuncs.scaled_negative_power, -3.0, -4.0),
+        (ffuncs.add_scaled_negative_power, -3.0, -4.0),
+        (ffuncs.root_scaled_power, 3.0, 4.0),
+        (ffuncs.root_scaled_negative_power, -3.0, -4.0),
+    ],
+)
+def test_function_ftypes_do_not_specialize_runtime_data(factory, first, second):
+    left, right = factory(first), factory(second)
+    assert left != right
+    assert ftype(left) == ftype(right)
+    assert hash(ftype(left)) == hash(ftype(right))
+    assert finch.algebra.is_associative(left.ftype) == finch.algebra.is_associative(
+        right.ftype
+    )
+    field_values = [getattr(right, name) for name in ftype(right).struct_fieldnames]
+    assert ftype(left).from_fields(*field_values) == right

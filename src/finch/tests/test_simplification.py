@@ -65,7 +65,7 @@ def _assert_same(actual, expected, path):
         case (CallTerm(op=a_op, args=a_args), CallTerm(op=e_op, args=e_args)) if (
             a_op == e_op and len(a_args) == len(e_args)
         ):
-            if is_commutative(a_op.val):
+            if is_commutative(a_op.val.ftype):
                 remaining = list(e_args)
                 for arg in a_args:
                     found = next((e for e in remaining if _same(arg, e)), None)
@@ -403,9 +403,9 @@ class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
         self.ctx = ctx
         self.last: asm.Module
 
-    def lower(self, term: asm.Module):
+    def lower(self, term: asm.Module, *, mode=None):
         self.last = term
-        return self.ctx(term)
+        return self.ctx(term, mode=mode)
 
 
 def _assembly_for(build):

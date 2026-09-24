@@ -10,6 +10,7 @@ from finch.finch_assembly import (
     IfElse,
     Literal,
     Load,
+    Resize,
     Store,
     Variable,
     parse_assembly,
@@ -43,16 +44,13 @@ def test_for_loop():
     result = parse_assembly(expr, locals())
     expected = Block(
         (
-            Call(
-                op=Literal(val=np.resize),
-                args=(
-                    Variable(name="lvl_ptr", type=ndarray_ftype),
-                    Call(
-                        op=Literal(val=ffuncs.add),
-                        args=(
-                            Variable(name="pos_stop", type=ftype(int)),
-                            Literal(val=np.intp(1)),
-                        ),
+            Resize(
+                Variable(name="lvl_ptr", type=ndarray_ftype),
+                Call(
+                    op=Literal(val=ffuncs.add),
+                    args=(
+                        Variable(name="pos_stop", type=ftype(int)),
+                        Literal(val=np.intp(1)),
                     ),
                 ),
             ),
@@ -111,12 +109,9 @@ def test_for_loop():
                     ),
                 ),
             ),
-            Call(
-                op=Literal(val=np.resize),
-                args=(
-                    Variable(name="lvl_idx", type=ndarray_ftype),
-                    Variable(name="qos_stop", type=ftype(int)),
-                ),
+            Resize(
+                Variable(name="lvl_idx", type=ndarray_ftype),
+                Variable(name="qos_stop", type=ftype(int)),
             ),
         )
     )

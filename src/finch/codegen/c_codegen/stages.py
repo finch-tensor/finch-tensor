@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from finch import finch_assembly as asm
-from finch.symbolic import Stage
+from finch.symbolic import CompilerMode, Stage
 
 
 class CCode:
@@ -14,7 +14,7 @@ class CCode:
 
 class CLowerer(Stage):
     @abstractmethod
-    def lower(self, prgm: asm.Module) -> CCode:
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None) -> CCode:
         """
         Lower the given assembly program to C code.
         """
