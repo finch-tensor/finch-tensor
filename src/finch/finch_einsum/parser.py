@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Any
 
 from lark import Lark, Token, Tree
@@ -294,7 +295,13 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
+@lru_cache(maxsize=256)
 def parse_einop(expr: str) -> ein.EinsumNode:
+    """Parse an einop expression once per distinct source string.
+
+    The returned Einsum nodes are frozen dataclasses, so callers can safely
+    share the cached AST across repeated evaluations of the same expression.
+    """
     tree = lark_parser.parse(expr)
     match tree:
         case Tree(
