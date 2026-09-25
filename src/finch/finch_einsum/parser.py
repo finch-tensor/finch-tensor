@@ -295,7 +295,7 @@ def _parse_einop_expr(t: Tree) -> ein.EinsumExpression:
             raise ValueError(f"Unknown tree structure: {t}")
 
 
-@lru_cache(maxsize=256)
+@lru_cache
 def parse_einop(expr: str) -> ein.EinsumNode:
     tree = lark_parser.parse(expr)
     match tree:
