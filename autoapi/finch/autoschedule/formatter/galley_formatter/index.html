@@ -5557,7 +5557,10 @@ built under.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/formatter/galley_formatter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
@@ -5645,12 +5648,7 @@ built under.</p>
 <span class="normal">252</span>
 <span class="normal">253</span>
 <span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
+<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A formatter which picks output formats the way Galley's physical optimizer</span>
 <span class="sd">    does, choosing per level between dense, bytemap, hash, and sparse list</span>
@@ -5708,8 +5706,10 @@ built under.</p>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                     <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
-                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
-                    <span class="n">rhs_stats</span> <span class="o">=</span> <span class="n">stats_interpreter</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">rhs</span><span class="p">):</span>
+                    <span class="c1"># Evaluating the query gives the stats of the stored result,</span>
+                    <span class="c1"># in the order of its left-hand table.</span>
+                    <span class="n">rhs_stats</span> <span class="o">=</span> <span class="n">stats_interpreter</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs_stats</span><span class="p">,</span> <span class="n">NumericStats</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"GalleyFormatter requires NumericStats."</span><span class="p">)</span>
                     <span class="n">stats_bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">rhs_stats</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
@@ -5727,11 +5727,7 @@ built under.</p>
                             <span class="n">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">),</span>
                         <span class="p">)</span>
 
-                    <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
-                        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
-                            <span class="k">return</span> <span class="n">node</span>
-                        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                            <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">()))</span>
+                    <span class="k">return</span> <span class="n">node</span>
                 <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">():</span>
                     <span class="k">return</span> <span class="n">node</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
@@ -5985,10 +5981,7 @@ transpose query is looped in the order its input is stored.</p>
 <span class="normal">158</span>
 <span class="normal">159</span>
 <span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="normal">161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query_loop_order</span><span class="p">(</span><span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The loop order a query's right hand side is evaluated under.</span>
 
@@ -5996,16 +5989,13 @@ transpose query is looped in the order its input is stored.</p>
 <span class="sd">    transpose query is looped in the order its input is stored.</span>
 <span class="sd">    """</span>
     <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
-        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">idxs</span>
-        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">idxs</span>
-        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
-            <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">))),</span>
-            <span class="n">_</span><span class="p">,</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span>
+            <span class="n">_</span><span class="p">,</span> <span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">))</span>
         <span class="p">):</span>
-            <span class="k">return</span> <span class="n">idxs</span>
-        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">idxs</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span>

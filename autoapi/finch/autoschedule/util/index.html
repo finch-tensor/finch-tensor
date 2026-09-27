@@ -2039,6 +2039,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.util.drop_query_reorders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        drop_query_reorders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.util.reorder_to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reorder_to
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5337,6 +5359,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.util.drop_query_reorders" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        drop_query_reorders
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.util.reorder_to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reorder_to
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5385,6 +5429,83 @@
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.util.drop_query_reorders" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">)</span></code>
+
+</h2>
+          <div class="doc-overloads">
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span>
+</code></pre></div><div class="doc-signature highlight"><pre><span></span><code><span class="nf">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span>
+</code></pre></div>          </div>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Remove a Reorder at the root of each query's right-hand side. The table on
+the left-hand side of a query already fixes the order of its result.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Remove a Reorder at the root of each query's right-hand side. The table on</span>
+<span class="sd">    the left-hand side of a query already fixes the order of its result.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">rule</span><span class="p">(</span><span class="n">stmt</span><span class="p">):</span>
+        <span class="k">match</span> <span class="n">stmt</span><span class="p">:</span>
+            <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="k">_</span><span class="p">)):</span>
+                <span class="k">return</span> <span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">Rewrite</span><span class="p">(</span><span class="n">PostWalk</span><span class="p">(</span><span class="n">rule</span><span class="p">))(</span><span class="n">root</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.util.reorder_to" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reorder_to</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p><code>ex</code> with its fields in the order <code>idxs</code>.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reorder_to</span><span class="p">(</span><span class="n">ex</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">LogicExpression</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""`ex` with its fields in the order `idxs`."""</span>
+    <span class="k">return</span> <span class="n">ex</span> <span class="k">if</span> <span class="n">ex</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="o">==</span> <span class="n">idxs</span> <span class="k">else</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

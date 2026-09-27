@@ -5533,8 +5533,8 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">gather</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">val</span><span class="p">),</span> <span class="p">()))</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span>
-                <span class="n">val</span><span class="p">,</span> <span class="n">ConstantScalar</span>
+            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="p">()),</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">val</span><span class="p">),</span> <span class="p">()))</span> <span class="k">if</span> <span class="p">(</span>
+                <span class="nb">isinstance</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">ConstantScalar</span><span class="p">)</span>
             <span class="p">):</span>
                 <span class="n">constants</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span><span class="o">.</span><span class="n">val</span>
             <span class="k">case</span> <span class="n">Produces</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
@@ -5571,10 +5571,10 @@
         <span class="k">match</span> <span class="n">stmt</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">Plan</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">inline_stmt</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
-            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span> <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">produced</span> <span class="ow">and</span> <span class="p">(</span>
+            <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">rhs</span><span class="p">)</span> <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">produced</span> <span class="ow">and</span> <span class="p">(</span>
                 <span class="n">ref</span> <span class="o">:=</span> <span class="n">constant_ref</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span>
             <span class="p">):</span>
-                <span class="c1"># `Query(a, Literal(v))` names no tensor to produce, so a</span>
+                <span class="c1"># `Query(Table(a, ()), Literal(v))` names no tensor to produce, so a</span>
                 <span class="c1"># produced query that is *only* a constant reference is left</span>
                 <span class="c1"># alone -- and the binding it reads has to stay.</span>
                 <span class="n">live</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
@@ -5594,8 +5594,8 @@
                     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span>
                         <span class="nb">isinstance</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">Query</span><span class="p">)</span>
-                        <span class="ow">and</span> <span class="n">body</span><span class="o">.</span><span class="n">lhs</span> <span class="ow">in</span> <span class="n">constants</span>
-                        <span class="ow">and</span> <span class="n">body</span><span class="o">.</span><span class="n">lhs</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">live</span>
+                        <span class="ow">and</span> <span class="n">body</span><span class="o">.</span><span class="n">lhs</span><span class="o">.</span><span class="n">tns</span> <span class="ow">in</span> <span class="n">constants</span>
+                        <span class="ow">and</span> <span class="n">body</span><span class="o">.</span><span class="n">lhs</span><span class="o">.</span><span class="n">tns</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">live</span>
                     <span class="p">)</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="n">Plan</span><span class="p">(</span><span class="n">kept</span><span class="p">)</span> <span class="k">if</span> <span class="n">kept</span> <span class="o">!=</span> <span class="n">bodies</span> <span class="k">else</span> <span class="kc">None</span>

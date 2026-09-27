@@ -5672,7 +5672,7 @@ constraints are built from:</p>
         <span class="n">degrees</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"degrees_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
             <span class="n">Query</span><span class="p">(</span>
-                <span class="n">degrees</span><span class="p">,</span>
+                <span class="n">Table</span><span class="p">(</span><span class="n">degrees</span><span class="p">,</span> <span class="p">(</span><span class="n">field</span><span class="p">,)),</span>
                 <span class="n">Aggregate</span><span class="p">(</span>
                     <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
                     <span class="n">int_zero</span><span class="p">,</span>
@@ -5706,7 +5706,7 @@ constraints are built from:</p>
                     <span class="p">),</span>
                     <span class="p">(</span><span class="n">field</span><span class="p">,),</span>
                 <span class="p">)</span>
-            <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">rhs</span><span class="p">))</span>
+            <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="p">()),</span> <span class="n">rhs</span><span class="p">))</span>
             <span class="n">outputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
 
     <span class="n">prgm</span> <span class="o">=</span> <span class="n">Plan</span><span class="p">((</span><span class="o">*</span><span class="n">bodies</span><span class="p">,</span> <span class="n">Produces</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">outputs</span><span class="p">))))</span>

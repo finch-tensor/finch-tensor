@@ -5427,13 +5427,7 @@ tensors.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
@@ -5487,7 +5481,13 @@ tensors.</p>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
     <span class="n">f</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -5504,13 +5504,13 @@ tensors.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rule_0</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
+            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">rhs</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">bound</span><span class="p">:</span>
                     <span class="n">var</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
                     <span class="n">renames</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">var</span>
                     <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
                         <span class="n">writes</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">var</span>
-                    <span class="k">return</span> <span class="n">Query</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">rhs</span><span class="p">)</span>
                 <span class="n">bound</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">a</span> <span class="k">if</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
@@ -5538,7 +5538,7 @@ tensors.</p>
                     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
                         <span class="n">Field</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"i"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">bindings</span><span class="p">[</span><span class="n">k</span><span class="p">]</span><span class="o">.</span><span class="n">ndim</span><span class="p">)</span>
                     <span class="p">)</span>
-                    <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">v_post</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
+                    <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">Table</span><span class="p">(</span><span class="n">v_post</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)))</span>
 
                 <span class="n">v_post_to_k</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">v_post_list</span><span class="p">,</span> <span class="n">writes</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
                 <span class="n">args_2</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>

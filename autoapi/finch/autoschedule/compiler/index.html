@@ -5745,11 +5745,7 @@ compilation process.</p>
 <span class="normal">361</span>
 <span class="normal">362</span>
 <span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationContext</span><span class="p">:</span>
+<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationContext</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compiles Finch Logic to Finch Notation. Holds the state of the</span>
 <span class="sd">    compilation process.</span>
@@ -5927,7 +5923,9 @@ compilation process.</p>
         <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
-            <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(),</span> <span class="k">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">)):</span>
+            <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(),</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg</span>
+            <span class="p">):</span>
                 <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span><span class="o">.</span><span class="n">fill_value</span><span class="p">:</span>
                     <span class="k">case</span> <span class="n">DynamicFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">:</span>
                         <span class="n">init</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
@@ -5952,15 +5950,12 @@ compilation process.</p>
                     <span class="p">)</span>
                 <span class="p">)</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
-                <span class="n">lhs</span><span class="p">,</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg_2</span><span class="p">,</span>
-                        <span class="n">idxs_2</span><span class="p">,</span>
-                    <span class="p">),</span>
-                    <span class="n">output_idxs</span><span class="p">,</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">output_idxs</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg_2</span><span class="p">,</span>
+                    <span class="n">idxs_2</span><span class="p">,</span>
                 <span class="p">),</span>
             <span class="p">):</span>
                 <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">idxs_2</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">init</span><span class="p">):</span>
@@ -5982,21 +5977,18 @@ compilation process.</p>
                     <span class="p">)</span>
                 <span class="p">)</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
-                <span class="n">lhs</span><span class="p">,</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
-                        <span class="p">(</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs_1</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">),</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
-                                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op_1</span><span class="p">),</span>
-                                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
-                                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">agg_arg</span><span class="p">,</span>
-                                <span class="n">_</span><span class="p">,</span>
-                            <span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+                    <span class="p">(</span>
+                        <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs_1</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">),</span>
+                        <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
+                            <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op_1</span><span class="p">),</span>
+                            <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
+                            <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">agg_arg</span><span class="p">,</span>
+                            <span class="n">_</span><span class="p">,</span>
                         <span class="p">),</span>
                     <span class="p">),</span>
-                    <span class="n">idxs_2</span><span class="p">,</span>
                 <span class="p">),</span>
             <span class="p">)</span> <span class="k">if</span> <span class="n">lhs_1</span> <span class="o">==</span> <span class="n">lhs</span> <span class="ow">and</span> <span class="n">idxs_1</span> <span class="o">==</span> <span class="n">idxs_2</span> <span class="ow">and</span> <span class="n">op_1</span> <span class="ow">in</span> <span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">):</span>
                 <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op_1</span><span class="p">,</span> <span class="n">agg_arg</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">)</span>
@@ -6173,11 +6165,7 @@ node.</p>
 <span class="normal">361</span>
 <span class="normal">362</span>
 <span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower Finch Logic to Finch Notation. First we check for early</span>
 <span class="sd">    simplifications, then we call the normal lowering for the outermost</span>
@@ -6186,7 +6174,9 @@ node.</p>
     <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
-        <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(),</span> <span class="k">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">)):</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(),</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg</span>
+        <span class="p">):</span>
             <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span><span class="o">.</span><span class="n">fill_value</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">DynamicFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">:</span>
                     <span class="n">init</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
@@ -6211,15 +6201,12 @@ node.</p>
                 <span class="p">)</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
-            <span class="n">lhs</span><span class="p">,</span>
-            <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg_2</span><span class="p">,</span>
-                    <span class="n">idxs_2</span><span class="p">,</span>
-                <span class="p">),</span>
-                <span class="n">output_idxs</span><span class="p">,</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">output_idxs</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">arg_2</span><span class="p">,</span>
+                <span class="n">idxs_2</span><span class="p">,</span>
             <span class="p">),</span>
         <span class="p">):</span>
             <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">idxs_2</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">init</span><span class="p">):</span>
@@ -6241,21 +6228,18 @@ node.</p>
                 <span class="p">)</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
-            <span class="n">lhs</span><span class="p">,</span>
-            <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span>
-                    <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
-                    <span class="p">(</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs_1</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">),</span>
-                        <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op_1</span><span class="p">),</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">agg_arg</span><span class="p">,</span>
-                            <span class="n">_</span><span class="p">,</span>
-                        <span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">MapJoin</span><span class="p">(</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+                <span class="p">(</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs_1</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">),</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span>
+                        <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op_1</span><span class="p">),</span>
+                        <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
+                        <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">agg_arg</span><span class="p">,</span>
+                        <span class="n">_</span><span class="p">,</span>
                     <span class="p">),</span>
                 <span class="p">),</span>
-                <span class="n">idxs_2</span><span class="p">,</span>
             <span class="p">),</span>
         <span class="p">)</span> <span class="k">if</span> <span class="n">lhs_1</span> <span class="o">==</span> <span class="n">lhs</span> <span class="ow">and</span> <span class="n">idxs_1</span> <span class="o">==</span> <span class="n">idxs_2</span> <span class="ow">and</span> <span class="n">op_1</span> <span class="ow">in</span> <span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">):</span>
             <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op_1</span><span class="p">,</span> <span class="n">agg_arg</span><span class="p">,</span> <span class="n">idxs_2</span><span class="p">)</span>

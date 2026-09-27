@@ -7085,13 +7085,13 @@ sample_prob : Bernoulli sample prob</p>
             <span class="n">n_a</span><span class="p">,</span> <span class="n">dn_a</span><span class="p">,</span> <span class="n">f1_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"n"</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"d_n"</span><span class="p">),</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"f_1"</span><span class="p">)</span>
             <span class="n">bodies</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="n">Query</span><span class="p">(</span>
-                    <span class="n">n_a</span><span class="p">,</span>
+                    <span class="n">Table</span><span class="p">(</span><span class="n">n_a</span><span class="p">,</span> <span class="p">()),</span>
                     <span class="n">Aggregate</span><span class="p">(</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">sketch</span><span class="p">,</span> <span class="n">fields</span>
                     <span class="p">),</span>
                 <span class="p">),</span>
                 <span class="n">Query</span><span class="p">(</span>
-                    <span class="n">dn_a</span><span class="p">,</span>
+                    <span class="n">Table</span><span class="p">(</span><span class="n">dn_a</span><span class="p">,</span> <span class="p">()),</span>
                     <span class="n">Aggregate</span><span class="p">(</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
@@ -7100,7 +7100,7 @@ sample_prob : Bernoulli sample prob</p>
                     <span class="p">),</span>
                 <span class="p">),</span>
                 <span class="n">Query</span><span class="p">(</span>
-                    <span class="n">f1_a</span><span class="p">,</span>
+                    <span class="n">Table</span><span class="p">(</span><span class="n">f1_a</span><span class="p">,</span> <span class="p">()),</span>
                     <span class="n">Aggregate</span><span class="p">(</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
                         <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
@@ -7116,7 +7116,7 @@ sample_prob : Bernoulli sample prob</p>
                 <span class="n">max_a</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"max_val"</span><span class="p">)</span>
                 <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                     <span class="n">Query</span><span class="p">(</span>
-                        <span class="n">max_a</span><span class="p">,</span>
+                        <span class="n">Table</span><span class="p">(</span><span class="n">max_a</span><span class="p">,</span> <span class="p">()),</span>
                         <span class="n">Aggregate</span><span class="p">(</span>
                             <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">max</span><span class="p">),</span>
                             <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
@@ -7140,7 +7140,7 @@ sample_prob : Bernoulli sample prob</p>
                     <span class="n">freq_alias</span> <span class="o">=</span> <span class="p">[</span><span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"f_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_val</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
                     <span class="n">freq_bodies</span> <span class="o">=</span> <span class="p">[</span>
                         <span class="n">Query</span><span class="p">(</span>
-                            <span class="n">a</span><span class="p">,</span>
+                            <span class="n">Table</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">()),</span>
                             <span class="n">Aggregate</span><span class="p">(</span>
                                 <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
                                 <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
@@ -7175,7 +7175,7 @@ sample_prob : Bernoulli sample prob</p>
                 <span class="k">continue</span>
             <span class="n">out</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"sampled_count"</span><span class="p">)</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span>
-                <span class="n">out</span><span class="p">,</span>
+                <span class="n">Table</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="p">()),</span>
                 <span class="n">Aggregate</span><span class="p">(</span>
                     <span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">add</span><span class="p">),</span>
                     <span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span>
