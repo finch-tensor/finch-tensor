@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from finch.algebra import is_associative, is_commutative, is_distributive
+from finch.algebra import (
+    ffuncs,
+    is_associative,
+    is_commutative,
+    is_distributive,
+    is_dynamic,
+    is_identity,
+)
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -374,16 +381,37 @@ def merge_mapjoin_rule(node: LogicNode) -> LogicNode:
             return node
 
 
+def map_pointwise_aggregate(node: LogicNode) -> LogicNode | None:
+    """
+    Rewrite: Aggregate(op, init, arg, ()) -> MapJoin(op, (init, arg))
+    Galley starts each reduction from the init of the indices it reduces, so an
+    aggregate which reduces no indices would drop an init which isn't an
+    identity of its operator.
+    """
+    match node:
+        case Aggregate(Literal(op), Literal(init), arg, ()) if (
+            op not in (None, ffuncs.overwrite)
+            and not is_dynamic(init)
+            and not is_identity(op.ftype, init)
+        ):
+            return MapJoin(node.op, (node.init, arg))
+        case _:
+            return None
+
+
 def preprocess_plan_for_galley(plan: Plan) -> Plan:
     """
     End-to-end preprocessing used before running Galley greedy optimization.
 
-    - First merges alias-based queries to produce roughly one query per
-      produced alias.
+    - First writes aggregates which reduce no indices as maps, so their inits
+      are kept.
+    - Merges alias-based queries to produce roughly one query per produced
+      alias.
     - Pushes aggregates up and merges adjacent same-op aggregates so reduction
       indices are not parent-related (enables cost-optimal reduction order).
     - Then normalizes Reorder usage so that no query RHS has Reorder nodes.
     """
+    plan = Rewrite(PostWalk(map_pointwise_aggregate))(plan)
     merged = merge_queries(plan)
     merged = normalize_reorders_in_plan(merged)
     new_bodies: list[LogicStatement] = []
