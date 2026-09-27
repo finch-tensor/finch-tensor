@@ -32,7 +32,7 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
     prgm = Plan(
         (
             Query(
-                B,
+                Table(B, (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
                     (Table(A, (i, j)), Table(A, (i, j))),

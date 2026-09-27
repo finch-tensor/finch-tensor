@@ -149,16 +149,13 @@ def query_loop_order(rhs: lgc.LogicExpression) -> tuple[Field, ...]:
     transpose query is looped in the order its input is stored.
     """
     match rhs:
-        case lgc.Reorder(lgc.Table(_, idxs), _):
+        case lgc.Table(_, idxs):
             return idxs
-        case lgc.Reorder(lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _), _):
+        case lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _):
             return idxs
-        case lgc.Reorder(
-            lgc.MapJoin(_, (lgc.Table(), lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _))),
-            _,
+        case lgc.MapJoin(
+            _, (lgc.Table(), lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _))
         ):
-            return idxs
-        case lgc.Reorder(_, idxs):
             return idxs
         case _:
             return rhs.fields()
@@ -222,8 +219,10 @@ class GalleyFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
-                case lgc.Query(lhs, rhs):
-                    rhs_stats = stats_interpreter(rhs, stats_bindings)
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs):
+                    # Evaluating the query gives the stats of the stored result,
+                    # in the order of its left-hand table.
+                    rhs_stats = stats_interpreter(node, stats_bindings)
                     if not isinstance(rhs_stats, NumericStats):
                         raise TypeError("GalleyFormatter requires NumericStats.")
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
@@ -241,11 +240,7 @@ class GalleyFormatter(LogicFormatter):
                             query_loop_order(rhs),
                         )
 
-                    match rhs:
-                        case lgc.Reorder():
-                            return node
-                        case _:
-                            return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
+                    return node
                 case lgc.Produces():
                     return node
                 case _:
