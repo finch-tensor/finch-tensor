@@ -186,3 +186,27 @@ def test_copy_propagation_keeps_copies_updated_in_place():
         )
     )
     assert propagate_copy_queries(plan, {A: None, B: None}) == plan
+
+
+def test_query_into_cannot_drop_nonunit_dims():
+    # QueryInto drops fields like a Reorder does, so it must not reduce them.
+    plan = Plan(
+        (
+            QueryInto(Table(A, (i,)), Literal(ffuncs.add), Table(B, (i, j))),
+            Produces((A,)),
+        )
+    )
+    binds = {
+        A: BufferizedNDArray.from_numpy(np.array([1.0, 2.0])),
+        B: BufferizedNDArray.from_numpy(B_DATA.copy()),
+    }
+    with pytest.raises(ValueError, match="drop"):
+        INTERPRET_LOGIC(plan, binds)
+
+
+@pytest.mark.parametrize("scheduler", SCHEDULERS)
+def test_query_drops_unit_dims(scheduler):
+    plan = Plan((Query(Table(C, (j,)), Table(B, (i, j))), Produces((C,))))
+    binds = {B: BufferizedNDArray.from_numpy(B_DATA[:1].copy())}
+    (result,) = scheduler(plan, binds)
+    finch_assert_equal(result, B_DATA[0])
