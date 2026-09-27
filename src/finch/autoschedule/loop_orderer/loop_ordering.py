@@ -103,9 +103,6 @@ def drop_internal_reorders(
             case Query(lhs, Aggregate(op, init, arg, idxs_2)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Aggregate(op, init, arg_1, idxs_2))
-            case QueryInto(lhs, op, Aggregate(op1, init, arg, ag_idxs)):
-                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return QueryInto(lhs, op, Aggregate(op1, init, arg_1, ag_idxs))
             case QueryInto(lhs, op, arg):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return QueryInto(lhs, op, arg_1)
@@ -115,13 +112,6 @@ def drop_internal_reorders(
             case Query(lhs, Aggregate(op, init, Reorder(arg, idxs_1), idxs_2)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return Query(lhs, Aggregate(op, init, Reorder(arg_1, idxs_1), idxs_2))
-            case QueryInto(
-                lhs, op, Aggregate(op1, init, Reorder(arg, idxs_1), ag_idxs)
-            ):
-                arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
-                return QueryInto(
-                    lhs, op, Aggregate(op1, init, Reorder(arg_1, idxs_1), ag_idxs)
-                )
             case QueryInto(lhs, op, Reorder(arg, idxs_1)):
                 arg_1 = Rewrite(PostWalk(reorder_remover))(arg)
                 return QueryInto(lhs, op, Reorder(arg_1, idxs_1))
@@ -189,17 +179,16 @@ def with_loop_order(
 ) -> LogicStatement:
     """
     Set the loop order of a query. An aggregate query holds its loop order in
-    a Reorder of the aggregate's argument, and a pointwise in-place update
-    holds it in a Reorder of its right-hand side.
+    a Reorder of the aggregate's argument, and an in-place update holds it in a
+    Reorder of its right-hand side. An in-place update can't change the layout
+    of the table it updates, so its loop order is permuted to visit the fields
+    of that table in order.
     """
     match stmt:
         case Query(lhs, Aggregate(op, init, arg, idxs)):
             return Query(lhs, Aggregate(op, init, Reorder(arg, loop_order), idxs))
-        case QueryInto(lhs, update_op, Aggregate(op, init, arg, idxs)):
-            return QueryInto(
-                lhs, update_op, Aggregate(op, init, Reorder(arg, loop_order), idxs)
-            )
-        case QueryInto(lhs, op, arg):
+        case QueryInto(Table(_, lhs_idxs) as lhs, op, arg):
+            loop_order = with_subsequence(intersect(lhs_idxs, loop_order), loop_order)
             return QueryInto(lhs, op, Reorder(arg, loop_order))
         case _:
             raise ValueError(f"Expected an aggregate or in-place query, got {stmt}")
@@ -211,14 +200,8 @@ def heuristic_loop_order(plan: Plan) -> Plan:
 
         def rule_1(query):
             match query:
-                case Query(_, Aggregate(_, _, arg, _)) | QueryInto(
-                    _, _, Aggregate(_, _, arg, _)
-                ):
+                case Query(_, Aggregate(_, _, arg, _)) | QueryInto(_, _, arg):
                     return with_loop_order(query, _heuristic_loop_order(arg))
-                case QueryInto(Table(_, idxs), _, _):
-                    # A pointwise update loops in the order of the table it
-                    # updates.
-                    return with_loop_order(query, idxs)
                 case Query(_, Table(Alias(), _)) as q:
                     return q
                 case _:

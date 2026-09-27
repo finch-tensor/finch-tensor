@@ -142,26 +142,19 @@ def test_logic_compiler_inplace(file_regression):
             QueryInto(
                 lhs=Table(Alias(name="A2"), (Field(name="i0"), Field(name="i2"))),
                 op=Literal(ffuncs.add),
-                rhs=Aggregate(
-                    op=logic.Literal(val=ffuncs.add),
-                    init=logic.Literal(val=0),
-                    arg=Reorder(
-                        arg=MapJoin(
-                            op=logic.Literal(val=ffuncs.mul),
-                            args=(
-                                Table(
-                                    Alias(name="A0"),
-                                    (Field(name="i0"), Field(name="i1")),
-                                ),
-                                Table(
-                                    Alias(name="A1"),
-                                    (Field(name="i1"), Field(name="i2")),
-                                ),
+                rhs=Reorder(
+                    arg=MapJoin(
+                        op=logic.Literal(val=ffuncs.mul),
+                        args=(
+                            Table(
+                                Alias(name="A0"), (Field(name="i0"), Field(name="i1"))
+                            ),
+                            Table(
+                                Alias(name="A1"), (Field(name="i1"), Field(name="i2"))
                             ),
                         ),
-                        idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                     ),
-                    idxs=(Field(name="i1"),),
+                    idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                 ),
             ),
             Produces(args=(Alias(name="A2"),)),

@@ -209,15 +209,12 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         for query in prgm.bodies[:-1]:
             match query:
                 case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
-                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                    Table(_, out_idxs), _, arg
                 ):
                     idxs_2 = loop_order_bfs(
                         arg, stats_factory, stats_bindings, out_idxs, k=self.k
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
-                case QueryInto(Table(_, out_idxs), _, _):
-                    # A pointwise update loops in the order of the table it updates.
-                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
@@ -244,15 +241,12 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         for query in prgm.bodies[:-1]:
             match query:
                 case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
-                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                    Table(_, out_idxs), _, arg
                 ):
                     idxs_2 = loop_order_dfs(
                         arg, stats_factory, stats_bindings, out_idxs
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
-                case QueryInto(Table(_, out_idxs), _, _):
-                    # A pointwise update loops in the order of the table it updates.
-                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
@@ -279,15 +273,12 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         for query in prgm.bodies[:-1]:
             match query:
                 case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
-                    Table(_, out_idxs), _, Aggregate(_, _, arg, _)
+                    Table(_, out_idxs), _, arg
                 ):
                     idxs_2 = loop_order_brute_force(
                         arg, stats_factory, stats_bindings, out_idxs
                     )
                     new_queries.append(with_loop_order(query, idxs_2))
-                case QueryInto(Table(_, out_idxs), _, _):
-                    # A pointwise update loops in the order of the table it updates.
-                    new_queries.append(with_loop_order(query, out_idxs))
                 case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:

@@ -13,7 +13,11 @@ from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.tensor_stats.logic_to_stats import (
     insert_statistics,
 )
-from finch.autoschedule.util import desugar_query_into, flatten_plans
+from finch.autoschedule.util import (
+    desugar_query_into,
+    flatten_plans,
+    split_aggregate_inits,
+)
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -142,8 +146,10 @@ class GalleyLogicFactorizer(LogicFactorizer):
 
         # Galley only keeps the queries that compute produced aliases, so each
         # write to a bound tensor, including an in-place update, is renamed and
-        # produced, then copied back to the tensor it updates.
-        term = desugar_query_into(term)
+        # produced, then copied back to the tensor it updates. Galley only
+        # reduces from literals, so aggregates which start from a tensor are
+        # split first.
+        term = split_aggregate_inits(desugar_query_into(term), bindings)
         term, bindings = with_unique_lhs(transform, term, bindings)
         assert isinstance(term, Plan)
         return self.ctx(flatten_plans(term), bindings, stats, stats_factory)

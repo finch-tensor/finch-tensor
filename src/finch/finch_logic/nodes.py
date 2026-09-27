@@ -541,6 +541,9 @@ class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
     with `init`. `idxs` are the dimensions to reduce. May happen in any order.
+    The fields of the result are those of `arg` which are not reduced. `init`
+    may be a literal or a tensor expression whose fields are a subset of the
+    result's fields, in which case it is broadcast over the remaining fields.
 
     Attributes:
         op: The reduction operation.
@@ -550,7 +553,7 @@ class Aggregate(LogicTree, LogicExpression):
     """
 
     op: Literal
-    init: Literal
+    init: LogicExpression
     arg: LogicExpression
     idxs: tuple[Field, ...]
 
@@ -570,9 +573,20 @@ class Aggregate(LogicTree, LogicExpression):
     ) -> tuple[T | None, ...]:
         idxs = self.arg.fields()
         dims = self.arg.dimmap(op, dim_bindings)
-        return tuple(
-            val for idx, val in zip(idxs, dims, strict=True) if idx not in self.idxs
-        )
+        idx_dims = {
+            idx: val
+            for idx, val in zip(idxs, dims, strict=True)
+            if idx not in self.idxs
+        }
+        init_dims = self.init.dimmap(op, dim_bindings)
+        for idx, dim in zip(self.init.fields(), init_dims, strict=True):
+            if idx not in idx_dims:
+                raise ValueError(
+                    f"The init of an aggregate has a field {idx} which is not "
+                    f"in the result fields {tuple(idx_dims)}"
+                )
+            idx_dims[idx] = op(idx_dims[idx], dim)
+        return tuple(idx_dims.values())
 
     def valmap(
         self,
@@ -580,7 +594,11 @@ class Aggregate(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return g(self.op.val, self.init.val, self.arg.valmap(f, g, bindings))
+        return g(
+            self.op.val,
+            self.init.valmap(f, g, bindings),
+            self.arg.valmap(f, g, bindings),
+        )
 
     @classmethod
     def from_children(cls, op, init, arg, *idxs):
@@ -742,12 +760,11 @@ class Query(LogicTree, LogicStatement):
 class QueryInto(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that updates the table `lhs` in place,
-    using the reduction operator `op` to combine each of its elements with the
-    matching element of `rhs`. The alias `lhs.tns` must already be bound. Like
-    a `Query`, a `QueryInto` behaves as though its right-hand side were wrapped
-    in `Reorder(rhs, lhs.idxs)`, so it does not reduce any dimensions of `rhs`.
-    A `QueryInto` is equivalent to
-    `Query(lhs, MapJoin(op, (lhs, Reorder(rhs, lhs.idxs))))`.
+    using the reduction operator `op` to fold each element of `rhs` into the
+    matching element of `lhs`. The alias `lhs.tns` must already be bound. The
+    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, so a
+    `QueryInto` is equivalent to the aggregate which starts from `lhs`,
+    `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
 
     Attributes:
         lhs: The table to update, a `Table` wrapping an `Alias`.
@@ -765,9 +782,9 @@ class QueryInto(LogicTree, LogicStatement):
         return [self.lhs, self.op, self.rhs]
 
     def as_query(self) -> Query:
-        """The equivalent statement which is not in place."""
-        rhs = Reorder(self.rhs, self.lhs.idxs)
-        return Query(self.lhs, MapJoin(self.op, (self.lhs, rhs)))
+        """The equivalent aggregate query, which is not in place."""
+        idxs = tuple(idx for idx in self.rhs.fields() if idx not in self.lhs.idxs)
+        return Query(self.lhs, Aggregate(self.op, self.lhs, self.rhs, idxs))
 
     def infer_dimmap(
         self,

@@ -121,16 +121,30 @@ class LogicMachine:
                     ]
                     result[*crds] = op(*vals)
                 return TableValue(result, tuple(idxs))
-            case Aggregate(Literal(op), Literal(init), arg, idxs):
+            case Aggregate(Literal(op), init, arg, idxs):
+                init = self(init)
                 arg = self(arg)
-                dtype = fixpoint_type(op.ftype, init, arg.tns.element_type)
-                new_shape = tuple(
-                    int(dim)
+                dtype = fixpoint_type(
+                    op.ftype, init.tns.element_type, arg.tns.element_type
+                )
+                out_dims = {
+                    idx: int(dim)
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
                     if idx not in node.idxs
-                )
+                }
+                for idx, dim in zip(init.idxs, init.tns.shape, strict=True):
+                    if out_dims.get(idx) != dim:
+                        raise ValueError(
+                            f"The init of an aggregate must broadcast to its "
+                            f"result, but it has field {idx} of size {dim}"
+                        )
+                new_shape = tuple(out_dims.values())
                 assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
-                result = self.make_tensor(new_shape, init, dtype=dtype)
+                result = self.make_tensor(new_shape, init.tns.fill_value, dtype=dtype)
+                for out_crds in product(*[range(dim) for dim in new_shape]):
+                    idx_crds = dict(zip(out_dims, out_crds, strict=True))
+                    init_crds = [idx_crds[idx] for idx in init.idxs]
+                    result[*out_crds] = init.tns[*init_crds].item()
                 for crds in product(*[range(dim) for dim in arg.tns.shape]):
                     out_crds = [
                         crd

@@ -1,6 +1,9 @@
 import itertools
+from functools import cache
 from typing import overload
 
+from finch.algebra import init_value
+from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequence
 from finch.finch_logic import (
     Aggregate,
@@ -49,7 +52,13 @@ def push_fields(root):
                 diff_idxs = setdiff(arg.fields(), agg_idxs)
                 reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
                 relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields())
-                return Aggregate(op, init, Relabel(arg, relabeled_idxs), agg_idxs)
+                init_idxs = tuple(reidx_dict[idx] for idx in init.fields())
+                return Aggregate(
+                    op,
+                    Relabel(init, init_idxs),
+                    Relabel(arg, relabeled_idxs),
+                    agg_idxs,
+                )
             case Relabel(Relabel(arg, _), idxs):
                 return Relabel(arg, idxs)
             case Relabel(Reorder(arg, idxs_1), idxs_2):
@@ -96,14 +105,19 @@ def push_fields(root):
 
     # A query stores its result in the order of its left-hand table, so we
     # expose that order to `rule_2` as a Reorder and strip it afterwards. The
-    # Reorder at the root of a pointwise in-place update is its loop order,
-    # which must follow the order of the table it updates, so that one is kept.
+    # Reorder at the root of an in-place update is its loop order, which must
+    # visit the fields of the table it updates in order, so that one is kept.
     def wrap_query(stmt):
         match stmt:
             case Query(Table(_, idxs) as lhs, rhs) if rhs.fields() != idxs:
                 return Query(lhs, Reorder(rhs, idxs))
-            case QueryInto(Table(_, idxs) as lhs, op, rhs) if rhs.fields() != idxs:
-                return QueryInto(lhs, op, Reorder(rhs, idxs))
+            case QueryInto(Table(_, idxs) as lhs, op, rhs) if not is_subsequence(
+                intersect(idxs, rhs.fields()), rhs.fields()
+            ):
+                loop_order = with_subsequence(
+                    intersect(idxs, rhs.fields()), rhs.fields()
+                )
+                return QueryInto(lhs, op, Reorder(rhs, loop_order))
 
     root = Rewrite(PostWalk(wrap_query))(root)
     root = Rewrite(PreWalk(Fixpoint(rule_2)))(root)
@@ -140,6 +154,67 @@ def desugar_query_into(root: LogicStatement) -> LogicStatement:
         match stmt:
             case QueryInto() as q:
                 return q.as_query()
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def resugar_query_into(root: LogicStatement) -> LogicStatement:
+    """
+    Replace each query of an aggregate which starts from a tensor with an
+    in-place `QueryInto`. The aggregate folds its argument into a copy of its
+    init, so the copy is skipped when the init is the table being written.
+    Inits which are broadcast over the output can't be copied into it, so they
+    are left as they are.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case Query(
+                Table(Alias() as lhs, idxs) as tbl,
+                Aggregate(op, init, arg, agg_idxs),
+            ) if (
+                not isinstance(init, Literal)
+                and lhs not in PostOrderDFS(arg)
+                and set(setdiff(arg.fields(), agg_idxs)) == set(idxs)
+                and set(init.fields()) == set(idxs)
+                and (init == tbl or lhs not in PostOrderDFS(init))
+            ):
+                update = QueryInto(tbl, op, arg)
+                return update if init == tbl else Plan((Query(tbl, init), update))
+
+    return Rewrite(PostWalk(rule))(root)
+
+
+def split_aggregate_inits(
+    root: LogicStatement,
+    bindings: dict[Alias, TensorFType],
+    broadcast_only: bool = False,
+) -> LogicStatement:
+    """
+    Replace each aggregate which starts from a tensor with a map of that tensor
+    and a reduction which starts from the identity of the aggregate's operator.
+    With `broadcast_only`, only the inits which are broadcast over some fields
+    of the aggregate are split.
+    """
+
+    # Element types are only needed to find identities, so they are inferred
+    # lazily.
+    @cache
+    def element_types():
+        return root.infer_element_type(
+            {var: tns.element_type for var, tns in bindings.items()}
+        )
+
+    def rule(node):
+        match node:
+            case Aggregate(Literal(op) as op_lit, init, arg, idxs) if not (
+                isinstance(init, Literal)
+                or (broadcast_only and set(init.fields()) == set(node.fields()))
+            ):
+                if idxs:
+                    z = init_value(op.ftype, init.element_type(element_types()))
+                    arg = Aggregate(op_lit, Literal(z), arg, idxs)
+                return MapJoin(op_lit, (init, arg))
 
     return Rewrite(PostWalk(rule))(root)
 

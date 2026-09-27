@@ -2,7 +2,6 @@ from abc import abstractmethod
 
 from finch import finch_einsum as ein
 from finch import finch_notation as ntn
-from finch.algebra.algebra import is_identity
 from finch.algebra.tensor import TensorFType
 from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
@@ -67,18 +66,15 @@ class AliasedForm(Form):
 class SingleAggregateForm(AliasedForm):
     """
     SingleAggregateForm assumes that the fusion strategy has
-    already been optimized for this query. There are four valid kinds of input query:
+    already been optimized for this query. There are three valid kinds of input query:
     1) transpose queries
         Query(Table(_, output_order), Table(_, _))
     2) aggregate queries
-        Query(Table(_, output_order), Aggregate(_, _, arg, _))
-    3) in-place aggregate queries
-        QueryInto(Table(_, output_order), op, Aggregate(op, init, arg, _))
-    (Here, the aggregate reduces with the update operator op, starting from an
-    identity init, so each value can be folded directly into the output.)
-    4) in-place pointwise queries
+        Query(Table(_, output_order), Aggregate(_, Literal(), arg, _))
+    3) in-place queries
         QueryInto(Table(_, output_order), op, arg)
-    (Here, arg has no aggregates.)
+    (Here, arg has no aggregates. The fields of arg which are not in
+    output_order are reduced with op.)
     """
 
     @classmethod
@@ -102,19 +98,14 @@ class SingleAggregateForm(AliasedForm):
                         validate(body, True)
                 case Query(Table(), Table()):
                     return None
-                case Query(Table(), Aggregate(_, _, arg, _)):
+                case Query(Table(), Aggregate(_, Literal(), arg, _)):
                     return validate(arg, False)
-                case QueryInto(
-                    Table(),
-                    Literal(op1),
-                    Aggregate(Literal(op2), Literal(init), arg, _),
-                ):
-                    if op2 != op1 or not is_identity(op1.ftype, init):
-                        raise ValueError(
-                            "The aggregate of an in-place query must reduce with "
-                            "the update operator, starting from its identity."
-                        )
-                    return validate(arg, False)
+                case Query(Table(), Aggregate(_, init, _, _)):
+                    raise ValueError(
+                        f"Aggregate queries must start from a literal, not {init}. "
+                        "Copy the init into the output and update it with a "
+                        "QueryInto instead."
+                    )
                 case QueryInto(Table(), _, arg):
                     return validate(arg, False)
                 case Query(_, rhs):
@@ -146,10 +137,7 @@ class LoopOrderedForm(SingleAggregateForm):
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
             Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
-        3) in-place aggregate queries
-            QueryInto(Table(_, lhs_idxs), _,
-                Aggregate(_, _, Reorder(arg, loop_order), _))
-        4) in-place pointwise queries
+        3) in-place queries
             QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
     (Here, the loop order visits the fields of lhs_idxs in order.)
     """
@@ -183,18 +171,8 @@ class LoopOrderedForm(SingleAggregateForm):
                         "All aggregates must wrap a Reorder node specifying\
                              the loop order."
                     )
-                case QueryInto(
-                    Table(_, lhs_idxs), _, Aggregate(_, _, Reorder(arg, idxs_1), _)
-                ):
-                    if not cls._check_loop_order(lhs_idxs, idxs_1):
-                        raise ValueError("Table index order does not match loop order.")
-                    return validate(arg, idxs_1)
-                case QueryInto(Table(), _, Aggregate()):
-                    raise ValueError(
-                        "In-place queries must have an interior loop order!"
-                    )
                 case QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs_1)):
-                    # A pointwise update has no aggregate to hold its loop order,
+                    # An in-place query has no aggregate to hold its loop order,
                     # so its right-hand side is wrapped in a Reorder instead.
                     if not cls._check_loop_order(lhs_idxs, idxs_1):
                         raise ValueError("Table index order does not match loop order.")

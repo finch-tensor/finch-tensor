@@ -318,11 +318,11 @@ class NotationContext:
             case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs_2),
                 lgc.Literal(op),
-                lgc.Aggregate(_, _, lgc.Reorder() as arg, _) | (lgc.Reorder() as arg),
+                lgc.Reorder() as arg,
             ):
-                # An aggregate reduces with `op` from its identity, so both
-                # forms fold each value into the output with `op`, in the loop
-                # order given by the Reorder.
+                # Each value is folded into the output with `op`, in the loop
+                # order given by the Reorder, which reduces the fields that are
+                # not in the output.
                 body = self._lower_query_of_aggregate(lhs, op, arg, idxs_2)
                 return ntn.Block(
                     (

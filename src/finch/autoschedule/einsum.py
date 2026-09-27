@@ -44,7 +44,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
         case lgc.QueryInto(
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Literal(operation),
-            lgc.Aggregate(_, _, rhs, _) | rhs,
+            rhs,
         ):
             return ein.Einsum(
                 op=ein.Literal(operation),
