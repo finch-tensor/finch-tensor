@@ -6,8 +6,12 @@ import finch.finch_logic as logic
 import finch.finch_notation as ntn
 from finch import ffuncs, ftype
 from finch.algebra import DynamicFill
-from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
-from finch.autoschedule.compiler import to_compiler_form
+from finch.autoschedule import (
+    INTERPRET_NOTATION,
+    CompilerFormLowerer,
+    LogicCapture,
+    NotationGenerator,
+)
 from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
@@ -72,12 +76,14 @@ def test_generated_init_write(kind, init, compiler):
         ),
     }
     plan = Plan((query, Produces((dst,))))
-    program = NotationGenerator()(
-        to_compiler_form(plan),
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
         {var: ftype(val) for var, val in bindings.items()},
         {},
         None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     result = compiler()(program).main(*bindings.values())
     finch_assert_equal(result[0].to_numpy(), expected)
 
@@ -119,12 +125,14 @@ def test_logic_compiler(file_regression):
         Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
     }
 
-    program = NotationGenerator()(
-        to_compiler_form(plan),
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
         {var: ftype(val) for var, val in bindings.items()},
         {},
         None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
 
     file_regression.check(
         reset_name_counts(str(program)),
@@ -174,12 +182,14 @@ def test_logic_compiler_inplace(file_regression):
         Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[1, 1], [1, 1]])),
     }
 
-    program = NotationGenerator()(
-        to_compiler_form(plan),
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
         {var: ftype(val) for var, val in bindings.items()},
         {},
         None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
 
     file_regression.check(
         reset_name_counts(str(program)),

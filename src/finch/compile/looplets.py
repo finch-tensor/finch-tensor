@@ -7,7 +7,7 @@ from typing import Any
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import ffuncs
-from finch.compile.lower import DefaultPass, LoopletContext, LoopletPass, SymbolicExtent
+from finch.compile.lower import LoopletContext, LoopletPass, SymbolicExtent
 from finch.symbolic import PostOrderDFS, PostWalk, Rewrite
 
 
@@ -342,13 +342,9 @@ class RunPass(LoopletPass):
                     return ntn.Access(body, mode, tuple(idxs))
             return None
 
-        body_2 = PostWalk(run_node)(body)
+        body_2 = Rewrite(PostWalk(run_node))(body)
         ctx_2 = ctx.scope()
-        match ctx_2.select_pass(body_2):
-            case DefaultPass():
-                ctx_2.ctx(body_2)
-            case _:
-                ctx_2(ext, body_2)
+        ctx_2(ext, body_2)
         ctx.exec(asm.Block(ctx_2.emit()))
 
 

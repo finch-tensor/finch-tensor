@@ -182,10 +182,13 @@ def with_loop_order(
     a Reorder of the aggregate's argument, and an in-place update holds it in a
     Reorder of its right-hand side. An in-place update can't change the layout
     of the table it updates, so its loop order is permuted to visit the fields
-    of that table in order.
+    of that table in order. Aggregate queries also include output-only unit
+    dimensions and visit the output fields in order.
     """
     match stmt:
-        case Query(lhs, Aggregate(op, init, arg, idxs)):
+        case Query(Table(_, lhs_idxs) as lhs, Aggregate(op, init, arg, idxs)):
+            loop_order = with_subsequence(intersect(lhs_idxs, loop_order), loop_order)
+            loop_order = toposort([list(loop_order), list(lhs_idxs)])
             return Query(lhs, Aggregate(op, init, Reorder(arg, loop_order), idxs))
         case QueryInto(Table(_, lhs_idxs) as lhs, op, arg):
             loop_order = with_subsequence(intersect(lhs_idxs, loop_order), loop_order)

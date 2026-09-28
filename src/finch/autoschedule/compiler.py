@@ -28,7 +28,6 @@ from finch.symbolic import PostWalk, Rewrite, gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
 
-from .loop_orderer.loop_ordering import CycleInFields, toposort
 from .stages import CompilerForm, FormattedForm, LogicNotationLowerer
 from .util import flatten_plans
 
@@ -168,6 +167,7 @@ class NotationContext:
         op: FinchOperator,
         arg: lgc.Table,
         reorder_idxs: tuple[lgc.Field, ...],
+        loop_order: tuple[lgc.Field, ...],
     ):
         # The table is broadcast over the fields only the output has.
         arg_dims = arg.dimmap(merge_shapes, self.shapes)
@@ -177,49 +177,34 @@ class NotationContext:
         }
         shapes = {
             idx: shapes_map.get(idx) or ntn.Literal(ftypes.intp(1))
-            for idx in arg.idxs + reorder_idxs
+            for idx in loop_order
         }
         arg_types = arg.shape_type(self.shape_types)
         shape_type_map = {
             **dict(zip(reorder_idxs, self.shape_types[query_lhs], strict=True)),
             **dict(zip(arg.idxs, arg_types, strict=True)),
         }
-        shape_type = {
-            idx: shape_type_map.get(idx) or ftypes.intp
-            for idx in arg.idxs + reorder_idxs
-        }
+        shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_order}
+        # Visit the output in loop order. Revisit an input field with a fresh
+        # index when its storage order conflicts, restricting that loop to the
+        # original index below. This keeps sparse reads and writes concordant.
         loop_idxs = []
         remap_idxs = {}
-        out_idxs = iter(reorder_idxs)
-        out_idx = next(out_idxs, None)
-        new_idxs = []
-        for idx in arg.idxs:
+        read_idxs = []
+        pending = iter(arg.idxs)
+        read_idx = next(pending, None)
+        for idx in loop_order:
             loop_idxs.append(idx)
-            if idx == out_idx:
-                out_idx = next(out_idxs, None)
-                new_idxs.append(idx)
-            while (
-                out_idx in loop_idxs or out_idx not in arg.idxs
-            ) and out_idx is not None:
-                if out_idx in loop_idxs:
-                    new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
-                    remap_idxs[new_idx] = out_idx
-                    loop_idxs.append(new_idx)
-                    new_idxs.append(new_idx)
-                else:
-                    loop_idxs.append(out_idx)
-                    new_idxs.append(out_idx)
-                out_idx = next(out_idxs, None)
-        while (out_idx in loop_idxs or out_idx not in arg.idxs) and out_idx is not None:
-            if out_idx in loop_idxs:
-                new_idx = lgc.Field(gensym(f"{out_idx.name}_"))
-                remap_idxs[new_idx] = out_idx
+            if idx == read_idx:
+                read_idxs.append(idx)
+                read_idx = next(pending, None)
+            while read_idx is not None and read_idx in loop_idxs:
+                new_idx = lgc.Field(gensym(f"{read_idx.name}_"))
+                remap_idxs[new_idx] = read_idx
                 loop_idxs.append(new_idx)
-                new_idxs.append(new_idx)
-            else:
-                loop_idxs.append(out_idx)
-                new_idxs.append(out_idx)
-            out_idx = next(out_idxs, None)
+                read_idxs.append(new_idx)
+                read_idx = next(pending, None)
+        assert read_idx is None
         loops = {
             idx: ntn.Variable(
                 gensym(idx.name),
@@ -228,11 +213,11 @@ class NotationContext:
             for idx in loop_idxs
         }
         ctx = PointwiseContext(self)
-        rhs = ctx(arg, loops)
+        rhs = ctx(lgc.Table(arg.tns, tuple(read_idxs)), loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(op)),
-            tuple(loops[idx] for idx in new_idxs),
+            tuple(loops[idx] for idx in reorder_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(loop_idxs):
@@ -347,8 +332,10 @@ class NotationContext:
                 else:
                     stmts += self.thaw(lhs, ntn.Literal(op))
                 match rhs:
-                    case lgc.Table():
-                        body = self._lower_query_of_reorder(lhs, op, rhs, idxs)
+                    case lgc.Reorder(lgc.Table() as arg, loop_order):
+                        body = self._lower_query_of_reorder(
+                            lhs, op, arg, idxs, loop_order
+                        )
                     case lgc.Reorder():
                         body = self._lower_query_of_aggregate(lhs, op, rhs, idxs)
                 return ntn.Block((*stmts, body))
@@ -373,50 +360,12 @@ class NotationContext:
                 raise Exception(f"Unrecognized logic: {prgm}")
 
 
-def to_compiler_form(root: lgc.LogicStatement) -> lgc.LogicStatement:
-    """
-    Rewrite a program in FormattedForm into CompilerForm. A transpose query
-    overwrites its output, and an aggregate query initializes its output with
-    its init before folding its argument into it.
-
-    A query reorders its result to the fields of its output, which adds the
-    fields its argument lacks as unit dimensions. A QueryInto broadcasts its
-    argument over them instead, so they are added to the loop order, keeping
-    the fields of the output in order.
-    """
-
-    def rule(stmt):
-        match stmt:
-            case lgc.Query(lhs, lgc.Table() as arg):
-                return lgc.QueryInto(lhs, lgc.Literal(ffuncs.overwrite), arg)
-            case lgc.Query(
-                lgc.Table(_, idxs) as lhs,
-                lgc.Aggregate(op, init, lgc.Reorder(arg, loop_order), _),
-            ):
-                try:
-                    loop_order = toposort([list(loop_order), list(idxs)])
-                except CycleInFields:
-                    raise ValueError(
-                        f"Cannot choose a loop order which visits both {loop_order}"
-                        f" and the output fields {idxs} in order."
-                    ) from None
-                return lgc.Plan(
-                    (
-                        lgc.QueryInto(lhs, lgc.Literal(ffuncs.overwrite), init),
-                        lgc.QueryInto(lhs, op, lgc.Reorder(arg, loop_order)),
-                    )
-                )
-
-    root = Rewrite(PostWalk(rule))(root)
-    assert isinstance(root, lgc.Plan)
-    return flatten_plans(root)
-
-
 class CompilerFormLowerer(FormattedForm, LogicLoader):
     """
     Rewrite a program in FormattedForm into CompilerForm, which makes the
     initialization of each output and the loop over each of its fields
-    explicit.
+    explicit. Transposes follow the output's storage order; aggregates retain
+    their validated loop order.
     """
 
     def __init__(self, ctx: LogicLoader):
@@ -434,9 +383,27 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
-        lib, bindings, shape_vars, _ = self.ctx(
-            to_compiler_form(prgm), bindings, stats, stats_factory
-        )
+        def rule(stmt):
+            match stmt:
+                case lgc.Query(lgc.Table(_, idxs) as lhs, lgc.Table() as arg):
+                    loop_order = (*idxs, *(idx for idx in arg.idxs if idx not in idxs))
+                    return lgc.QueryInto(
+                        lhs, lgc.Literal(ffuncs.overwrite), lgc.Reorder(arg, loop_order)
+                    )
+                case lgc.Query(
+                    lhs, lgc.Aggregate(op, init, lgc.Reorder(arg, loop_order), _)
+                ):
+                    return lgc.Plan(
+                        (
+                            lgc.QueryInto(lhs, lgc.Literal(ffuncs.overwrite), init),
+                            lgc.QueryInto(lhs, op, lgc.Reorder(arg, loop_order)),
+                        )
+                    )
+
+        root = Rewrite(PostWalk(rule))(prgm)
+        assert isinstance(root, lgc.Plan)
+        root = flatten_plans(root)
+        lib, bindings, shape_vars, _ = self.ctx(root, bindings, stats, stats_factory)
         # Bind-time inference starts from the inputs alone, but CompilerForm
         # initializes an intermediate before any query defines it, so the
         # program this pass received is returned instead.

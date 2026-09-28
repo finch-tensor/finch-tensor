@@ -1,13 +1,21 @@
+from itertools import permutations
+
 import pytest
 
 import numpy as np
 
+import finch as fl
 import finch.finch_notation as ntn
 from finch.algebra import ffuncs
-from finch.autoschedule import NotationGenerator
-from finch.autoschedule.compiler import to_compiler_form
-from finch.autoschedule.stages import CompilerForm
+from finch.autoschedule import (
+    CompilerFormLowerer,
+    DefaultLoopOrderer,
+    LogicCapture,
+    NotationGenerator,
+)
+from finch.autoschedule.stages import CompilerForm, FormattedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
+from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -168,9 +176,16 @@ def test_folding_into_a_tensor_without_initializing_it_thaws_it():
     [
         (QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)), True),
         (QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j))), True),
-        # A transpose loops over the table in the order it is stored.
-        (QueryInto(Table(C, (i,)), OVERWRITE, Table(A, (j, i))), True),
-        (QueryInto(Table(C, (i,)), ADD, Table(A, (i, j))), True),
+        # A transpose has an explicit loop order, including the lhs in order.
+        (
+            QueryInto(Table(D, (j, i)), OVERWRITE, Reorder(Table(A, (i, j)), (j, i))),
+            True,
+        ),
+        (QueryInto(Table(C, (i,)), OVERWRITE, Table(A, (j, i))), False),
+        (QueryInto(Table(C, (i,)), ADD, Table(A, (i, j))), False),
+        # Fields cannot be omitted or revisited by the explicit loop order.
+        (QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i,))), False),
+        (QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j, j))), False),
         # Queries must be split into an initialization and a fold.
         (
             Query(
@@ -209,7 +224,7 @@ def test_compiler_form(stmt, valid):
             CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
-def test_to_compiler_form():
+def test_compiler_form_lowerer():
     arg = Reorder(Table(A, (i, j)), (i, j))
     plan = Plan(
         (
@@ -218,11 +233,152 @@ def test_to_compiler_form():
             Produces((C, D)),
         )
     )
-    assert to_compiler_form(plan) == Plan(
+    capture = LogicCapture()
+    binds = bindings(d=np.zeros((2, 2)))
+    _, _, _, original = CompilerFormLowerer(capture)(
+        plan, {var: tns.ftype for var, tns in binds.items()}, {}, DenseStatsFactory()
+    )
+    assert original == plan
+    assert capture.last_prgm == Plan(
         (
             QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)),
             QueryInto(Table(C, (i,)), ADD, arg),
-            QueryInto(Table(D, (j, i)), OVERWRITE, Table(A, (i, j))),
+            QueryInto(Table(D, (j, i)), OVERWRITE, Reorder(Table(A, (i, j)), (j, i))),
             Produces((C, D)),
         )
     )
+
+
+@pytest.mark.parametrize("axes", list(permutations(range(3))))
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_transpose_keeps_output_in_loop_order(axes, compiler):
+    data = np.arange(24.0).reshape(2, 3, 4)
+    data[data % 3 != 0] = 0
+    expected = data.transpose(axes)
+    source = BufferizedNDArray.from_numpy(data)
+    output = BufferizedNDArray.from_numpy(np.zeros_like(expected))
+    fields = (i, j, Field("k"))
+    lhs_idxs = tuple(fields[axis] for axis in axes)
+    plan = Plan((Query(Table(C, lhs_idxs), Table(A, fields)), Produces((C,))))
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan, {A: source.ftype, C: output.ftype}, {}, DenseStatsFactory()
+    )
+    match capture.last_prgm:
+        case Plan((QueryInto(Table(_, idxs), _, Reorder(_, loop_order)), Produces())):
+            assert tuple(idx for idx in loop_order if idx in idxs) == idxs
+        case _:
+            pytest.fail("Expected a fold with an explicit loop order")
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    result = compiler()(program).main(source, output)
+    finch_assert_equal(result[0].to_numpy(), expected)
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_transposed_fold_broadcasts_and_reduces(compiler):
+    k = Field("k")
+    data = np.arange(6.0).reshape(2, 3)
+    source = BufferizedNDArray.from_numpy(data)
+    output = BufferizedNDArray.from_numpy(np.ones((3, 4)))
+    plan = Plan(
+        (
+            QueryInto(Table(C, (j, k)), ADD, Reorder(Table(A, (i, j)), (j, k, i))),
+            Produces((C,)),
+        )
+    )
+    program = lower(plan, {A: source, C: output})
+    result = compiler()(program).main(source, output)
+    finch_assert_equal(
+        result[0].to_numpy(), 1 + np.broadcast_to(data.sum(axis=0)[:, None], (3, 4))
+    )
+
+
+def test_sparse_transpose():
+    import scipy.sparse as sps
+
+    data = np.array([[0.0, 1.0, 0.0], [2.0, 0.0, 3.0]])
+    source = fl.FiberTensor.from_scipy_csr(sps.csr_array(data))
+    output = fl.FiberTensor.from_scipy_csr(sps.csr_array(np.zeros(data.T.shape)))
+    capture = LogicCapture()
+    plan = Plan((Query(Table(C, (j, i)), Table(A, (i, j))), Produces((C,))))
+    CompilerFormLowerer(capture)(plan, {A: source.ftype, C: output.ftype}, {}, None)
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    result = NotationCompiler()(program).main(source, output)
+    finch_assert_equal(result[0].to_scipy().toarray(), data.T)
+
+
+@pytest.mark.parametrize("form", [LoopOrderedForm, FormattedForm])
+@pytest.mark.parametrize("inplace", [False, True])
+@pytest.mark.parametrize(
+    "lhs_idxs, valid",
+    [
+        ((i,), True),
+        ((j,), True),
+        ((i, j), True),
+        ((), True),
+        ((j, i), False),
+        ((i, Field("k")), False),
+    ],
+)
+def test_loop_ordered_form_checks_lhs(form, inplace, lhs_idxs, valid):
+    rhs = Reorder(Table(A, (i, j)), (i, j))
+    lhs = Table(C, lhs_idxs)
+    stmt = (
+        QueryInto(lhs, ADD, rhs)
+        if inplace
+        else Query(
+            lhs,
+            Aggregate(
+                ADD,
+                Literal(0.0),
+                rhs,
+                tuple(idx for idx in rhs.fields() if idx not in lhs_idxs),
+            ),
+        )
+    )
+    plan = Plan((stmt, Produces((C,))))
+    ftypes = {var: tns.ftype for var, tns in bindings().items()}
+    if valid:
+        form.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    else:
+        with pytest.raises(
+            ValueError, match="Table index order does not match loop order"
+        ):
+            form.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
+@pytest.mark.parametrize("lhs_idxs", [(i, Field("k")), (Field("k"), i), (Field("k"),)])
+def test_loop_orderer_includes_output_only_fields(lhs_idxs):
+    plan = Plan(
+        (
+            Query(
+                Table(C, lhs_idxs),
+                Aggregate(
+                    ADD,
+                    Literal(0.0),
+                    Table(A, (i, j)),
+                    tuple(idx for idx in (i, j) if idx not in lhs_idxs),
+                ),
+            ),
+            Produces((C,)),
+        )
+    )
+    capture = LogicCapture()
+    factory = DenseStatsFactory()
+    DefaultLoopOrderer(capture)(plan, {A: bindings()[A].ftype}, {}, factory)
+    assert isinstance(capture.last_prgm, Plan)
+    LoopOrderedForm.validate_inputs(
+        capture.last_prgm, capture.last_bindings, {}, factory
+    )
+    match capture.last_prgm:
+        case Plan(
+            (
+                *_,
+                Query(Table(_, idxs), Aggregate(_, _, Reorder(_, order), _)),
+                Produces(),
+            )
+        ):
+            assert idxs == lhs_idxs
+            assert tuple(idx for idx in order if idx in lhs_idxs) == lhs_idxs
+        case _:
+            pytest.fail("Expected a loop-ordered aggregate")

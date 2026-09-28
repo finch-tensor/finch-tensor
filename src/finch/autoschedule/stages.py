@@ -140,7 +140,8 @@ class LoopOrderedForm(SingleAggregateForm):
             Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
         3) in-place queries
             QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
-    (Here, the loop order visits the fields of lhs_idxs in order.)
+    For aggregate and in-place queries, the loop order includes every lhs
+    field and visits those fields in order.
     """
 
     @staticmethod
@@ -165,19 +166,17 @@ class LoopOrderedForm(SingleAggregateForm):
                         validate(body, loop_order)
                 case Query(Table(), Table()):
                     return None
-                case Query(Table(), Aggregate(_, _, Reorder(arg, idxs), _)):
+                case Query(
+                    Table(_, lhs_idxs), Aggregate(_, _, Reorder(arg, idxs), _)
+                ) | QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs)):
+                    if not cls._check_loop_order(lhs_idxs, idxs):
+                        raise ValueError("Table index order does not match loop order.")
                     return validate(arg, idxs)
                 case Query(Table(), Aggregate(_, _, arg, _)):
                     raise ValueError(
                         "All aggregates must wrap a Reorder node specifying\
                              the loop order."
                     )
-                case QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs_1)):
-                    # An in-place query has no aggregate to hold its loop order,
-                    # so its right-hand side is wrapped in a Reorder instead.
-                    if not cls._check_loop_order(lhs_idxs, idxs_1):
-                        raise ValueError("Table index order does not match loop order.")
-                    return validate(arg, idxs_1)
                 case QueryInto():
                     raise ValueError("In-place queries must have a loop order!")
                 case MapJoin(_, args):
@@ -250,19 +249,18 @@ class CompilerForm(AliasedForm):
     """
     CompilerForm is the input of the notation lowerer. Every statement but the
     final Produces is a QueryInto, and initialization is explicit. There are
-    three valid kinds of statement:
+    two valid kinds of statement:
     1) initializations
         QueryInto(Table(lhs, _), overwrite, Literal(init))
     (Every element of lhs is set to init.)
-    2) transposes
-        QueryInto(Table(lhs, _), op, Table(_, _))
-    (The table is looped over in the order it is stored, and it is broadcast
-    over the fields of lhs which it lacks.)
-    3) folds
+    2) folds
         QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
-    (Here, arg is made of Tables, Literals, and MapJoins, and the loop order
-    visits the fields of lhs_idxs and of each table in arg in order. The fields
-    of the loop which are not in lhs_idxs are reduced with op.)
+    (Here, arg is made of Tables, Literals, and MapJoins. The loop order
+    contains each field once and visits all fields of lhs_idxs in order.
+    Tables in a MapJoin must also follow loop order, except implicit patterns.
+    A single Table argument may have a different storage order, representing a
+    transpose; notation lowering inserts equality-constrained loops to read it
+    in storage order. Fields absent from lhs_idxs are reduced with op.)
     A transpose or fold which overwrites lhs also initializes it, starting from
     the init of a preceding initialization, or else the fill value of lhs.
     Every alias must have a TensorFType in the bindings, and a statement can't
@@ -316,16 +314,24 @@ class CompilerForm(AliasedForm):
                                 raise ValueError(
                                     f"Initializing {lhs} must overwrite it, not {op}."
                                 )
-                        case Table():
-                            validate(rhs, rhs.idxs)
                         case Reorder(arg, loop_order):
+                            if len(set(loop_order)) != len(loop_order):
+                                raise ValueError("Loop order must not repeat fields.")
+                            if not set(arg.fields()).issubset(loop_order):
+                                raise ValueError(
+                                    "Loop order must include every RHS field."
+                                )
                             if not LoopOrderedForm._check_loop_order(
                                 lhs_idxs, loop_order
                             ):
                                 raise ValueError(
                                     "Table index order does not match loop order."
                                 )
-                            validate(arg, loop_order)
+                            match arg:
+                                case Table():
+                                    validate(arg, arg.idxs)
+                                case _:
+                                    validate(arg, loop_order)
                         case _:
                             raise ValueError(f"Unsupported QueryInto: {body}")
                 case _:

@@ -419,8 +419,7 @@ def test_simplification_uses_callable_expression_type(ir):
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter(), NotationCompiler()])
 @pytest.mark.parametrize("fill", [0, 3])
 def test_logic_lowering_preserves_literal_callee(compiler, fill):
-    from finch.autoschedule import NotationGenerator
-    from finch.autoschedule.compiler import to_compiler_form
+    from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
     from finch.tensor import BufferizedNDArray
 
     op = lgc.Literal(ffuncs.choose(StaticFill(np.int64(fill))))
@@ -446,7 +445,9 @@ def test_logic_lowering_preserves_literal_callee(compiler, fill):
     src = BufferizedNDArray.from_numpy(values)
     out = BufferizedNDArray.from_numpy(np.zeros_like(values))
     bindings = {source: ftype(src), output: ftype(out)}
-    program = NotationGenerator()(to_compiler_form(plan), bindings, {}, None)
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(plan, bindings, {}, None)
+    program = NotationGenerator()(capture.last_prgm, bindings, {}, None)
     module = compiler(program)
     module.main(src, out)
     np.testing.assert_array_equal(out.to_numpy(), np.where(values == fill, 9, values))
