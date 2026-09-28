@@ -1,7 +1,7 @@
-S = Table([[2 4] [6 0]], i, j)
-A = Table([[1 2] [3 2]], i, k)
-B = Table([[9 8] [6 5]], k, j)
-AB = MapJoin(mul, Table(A, i, j), Table(B, k, j))
-C = Aggregate(add, 0, Table(AB, i, j, k), k)
-RES = MapJoin(mul, Table(C, i, j), Table(S, i, j))
+S[i, j] = Table([[2 4] [6 0]], i, j)
+A[i, k] = Table([[1 2] [3 2]], i, k)
+B[k, j] = Table([[9 8] [6 5]], k, j)
+AB[i, j, k] = MapJoin(mul, Table(A, i, j), Table(B, k, j))
+C[i, j] = Aggregate(add, 0, Table(AB, i, j, k), k)
+RES[i, j] = MapJoin(mul, Table(C, i, j), Table(S, i, j))
 return RES

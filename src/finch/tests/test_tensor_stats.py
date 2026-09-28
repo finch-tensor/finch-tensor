@@ -416,7 +416,7 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
     prgm = Plan(
         (
             Query(
-                B,
+                Table(B, (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
                     (Table(A, (i, j)), Table(A, (i, j))),
@@ -443,7 +443,7 @@ def test_fd_formatter_uses_dense_levels_for_dense_properties():
     prgm = Plan(
         (
             Query(
-                B,
+                Table(B, (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
                     (Table(A, (i, j)), Table(A, (i, j))),

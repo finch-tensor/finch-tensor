@@ -422,10 +422,21 @@ def _promote_type_helper(args: Sequence[Any]) -> Any:
 
 
 def mlir_nary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
-    t = mlir_type(_promote_type_helper(args))
-    acc = ctx(args[0])
-    for a in args[1:]:
-        rhs = ctx(a)
+    dtype = _promote_type_helper(args)
+    t = mlir_type(dtype)
+    acc = mlir_cast_value(
+        ctx,
+        ctx(args[0]),
+        getattr(args[0].result_type, "element_type", args[0].result_type),
+        dtype,
+    )
+    for arg in args[1:]:
+        rhs = mlir_cast_value(
+            ctx,
+            ctx(arg),
+            getattr(arg.result_type, "element_type", arg.result_type),
+            dtype,
+        )
         res = ctx.new_ssa()
         ctx.exec(f"{ctx.feed}{res} = {mlir_name} {acc}, {rhs} : {t}")
         acc = res
@@ -434,9 +445,21 @@ def mlir_nary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str
 
 def mlir_binary_function_call(mlir_name: str, ctx: MLIRContext, *args: Any) -> str:
     a, b = args
-    av, bv = ctx(a), ctx(b)
+    dtype = _promote_type_helper(args)
+    av = mlir_cast_value(
+        ctx,
+        ctx(a),
+        getattr(a.result_type, "element_type", a.result_type),
+        dtype,
+    )
+    bv = mlir_cast_value(
+        ctx,
+        ctx(b),
+        getattr(b.result_type, "element_type", b.result_type),
+        dtype,
+    )
     res = ctx.new_ssa()
-    t = mlir_type(_promote_type_helper(args))
+    t = mlir_type(dtype)
     ctx.exec(f"{ctx.feed}{res} = {mlir_name} {av}, {bv} : {t}")
     return res
 
@@ -472,6 +495,86 @@ def mlir_call_function_call(
     return res
 
 
+def mlir_cast_value(ctx, value, src_type, dst_type):
+    src, dst = mlir_type(src_type), mlir_type(dst_type)
+    if src == dst:
+        return value
+
+    match src_type, dst_type:
+        case TupleFType(), TupleFType():
+            if src_type.struct_fieldnames != dst_type.struct_fieldnames:
+                raise TypeError(f"Cannot cast {src_type} to {dst_type}")
+            result = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{result} = llvm.mlir.undef : {dst}")
+            for k, field in enumerate(src_type.struct_fieldnames):
+                field_value = mlir_getattr(src_type, ctx, value, [field])
+                field_value = mlir_cast_value(
+                    ctx,
+                    field_value,
+                    src_type.struct_attrtype(field),
+                    dst_type.struct_attrtype(field),
+                )
+                updated = ctx.new_ssa()
+                ctx.exec(
+                    f"{ctx.feed}{updated} = llvm.insertvalue {field_value}, "
+                    f"{result}[{k}] : {dst}"
+                )
+                result = updated
+            return result
+
+    src_int = src == "index" or src.startswith("i")
+    dst_int = dst == "index" or dst.startswith("i")
+    src_ft = src.startswith("f")
+    dst_ft = dst.startswith("f")
+
+    if src == "i1" and dst == "index":
+        extended = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{extended} = arith.extui {value} : i1 to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.index_cast {extended} : i64 to index")
+        return result
+    if src == "index" and dst_ft:
+        integer = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{integer} = arith.index_cast {value} : index to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.sitofp {integer} : i64 to {dst}")
+        return result
+    if src_ft and dst == "index":
+        integer = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{integer} = arith.fptosi {value} : {src} to i64")
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = arith.index_cast {integer} : i64 to index")
+        return result
+
+    if src_int and dst_int:
+        if src == "index" or dst == "index":
+            job = "arith.index_cast"
+        elif int(src[1:]) > int(dst[1:]):
+            job = "arith.trunci"
+        else:
+            job = (
+                "arith.extui"
+                if np_dtype(src_type).kind in {"b", "u"}
+                else "arith.extsi"
+            )
+    elif src_int and dst_ft:
+        job = (
+            "arith.uitofp" if np_dtype(src_type).kind in {"b", "u"} else "arith.sitofp"
+        )
+    elif src_ft and dst_int:
+        job = (
+            "arith.fptoui" if np_dtype(dst_type).kind in {"b", "u"} else "arith.fptosi"
+        )
+    elif src_ft and dst_ft:
+        job = "arith.truncf" if int(src[1:]) > int(dst[1:]) else "arith.extf"
+    else:
+        raise NotImplementedError(f"MLIR cast from {src} to {dst}")
+
+    result = ctx.new_ssa()
+    ctx.exec(f"{ctx.feed}{result} = {job} {value} : {src} to {dst}")
+    return result
+
+
 def mlir_same(ctx, x, y, x_type, y_type):
     match x_type, y_type:
         case TupleFType(), TupleFType():
@@ -497,6 +600,8 @@ def mlir_same(ctx, x, y, x_type, y_type):
             return ctx.constant(1, "i1") if result is None else result
         case FDType(), FDType():
             dtype = promote_type(x_type, y_type)
+            x = mlir_cast_value(ctx, x, x_type, dtype)
+            y = mlir_cast_value(ctx, y, y_type, dtype)
             t = mlir_type(dtype)
             equal = ctx.new_ssa()
             comparison = mlir_function_name(ffuncs.eq.ftype, dtype)
@@ -518,32 +623,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
     match op_type:
         case ffuncs._CastFType(dtype=dtype):
             arg = args[0]
-            value = ctx(arg)
-            src, dst = mlir_type(arg.result_type), mlir_type(dtype)
-            if src == dst:
-                return value
-            if (
-                src == "index"
-                and dst.startswith("i")
-                or dst == "index"
-                and src.startswith("i")
-            ):
-                instruction = "arith.index_cast"
-            elif src.startswith("i") and dst.startswith("i"):
-                instruction = (
-                    "arith.trunci"
-                    if int(src[1:]) > int(dst[1:])
-                    else (
-                        "arith.extui"
-                        if np_dtype(arg.result_type).kind == "u"
-                        else "arith.extsi"
-                    )
-                )
-            else:
-                raise NotImplementedError(f"MLIR cast from {src} to {dst}")
-            result = ctx.new_ssa()
-            ctx.exec(f"{ctx.feed}{result} = {instruction} {value} : {src} to {dst}")
-            return result
+            return mlir_cast_value(ctx, ctx(arg), arg.result_type, dtype)
         case asm.AssemblyKernelFType():
             ret = op_type.return_type(*(arg.result_type for arg in args))
             callee = ctx(op)
@@ -599,24 +679,34 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             )
             fill_value = ctx(value)
             arg_values = [ctx(arg) for arg in args]
-            result = fill_value
+            result_type = op_type.return_type(*(arg.result_type for arg in args))
+            result = mlir_cast_value(ctx, fill_value, value.result_type, result_type)
             for arg, arg_value in reversed(list(zip(args, arg_values, strict=True))):
                 cond = mlir_same(
                     ctx, arg_value, fill_value, arg.result_type, value.result_type
                 )
+                arg_value = mlir_cast_value(
+                    ctx, arg_value, arg.result_type, result_type
+                )
                 selected = ctx.new_ssa()
                 ctx.exec(
                     f"{ctx.feed}{selected} = arith.select {cond}, {result},"
-                    f" {arg_value} : {mlir_type(arg.result_type)}"
+                    f" {arg_value} : {mlir_type(result_type)}"
                 )
                 result = selected
             return result
         case ffuncs._WhereFType():
-            cond, x, y = (ctx(arg) for arg in args)
+            cond_arg, x_arg, y_arg = args
+            cond = ctx(cond_arg)
+            result_type = op_type.return_type(
+                cond_arg.result_type, x_arg.result_type, y_arg.result_type
+            )
+            x = mlir_cast_value(ctx, ctx(x_arg), x_arg.result_type, result_type)
+            y = mlir_cast_value(ctx, ctx(y_arg), y_arg.result_type, result_type)
             res = ctx.new_ssa()
             ctx.exec(
                 f"{ctx.feed}{res} = arith.select {cond}, {x}, {y}"
-                f" : {mlir_type(args[1].result_type)}"
+                f" : {mlir_type(result_type)}"
             )
             return res
         case ffuncs._MakeTupleFType():

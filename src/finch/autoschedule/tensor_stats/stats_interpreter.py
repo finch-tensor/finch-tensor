@@ -87,9 +87,11 @@ class StatsMachine(Generic[TS]):
                     last_result = self(body)
                 return last_result
 
-            case Query():
-                rhs_stats = self(node.rhs)
-                self.bindings[node.lhs] = rhs_stats
+            case Query(Table(Alias() as var, idxs), rhs):
+                if rhs.fields() != idxs:
+                    rhs = Reorder(rhs, idxs)
+                rhs_stats = self(rhs)
+                self.bindings[var] = rhs_stats
                 return rhs_stats
 
             case Alias():
