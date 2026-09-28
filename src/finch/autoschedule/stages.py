@@ -22,7 +22,6 @@ from finch.finch_logic import (
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
 from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
-from finch.tensor.patterns import PatternTensorFType
 
 
 class AliasedForm(Form):
@@ -182,11 +181,7 @@ class LoopOrderedForm(SingleAggregateForm):
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
-                case Table(tns, idxs):
-                    # Implicit patterns have no row-major storage to preserve.
-                    match bindings.get(tns):
-                        case PatternTensorFType():
-                            return None
+                case Table(_, idxs):
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
@@ -257,7 +252,7 @@ class CompilerForm(AliasedForm):
         QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
     (Here, arg is made of Tables, Literals, and MapJoins. The loop order
     contains each field once and visits all fields of lhs_idxs in order.
-    Tables in a MapJoin must also follow loop order, except implicit patterns.
+    Tables in a MapJoin must also follow loop order.
     A single Table argument may have a different storage order, representing a
     transpose; notation lowering inserts equality-constrained loops to read it
     in storage order. Fields absent from lhs_idxs are reduced with op.)
@@ -283,12 +278,8 @@ class CompilerForm(AliasedForm):
                     for arg in args:
                         validate(arg, loop_order)
                 case Table(tns, idxs):
-                    match bindings.get(tns):
-                        case None:
-                            raise ValueError(f"Alias {tns} has no TensorFType.")
-                        # Implicit patterns have no row-major storage to preserve.
-                        case PatternTensorFType():
-                            return
+                    if tns not in bindings:
+                        raise ValueError(f"Alias {tns} has no TensorFType.")
                     if not LoopOrderedForm._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Literal():

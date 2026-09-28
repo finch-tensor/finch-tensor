@@ -175,17 +175,18 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         PairCarryTensor((5, 3)),
         ReverseTensor((3, 5)),
         *(RollTensor((7, 3), k=k) for k in (-4, 0, 5)),
-        *(RepeatTensor((7, 3), k=k) for k in (-1, 0, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        ChunkMaskTensor((6, 3), b=2, dtype=np.int32),
+        *(RepeatTensor((3, 7), k=k) for k in (-1, 0, 2)),
+        ChunkMaskTensor((4, 10), b=3),
+        ChunkMaskTensor((3, 6), b=2, dtype=np.int32),
         ChunkMaskTensor((3, 3), b=1),
-        ChunkMaskTensor((2, 1), b=5),
+        ChunkMaskTensor((1, 2), b=5),
         ChunkMaskTensor((0, 0), b=3),
-        SplitMaskTensor((10, 3)),
-        SplitMaskTensor((6, 3), dtype=np.float64),
-        SplitMaskTensor((3, 5)),
-        SplitMaskTensor((3, 1)),
-        SplitMaskTensor((0, 3)),
+        SplitMaskTensor((3, 10)),
+        SplitMaskTensor((3, 10), dtype=np.intp),
+        SplitMaskTensor((3, 6), dtype=np.float64),
+        SplitMaskTensor((5, 3)),
+        SplitMaskTensor((1, 3)),
+        SplitMaskTensor((3, 0)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor((), 0.5, seed=1 << 63),
         RandomMaskTensor((0,), 0.5, seed=42),
@@ -233,6 +234,53 @@ def test_compile_julia_pattern_masks(mask):
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
+_MATRIX = np.arange(1.0, 13.0).reshape(3, 4)
+_VECTOR = np.array([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+
+
+@pytest.mark.parametrize(
+    "op, np_op, arg",
+    [
+        (lambda a: ft.flip(a, axis=1), lambda a: np.flip(a, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, 2, axis=1), lambda a: np.roll(a, 2, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, -1, axis=0), lambda a: np.roll(a, -1, axis=0), _MATRIX),
+        (
+            lambda a: ft.repeat(a, 3, axis=1),
+            lambda a: np.repeat(a, 3, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, axis=1),
+            lambda a: np.cumsum(a, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, include_initial=True),
+            lambda a: np.concatenate([[0.0], np.cumsum(a)]),
+            _VECTOR,
+        ),
+        (ft.sort, np.sort, _VECTOR),
+        (
+            lambda a: ft.argsort(a, stable=True),
+            lambda a: np.argsort(a, kind="stable"),
+            _VECTOR,
+        ),
+        (lambda a: ft.triu(a, k=1), lambda a: np.triu(a, k=1), _MATRIX),
+        (lambda a: ft.tril(a, k=-1), lambda a: np.tril(a, k=-1), _MATRIX),
+    ],
+)
+def test_compile_julia_pattern_interface(op, np_op, arg):
+    # These functions select, reduce, and fill through pattern masks, fill
+    # tensors, and choose, which all lower specially on the Julia backend.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg)))
+
+    np.testing.assert_array_equal(result.to_numpy(), np_op(arg))
+
+
 def test_compile_julia_numeric_pattern_mask():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA
@@ -273,8 +321,9 @@ def test_random_mask_matches_julia(shape):
     for seed in (0, 1, 42, (1 << 63) - 1, 1 << 63, (1 << 64) - 1):
         for p in (0.0, np.nextafter(0.0, 1.0), 0.4, 0.5, np.nextafter(1.0, 0.0), 1.0):
             mask = RandomMaskTensor(shape, p, seed=seed)
-            native = jl.Finch.randommask(shape, p, seed=jl.UInt64(seed))
-            expected = materialize(native).to_numpy()
+            # Julia masks have the reversed axes of Python masks.
+            native = jl.Finch.randommask(shape[::-1], p, seed=jl.UInt64(seed))
+            expected = np.transpose(materialize(native).to_numpy())
             actual = np.array([mask[idx].item() for idx in np.ndindex(shape)])
             np.testing.assert_array_equal(actual.reshape(shape), expected)
 
@@ -287,13 +336,13 @@ def test_random_mask_large_coordinates_match_julia():
     large_index = (shape[0] + 1) // 2
     for seed in (42, (1 << 64) - 1):
         mask = RandomMaskTensor(shape, 0.5, seed=seed)
-        native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
+        native = jl.Finch.randommask(shape[::-1], 0.5, seed=jl.UInt64(seed))
         for idx in (
             (2, 3, 1),
             tuple(dim - 1 for dim in shape),
             (large_index, large_index, 7),
         ):
-            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
+            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx[::-1]))
 
 
 def test_compile_julia_pattern_lowering(file_regression):
@@ -325,8 +374,8 @@ def test_compile_julia_pattern_lowering(file_regression):
         RollTensor((7, 3), k=-4),
         OneHotMaskTensor(5, index=2),
         ReshapeMaskTensor((2, 3), (3, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        SplitMaskTensor((10, 3)),
+        ChunkMaskTensor((4, 10), b=3),
+        SplitMaskTensor((3, 10)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor(7, 0.25, seed=42),
         RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
