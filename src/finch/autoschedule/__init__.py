@@ -16,7 +16,7 @@ from finch.finch_logic import (
 from finch.symbolic import PostOrderDFS, PostWalk, PreWalk
 
 from .capture import LogicCapture
-from .compiler import LogicCompiler, NotationGenerator
+from .compiler import CompilerFormLowerer, LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_JULIA,
     COMPILE_JULIA_GALLEY,
@@ -58,6 +58,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "BufferizedNDArrayFormatter",
+    "CompilerFormLowerer",
     "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
     "DefaultLoopOrderer",

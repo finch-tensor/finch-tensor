@@ -18,6 +18,7 @@ from finch import (
     ftype,
 )
 from finch.autoschedule import (
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLoopOrderer,
     FDFormatter,
@@ -314,7 +315,9 @@ def test_compile_julia_pattern_lowering(file_regression):
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     for mask in (
         EyeTensor((3, 5), k=1),
         UpperTriangleTensor((3, 5), k=-1),
@@ -367,7 +370,11 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     scheduler = LogicNormalizer(
         LogicExecutor(
             DefaultLogicFactorizer(
-                LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+                    )
+                )
             ),
             stats_factory=FDStatsFactory(),
         )
@@ -418,7 +425,9 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     compiler = RecordingJLCompiler()
     scheduler = LogicNormalizer(
         LogicExecutor(
-            LogicSimplify(DefaultLogicFormatter(LogicCompiler(compiler))),
+            LogicSimplify(
+                DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+            ),
             stats_factory=FDStatsFactory(),
         )
     )
@@ -639,7 +648,9 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     data = sparse_diagonal_data
     mask = EyeTensor(data.shape, dtype=DTYPE)
     with with_default_scheduler(scheduler):
@@ -721,7 +732,9 @@ def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
 
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = RecordingFDFormatter(
+        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+    )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
     arg = ft.asarray(data)
@@ -769,7 +782,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a

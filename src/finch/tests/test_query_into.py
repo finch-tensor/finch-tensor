@@ -7,6 +7,7 @@ from finch.autoschedule import (
     INTERPRET_LOGIC,
     INTERPRET_NOTATION,
     INTERPRET_NOTATION_GALLEY,
+    CompilerFormLowerer,
     DefaultLogicFormatter,
     DefaultLoopOrderer,
     LogicCapture,
@@ -166,7 +167,7 @@ def test_query_into_compiles_without_factorizing():
     LoopOrderedForm.validate_inputs(ordered, capture.last_bindings, {}, stats_factory)
 
     scheduler = LogicExecutor(
-        DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler()))
+        DefaultLoopOrderer(DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler())))
     )
     (result,) = scheduler(plan, bindings())
     finch_assert_equal(result, A_DATA + B_DATA.T)
@@ -192,7 +193,7 @@ def test_query_into_reduction_compiles_without_factorizing():
     LoopOrderedForm.validate_inputs(ordered, capture.last_bindings, {}, stats_factory)
 
     scheduler = LogicExecutor(
-        DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler()))
+        DefaultLoopOrderer(DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler())))
     )
     binds = {
         A: BufferizedNDArray.from_numpy(np.array([1.0, 2.0])),

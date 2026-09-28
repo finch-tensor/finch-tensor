@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 from finch import finch_einsum as ein
 from finch import finch_notation as ntn
+from finch.algebra import ffuncs
 from finch.algebra.tensor import TensorFType
 from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
@@ -20,7 +21,7 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finch.symbolic import Form, PreWalk, Rewrite, Stage
+from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
 from finch.tensor.patterns import PatternTensorFType
 
 
@@ -245,6 +246,92 @@ class FormattedForm(LoopOrderedForm):
         validate(term)
 
 
+class CompilerForm(AliasedForm):
+    """
+    CompilerForm is the input of the notation lowerer. Every statement but the
+    final Produces is a QueryInto, and initialization is explicit. There are
+    three valid kinds of statement:
+    1) initializations
+        QueryInto(Table(lhs, _), overwrite, Literal(init))
+    (Every element of lhs is set to init.)
+    2) transposes
+        QueryInto(Table(lhs, _), op, Table(_, _))
+    (The table is looped over in the order it is stored, and it is broadcast
+    over the fields of lhs which it lacks.)
+    3) folds
+        QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
+    (Here, arg is made of Tables, Literals, and MapJoins, and the loop order
+    visits the fields of lhs_idxs and of each table in arg in order. The fields
+    of the loop which are not in lhs_idxs are reduced with op.)
+    A transpose or fold which overwrites lhs also initializes it, starting from
+    the init of a preceding initialization, or else the fill value of lhs.
+    Every alias must have a TensorFType in the bindings, and a statement can't
+    read the alias it writes.
+    """
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        term: Plan,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> None:
+        super().validate_inputs(term, bindings, stats, stats_factory)
+
+        def validate(node, loop_order):
+            match node:
+                case MapJoin(_, args):
+                    for arg in args:
+                        validate(arg, loop_order)
+                case Table(tns, idxs):
+                    match bindings.get(tns):
+                        case None:
+                            raise ValueError(f"Alias {tns} has no TensorFType.")
+                        # Implicit patterns have no row-major storage to preserve.
+                        case PatternTensorFType():
+                            return
+                    if not LoopOrderedForm._check_loop_order(idxs, loop_order):
+                        raise ValueError("Table index order does not match loop order.")
+                case Literal():
+                    return
+                case _:
+                    raise ValueError(f"Unsupported expression in a fold: {node}")
+
+        match term:
+            case Plan((*bodies, Produces())):
+                pass
+            case _:
+                raise ValueError("The last body of a plan must be a Produces node.")
+        for body in bodies:
+            match body:
+                case QueryInto(Table(lhs, lhs_idxs), Literal(op), rhs):
+                    if lhs not in bindings:
+                        raise ValueError(f"Alias {lhs} has no TensorFType.")
+                    if lhs in PostOrderDFS(rhs):
+                        raise ValueError(f"QueryInto can't both read and write {lhs}.")
+                    match rhs:
+                        case Literal():
+                            if op != ffuncs.overwrite:
+                                raise ValueError(
+                                    f"Initializing {lhs} must overwrite it, not {op}."
+                                )
+                        case Table():
+                            validate(rhs, rhs.idxs)
+                        case Reorder(arg, loop_order):
+                            if not LoopOrderedForm._check_loop_order(
+                                lhs_idxs, loop_order
+                            ):
+                                raise ValueError(
+                                    "Table index order does not match loop order."
+                                )
+                            validate(arg, loop_order)
+                        case _:
+                            raise ValueError(f"Unsupported QueryInto: {body}")
+                case _:
+                    raise ValueError(f"CompilerForm only allows QueryInto, not {body}")
+
+
 class LogicFactorizer(AliasedForm, LogicLoader):
     @abstractmethod
     def lower(
@@ -304,7 +391,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
         """
 
 
-class LogicNotationLowerer(FormattedForm, Stage):
+class LogicNotationLowerer(CompilerForm, Stage):
     @abstractmethod
     def lower(
         self,

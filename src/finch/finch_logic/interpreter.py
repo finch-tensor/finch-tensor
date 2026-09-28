@@ -127,17 +127,18 @@ class LogicMachine:
                 dtype = fixpoint_type(
                     op.ftype, init.tns.element_type, arg.tns.element_type
                 )
+                arg_dims = dict(zip(arg.idxs, map(int, arg.tns.shape), strict=True))
                 out_dims = {
-                    idx: int(dim)
-                    for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
-                    if idx not in node.idxs
+                    idx: dim for idx, dim in arg_dims.items() if idx not in node.idxs
                 }
                 for idx, dim in zip(init.idxs, init.tns.shape, strict=True):
-                    if out_dims.get(idx) != dim:
+                    if out_dims.setdefault(idx, dim) != dim or idx in node.idxs:
                         raise ValueError(
-                            f"The init of an aggregate must broadcast to its "
-                            f"result, but it has field {idx} of size {dim}"
+                            f"The init of an aggregate doesn't broadcast to its "
+                            f"result, since it has field {idx} of size {dim}"
                         )
+                # The argument is broadcast over the fields only the init has.
+                loop_dims = {**arg_dims, **out_dims}
                 new_shape = tuple(out_dims.values())
                 assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
                 result = self.make_tensor(new_shape, init.tns.fill_value, dtype=dtype)
@@ -145,18 +146,14 @@ class LogicMachine:
                     idx_crds = dict(zip(out_dims, out_crds, strict=True))
                     init_crds = [idx_crds[idx] for idx in init.idxs]
                     result[*out_crds] = init.tns[*init_crds].item()
-                for crds in product(*[range(dim) for dim in arg.tns.shape]):
-                    out_crds = [
-                        crd
-                        for (crd, idx) in zip(crds, arg.idxs, strict=True)
-                        if idx not in node.idxs
-                    ]
+                for crds in product(*[range(dim) for dim in loop_dims.values()]):
+                    idx_crds = dict(zip(loop_dims, crds, strict=True))
+                    out_crds = [idx_crds[idx] for idx in out_dims]
+                    arg_crds = [idx_crds[idx] for idx in arg.idxs]
                     result[*out_crds] = op(
-                        result[*out_crds].item(), arg.tns[*crds].item()
+                        result[*out_crds].item(), arg.tns[*arg_crds].item()
                     )
-                return TableValue(
-                    result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
-                )
+                return TableValue(result, tuple(out_dims))
             case Relabel(arg, idxs):
                 arg = self(arg)
                 if len(arg.idxs) != len(idxs):

@@ -541,9 +541,10 @@ class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
     with `init`. `idxs` are the dimensions to reduce. May happen in any order.
-    The fields of the result are those of `arg` which are not reduced. `init`
-    may be a literal or a tensor expression whose fields are a subset of the
-    result's fields, in which case it is broadcast over the remaining fields.
+    `init` may be a literal or a tensor expression. The fields of the result
+    are those of `arg` which are not reduced, followed by the fields of `init`
+    which are not in `arg`. `init` and `arg` are broadcast over the fields of
+    the result which they lack, as in a `MapJoin`.
 
     Attributes:
         op: The reduction operation.
@@ -564,7 +565,8 @@ class Aggregate(LogicTree, LogicExpression):
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        return tuple(field for field in self.arg.fields() if field not in self.idxs)
+        arg_fields = [field for field in self.arg.fields() if field not in self.idxs]
+        return tuple(dict.fromkeys([*arg_fields, *self.init.fields()]))
 
     def dimmap(
         self,
@@ -580,12 +582,9 @@ class Aggregate(LogicTree, LogicExpression):
         }
         init_dims = self.init.dimmap(op, dim_bindings)
         for idx, dim in zip(self.init.fields(), init_dims, strict=True):
-            if idx not in idx_dims:
-                raise ValueError(
-                    f"The init of an aggregate has a field {idx} which is not "
-                    f"in the result fields {tuple(idx_dims)}"
-                )
-            idx_dims[idx] = op(idx_dims[idx], dim)
+            if idx in self.idxs:
+                raise ValueError(f"The init of an aggregate can't have reduced {idx}")
+            idx_dims[idx] = op(idx_dims[idx], dim) if idx in idx_dims else dim
         return tuple(idx_dims.values())
 
     def valmap(
@@ -762,8 +761,9 @@ class QueryInto(LogicTree, LogicStatement):
     Represents a logical AST statement that updates the table `lhs` in place,
     using the reduction operator `op` to fold each element of `rhs` into the
     matching element of `lhs`. The alias `lhs.tns` must already be bound. The
-    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, so a
-    `QueryInto` is equivalent to the aggregate which starts from `lhs`,
+    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, and `rhs`
+    is broadcast over the fields of `lhs` which it lacks, so a `QueryInto` is
+    equivalent to the aggregate which starts from `lhs`,
     `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
 
     Attributes:

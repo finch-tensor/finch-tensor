@@ -6,10 +6,8 @@ from collections.abc import Iterable
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import (
-    DynamicFill,
     FinchOperator,
     FType,
-    StaticFill,
     ffuncs,
     ftypes,
     is_dynamic,
@@ -26,12 +24,13 @@ from finch.finch_logic import (
 )
 from finch.finch_notation import NotationInterpreter
 from finch.finch_notation.stages import NotationLoader
-from finch.symbolic import gensym
+from finch.symbolic import PostWalk, Rewrite, gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
 
 from .loop_orderer.loop_ordering import CycleInFields, toposort
-from .stages import FormattedForm, LogicNotationLowerer
+from .stages import CompilerForm, FormattedForm, LogicNotationLowerer
+from .util import flatten_plans
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_NOTATION)
 
@@ -110,6 +109,58 @@ class NotationContext:
         if epilogue is None:
             epilogue = ()
         self.epilogue = epilogue
+        # The mode of each tensor at the current statement: frozen tensors are
+        # Read, and thawed tensors are Updated with the op they were thawed
+        # with. Initializations are only declared once we know how the tensor
+        # is used next, so their inits are held here until then.
+        self.modes: dict[lgc.Alias, ntn.AccessMode] = {
+            var: ntn.Read() for var in bindings
+        }
+        self.inits: dict[lgc.Alias, ntn.Literal] = {}
+
+    def freeze(self, var: lgc.Alias) -> tuple[ntn.NotationStatement, ...]:
+        """Statements which leave `var` frozen, so that it can be read."""
+        if var in self.inits:
+            # Nothing was folded into the init, so it is declared as it is.
+            op = ntn.Literal(ffuncs.overwrite)
+            init = self.inits.pop(var)
+            return (
+                ntn.Declare(self.slots[var], init, op, ()),
+                ntn.Freeze(self.slots[var], op),
+            )
+        match self.modes[var]:
+            case ntn.Update(op):
+                self.modes[var] = ntn.Read()
+                return (ntn.Freeze(self.slots[var], op),)
+        return ()
+
+    def thaw(
+        self, var: lgc.Alias, op: ntn.Literal
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Statements which leave `var` thawed, so that it can be updated with
+        `op`."""
+        if var in self.inits:
+            self.modes[var] = ntn.Update(op)
+            return (ntn.Declare(self.slots[var], self.inits.pop(var), op, ()),)
+        if self.modes[var] == ntn.Update(op):
+            return ()
+        stmts = self.freeze(var)
+        self.modes[var] = ntn.Update(op)
+        return (*stmts, ntn.Thaw(self.slots[var], op))
+
+    def declare(
+        self, var: lgc.Alias, init: ntn.Literal, op: ntn.Literal
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Statements which reset `var` to `init`, leaving it thawed, so that it
+        can be updated with `op`."""
+        self.inits.pop(var, None)
+        stmts = self.freeze(var)
+        self.modes[var] = ntn.Update(op)
+        return (*stmts, ntn.Declare(self.slots[var], init, op, ()))
+
+    def fill_literal(self, var: lgc.Alias) -> ntn.Literal:
+        fill = self.bindings[var].fill_value
+        return ntn.Literal(fill if is_dynamic(fill) else fill.value)
 
     def _lower_query_of_reorder(
         self,
@@ -118,14 +169,21 @@ class NotationContext:
         arg: lgc.Table,
         reorder_idxs: tuple[lgc.Field, ...],
     ):
+        # The table is broadcast over the fields only the output has.
         arg_dims = arg.dimmap(merge_shapes, self.shapes)
-        shapes_map = dict(zip(arg.idxs, arg_dims, strict=True))
+        shapes_map = {
+            **dict(zip(reorder_idxs, self.shapes[query_lhs], strict=True)),
+            **dict(zip(arg.idxs, arg_dims, strict=True)),
+        }
         shapes = {
             idx: shapes_map.get(idx) or ntn.Literal(ftypes.intp(1))
             for idx in arg.idxs + reorder_idxs
         }
         arg_types = arg.shape_type(self.shape_types)
-        shape_type_map = dict(zip(arg.idxs, arg_types, strict=True))
+        shape_type_map = {
+            **dict(zip(reorder_idxs, self.shape_types[query_lhs], strict=True)),
+            **dict(zip(arg.idxs, arg_types, strict=True)),
+        }
         shape_type = {
             idx: shape_type_map.get(idx) or ftypes.intp
             for idx in arg.idxs + reorder_idxs
@@ -206,38 +264,30 @@ class NotationContext:
         agg_arg: lgc.Reorder,
         output_idxs: tuple[lgc.Field, ...],
     ):
-        # Build a dict mapping fields to their shapes
-        arg_dims = agg_arg.dimmap(merge_shapes, self.shapes)
-        shapes_map = dict(zip(agg_arg.idxs, arg_dims, strict=True))
-        # Reorders may add output-only dimensions; those are singleton axes.
-        try:
-            loop_idxs = toposort([list(agg_arg.idxs), list(output_idxs)])
-        except CycleInFields:
-            raise ValueError(
-                "Cannot choose a loop order that preserves both aggregate "
-                "and output indices."
-            ) from None
+        # The loop order holds every field of the output, and the argument is
+        # broadcast over the fields only the output has.
+        loop_idxs = agg_arg.idxs
+        arg_dims = agg_arg.arg.dimmap(merge_shapes, self.shapes)
+        shapes_map = {
+            **dict(zip(output_idxs, self.shapes[query_lhs], strict=True)),
+            **dict(zip(agg_arg.arg.fields(), arg_dims, strict=True)),
+        }
         shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in loop_idxs}
-        arg_types = agg_arg.shape_type(self.shape_types)
-        shape_type_map = dict(zip(agg_arg.idxs, arg_types, strict=True))
+        arg_types = agg_arg.arg.shape_type(self.shape_types)
+        shape_type_map = {
+            **dict(zip(output_idxs, self.shape_types[query_lhs], strict=True)),
+            **dict(zip(agg_arg.arg.fields(), arg_types, strict=True)),
+        }
         shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs}
         loops = {
             idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in loop_idxs
         }
         ctx = PointwiseContext(self)
         rhs = ctx(agg_arg.arg, loops)
-
-        def lhs_idx(n, idx):
-            if idx in loops:
-                return loops[idx]
-            shape_type = self.shape_types[query_lhs][n] or ftypes.intp
-            return ntn.Literal(shape_type(0))
-
-        lhs_idxs = tuple(lhs_idx(n, idx) for n, idx in enumerate(output_idxs))
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
-            lhs_idxs,
+            tuple(loops[idx] for idx in output_idxs),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(loop_idxs):
@@ -261,82 +311,47 @@ class NotationContext:
         """
         match prgm:
             case lgc.Plan(bodies):
-                return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(
-                lgc.Table(lgc.Alias() as lhs, idxs_2), lgc.Table(lgc.Alias(), _) as arg
-            ):
-                match self.bindings[lhs].fill_value:
-                    case DynamicFill() as fill:
-                        init = ntn.Literal(fill)
-                        op = ffuncs.overwrite
-                    case StaticFill() as fill:
-                        init = ntn.Literal(fill.value)
-                        op = ffuncs.init_write(fill.value)
-                body = self._lower_query_of_reorder(lhs, op, arg, idxs_2)
-                return ntn.Block(
-                    (
-                        ntn.Declare(
-                            self.slots[lhs],
-                            init,
-                            ntn.Literal(op),
-                            (),
-                        ),
-                        body,
-                        ntn.Freeze(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                    )
-                )
-            case lgc.Query(
-                lgc.Table(lgc.Alias() as lhs, output_idxs),
-                lgc.Aggregate(
-                    lgc.Literal(op),
-                    lgc.Literal(init),
-                    lgc.Reorder(arg, _) as arg_2,
-                    idxs_2,
-                ),
-            ):
-                if op == ffuncs.overwrite and not idxs_2 and not is_dynamic(init):
-                    op = ffuncs.init_write(init)
-                body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
-                return ntn.Block(
-                    (
-                        ntn.Declare(
-                            self.slots[lhs],
-                            ntn.Literal(init),
-                            ntn.Literal(op),
-                            (),
-                        ),
-                        body,
-                        ntn.Freeze(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                    )
-                )
+                # Initializations lower to nothing until the tensor is used.
+                stmts = (self(body) for body in bodies)
+                return ntn.Block(tuple(s for s in stmts if s != ntn.Block(())))
             case lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, idxs_2),
-                lgc.Literal(op),
-                lgc.Reorder() as arg,
+                lgc.Table(lgc.Alias() as lhs, _),
+                lgc.Literal(ffuncs.overwrite),
+                lgc.Literal(init),
             ):
-                # Each value is folded into the output with `op`, in the loop
-                # order given by the Reorder, which reduces the fields that are
-                # not in the output.
-                body = self._lower_query_of_aggregate(lhs, op, arg, idxs_2)
-                return ntn.Block(
-                    (
-                        ntn.Thaw(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                        body,
-                        ntn.Freeze(
-                            self.slots[lhs],
-                            ntn.Literal(op),
-                        ),
-                    )
+                # An initialization is declared by the statement which next
+                # uses the tensor, since the declaration needs to know the op
+                # the tensor will be updated with. An earlier init which is still
+                # pending is overwritten, so it is dropped.
+                self.inits.pop(lhs, None)
+                stmts = self.freeze(lhs)
+                self.inits[lhs] = ntn.Literal(init)
+                return ntn.Block(stmts)
+            case lgc.QueryInto(
+                lgc.Table(lgc.Alias() as lhs, idxs), lgc.Literal(op), rhs
+            ):
+                reads = dict.fromkeys(
+                    node for node in PostOrderDFS(rhs) if isinstance(node, lgc.Alias)
                 )
+                stmts = tuple(stmt for var in reads for stmt in self.freeze(var))
+                if op == ffuncs.overwrite:
+                    # Overwriting every element of lhs resets it, so it is
+                    # declared, starting from its init or else its fill value.
+                    init = self.inits.pop(lhs, None)
+                    if init is None:
+                        init = self.fill_literal(lhs)
+                    reduced = any(idx not in idxs for idx in rhs.fields())
+                    if not reduced and not is_dynamic(init.val):
+                        op = ffuncs.init_write(init.val)
+                    stmts += self.declare(lhs, init, ntn.Literal(op))
+                else:
+                    stmts += self.thaw(lhs, ntn.Literal(op))
+                match rhs:
+                    case lgc.Table():
+                        body = self._lower_query_of_reorder(lhs, op, rhs, idxs)
+                    case lgc.Reorder():
+                        body = self._lower_query_of_aggregate(lhs, op, rhs, idxs)
+                return ntn.Block((*stmts, body))
             case lgc.Produces(args):
                 vars: list[lgc.Alias] = []
                 for var in args:
@@ -344,6 +359,7 @@ class NotationContext:
                     vars.append(var)
                 return ntn.Block(
                     (
+                        *(stmt for var in self.bindings for stmt in self.freeze(var)),
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
@@ -355,6 +371,76 @@ class NotationContext:
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {prgm}")
+
+
+def to_compiler_form(root: lgc.LogicStatement) -> lgc.LogicStatement:
+    """
+    Rewrite a program in FormattedForm into CompilerForm. A transpose query
+    overwrites its output, and an aggregate query initializes its output with
+    its init before folding its argument into it.
+
+    A query reorders its result to the fields of its output, which adds the
+    fields its argument lacks as unit dimensions. A QueryInto broadcasts its
+    argument over them instead, so they are added to the loop order, keeping
+    the fields of the output in order.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case lgc.Query(lhs, lgc.Table() as arg):
+                return lgc.QueryInto(lhs, lgc.Literal(ffuncs.overwrite), arg)
+            case lgc.Query(
+                lgc.Table(_, idxs) as lhs,
+                lgc.Aggregate(op, init, lgc.Reorder(arg, loop_order), _),
+            ):
+                try:
+                    loop_order = toposort([list(loop_order), list(idxs)])
+                except CycleInFields:
+                    raise ValueError(
+                        f"Cannot choose a loop order which visits both {loop_order}"
+                        f" and the output fields {idxs} in order."
+                    ) from None
+                return lgc.Plan(
+                    (
+                        lgc.QueryInto(lhs, lgc.Literal(ffuncs.overwrite), init),
+                        lgc.QueryInto(lhs, op, lgc.Reorder(arg, loop_order)),
+                    )
+                )
+
+    root = Rewrite(PostWalk(rule))(root)
+    assert isinstance(root, lgc.Plan)
+    return flatten_plans(root)
+
+
+class CompilerFormLowerer(FormattedForm, LogicLoader):
+    """
+    Rewrite a program in FormattedForm into CompilerForm, which makes the
+    initialization of each output and the loop over each of its fields
+    explicit.
+    """
+
+    def __init__(self, ctx: LogicLoader):
+        self.ctx = ctx
+
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> tuple[
+        AssemblyLibrary,
+        dict[lgc.Alias, TensorFType],
+        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
+        lgc.LogicStatement,
+    ]:
+        lib, bindings, shape_vars, _ = self.ctx(
+            to_compiler_form(prgm), bindings, stats, stats_factory
+        )
+        # Bind-time inference starts from the inputs alone, but CompilerForm
+        # initializes an intermediate before any query defines it, so the
+        # program this pass received is returned instead.
+        return lib, bindings, shape_vars, prgm
 
 
 class NotationGenerator(LogicNotationLowerer):
@@ -425,7 +511,7 @@ class NotationGenerator(LogicNotationLowerer):
         )
 
 
-class LogicCompiler(FormattedForm, LogicLoader):
+class LogicCompiler(CompilerForm, LogicLoader):
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,

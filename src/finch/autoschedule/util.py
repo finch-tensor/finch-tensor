@@ -48,9 +48,8 @@ def push_fields(root):
                         for arg in args
                     ),
                 )
-            case Relabel(Aggregate(op, init, arg, agg_idxs), relabel_idxs):
-                diff_idxs = setdiff(arg.fields(), agg_idxs)
-                reidx_dict = dict(zip(diff_idxs, relabel_idxs, strict=True))
+            case Relabel(Aggregate(op, init, arg, agg_idxs) as agg, relabel_idxs):
+                reidx_dict = dict(zip(agg.fields(), relabel_idxs, strict=True))
                 relabeled_idxs = tuple(reidx_dict.get(idx, idx) for idx in arg.fields())
                 init_idxs = tuple(reidx_dict[idx] for idx in init.fields())
                 return Aggregate(

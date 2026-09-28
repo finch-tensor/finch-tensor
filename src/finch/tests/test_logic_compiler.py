@@ -7,6 +7,7 @@ import finch.finch_notation as ntn
 from finch import ffuncs, ftype
 from finch.algebra import DynamicFill
 from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
+from finch.autoschedule.compiler import to_compiler_form
 from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
@@ -72,7 +73,10 @@ def test_generated_init_write(kind, init, compiler):
     }
     plan = Plan((query, Produces((dst,))))
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+        to_compiler_form(plan),
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
     result = compiler()(program).main(*bindings.values())
     finch_assert_equal(result[0].to_numpy(), expected)
@@ -116,7 +120,10 @@ def test_logic_compiler(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+        to_compiler_form(plan),
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
 
     file_regression.check(
@@ -168,7 +175,10 @@ def test_logic_compiler_inplace(file_regression):
     }
 
     program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+        to_compiler_form(plan),
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
 
     file_regression.check(
