@@ -16,7 +16,7 @@ from .julia import jl
 
 
 @dataclass(frozen=True)
-class _TensorCacheKey:
+class _TranslationCacheKey:
     pin_fill: bool
     kind: str
     identity: int
@@ -50,8 +50,8 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def __init__(self) -> None:
         self._kernels: dict[Any, Any] = {}
         self._kernel_metadata: dict[str, _KernalMetadata] = {}
-        self._owned_by_buffer: dict[_TensorCacheKey, JuliaOwnedTensor] = {}
-        self._source_finalizers: dict[_TensorCacheKey, weakref.finalize] = {}
+        self._translated_buffers: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
+        self._source_finalizers: dict[_TranslationCacheKey, weakref.finalize] = {}
         self.free_pool = _BufferPool()
 
     def get_cached_kernel(self, key):
@@ -69,39 +69,33 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
         # Lease Julia buffers only for resettable compiler-created outputs.
         owned_args: list[JuliaOwnedTensor] = []
-        raw_args: list[Any] = []
         for position, tensor in enumerate(args):
             pin_fill = position in kernel.dynamic_args
             if position in metadata.reset_positions and not isinstance(
                 tensor, JuliaOwnedTensor
             ):
-                ftype = tensor.ftype
                 lease = self.free_pool.acquire(
-                    ftype,
+                    tensor.ftype,
                     tensor.shape,
                     pin_fill,
                 )
-                owned = JuliaOwnedTensor(
-                    ftype,
+                julia_buf = JuliaOwnedTensor(
+                    tensor.ftype,
                     lease.key.shape,
                     self.release,
                     lease.raw,
                     lease.key.pin_fill,
-                    lease=lease,
+                    lease,
                 )
             else:
-                owned = self._to_julia_owned_tensor(tensor, pin_fill)
-            owned_args.append(owned)
-            raw_args.append(owned.raw_julia_obj)
+                julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
+            owned_args.append(julia_buf)
 
         # Julia returns the formal arguments that contain the computed results.
-        getattr(jl, kernel.func_name)(*raw_args)
+        getattr(jl, kernel.func_name)(*(arg.raw_julia_obj for arg in owned_args))
 
         # Associate returned buffers with their Python ownership handles.
         return tuple(owned_args[position] for position in metadata.returned_positions)
-
-    def _tensor_to_jl(self, tensor: Tensor, pin_fill: bool = False):
-        return self._to_julia_owned_tensor(tensor, pin_fill).raw_julia_obj
 
     def _to_julia_owned_tensor(
         self, tensor: Tensor, pin_fill: bool = False
@@ -109,44 +103,42 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         if isinstance(tensor, JuliaOwnedTensor):
             if tensor._pin_fill == pin_fill:
                 return tensor
-            source = tensor._as_tensor()
-            self._tensor_to_jl(source, pin_fill=pin_fill)
-            return self._owned_by_buffer[
-                self._tensor_cache_key(source, pin_fill=pin_fill)
-            ]
-        key = self._tensor_cache_key(tensor, pin_fill=pin_fill)
-        owned = self._owned_by_buffer.get(key)
-        if owned is not None:
-            return owned
+            return self._to_julia_owned_tensor(tensor._as_tensor(), pin_fill)
+        key = self._translation_cache_key(tensor, pin_fill=pin_fill)
+        julia_buf = self._translated_buffers.get(key)
+        if julia_buf is not None:
+            return julia_buf
 
         raw = tensor_to_jl(tensor, pin_fill=pin_fill)
-        owned = JuliaOwnedTensor(
+        julia_buf = JuliaOwnedTensor(
             tensor.ftype,
             tuple(int(dimension) for dimension in tensor.shape),
             self.release,
             raw,
             pin_fill,
         )
-        self._owned_by_buffer[key] = owned
+        self._translated_buffers[key] = julia_buf
         self._source_finalizers[key] = weakref.finalize(
             tensor, self._drop_source_buffer, key
         )
-        return owned
+        return julia_buf
 
-    def _drop_source_buffer(self, key: _TensorCacheKey) -> None:
+    def _drop_source_buffer(self, key: _TranslationCacheKey) -> None:
         """Drop cached Julia state once its Python source tensor is collected.
 
         Cached conversions retain Julia-owned buffers, so their entries must not
         outlive the Python tensor that owns the backing storage.
         """
         self._source_finalizers.pop(key, None)
-        self._owned_by_buffer.pop(key, None)
+        self._translated_buffers.pop(key, None)
 
     @staticmethod
-    def _tensor_cache_key(tensor: Tensor, pin_fill: bool = False) -> _TensorCacheKey:
+    def _translation_cache_key(
+        tensor: Tensor, pin_fill: bool = False
+    ) -> _TranslationCacheKey:
         if isinstance(tensor, BufferizedNDArray):
             array = tensor.to_numpy()
-            return _TensorCacheKey(
+            return _TranslationCacheKey(
                 pin_fill,
                 "numpy",
                 array.__array_interface__["data"][0],
@@ -156,7 +148,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             )
         if isinstance(tensor, NumPyWrapper):
             array = tensor._data
-            return _TensorCacheKey(
+            return _TranslationCacheKey(
                 pin_fill,
                 "numpy",
                 array.__array_interface__["data"][0],
@@ -164,7 +156,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 tuple(int(stride) for stride in array.strides),
                 array.dtype.str,
             )
-        return _TensorCacheKey(pin_fill, "object", id(tensor))
+        return _TranslationCacheKey(pin_fill, "object", id(tensor))
 
     def release(self, tensor: JuliaOwnedTensor) -> None:
         if tensor._lease is not None:
@@ -175,5 +167,5 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             finalizer.detach()
         self._kernels.clear()
         self._kernel_metadata.clear()
-        self._owned_by_buffer.clear()
+        self._translated_buffers.clear()
         self._source_finalizers.clear()
