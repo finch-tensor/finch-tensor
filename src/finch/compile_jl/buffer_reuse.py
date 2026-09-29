@@ -20,7 +20,6 @@ class _BufferLease:
 class _BufferPoolKey:
     ftype: str
     shape: tuple[int, ...]
-    pin_fill: bool
 
 
 class _BufferPool:
@@ -31,20 +30,18 @@ class _BufferPool:
         self,
         ftype: TensorFType,
         shape: tuple[int, ...],
-        pin_fill: bool,
     ) -> _BufferLease:
         from .interop import tensor_to_jl
 
         key = _BufferPoolKey(
             repr(ftype),
             tuple(int(dimension) for dimension in shape),
-            pin_fill,
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
         tensor = ftype.construct(shape)
         return _BufferLease(
-            tensor_to_jl(tensor, pin_fill=pin_fill),
+            tensor_to_jl(tensor),
             key,
         )
 
@@ -62,7 +59,6 @@ class JuliaOwnedTensor(Tensor):
         shape: tuple[int, ...],
         release: Callable[[JuliaOwnedTensor], None],
         raw_julia_obj: Any,
-        pin_fill: bool,
         lease: _BufferLease | None = None,
         translation_finalizer: finalize | None = None,
     ) -> None:
@@ -70,7 +66,6 @@ class JuliaOwnedTensor(Tensor):
         self._shape = shape
         self._release = release
         self._raw_julia_obj = raw_julia_obj
-        self._pin_fill = pin_fill
         self._lease = lease
         # If this tensor is a translation of a python tensor then this finalizer
         # triggers the garbage collection of this tensor when its python equivalent is killed.

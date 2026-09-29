@@ -60,7 +60,7 @@ class RecordingJulia:
 def _runtime(monkeypatch, metadata):
     raw_tensors = []
 
-    def tensor_to_julia(tensor, pin_fill=False):
+    def tensor_to_julia(tensor):
         raw = object()
         raw_tensors.append(raw)
         return raw
@@ -71,7 +71,8 @@ def _runtime(monkeypatch, metadata):
     monkeypatch.setattr(runtime_module, "jl", julia)
     runtime = DefaultFinchJLRuntime()
     runtime._kernels = {
-        name: SimpleNamespace(func_name=name, dynamic_args=()) for name in metadata
+        name: SimpleNamespace(func_name=name, instantiate=lambda _, name=name: name)
+        for name in metadata
     }
     runtime._kernel_metadata = metadata
     return runtime, julia, raw_tensors
@@ -83,7 +84,7 @@ def test_default_runtime_uses_a_free_buffer(monkeypatch):
         {"kernel": _KernalMetadata(frozenset({0}), (0,))},
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
-    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape, False)
+    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape)
     runtime.free_pool.release_lease(lease)
 
     result = runtime.kernel_call(runtime._kernels["kernel"], (tensor,))[0]

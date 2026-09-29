@@ -6,8 +6,7 @@ from typing import Any
 import numpy as np
 
 import finch as ft
-from finch.algebra.fill import DynamicFill, StaticFill
-from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType, ftype
+from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType
@@ -190,11 +189,6 @@ def to_jl_vector(T, values, *, offset: int = 0):
 
 
 def _julia_literal(value: Any) -> str:
-    match value:
-        case DynamicFill() as fill:
-            value = ftype(fill.value)(0)
-        case StaticFill() as fill:
-            value = fill.value
     # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
@@ -215,7 +209,7 @@ def _plus_one_ctor_str(elem_type_str: str) -> str:
     return f"Finch.PlusOneVector({elem_type_str}[])"
 
 
-def _level_constructor_str(level_ftype: LevelFType) -> str:
+def _level_constructor_str(level_ftype: LevelFType, fill_literal: str) -> str:
     """
     Julia source text that constructs a minimal (empty-buffer, but real --
     Finch's virtualize() needs an actual value, not just a type) instance of
@@ -226,25 +220,33 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     """
     if isinstance(level_ftype, ElementLevelFType):
         elem_t = _leaf_type_str(level_ftype.element_type)
-        fill = _julia_literal(level_ftype.fill_value)
-        return f"Finch.ElementLevel({fill}, {elem_t}[])"
+        return f"Finch.ElementLevel({fill_literal}, {elem_t}[])"
     if isinstance(level_ftype, DenseLevelFType):
         # interop.py's level_to_jl does `int(dimension)`, so the "shape"
         # scalar (level type param Ti) is always plain Julia Int (Int64),
         # regardless of the declared dimension_type -- only index/pointer
         # *buffers* actually preserve dimension_type/position_type.
-        return f"Finch.DenseLevel({_level_constructor_str(level_ftype.lvl_t)}, 1)"
+        lvl = _level_constructor_str(
+            level_ftype.lvl_t, fill_literal=fill_literal
+        )
+        return f"Finch.DenseLevel({lvl}, 1)"
     if isinstance(level_ftype, SparseListLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
+        lvl = _level_constructor_str(
+            level_ftype.lvl_t, fill_literal=fill_literal
+        )
         return (
-            f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"Finch.SparseListLevel({lvl}, "
             f"1, {_plus_one_ctor_str(pos_t)}, {_plus_one_ctor_str(dim_t)})"
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
+        lvl = _level_constructor_str(
+            level_ftype.lvl_t, fill_literal=fill_literal
+        )
         return (
-            f"Finch.SparseByteMapLevel({_level_constructor_str(level_ftype.lvl_t)}, "
+            f"Finch.SparseByteMapLevel({lvl}, "
             f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
             f"{_plus_one_ctor_str(pos_t)})"
         )
@@ -256,9 +258,12 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         ]
         dims = ",".join("1" for _ in dim_ts)
         idxs = ",".join(_plus_one_ctor_str(t) for t in dim_ts)
+        lvl = _level_constructor_str(
+            level_ftype.lvl_t, fill_literal=fill_literal
+        )
         return (
             f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
-            f"{_level_constructor_str(level_ftype.lvl_t)}, ({dims},), "
+            f"{lvl}, ({dims},), "
             f"{_plus_one_ctor_str(pos_t)}, ({idxs},))"
         )
     if isinstance(level_ftype, SparseHashLevelFType):
@@ -266,11 +271,14 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         single_writer = "true" if level_ftype.single_writer else "false"
         tbl_entry_t = f"Tuple{{{pos_t},{dim_t},{pos_t}}}"
+        lvl = _level_constructor_str(
+            level_ftype.lvl_t, fill_literal=fill_literal
+        )
         # interop.py derives Ti from `np.asarray(dimension).item()`, which
         # (like DenseLevel above) always yields plain Julia Int (Int64).
         return (
             f"Finch.SparseHashLevel{{Int,{single_writer}}}("
-            f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
+            f"{lvl}, 1, 1, "
             f"{_plus_one_ctor_str(pos_t)}, UInt8[], {tbl_entry_t}[], {pos_t}[], "
             f"{_plus_one_ctor_str(pos_t)})"
         )
@@ -280,22 +288,21 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     )
 
 
-def ftype_to_jl_constructor_str(ftype: FType) -> str:
+def ftype_to_jl_constructor_str(ftype: FType, *, fill_literal: str) -> str:
     """Julia source text constructing a minimal instance of `ftype`, for
     embedding directly in generated kernel source (see compiler.py)."""
     if isinstance(ftype, ScalarFType):
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_value)
-        return f"Finch.Tensor(Finch.ElementLevel({fill}, {elem_t}[]))"
+        return f"Finch.Tensor(Finch.ElementLevel({fill_literal}, {elem_t}[]))"
     if isinstance(ftype, FiberTensorFType):
-        return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
+        lvl = _level_constructor_str(ftype.lvl_t, fill_literal=fill_literal)
+        return f"Finch.Tensor({lvl})"
     if isinstance(ftype, BufferizedNDArrayFType):
         # Matches interop.py's _ndarray_to_jl_tensor: a plain dense buffer
         # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
         # (regardless of the ftype's own dimension_type).
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_value)
-        ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
+        ctor = f"Finch.ElementLevel({fill_literal}, {elem_t}[])"
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"
@@ -370,16 +377,17 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     )
 
 
-_TYPE_STR_CACHE: dict[FType, str] = {}
+_TYPE_STR_CACHE: dict[tuple[FType, str], str] = {}
 
 
-def ftype_to_jl_type_str(ftype: FType) -> str:
+def ftype_to_jl_type_str(ftype: FType, fill_literal: str) -> str:
     """Julia type as source text (e.g. for a cache key). Cached per ftype."""
-    cached = _TYPE_STR_CACHE.get(ftype)
+    key = (ftype, fill_literal)
+    cached = _TYPE_STR_CACHE.get(key)
     if cached is not None:
         return cached
     jl = get_jl()
-    ctor = ftype_to_jl_constructor_str(ftype)
+    ctor = ftype_to_jl_constructor_str(ftype, fill_literal=fill_literal)
     type_str = str(jl.string(jl.typeof(jl.seval(ctor))))
-    _TYPE_STR_CACHE[ftype] = type_str
+    _TYPE_STR_CACHE[key] = type_str
     return type_str
