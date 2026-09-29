@@ -111,7 +111,6 @@ class FinchJLKernel(AssemblyKernel):
 
     def __init__(
         self,
-        func_name,
         jl_code,
         type_,
         finch_program: ntn.Function,
@@ -122,19 +121,24 @@ class FinchJLKernel(AssemblyKernel):
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.finch_program = finch_program
-        self.func_name = func_name
         self.dynamic_args = dynamic_args
+        self.compiled_kernels: dict[tuple[str, ...], str] = {}
         self.runtime = runtime
 
     def __call__(self, *args):
-        source = self.jl_code
-        for position in self.dynamic_args:
-            fill = args[position].ftype.fill_value.value
-            source = source.replace(
-                _dynamic_fill_placeholder(position), _julia_literal(fill)
-            )
-        jl.seval(source)
-        return self.runtime.kernel_call(self, args)
+        fills = tuple(
+            _julia_literal(args[position].ftype.fill_value.value)
+            for position in self.dynamic_args
+        )
+        func_name = self.compiled_kernels.get(fills)
+        if func_name is None:
+            func_name = f"kernel_{uuid.uuid4().hex}"
+            source = self.jl_code.replace("__FINCH_KERNEL_NAME__", func_name)
+            for position, fill in zip(self.dynamic_args, fills, strict=True):
+                source = source.replace(_dynamic_fill_placeholder(position), fill)
+            jl.seval(source)
+            self.compiled_kernels[fills] = func_name
+        return self.runtime.kernel_call(func_name, self, args)
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -192,7 +196,8 @@ class FinchJLGenerator:
                 return (
                     "eval(let\n"
                     f"{proto_str}\n"
-                    f"    Finch.@finch_kernel function {name}({arg_str})\n"
+                    "    Finch.@finch_kernel function "
+                    f"__FINCH_KERNEL_NAME__({arg_str})\n"
                     f"{body_str}\n    end\n"
                     "end)"
                 )
@@ -324,10 +329,9 @@ class FinchJLGenerator:
                 return f"Finch.initwrite({value})"
 
             case ntn.Literal(val):
-                if isinstance(val, AbstractFill):
-                    # str() would silently emit broken source.
+                if isinstance(val, AbstractFill) and is_dynamic(val):
                     raise DynamicFillError(
-                        "cannot emit a wrapped fill as a Julia literal"
+                        "Julia only supports header dynamic fills"
                     )
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
@@ -395,10 +399,8 @@ class FinchJLCompiler(NotationCompiler):
             key = (generated_prgm, arg_type_strs, dynamic_args)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
-                jl_name = f"kernel_{uuid.uuid4().hex}"
                 kernel = FinchJLKernel(
-                    jl_name,
-                    generated_prgm.replace(func.name.name, jl_name, 1),
+                    generated_prgm,
                     func.name.result_type,
                     func,
                     self.runtime,
@@ -407,13 +409,13 @@ class FinchJLCompiler(NotationCompiler):
                 self.runtime.cache_kernel(key, kernel)
             elif kernel.ftype != func.name.result_type:
                 kernel = FinchJLKernel(
-                    kernel.func_name,
                     kernel.jl_code,
                     func.name.result_type,
                     func,
                     self.runtime,
                     dynamic_args,
                 )
+                self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)

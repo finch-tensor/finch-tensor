@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
-from finch.algebra import Tensor
+from finch.algebra import Tensor, is_dynamic
 from finch.tensor import BufferizedNDArray
 from finch.tensor.np_wrapper import NumPyWrapper
 
@@ -40,7 +40,7 @@ class FinchJLRuntime(ABC):
     def cache_kernel(self, key, kernel): ...
 
     @abstractmethod
-    def kernel_call(self, kernel, args): ...
+    def kernel_call(self, func_name, kernel, args): ...
 
 
 class DefaultFinchJLRuntime(FinchJLRuntime):
@@ -48,7 +48,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def __init__(self) -> None:
         self._kernels: dict[Any, Any] = {}
-        self._kernel_metadata: dict[str, _KernalMetadata] = {}
+        self._kernel_metadata: dict[int, _KernalMetadata] = {}
         self._translated_buffers: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
         self.free_pool = _BufferPool()
 
@@ -57,13 +57,13 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def cache_kernel(self, key, kernel):
         self._kernels[key] = kernel
-        self._kernel_metadata[kernel.func_name] = _KernalMetadata(
+        self._kernel_metadata[id(kernel)] = _KernalMetadata(
             reset_argument_positions(kernel.finch_program),
             returned_argument_positions(kernel.finch_program),
         )
 
-    def kernel_call(self, kernel, args):
-        metadata = self._kernel_metadata[kernel.func_name]
+    def kernel_call(self, func_name, kernel, args):
+        metadata = self._kernel_metadata[id(kernel)]
 
         # Lease Julia buffers only for resettable compiler-created outputs.
         julia_buf_args: list[JuliaOwnedTensor] = []
@@ -74,6 +74,11 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 lease = self.free_pool.acquire(
                     tensor.ftype,
                     tensor.shape,
+                    (
+                        tensor.ftype.fill_value
+                        if is_dynamic(tensor.ftype.fill_value)
+                        else None
+                    ),
                 )
                 julia_buf = JuliaOwnedTensor(
                     tensor.ftype,
@@ -86,7 +91,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 julia_buf = self._to_julia_owned_tensor(tensor)
             julia_buf_args.append(julia_buf)
 
-        getattr(jl, kernel.func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
+        getattr(jl, func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
 
         # Associate returned buffers with their Python ownership handles.
         return tuple(

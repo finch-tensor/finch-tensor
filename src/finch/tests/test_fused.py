@@ -695,6 +695,22 @@ def test_jit_while():
     finch_assert_allclose(opt_fn(A, B, n), simple_fn(A, B, n))
 
 
+def test_jit_while_with_tensor_condition():
+    @jit
+    def opt_fn(A, B, n):
+        has_values = True
+        while n > 0 and has_values:
+            A = add(A, B)
+            has_values = finch.any(A)
+            n = n - 1
+        return A
+
+    A = asarray(np.array([1, 2]))
+    B = asarray(np.array([0, 0]))
+
+    finch_assert_allclose(opt_fn(A, B, 2), A)
+
+
 def test_jit_while_inserted_code(file_regression):
     def opt_fn(A, B, n):
         C = A
