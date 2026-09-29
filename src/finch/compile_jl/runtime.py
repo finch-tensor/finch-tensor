@@ -19,10 +19,10 @@ from .julia import jl
 class _TranslationCacheKey:
     pin_fill: bool
     kind: str
-    identity: int
-    shape: tuple[int, ...] = ()
-    strides: tuple[int, ...] = ()
-    dtype: str = ""
+    identity: int | None
+    shape: tuple[int, ...] | None
+    strides: tuple[int, ...] | None
+    dtype: str | None
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         metadata = self._kernel_metadata[kernel.func_name]
 
         # Lease Julia buffers only for resettable compiler-created outputs.
-        owned_args: list[JuliaOwnedTensor] = []
+        julia_buf_args: list[JuliaOwnedTensor] = []
         for position, tensor in enumerate(args):
             pin_fill = position in kernel.dynamic_args
             if position in metadata.reset_positions and not isinstance(
@@ -89,13 +89,17 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 )
             else:
                 julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
-            owned_args.append(julia_buf)
+            julia_buf_args.append(julia_buf)
 
         # Julia returns the formal arguments that contain the computed results.
-        getattr(jl, kernel.func_name)(*(arg.raw_julia_obj for arg in owned_args))
+        getattr(jl, kernel.func_name)(
+            *(arg.raw_julia_obj for arg in julia_buf_args)
+        )
 
         # Associate returned buffers with their Python ownership handles.
-        return tuple(owned_args[position] for position in metadata.returned_positions)
+        return tuple(
+            julia_buf_args[position] for position in metadata.returned_positions
+        )
 
     def _to_julia_owned_tensor(
         self, tensor: Tensor, pin_fill: bool = False
@@ -141,7 +145,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             return _TranslationCacheKey(
                 pin_fill,
                 "numpy",
-                array.__array_interface__["data"][0],
+                None,
                 tuple(int(dimension) for dimension in array.shape),
                 tuple(int(stride) for stride in array.strides),
                 array.dtype.str,
@@ -151,12 +155,12 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             return _TranslationCacheKey(
                 pin_fill,
                 "numpy",
-                array.__array_interface__["data"][0],
+                None,
                 tuple(int(dimension) for dimension in array.shape),
                 tuple(int(stride) for stride in array.strides),
                 array.dtype.str,
             )
-        return _TranslationCacheKey(pin_fill, "object", id(tensor))
+        return _TranslationCacheKey(pin_fill, "object", id(tensor), None, None, None)
 
     def release(self, tensor: JuliaOwnedTensor) -> None:
         if tensor._lease is not None:
