@@ -71,10 +71,11 @@ def _runtime(monkeypatch, metadata):
     monkeypatch.setattr(runtime_module, "jl", julia)
     runtime = DefaultFinchJLRuntime()
     runtime._kernels = {
-        name: SimpleNamespace(func_name=name, instantiate=lambda _, name=name: name)
-        for name in metadata
+        name: SimpleNamespace(finch_program=None) for name in metadata
     }
-    runtime._kernel_metadata = metadata
+    runtime._kernel_metadata = {
+        id(runtime._kernels[name]): value for name, value in metadata.items()
+    }
     return runtime, julia, raw_tensors
 
 
@@ -87,7 +88,7 @@ def test_default_runtime_uses_a_free_buffer(monkeypatch):
     lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape)
     runtime.free_pool.release_lease(lease)
 
-    result = runtime.kernel_call(runtime._kernels["kernel"], (tensor,))[0]
+    result = runtime.kernel_call("kernel", runtime._kernels["kernel"], (tensor,))[0]
 
     assert result.raw_julia_obj is lease.raw
 
@@ -99,7 +100,7 @@ def test_default_runtime_creates_a_buffer_when_the_pool_is_empty(monkeypatch):
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
 
-    result = runtime.kernel_call(runtime._kernels["kernel"], (tensor,))[0]
+    result = runtime.kernel_call("kernel", runtime._kernels["kernel"], (tensor,))[0]
 
     assert result.raw_julia_obj is raw_tensors[0]
     assert len(raw_tensors) == 1
@@ -115,8 +116,8 @@ def test_default_runtime_reuses_an_input_across_kernels(monkeypatch):
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
 
-    runtime.kernel_call(runtime._kernels["first_kernel"], (tensor,))
-    runtime.kernel_call(runtime._kernels["second_kernel"], (tensor,))
+    runtime.kernel_call("first_kernel", runtime._kernels["first_kernel"], (tensor,))
+    runtime.kernel_call("second_kernel", runtime._kernels["second_kernel"], (tensor,))
 
     assert len(raw_tensors) == 1
     assert julia.calls == [
