@@ -2,19 +2,33 @@ from __future__ import annotations
 
 import weakref
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-import numpy as np
-
-from finch.algebra import Tensor, TensorFType
+from finch.algebra import Tensor
 from finch.tensor import BufferizedNDArray
 from finch.tensor.np_wrapper import NumPyWrapper
 
 from .analyze import reset_argument_positions, returned_argument_positions
-from .interop import jl_tensor_to_python, tensor_to_jl
+from .buffer_reuse import JuliaOwnedTensor, _BufferPool
+from .interop import tensor_to_jl
 from .julia import jl
+
+
+@dataclass(frozen=True)
+class _TensorCacheKey:
+    pin_fill: bool
+    kind: str
+    identity: int
+    shape: tuple[int, ...] = ()
+    strides: tuple[int, ...] = ()
+    dtype: str = ""
+
+
+@dataclass(frozen=True)
+class _KernalMetadata:
+    reset_positions: frozenset[int]
+    returned_positions: tuple[int, ...]
 
 
 class FinchJLRuntime(ABC):
@@ -28,100 +42,6 @@ class FinchJLRuntime(ABC):
 
     @abstractmethod
     def kernel_call(self, func_name, args): ...
-
-
-@dataclass(frozen=True)
-class _TensorCacheKey:
-    pin_fill: bool
-    kind: str
-    identity: int
-    shape: tuple[int, ...] = ()
-    strides: tuple[int, ...] = ()
-    dtype: str = ""
-
-
-@dataclass
-class _BufferLease:
-    raw: Any
-    key: _BufferPoolKey
-
-
-@dataclass(frozen=True)
-class _KernalMetadata:
-    reset_positions: frozenset[int]
-    returned_positions: tuple[int, ...]
-
-
-@dataclass(frozen=True)
-class _BufferPoolKey:
-    ftype: str
-    shape: tuple[int, ...]
-    pin_fill: bool
-
-
-class JuliaOwnedTensor(Tensor):
-    """A Finch tensor handle for storage owned by the Julia runtime."""
-
-    def __init__(
-        self,
-        ftype: TensorFType,
-        shape: tuple[int, ...],
-        runtime: DefaultFinchJLRuntime,
-        raw_julia_obj: Any,
-        pin_fill: bool,
-        lease: _BufferLease | None = None,
-    ) -> None:
-        self._ftype = ftype
-        self._shape = shape
-        self._runtime = runtime
-        self._raw_julia_obj = raw_julia_obj
-        self._pin_fill = pin_fill
-        self._lease = lease
-
-    def __del__(self) -> None:
-        self._runtime.release(self)
-
-    @property
-    def ftype(self) -> TensorFType:
-        return self._ftype
-
-    @property
-    def shape(self) -> tuple[int, ...]:
-        return self._shape
-
-    @property
-    def raw_julia_obj(self) -> Any:
-        return self._raw_julia_obj
-
-    def _as_tensor(self) -> Tensor:
-        return jl_tensor_to_python(self.raw_julia_obj)
-
-    def item(self):
-        if not self._shape:
-            values = self.raw_julia_obj.lvl.val.to_numpy(copy=False)
-            return values[0].item()
-        return self._as_tensor().item()
-
-    def __getitem__(self, index):
-        if not self._shape:
-            return self.item()
-        return self._as_tensor().to_numpy()[index]
-
-    def to_numpy(self):
-        return self._as_tensor().to_numpy()
-
-    def __array__(self, dtype=None, copy=None):
-        out = np.asarray(self.to_numpy())
-        if dtype is not None and out.dtype != dtype:
-            if copy is not None and not copy:
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
-            out = out.astype(dtype)
-        return out
-
-    def to_scipy(self):
-        return self._as_tensor().to_scipy()
 
 
 class DefaultFinchJLRuntime(FinchJLRuntime):
@@ -165,11 +85,15 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 tensor, JuliaOwnedTensor
             ):
                 ftype = tensor.ftype
-                lease = self.free_pool.acquire(ftype, tensor.shape, pin_fill=pin_fill)
+                lease = self.free_pool.acquire(
+                    ftype,
+                    tensor.shape,
+                    pin_fill,
+                )
                 owned = JuliaOwnedTensor(
                     ftype,
                     lease.key.shape,
-                    self,
+                    self.release,
                     lease.raw,
                     lease.key.pin_fill,
                     lease=lease,
@@ -208,7 +132,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         owned = JuliaOwnedTensor(
             tensor.ftype,
             tuple(int(dimension) for dimension in tensor.shape),
-            self,
+            self.release,
             raw,
             pin_fill,
         )
@@ -263,31 +187,3 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernel_metadata.clear()
         self._owned_by_buffer.clear()
         self._source_finalizers.clear()
-
-
-class _BufferPool:
-    def __init__(self) -> None:
-        self._free: dict[_BufferPoolKey, dict[int, _BufferLease]] = defaultdict(dict)
-
-    def acquire(
-        self,
-        ftype: TensorFType,
-        shape: tuple[int, ...],
-        pin_fill: bool,
-    ) -> _BufferLease:
-        key = _BufferPoolKey(
-            repr(ftype),
-            tuple(int(dimension) for dimension in shape),
-            pin_fill,
-        )
-        if self._free[key]:
-            return self._free[key].popitem()[1]
-        tensor = ftype.construct(shape)
-        return _BufferLease(
-            tensor_to_jl(tensor, pin_fill=pin_fill),
-            key,
-        )
-
-    def release_lease(self, lease: _BufferLease) -> None:
-        free_leases = self._free[lease.key]
-        free_leases.setdefault(id(lease), lease)
