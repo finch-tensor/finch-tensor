@@ -40,7 +40,7 @@ def test_generated_init_write(kind, init, compiler):
     init = np.int64(init)
     fill = DynamicFill(init) if kind.startswith("dynamic_") else init
     if kind in ("copy", "dynamic_copy"):
-        query = Query(dst, Reorder(Table(src, (i, j)), (j, i)))
+        query = Query(Table(dst, (j, i)), Table(src, (i, j)))
         expected = data.T
     else:
         reduced = (j,) if kind == "reduction" else ()
@@ -53,7 +53,7 @@ def test_generated_init_write(kind, init, compiler):
         )
         if kind == "inplace":
             rhs = MapJoin(Literal(ffuncs.overwrite), (Table(dst, output_idxs), rhs))
-        query = Query(dst, Reorder(rhs, output_idxs))
+        query = Query(Table(dst, output_idxs), rhs)
         expected = data[:, -1] if reduced else data
 
     # Static pointwise initialization can differ from the storage format's fill.
@@ -76,30 +76,27 @@ def test_logic_compiler(file_regression):
     plan = Plan(
         bodies=(
             Query(
-                lhs=Alias(name="A2"),
-                rhs=Reorder(
-                    arg=Aggregate(
-                        op=logic.Literal(val=ffuncs.add),
-                        init=logic.Literal(val=0),
-                        arg=Reorder(
-                            arg=MapJoin(
-                                op=logic.Literal(val=ffuncs.mul),
-                                args=(
-                                    Table(
-                                        Alias(name="A0"),
-                                        (Field(name="i0"), Field(name="i1")),
-                                    ),
-                                    Table(
-                                        Alias(name="A1"),
-                                        (Field(name="i1"), Field(name="i2")),
-                                    ),
+                lhs=Table(Alias(name="A2"), (Field(name="i0"), Field(name="i2"))),
+                rhs=Aggregate(
+                    op=logic.Literal(val=ffuncs.add),
+                    init=logic.Literal(val=0),
+                    arg=Reorder(
+                        arg=MapJoin(
+                            op=logic.Literal(val=ffuncs.mul),
+                            args=(
+                                Table(
+                                    Alias(name="A0"),
+                                    (Field(name="i0"), Field(name="i1")),
+                                ),
+                                Table(
+                                    Alias(name="A1"),
+                                    (Field(name="i1"), Field(name="i2")),
                                 ),
                             ),
-                            idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                         ),
-                        idxs=(Field(name="i1"),),
+                        idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                     ),
-                    idxs=(Field(name="i0"), Field(name="i2")),
+                    idxs=(Field(name="i1"),),
                 ),
             ),
             Produces(args=(Alias(name="A2"),)),
@@ -137,40 +134,37 @@ def test_logic_compiler_inplace(file_regression):
     plan = Plan(
         bodies=(
             Query(
-                lhs=Alias(name="A2"),
-                rhs=Reorder(
-                    arg=MapJoin(
-                        op=Literal(ffuncs.add),
-                        args=(
-                            Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
-                            Aggregate(
-                                op=logic.Literal(val=ffuncs.add),
-                                init=logic.Literal(val=0),
-                                arg=Reorder(
-                                    arg=MapJoin(
-                                        op=logic.Literal(val=ffuncs.mul),
-                                        args=(
-                                            Table(
-                                                Alias(name="A0"),
-                                                (Field(name="i0"), Field(name="i1")),
-                                            ),
-                                            Table(
-                                                Alias(name="A1"),
-                                                (Field(name="i1"), Field(name="i2")),
-                                            ),
+                lhs=Table(Alias(name="A2"), (Field(name="i0"), Field(name="i2"))),
+                rhs=MapJoin(
+                    op=Literal(ffuncs.add),
+                    args=(
+                        Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
+                        Aggregate(
+                            op=logic.Literal(val=ffuncs.add),
+                            init=logic.Literal(val=0),
+                            arg=Reorder(
+                                arg=MapJoin(
+                                    op=logic.Literal(val=ffuncs.mul),
+                                    args=(
+                                        Table(
+                                            Alias(name="A0"),
+                                            (Field(name="i0"), Field(name="i1")),
+                                        ),
+                                        Table(
+                                            Alias(name="A1"),
+                                            (Field(name="i1"), Field(name="i2")),
                                         ),
                                     ),
-                                    idxs=(
-                                        Field(name="i0"),
-                                        Field(name="i1"),
-                                        Field(name="i2"),
-                                    ),
                                 ),
-                                idxs=(Field(name="i1"),),
+                                idxs=(
+                                    Field(name="i0"),
+                                    Field(name="i1"),
+                                    Field(name="i2"),
+                                ),
                             ),
+                            idxs=(Field(name="i1"),),
                         ),
                     ),
-                    idxs=(Field(name="i0"), Field(name="i2")),
                 ),
             ),
             Produces(args=(Alias(name="A2"),)),

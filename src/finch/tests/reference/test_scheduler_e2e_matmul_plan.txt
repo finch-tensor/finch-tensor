@@ -1,2 +1,2 @@
-C = Aggregate(add, 0, Reorder(MapJoin(mul, Reorder(Table(A, i, k), i, k), Reorder(Table(B, k, j), k, j)), i, k, j), k)
+C[i, j] = Aggregate(add, 0, Reorder(MapJoin(mul, Reorder(Table(A, i, k), i, k), Reorder(Table(B, k, j), k, j)), i, k, j), k)
 return C
