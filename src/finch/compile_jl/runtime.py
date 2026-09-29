@@ -41,7 +41,7 @@ class FinchJLRuntime(ABC):
     def cache_kernel(self, key, kernel): ...
 
     @abstractmethod
-    def kernel_call(self, func_name, args): ...
+    def kernel_call(self, kernel, args): ...
 
 
 class DefaultFinchJLRuntime(FinchJLRuntime):
@@ -49,7 +49,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def __init__(self) -> None:
         self._kernels: dict[Any, Any] = {}
-        self._kernels_by_name: dict[str, Any] = {}
         self._kernel_metadata: dict[str, _KernalMetadata] = {}
         self._owned_by_buffer: dict[_TensorCacheKey, JuliaOwnedTensor] = {}
         self._source_finalizers: dict[_TensorCacheKey, weakref.finalize] = {}
@@ -60,7 +59,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def cache_kernel(self, key, kernel):
         self._kernels[key] = kernel
-        self._kernels_by_name[kernel.func_name] = kernel
 
     def _kernel_metadata_for(self, kernel: Any) -> _KernalMetadata:
         metadata = self._kernel_metadata.get(kernel.func_name)
@@ -72,8 +70,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             self._kernel_metadata[kernel.func_name] = metadata
         return metadata
 
-    def kernel_call(self, func_name, args):
-        kernel = self._kernels_by_name[func_name]
+    def kernel_call(self, kernel, args):
         metadata = self._kernel_metadata_for(kernel)
 
         # Lease Julia buffers only for resettable compiler-created outputs.
@@ -104,7 +101,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             raw_args.append(owned.raw_julia_obj)
 
         # Julia returns the formal arguments that contain the computed results.
-        getattr(jl, func_name)(*raw_args)
+        getattr(jl, kernel.func_name)(*raw_args)
 
         # Associate returned buffers with their Python ownership handles.
         return tuple(owned_args[position] for position in metadata.returned_positions)
@@ -183,7 +180,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         for finalizer in self._source_finalizers.values():
             finalizer.detach()
         self._kernels.clear()
-        self._kernels_by_name.clear()
         self._kernel_metadata.clear()
         self._owned_by_buffer.clear()
         self._source_finalizers.clear()

@@ -127,7 +127,7 @@ class FinchJLKernel(AssemblyKernel):
         self.runtime = runtime
 
     def __call__(self, *args):
-        return self.runtime.kernel_call(self.func_name, args)
+        return self.runtime.kernel_call(self, args)
 
 
 class FinchJLLibrary(AssemblyLibrary):

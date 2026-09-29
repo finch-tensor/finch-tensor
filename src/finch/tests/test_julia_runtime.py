@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import numpy as np
 
 import finch as ft
+import finch.compile_jl.interop as interop_module
 import finch.compile_jl.runtime as runtime_module
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
@@ -65,10 +66,11 @@ def _runtime(monkeypatch, metadata):
         return raw
 
     julia = RecordingJulia()
+    monkeypatch.setattr(interop_module, "tensor_to_jl", tensor_to_julia)
     monkeypatch.setattr(runtime_module, "tensor_to_jl", tensor_to_julia)
     monkeypatch.setattr(runtime_module, "jl", julia)
     runtime = DefaultFinchJLRuntime()
-    runtime._kernels_by_name = {
+    runtime._kernels = {
         name: SimpleNamespace(func_name=name, dynamic_args=()) for name in metadata
     }
     runtime._kernel_metadata = metadata
@@ -84,7 +86,7 @@ def test_default_runtime_uses_a_free_buffer(monkeypatch):
     lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape, False)
     runtime.free_pool.release_lease(lease)
 
-    result = runtime.kernel_call("kernel", (tensor,))[0]
+    result = runtime.kernel_call(runtime._kernels["kernel"], (tensor,))[0]
 
     assert result.raw_julia_obj is lease.raw
 
@@ -96,7 +98,7 @@ def test_default_runtime_creates_a_buffer_when_the_pool_is_empty(monkeypatch):
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
 
-    result = runtime.kernel_call("kernel", (tensor,))[0]
+    result = runtime.kernel_call(runtime._kernels["kernel"], (tensor,))[0]
 
     assert result.raw_julia_obj is raw_tensors[0]
     assert len(raw_tensors) == 1
@@ -112,8 +114,8 @@ def test_default_runtime_reuses_an_input_across_kernels(monkeypatch):
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
 
-    runtime.kernel_call("first_kernel", (tensor,))
-    runtime.kernel_call("second_kernel", (tensor,))
+    runtime.kernel_call(runtime._kernels["first_kernel"], (tensor,))
+    runtime.kernel_call(runtime._kernels["second_kernel"], (tensor,))
 
     assert len(raw_tensors) == 1
     assert julia.calls == [
