@@ -54,7 +54,7 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     new_bodies = tuple(formatter(body) for body in bodies)
                     return lgc.Plan(new_bodies)
-                case lgc.Query(lhs, rhs):
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _):
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)
@@ -64,11 +64,7 @@ class MonoLogicFormatter(LogicFormatter):
                         tns = self.get_tensor_ftype(fill_values[lhs], shape_type)
 
                         bindings[lhs] = tns
-                    match rhs:
-                        case lgc.Reorder():
-                            return node
-                        case _:
-                            return lgc.Query(lhs, lgc.Reorder(rhs, rhs.fields()))
+                    return node
                 case lgc.Produces():
                     return node
                 case _:

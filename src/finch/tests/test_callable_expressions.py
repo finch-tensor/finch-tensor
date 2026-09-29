@@ -430,15 +430,12 @@ def test_logic_lowering_preserves_literal_callee(compiler, fill):
     plan = lgc.Plan(
         (
             lgc.Query(
-                output,
-                lgc.Reorder(
-                    lgc.Aggregate(
-                        lgc.Literal(ffuncs.overwrite),
-                        lgc.Literal(np.int64(0)),
-                        lgc.Reorder(expression, (index,)),
-                        (),
-                    ),
-                    (index,),
+                lgc.Table(output, (index,)),
+                lgc.Aggregate(
+                    lgc.Literal(ffuncs.overwrite),
+                    lgc.Literal(np.int64(0)),
+                    lgc.Reorder(expression, (index,)),
+                    (),
                 ),
             ),
             lgc.Produces((output,)),

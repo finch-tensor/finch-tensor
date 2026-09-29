@@ -62,7 +62,7 @@ def build_grid_uniform(
     size_outputs = tuple(Alias(f"block_sizes_{axis}") for axis in range(len(masks)))
     size_queries = tuple(
         Query(
-            size_out,
+            Table(size_out, (block_idx,)),
             Aggregate(
                 Literal(ffuncs.add),
                 Literal(np.intp(0)),
@@ -75,7 +75,11 @@ def build_grid_uniform(
         )
     )
     prgm = Plan(
-        (Query(out, nnz_grid_expr), *size_queries, Produces((out, *size_outputs)))
+        (
+            Query(Table(out, block_order), nnz_grid_expr),
+            *size_queries,
+            Produces((out, *size_outputs)),
+        )
     )
     nnz_grid, *sizes = NON_RECURSIVE_STANDARD_SCHEDULER(prgm)
 

@@ -34,10 +34,8 @@ The transformation has two steps:
      Produces statement.
 
 2. Reorder normalization:
-   - For each Query, record rhs.fields() as the final output field order.
-   - Recursively strip all interior Reorder nodes from the RHS.
-   - Wrap the resulting expression in a single outer `Reorder` that restores
-     the original fields() order.
+   - Recursively strip all Reorder nodes from the RHS of each Query. The
+     output order is kept by the table on the Query's left-hand side.
 """
 
 
@@ -185,7 +183,7 @@ def _inline_tables_in_expr(
     Whenever we see Table(Alias X, idxs), and X has a defining Query
     (and X is not in ``produced_aliases``), we:
       1. Take the RHS of that query.
-      2. Compute its natural field order via rhs.fields().
+      2. Take the order the result is stored in from the query's lhs table.
       3. Build a mapping from those fields to idxs.
       4. Alpha-rename the RHS under that mapping.
       5. Recursively inline within the renamed RHS.
@@ -202,8 +200,9 @@ def _inline_tables_in_expr(
             if alias not in alias_to_query or alias in produced_aliases:
                 return expr
 
-            rhs = alias_to_query[alias].rhs
-            orig_fields = rhs.fields()
+            query = alias_to_query[alias]
+            rhs = query.rhs
+            orig_fields = query.lhs.idxs
             if len(orig_fields) != len(idxs):
                 raise ValueError(
                     f"Alias {alias} has {len(orig_fields)} output fields, "
@@ -222,6 +221,8 @@ def _inline_tables_in_expr(
                     mapping[f] = Field(gensym("i"))
 
             renamed_rhs = alpha_rename_expr(rhs, mapping)
+            if renamed_rhs.fields() != idxs:
+                renamed_rhs = Reorder(renamed_rhs, idxs)
             return _inline_tables_in_expr(renamed_rhs, alias_to_query, produced_aliases)
 
         case MapJoin(op, args):
@@ -253,7 +254,7 @@ def merge_queries(plan: Plan) -> Plan:
 
     - Builds a mapping from Alias to its defining Query in the original plan.
     - For each alias mentioned in the final Produces statement, constructs a
-      new Query(lhs, merged_rhs) where merged_rhs inlines any
+      new Query(Table(alias, idxs), merged_rhs) where merged_rhs inlines any
       Table(Alias, ...) references using _inline_tables_in_expr.
     - Ensures that we never drop a Query whose lhs alias appears in a
       Produces statement
@@ -278,8 +279,9 @@ def merge_queries(plan: Plan) -> Plan:
     # Map each alias to the last Query that defines it in the original plan.
     alias_to_query: dict[Alias, Query] = {}
     for body in bodies:
-        if isinstance(body, Query):
-            alias_to_query[body.lhs] = body
+        match body:
+            case Query(Table(Alias() as alias, _)):
+                alias_to_query[alias] = body
 
     assert all(isinstance(arg, Alias) for arg in produces_stmt.args)
     produced_aliases: tuple[Alias, ...] = produces_stmt.args  # ty: ignore[invalid-assignment]
@@ -295,7 +297,7 @@ def merge_queries(plan: Plan) -> Plan:
         merged_rhs = _inline_tables_in_expr(
             defining_query.rhs, alias_to_query, other_produced
         )
-        new_queries.append(Query(alias, merged_rhs))
+        new_queries.append(Query(defining_query.lhs, merged_rhs))
 
     # Rebuild the plan as: [merged queries..., original Produces]
     if not new_queries:
@@ -312,13 +314,9 @@ def normalize_reorders_in_query(query: Query) -> Query:
     Normalize Reorder usage in a single query.
 
     For a given Query(lhs, rhs):
-      1. Record out_fields = rhs.fields().
-      2. Strip all interior Reorder nodes from rhs.
-      3. Remove any aggregates that references idxs created by reorders
-      4. Wrap the result in a single outer Reorder(inner_rhs, *out_fields).
+      1. Strip all Reorder nodes from rhs.
+      2. Remove any aggregates that references idxs created by reorders
     """
-    rhs = query.rhs
-    out_fields = rhs.fields()
 
     def strip_reorder(node):
         match node:
@@ -340,7 +338,7 @@ def normalize_reorders_in_query(query: Query) -> Query:
     inner_rhs = Rewrite(PostWalk(Chain([strip_reorder, remove_extra_aggregates])))(
         query.rhs
     )
-    return Query(query.lhs, Reorder(inner_rhs, out_fields))
+    return Query(query.lhs, inner_rhs)
 
 
 def normalize_reorders_in_plan(plan: Plan) -> Plan:
@@ -380,8 +378,7 @@ def preprocess_plan_for_galley(plan: Plan) -> Plan:
       produced alias.
     - Pushes aggregates up and merges adjacent same-op aggregates so reduction
       indices are not parent-related (enables cost-optimal reduction order).
-    - Then normalizes Reorder usage so that each query RHS has a single
-      outer Reorder and no interior Reorder nodes.
+    - Then normalizes Reorder usage so that no query RHS has Reorder nodes.
     """
     merged = merge_queries(plan)
     merged = normalize_reorders_in_plan(merged)
