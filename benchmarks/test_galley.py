@@ -29,7 +29,6 @@ from finch.autoschedule.loop_orderer import BFSLoopOrderer
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.julia import julia_available
-from finch.compile_jl.runtime import DefaultFinchJLRuntime
 from finch.finch_logic import (
     Alias,
     Field,
@@ -95,7 +94,7 @@ def _build_expr(empty_last):
 
 
 def _make_pipeline():
-    formatter = GalleyFormatter(LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime())))
+    formatter = GalleyFormatter(LogicCompiler(FinchJLCompiler()))
     optimizer = GalleyLogicFactorizer(LogicSimplify(BFSLoopOrderer(formatter)))
     executor = LogicExecutor(optimizer, stats_factory=DCStatsFactory())
     return LogicNormalizer(executor), formatter
