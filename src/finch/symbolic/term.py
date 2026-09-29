@@ -87,7 +87,7 @@ class TermTree(Term, ABC):
 
 
 @dataclass(eq=True, frozen=True)
-class LiteralTerm(Term, ABC, Generic[T]):
+class LiteralTerm(Term, Generic[T]):
     """
     A leaf term which wraps the constant `val`.
     """
