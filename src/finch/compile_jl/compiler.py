@@ -111,9 +111,9 @@ class FinchJLKernel(AssemblyKernel):
         func_name,
         jl_code,
         type_,
-        dynamic_args: tuple[int, ...],
         finch_program: ntn.Function,
         runtime: FinchJLRuntime,
+        dynamic_args: tuple[int, ...] = (),
     ):
         super().__init__(type_)
         # We store this code so that we can verify it in pytest
@@ -377,9 +377,9 @@ class FinchJLCompiler(NotationCompiler):
                     jl_name,
                     generated_prgm.replace(func.name.name, jl_name, 1),
                     func.name.result_type,
-                    dynamic_args,
                     func,
                     self.runtime,
+                    dynamic_args,
                 )
                 jl.seval(kernel.jl_code)
                 self.runtime.cache_kernel(key, kernel)
@@ -388,9 +388,9 @@ class FinchJLCompiler(NotationCompiler):
                     kernel.func_name,
                     kernel.jl_code,
                     func.name.result_type,
-                    dynamic_args,
                     func,
                     self.runtime,
+                    dynamic_args,
                 )
             kernel_dict[func.name.name] = kernel
 

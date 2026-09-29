@@ -303,11 +303,9 @@ def test_compile_julia_pattern_lowering(file_regression):
         FinchJLGenerator,
         handle_fills,
     )
-    from finch.compile_jl.runtime import DefaultFinchJLRuntime
-
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
-            super().__init__(DefaultFinchJLRuntime())
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -349,12 +347,11 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
         handle_fills,
     )
     from finch.compile_jl.julia import jl
-    from finch.compile_jl.runtime import DefaultFinchJLRuntime
     from finch.finch_logic import Field, LogicSimplify
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
-            super().__init__(DefaultFinchJLRuntime())
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -403,12 +400,11 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
         handle_fills,
     )
     from finch.compile_jl.julia import jl
-    from finch.compile_jl.runtime import DefaultFinchJLRuntime
     from finch.finch_logic import Field, LogicSimplify
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
-            super().__init__(DefaultFinchJLRuntime())
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -627,11 +623,9 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
         handle_fills,
     )
     from finch.compile_jl.julia import jl
-    from finch.compile_jl.runtime import DefaultFinchJLRuntime
-
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
-            super().__init__(DefaultFinchJLRuntime())
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -725,11 +719,10 @@ def test_compile_julia_sums_sparse_bytemap_level_with_narrow_dimension_type():
 
 def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
-    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
     formatter = RecordingFDFormatter(
-        LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime()))
+        LogicCompiler(FinchJLCompiler())
     )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
@@ -763,7 +756,6 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
     op_name,
 ):
     _requires_julia_backend()
-    from finch.compile_jl import DefaultFinchJLRuntime
     from finch.compile_jl.compiler import FinchJLCompiler
 
     sparse_a = np.array([[1, 0, 2], [0, 3, 0], [4, 0, 5]], dtype=DTYPE)
@@ -779,7 +771,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler(DefaultFinchJLRuntime())))
+    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a
