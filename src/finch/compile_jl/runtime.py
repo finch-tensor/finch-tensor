@@ -126,6 +126,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             array = tensor.to_numpy()
             return _TranslationCacheKey(
                 "numpy",
+                # The first data-interface entry is the array's memory address.
                 array.__array_interface__["data"][0],
                 tuple(int(dimension) for dimension in array.shape),
                 tuple(int(stride) for stride in array.strides),
@@ -135,6 +136,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             array = tensor._data
             return _TranslationCacheKey(
                 "numpy",
+                # The first data-interface entry is the array's memory address.
                 array.__array_interface__["data"][0],
                 tuple(int(dimension) for dimension in array.shape),
                 tuple(int(stride) for stride in array.strides),
