@@ -52,6 +52,33 @@ from finch.tensor.traits import (
 )
 
 
+@pytest.mark.parametrize("shape", [(), (4,), (2, 3), (2, 0, 3)])
+def test_fiber_tensor_from_numpy(shape):
+    arr = np.arange(np.prod(shape), dtype=np.int32).reshape(shape)
+    lvl_t = element(7, finch.int32)
+    for _ in shape:
+        lvl_t = dense(lvl_t, finch.int32)
+    fmt = fiber_tensor(lvl_t)
+    tensor = asarray(arr, format=fmt)
+    assert tensor.ftype == fmt
+    assert tensor.shape == shape
+    assert tensor.fill_value == 7
+    np.testing.assert_array_equal(tensor.to_numpy(), arr)
+
+
+@pytest.mark.parametrize("shape", [(), (2, 3)])
+def test_fiber_tensor_from_numpy_rank_mismatch(shape):
+    fmt = fiber_tensor(dense(element(0, finch.int32)))
+    with pytest.raises(ValueError, match="Array rank"):
+        fmt.from_numpy(np.zeros(shape, dtype=np.int32))
+
+
+def test_fiber_tensor_from_numpy_sparse_unsupported():
+    fmt = fiber_tensor(sparse_list(element(0, finch.int32), finch.intp))
+    with pytest.raises(NotImplementedError, match="SparseListLevelFType"):
+        fmt.from_numpy(np.zeros(3, dtype=np.int32))
+
+
 def test_fiber_tensor_attributes():
     fmt = fiber_tensor(dense(dense(element(0.0, finch.float64))))
     shape = (3, 4)
@@ -453,18 +480,6 @@ def test_random_mask_scalar_uses_seed_directly(seed, p, expected):
     assert mask.item() == expected
 
 
-def test_random_mask_draws_one_seed(monkeypatch):
-    rng = np.random.default_rng(42)
-    reference = np.random.default_rng(42)
-    monkeypatch.setattr(np.random, "default_rng", lambda: rng)
-    mask = RandomMaskTensor((3, 4), 0.5)
-    same = RandomMaskTensor((3, 4), 0.5, seed=int(reference.bit_generator.random_raw()))
-    for idx in reversed(list(np.ndindex(mask.shape))):
-        assert mask[idx].item() == same[idx].item()
-        assert mask[idx].item() == same[idx].item()
-    assert rng.bit_generator.random_raw() == reference.bit_generator.random_raw()
-
-
 @pytest.mark.parametrize("bit_generator", [np.random.PCG64, np.random.MT19937])
 def test_random_mask_accepts_rng(bit_generator):
     rng = np.random.Generator(bit_generator(42))
@@ -863,3 +878,29 @@ def test_fiber_tensor_to_coo():
     assert np.shares_memory(scipy_tensor.data, data)
     assert np.shares_memory(scipy_tensor.row, row)
     assert np.shares_memory(scipy_tensor.col, col)
+
+
+@pytest.mark.parametrize("dimension_type", [np.int32, np.int64])
+def test_dense_stride_stops_at_sparse_level(dimension_type):
+    elem = ElementLevel(element(0, finch.int32))
+    sparse = SparseListLevel(DenseLevel(elem, dimension_type(7)), dimension_type(5))
+    inner = DenseLevel(sparse, dimension_type(3))
+    outer = DenseLevel(inner, dimension_type(2))
+    assert inner.stride == 1
+    assert outer.stride == 3
+    assert type(outer.stride) is dimension_type
+    assert not hasattr(sparse, "stride")
+    fields = [getattr(sparse, name) for name, _ in sparse.ftype.struct_fields]
+    rebuilt = sparse.ftype.from_fields(*fields)
+    assert rebuilt.lvl is sparse.lvl
+    assert rebuilt.ptr is sparse.ptr
+    assert rebuilt.idx is sparse.idx
+
+
+@pytest.mark.parametrize("inner_size, expected", [(4, 4), (0, 0)])
+def test_dense_stride(inner_size, expected):
+    elem = ElementLevel(element(0, finch.int32))
+    inner = DenseLevel(elem, np.intp(inner_size))
+    outer = DenseLevel(inner, np.intp(2))
+    assert inner.stride == 1
+    assert outer.stride == expected

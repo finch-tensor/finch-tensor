@@ -3,8 +3,6 @@ from .buffers import (
     MallocBufferFType,
     NumpyBuffer,
     NumpyBufferFType,
-    SafeBuffer,
-    SafeBufferFType,
 )
 from .c_codegen import (
     CArgumentFType,
@@ -80,6 +78,4 @@ __all__ = [
     "NumbaUnaryOperator",
     "NumpyBuffer",
     "NumpyBufferFType",
-    "SafeBuffer",
-    "SafeBufferFType",
 ]

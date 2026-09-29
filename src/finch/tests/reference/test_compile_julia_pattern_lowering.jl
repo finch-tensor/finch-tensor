@@ -8,7 +8,7 @@ eval(let
         v2 .= 0.0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Float64(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0.0)>>= (Float64(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -25,7 +25,7 @@ eval(let
         v2 .= 0.0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Float64(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0.0)>>= (Float64(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -42,7 +42,7 @@ eval(let
         v2 .= 0.0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Float64(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0.0)>>= (Float64(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -59,7 +59,7 @@ eval(let
         v2 .= 0.0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Float64(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0.0)>>= (Float64(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -75,7 +75,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
-            v2[v3] = (Bool(v0[v3]) + v1[v3])
+            v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[v3]) + v1[v3])
         end
         return v2
     end
@@ -93,7 +93,7 @@ eval(let
             for v4 = _
                 for v5 = _
                     for v6 = _
-                        v2[v6,v5,v4,v3] = (Bool(v0[v6,v5,v4,v3]) + v1[v6,v5,v4,v3])
+                        v2[v6,v5,v4,v3] <<Finch.initwrite(0)>>= (Bool(v0[v6,v5,v4,v3]) + v1[v6,v5,v4,v3])
                     end
                 end
             end
@@ -112,7 +112,7 @@ eval(let
         v2 .= 0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Bool(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0)>>= (Bool(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -129,7 +129,7 @@ eval(let
         v2 .= 0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Bool(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0)>>= (Bool(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2
@@ -145,7 +145,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
-            v2[v3] = (Bool(v0[]) + v1[v3])
+            v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[]) + v1[v3])
         end
         return v2
     end
@@ -160,7 +160,7 @@ eval(let
     Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
-            v2[v3] = (Bool(v0[v3]) + v1[v3])
+            v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[v3]) + v1[v3])
         end
         return v2
     end
@@ -176,7 +176,7 @@ eval(let
         v2 .= 0
         for v3 = _
             for v4 = _
-                v2[v4,v3] = (Int64(v0[v4,v3]) + v1[v4,v3])
+                v2[v4,v3] <<Finch.initwrite(0)>>= (Int64(v0[v4,v3]) + v1[v4,v3])
             end
         end
         return v2

@@ -1,6 +1,7 @@
 import builtins
 import math
 import operator
+from dataclasses import dataclass
 from functools import reduce
 from typing import Any
 
@@ -8,10 +9,19 @@ import numpy as np
 
 from .algebra import (
     FinchOperator,
+    FinchOperatorFType,
+    SingletonOperatorFType,
     type_max,
     type_min,
 )
-from .fill import DynamicFill, StaticFill, is_dynamic
+from .fill import (
+    AbstractFill,
+    DynamicFill,
+    DynamicFillError,
+    StaticFill,
+    as_fill,
+    is_dynamic,
+)
 from .ftypes import (
     FDType,
     FDTypeBoolean,
@@ -21,6 +31,7 @@ from .ftypes import (
     FDTypeOrdered,
     FDTypeUnsignedInteger,
     FType,
+    ImmutableStructFType,
     TupleFType,
     bool,
     ftype,
@@ -30,7 +41,7 @@ from .ftypes import (
 )
 
 
-class NAryFinchOperator(FinchOperator):
+class NAryFinchOperatorFType(SingletonOperatorFType):
     arity = math.inf
 
     def return_type(self, *args) -> FType:  # type: ignore[override]
@@ -39,26 +50,26 @@ class NAryFinchOperator(FinchOperator):
             arg_type = ftype(arg)
             assert isinstance(arg_type, FDType)
             new_args.append(arg_type(True))
-        return ftype(self(*new_args))
+        return ftype(self.operator(*new_args))
 
 
-class BinaryFinchOperator(FinchOperator):
+class BinaryFinchOperatorFType(SingletonOperatorFType):
     arity = 2
 
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType) and isinstance(b, FDType)
-        return ftype(self(a(True), b(True)))
+        return ftype(self.operator(a(True), b(True)))
 
 
-class UnaryFinchOperator(FinchOperator):
+class UnaryFinchOperatorFType(SingletonOperatorFType):
     arity = 1
 
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
         assert isinstance(a, FDType)
-        return ftype(self(a(True)))
+        return ftype(self.operator(a(True)))
 
 
-class ComparisonFinchOperator(FinchOperator):
+class ComparisonFinchOperatorFType(SingletonOperatorFType):
     arity = 2
 
     def return_type(self, a: FType, b: FType) -> FType:  # type: ignore[override]
@@ -66,15 +77,14 @@ class ComparisonFinchOperator(FinchOperator):
         return bool
 
 
-class _Add(NAryFinchOperator):
+class _AddFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return add
+
     is_associative = True
+
     is_commutative = True
-
-    def __repr__(self) -> str:
-        return "add"
-
-    def __call__(self, *args: Any) -> Any:
-        return reduce(operator.add, args)
 
     def is_identity(self, arg: Any) -> builtins.bool:
         return arg == 0
@@ -94,23 +104,34 @@ class _Add(NAryFinchOperator):
         assert isinstance(type_, FDType)
         if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
             if isinstance(type_, FDTypeUnsignedInteger):
-                return self(type_(0), uint64(0))
-            return self(type_(0), int64(0))
+                return self.operator(type_(0), uint64(0))
+            return self.operator(type_(0), int64(0))
         return type_(0)
+
+
+class _Add(FinchOperator):
+    def __repr__(self) -> str:
+        return "add"
+
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.add, args)
+
+    @property
+    def ftype(self):
+        return _AddFType()
 
 
 add = _Add()
 
 
-class _Mul(NAryFinchOperator):
+class _MulFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return mul
+
     is_associative = True
+
     is_commutative = True
-
-    def __repr__(self) -> str:
-        return "mul"
-
-    def __call__(self, *args: Any) -> Any:
-        return reduce(operator.mul, args)
 
     def is_identity(self, arg: Any) -> builtins.bool:
         return arg == 1
@@ -118,8 +139,8 @@ class _Mul(NAryFinchOperator):
     def repeat_operator(self):
         return pow
 
-    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
-        return isinstance(other_op, _Add | _Sub)
+    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other_op, _AddFType | _SubFType)
 
     def is_annihilator(self, val):
         return val == 0
@@ -128,40 +149,78 @@ class _Mul(NAryFinchOperator):
         assert isinstance(type_, FDType)
         if isinstance(type_, FDTypeInteger) and not isinstance(type_, FDTypeBoolean):
             if isinstance(type_, FDTypeUnsignedInteger):
-                return self(type_(1), uint64(1))
-            return self(type_(1), int64(1))
+                return self.operator(type_(1), uint64(1))
+            return self.operator(type_(1), int64(1))
         return type_(1)
+
+
+class _Mul(FinchOperator):
+    def __repr__(self) -> str:
+        return "mul"
+
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.mul, args)
+
+    @property
+    def ftype(self):
+        return _MulFType()
 
 
 mul = _Mul()
 
 
-class _Sub(BinaryFinchOperator):
+class _SubFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return sub
+
+
+class _Sub(FinchOperator):
     def __repr__(self) -> str:
         return "sub"
 
     def __call__(self, a: Any, b: Any):
         return operator.sub(a, b)
 
+    @property
+    def ftype(self):
+        return _SubFType()
+
 
 sub = _Sub()
 
 
-class _TrueDiv(BinaryFinchOperator):
+class _TrueDivFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return truediv
+
+    def is_identity(self, arg):
+        return arg == 1
+
+
+class _TrueDiv(FinchOperator):
     def __repr__(self) -> str:
         return "truediv"
 
     def __call__(self, a: Any, b: Any):
         return np.true_divide(a, b)
 
-    def is_identity(self, arg):
-        return arg == 1
+    @property
+    def ftype(self):
+        return _TrueDivFType()
 
 
 truediv = _TrueDiv()
 
 
-class _FloorDiv(BinaryFinchOperator):
+class _FloorDivFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return floordiv
+
+
+class _FloorDiv(FinchOperator):
     def __repr__(self) -> str:
         return "floor_divide"
 
@@ -174,137 +233,214 @@ class _FloorDiv(BinaryFinchOperator):
             return np.floor(np.true_divide(a, b))
         return np.floor_divide(a, b)
 
+    @property
+    def ftype(self):
+        return _FloorDivFType()
+
 
 floordiv = _FloorDiv()
 
 
-class _Mod(BinaryFinchOperator):
+class _ModFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return mod
+
+
+class _Mod(FinchOperator):
     def __repr__(self) -> str:
         return "mod"
 
     def __call__(self, a: Any, b: Any):
         return np.mod(a, b)
 
+    @property
+    def ftype(self):
+        return _ModFType()
+
 
 mod = _Mod()
 
 
-class _DivMod(BinaryFinchOperator):
+class _DivModFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return divmod
+
+
+class _DivMod(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return divmod(a, b)
 
     def __repr__(self) -> str:
         return "divmod"
 
+    @property
+    def ftype(self):
+        return _DivModFType()
+
 
 divmod = _DivMod()
 
 
-class _Pow(BinaryFinchOperator):
+class _PowFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return pow
+
     @property
     def c_symbol(self) -> str:
         return "pow"
 
-    def __call__(self, a: Any, b: Any):
-        return np.power(a, b)
-
     def is_identity(self, arg):
         return arg == 1
 
+
+class _Pow(FinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return np.power(a, b)
+
     def __repr__(self) -> str:
         return "pow"
+
+    @property
+    def ftype(self):
+        return _PowFType()
 
 
 pow = _Pow()
 
 
-class _LShift(BinaryFinchOperator):
-    def __call__(self, a: Any, b: Any):
-        return operator.lshift(a, b)
+class _LShiftFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return lshift
 
     def is_identity(self, arg):
         return arg == 0
 
+
+class _LShift(FinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.lshift(a, b)
+
     def __repr__(self) -> str:
         return "lshift"
+
+    @property
+    def ftype(self):
+        return _LShiftFType()
 
 
 lshift = _LShift()
 
 
-class _RShift(BinaryFinchOperator):
-    def __call__(self, a: Any, b: Any):
-        return operator.rshift(a, b)
+class _RShiftFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return rshift
 
     def is_identity(self, arg):
         return arg == 0
 
+
+class _RShift(FinchOperator):
+    def __call__(self, a: Any, b: Any):
+        return operator.rshift(a, b)
+
     def __repr__(self) -> str:
         return "rshift"
+
+    @property
+    def ftype(self):
+        return _RShiftFType()
 
 
 rshift = _RShift()
 
 
-class _And(NAryFinchOperator):
+class _AndFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return and_
+
     is_associative = True
+
     is_commutative = True
+
     is_idempotent = True
 
+    def is_identity(self, arg):
+        return arg == -1
+
+    def is_annihilator(self, arg):
+        return not bool(arg)
+
+    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other_op, _OrFType | _XorFType)
+
+    def init_value(self, type_: FType) -> Any:
+        assert isinstance(type_, FDType)
+        return self.operator(type_(True), type_(True))
+
+
+class _And(FinchOperator):
     def __repr__(self) -> str:
         return "and_"
 
     def __call__(self, *args: Any) -> Any:
         return reduce(operator.and_, args)
 
-    def is_identity(self, arg):
-        return arg == -1
-
-    def is_annihilator(self, arg):
-        return not bool(arg)
-
-    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
-        return isinstance(other_op, _Or | _Xor)
-
-    def init_value(self, type_: FType) -> Any:
-        assert isinstance(type_, FDType)
-        return self(type_(True), type_(True))
+    @property
+    def ftype(self):
+        return _AndFType()
 
 
 and_ = _And()
 
 
-class _Xor(NAryFinchOperator):
+class _XorFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return xor
+
     is_associative = True
+
     is_commutative = True
-
-    def __repr__(self) -> str:
-        return "xor"
-
-    def __call__(self, *args: Any) -> Any:
-        return reduce(operator.xor, args)
 
     def is_identity(self, arg):
         return arg == 0
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return self(type_(False), type_(False))
+        return self.operator(type_(False), type_(False))
+
+
+class _Xor(FinchOperator):
+    def __repr__(self) -> str:
+        return "xor"
+
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.xor, args)
+
+    @property
+    def ftype(self):
+        return _XorFType()
 
 
 xor = _Xor()
 
 
-class _Or(NAryFinchOperator):
+class _OrFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return or_
+
     is_associative = True
+
     is_commutative = True
+
     is_idempotent = True
-
-    def __repr__(self) -> str:
-        return "or_"
-
-    def __call__(self, *args: Any) -> Any:
-        return reduce(operator.or_, args)
 
     def is_identity(self, arg):
         return not bool(arg)
@@ -312,167 +448,302 @@ class _Or(NAryFinchOperator):
     def is_annihilator(self, arg):
         return arg == -1
 
-    def is_distributive(self, other_op: "FinchOperator") -> builtins.bool:
-        return isinstance(other_op, _And)
+    def is_distributive(self, other_op: "FinchOperatorFType") -> builtins.bool:
+        return isinstance(other_op, _AndFType)
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return self(type_(False), type_(False))
+        return self.operator(type_(False), type_(False))
+
+
+class _Or(FinchOperator):
+    def __repr__(self) -> str:
+        return "or_"
+
+    def __call__(self, *args: Any) -> Any:
+        return reduce(operator.or_, args)
+
+    @property
+    def ftype(self):
+        return _OrFType()
 
 
 or_ = _Or()
 
 
-class _Not(UnaryFinchOperator):
+class _NotFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return not_
+
+
+class _Not(FinchOperator):
     def __call__(self, a: Any):
         return operator.not_(a)
 
     def __repr__(self) -> str:
         return "not_"
 
+    @property
+    def ftype(self):
+        return _NotFType()
+
 
 not_ = _Not()
 
 
-class _Abs(UnaryFinchOperator):
+class _AbsFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return abs
+
     is_idempotent = True
 
+
+class _Abs(FinchOperator):
     def __repr__(self) -> str:
         return "abs"
 
     def __call__(self, a: Any):
         return operator.abs(a)
 
+    @property
+    def ftype(self):
+        return _AbsFType()
+
 
 abs = _Abs()
 
 
-class _Pos(UnaryFinchOperator):
+class _PosFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return pos
+
     is_idempotent = True
 
+
+class _Pos(FinchOperator):
     def __repr__(self) -> str:
         return "pos"
 
     def __call__(self, a: Any):
         return operator.pos(a)
 
+    @property
+    def ftype(self):
+        return _PosFType()
+
 
 pos = _Pos()
 
 
-class _Neg(UnaryFinchOperator):
+class _NegFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return neg
+
+
+class _Neg(FinchOperator):
     def __call__(self, a: Any):
         return operator.neg(a)
 
     def __repr__(self) -> str:
         return "neg"
 
+    @property
+    def ftype(self):
+        return _NegFType()
+
 
 neg = _Neg()
 
 
-class _Invert(UnaryFinchOperator):
+class _InvertFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return invert
+
+
+class _Invert(FinchOperator):
     def __call__(self, a: Any):
         return operator.invert(a)
 
     def __repr__(self) -> str:
         return "invert"
 
+    @property
+    def ftype(self):
+        return _InvertFType()
+
 
 invert = _Invert()
 
 
-class _Eq(ComparisonFinchOperator):
+class _EqFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return eq
+
     is_commutative = True
 
+
+class _Eq(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.eq(a, b)
 
     def __repr__(self) -> str:
         return "eq"
 
+    @property
+    def ftype(self):
+        return _EqFType()
+
 
 eq = _Eq()
 
 
-class _Ne(ComparisonFinchOperator):
+class _NeFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return ne
+
     is_commutative = True
 
+
+class _Ne(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.ne(a, b)
 
     def __repr__(self) -> str:
         return "ne"
 
+    @property
+    def ftype(self):
+        return _NeFType()
+
 
 ne = _Ne()
 
 
-class _Gt(ComparisonFinchOperator):
+class _GtFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return gt
+
+
+class _Gt(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.gt(a, b)
 
     def __repr__(self) -> str:
         return "gt"
 
+    @property
+    def ftype(self):
+        return _GtFType()
+
 
 gt = _Gt()
 
 
-class _Lt(ComparisonFinchOperator):
+class _LtFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return lt
+
+
+class _Lt(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.lt(a, b)
 
     def __repr__(self) -> str:
         return "lt"
 
+    @property
+    def ftype(self):
+        return _LtFType()
+
 
 lt = _Lt()
 
 
-class _Ge(ComparisonFinchOperator):
+class _GeFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return ge
+
+
+class _Ge(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.ge(a, b)
 
     def __repr__(self) -> str:
         return "ge"
 
+    @property
+    def ftype(self):
+        return _GeFType()
+
 
 ge = _Ge()
 
 
-class _Le(ComparisonFinchOperator):
+class _LeFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return le
+
+
+class _Le(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return operator.le(a, b)
 
     def __repr__(self) -> str:
         return "le"
 
+    @property
+    def ftype(self):
+        return _LeFType()
+
 
 le = _Le()
 
 
-class _Divide(BinaryFinchOperator):
-    def __call__(self, a, b):
-        return np.divide(a, b)
+class _DivideFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return divide
 
     def is_identity(self, val) -> builtins.bool:
         return val == 1
 
+
+class _Divide(FinchOperator):
+    def __call__(self, a, b):
+        return np.divide(a, b)
+
     def __repr__(self) -> str:
         return "divide"
+
+    @property
+    def ftype(self):
+        return _DivideFType()
 
 
 divide = _Divide()
 
 
-class _LogAddExp(BinaryFinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = False
+class _LogAddExpFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return logaddexp
 
-    def __call__(self, a, b):
-        return np.logaddexp(a, b)
+    is_associative = True
+
+    is_commutative = True
+
+    is_idempotent = False
 
     def is_identity(self, val) -> builtins.bool:
         return val == -np.inf
@@ -483,20 +754,32 @@ class _LogAddExp(BinaryFinchOperator):
     def init_value(self, type_: FType) -> Any:
         return -np.inf
 
+
+class _LogAddExp(FinchOperator):
+    def __call__(self, a, b):
+        return np.logaddexp(a, b)
+
     def __repr__(self) -> str:
         return "logaddexp"
+
+    @property
+    def ftype(self):
+        return _LogAddExpFType()
 
 
 logaddexp = _LogAddExp()
 
 
-class _LogicalAnd(BinaryFinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = True
+class _LogicalAndFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return logical_and
 
-    def __call__(self, a, b):
-        return np.logical_and(a, b)
+    is_associative = True
+
+    is_commutative = True
+
+    is_idempotent = True
 
     def is_identity(self, val) -> builtins.bool:
         return builtins.bool(val)
@@ -504,26 +787,38 @@ class _LogicalAnd(BinaryFinchOperator):
     def is_annihilator(self, val) -> builtins.bool:
         return not builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
-        return isinstance(other_op, _LogicalOr | _LogicalXor)
+    def is_distributive(self, other_op: FinchOperatorFType) -> builtins.bool:
+        return isinstance(other_op, _LogicalOrFType | _LogicalXorFType)
 
     def init_value(self, type_: FType) -> Any:
         return True
 
+
+class _LogicalAnd(FinchOperator):
+    def __call__(self, a, b):
+        return np.logical_and(a, b)
+
     def __repr__(self) -> str:
         return "logical_and"
+
+    @property
+    def ftype(self):
+        return _LogicalAndFType()
 
 
 logical_and = _LogicalAnd()
 
 
-class _LogicalOr(BinaryFinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = True
+class _LogicalOrFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return logical_or
 
-    def __call__(self, a, b):
-        return np.logical_or(a, b)
+    is_associative = True
+
+    is_commutative = True
+
+    is_idempotent = True
 
     def is_identity(self, val) -> builtins.bool:
         return not builtins.bool(val)
@@ -531,26 +826,38 @@ class _LogicalOr(BinaryFinchOperator):
     def is_annihilator(self, val) -> builtins.bool:
         return builtins.bool(val)
 
-    def is_distributive(self, other_op: FinchOperator) -> builtins.bool:
-        return isinstance(other_op, _LogicalAnd)
+    def is_distributive(self, other_op: FinchOperatorFType) -> builtins.bool:
+        return isinstance(other_op, _LogicalAndFType)
 
     def init_value(self, type_: FType) -> Any:
         return False
 
+
+class _LogicalOr(FinchOperator):
+    def __call__(self, a, b):
+        return np.logical_or(a, b)
+
     def __repr__(self) -> str:
         return "logical_or"
+
+    @property
+    def ftype(self):
+        return _LogicalOrFType()
 
 
 logical_or = _LogicalOr()
 
 
-class _LogicalXor(BinaryFinchOperator):
-    is_associative = True
-    is_commutative = True
-    is_idempotent = False
+class _LogicalXorFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return logical_xor
 
-    def __call__(self, a, b):
-        return np.logical_xor(a, b)
+    is_associative = True
+
+    is_commutative = True
+
+    is_idempotent = False
 
     def is_identity(self, val) -> builtins.bool:
         return not builtins.bool(val)
@@ -558,40 +865,84 @@ class _LogicalXor(BinaryFinchOperator):
     def init_value(self, type_: FType) -> Any:
         return False
 
+
+class _LogicalXor(FinchOperator):
+    def __call__(self, a, b):
+        return np.logical_xor(a, b)
+
     def __repr__(self) -> str:
         return "logical_xor"
+
+    @property
+    def ftype(self):
+        return _LogicalXorFType()
 
 
 logical_xor = _LogicalXor()
 
 
-class _LogicalNot(UnaryFinchOperator):
+class _LogicalNotFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return logical_not
+
+
+class _LogicalNot(FinchOperator):
     def __call__(self, a):
         return np.logical_not(a)
 
     def __repr__(self) -> str:
         return "logical_not"
 
+    @property
+    def ftype(self):
+        return _LogicalNotFType()
+
 
 logical_not = _LogicalNot()
 
 
-class _Truth(UnaryFinchOperator):
+class _TruthFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return truth
+
+
+class _Truth(FinchOperator):
     def __call__(self, a: Any):
         return bool(a)
 
     def __repr__(self) -> str:
         return "truth"
 
+    @property
+    def ftype(self):
+        return _TruthFType()
+
 
 truth = _Truth()
 
 
-class _Min(NAryFinchOperator):
+class _MinFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return min
+
     is_associative = True
+
     is_commutative = True
+
     is_idempotent = True
 
+    def is_identity(self, val) -> builtins.bool:
+        return val == np.inf
+
+    def init_value(self, type_: FType):
+        assert isinstance(type_, FDTypeOrdered)
+        return type_max(type_)
+
+
+class _Min(FinchOperator):
     def __call__(self, *args: Any) -> Any:
         def op(a, b):
             A = ftype(a)
@@ -602,25 +953,37 @@ class _Min(NAryFinchOperator):
 
         return reduce(op, args)
 
-    def is_identity(self, val) -> builtins.bool:
-        return val == np.inf
-
-    def init_value(self, type_: FType):
-        assert isinstance(type_, FDTypeOrdered)
-        return type_max(type_)
-
     def __repr__(self) -> str:
         return "min"
+
+    @property
+    def ftype(self):
+        return _MinFType()
 
 
 min = _Min()
 
 
-class _Max(NAryFinchOperator):
+class _MaxFType(NAryFinchOperatorFType):
+    @property
+    def operator(self):
+        return max
+
     is_associative = True
+
     is_commutative = True
+
     is_idempotent = True
 
+    def is_identity(self, val) -> builtins.bool:
+        return val == -np.inf
+
+    def init_value(self, type_: FType):
+        assert isinstance(type_, FDTypeOrdered)
+        return type_min(type_)
+
+
+class _Max(FinchOperator):
     def __call__(self, *args: Any) -> Any:
         def op(a, b):
             A = ftype(a)
@@ -631,27 +994,45 @@ class _Max(NAryFinchOperator):
 
         return reduce(op, args)
 
-    def is_identity(self, val) -> builtins.bool:
-        return val == -np.inf
-
-    def init_value(self, type_: FType):
-        assert isinstance(type_, FDTypeOrdered)
-        return type_min(type_)
-
     def __repr__(self) -> str:
         return "max"
+
+    @property
+    def ftype(self):
+        return _MaxFType()
 
 
 max = _Max()
 
 
-class _MinBy(FinchOperator):
+class _MinByFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return minby
+
     arity = 2
 
     is_associative = True
+
     is_commutative = True
+
     is_idempotent = True
 
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
+            raise TypeError("Tuple operands must have the same length.")
+        return TupleFType.from_tuple(
+            tuple(
+                promote_type(x_type, y_type)
+                for x_type, y_type in zip(
+                    x.struct_fieldtypes, y.struct_fieldtypes, strict=True
+                )
+            )
+        )
+
+
+class _MinBy(FinchOperator):
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_key, y_key = x[0], y[0]
         x_last, y_last = x[-1], y[-1]
@@ -661,6 +1042,30 @@ class _MinBy(FinchOperator):
             return y
         return x if x_last <= y_last else y
 
+    def __repr__(self) -> str:
+        return "minby"
+
+    @property
+    def ftype(self):
+        return _MinByFType()
+
+
+minby = _MinBy()
+
+
+class _MaxByFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return maxby
+
+    arity = 2
+
+    is_associative = True
+
+    is_commutative = True
+
+    is_idempotent = True
+
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
         if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
@@ -674,20 +1079,8 @@ class _MinBy(FinchOperator):
             )
         )
 
-    def __repr__(self) -> str:
-        return "minby"
-
-
-minby = _MinBy()
-
 
 class _MaxBy(FinchOperator):
-    arity = 2
-
-    is_associative = True
-    is_commutative = True
-    is_idempotent = True
-
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_key, y_key = x[0], y[0]
         x_last, y_last = x[-1], y[-1]
@@ -697,194 +1090,324 @@ class _MaxBy(FinchOperator):
             return y
         return x if x_last >= y_last else y
 
-    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
-        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
-        if len(x.struct_fieldtypes) != len(y.struct_fieldtypes):
-            raise TypeError("Tuple operands must have the same length.")
-        return TupleFType.from_tuple(
-            tuple(
-                promote_type(x_type, y_type)
-                for x_type, y_type in zip(
-                    x.struct_fieldtypes, y.struct_fieldtypes, strict=True
-                )
-            )
-        )
-
     def __repr__(self) -> str:
         return "maxby"
+
+    @property
+    def ftype(self):
+        return _MaxByFType()
 
 
 maxby = _MaxBy()
 
 
-class _Remainder(BinaryFinchOperator):
+class _RemainderFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return remainder
+
+
+class _Remainder(FinchOperator):
     def __call__(self, a, b):
         return np.remainder(a, b)
 
     def __repr__(self) -> str:
         return "remainder"
 
+    @property
+    def ftype(self):
+        return _RemainderFType()
+
 
 remainder = _Remainder()
 
 
-class _Hypot(BinaryFinchOperator):
+class _HypotFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return hypot
+
     is_commutative = True
 
+
+class _Hypot(FinchOperator):
     def __call__(self, a, b):
         return np.hypot(a, b)
 
     def __repr__(self) -> str:
         return "hypot"
 
+    @property
+    def ftype(self):
+        return _HypotFType()
+
 
 hypot = _Hypot()
 
 
-class _Atan2(BinaryFinchOperator):
+class _Atan2FType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return atan2
+
+
+class _Atan2(FinchOperator):
     def __call__(self, a, b):
         return np.atan2(a, b)
 
     def __repr__(self) -> str:
         return "atan2"
 
+    @property
+    def ftype(self):
+        return _Atan2FType()
+
 
 atan2 = _Atan2()
 
 
-class _Copysign(BinaryFinchOperator):
+class _CopysignFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return copysign
+
+
+class _Copysign(FinchOperator):
     def __call__(self, a, b):
         return np.copysign(a, b)
 
     def __repr__(self) -> str:
         return "copysign"
 
+    @property
+    def ftype(self):
+        return _CopysignFType()
+
 
 copysign = _Copysign()
 
 
-class _Nextafter(BinaryFinchOperator):
+class _NextafterFType(BinaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return nextafter
+
+
+class _Nextafter(FinchOperator):
     def __call__(self, a, b):
         return np.nextafter(a, b)
 
     def __repr__(self) -> str:
         return "nextafter"
 
+    @property
+    def ftype(self):
+        return _NextafterFType()
+
 
 nextafter = _Nextafter()
 
 
-class _IsFinite(UnaryFinchOperator):
+class _IsFiniteFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return isfinite
+
+
+class _IsFinite(FinchOperator):
     def __call__(self, a):
         return np.isfinite(a)
 
     def __repr__(self) -> str:
         return "isfinite"
 
+    @property
+    def ftype(self):
+        return _IsFiniteFType()
+
 
 isfinite = _IsFinite()
 
 
-class _IsInf(UnaryFinchOperator):
+class _IsInfFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return isinf
+
+
+class _IsInf(FinchOperator):
     def __call__(self, a):
         return np.isinf(a)
 
     def __repr__(self) -> str:
         return "isinf"
 
+    @property
+    def ftype(self):
+        return _IsInfFType()
+
 
 isinf = _IsInf()
 
 
-class _IsNan(UnaryFinchOperator):
+class _IsNanFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return isnan
+
+
+class _IsNan(FinchOperator):
     def __call__(self, a):
         return np.isnan(a)
 
     def __repr__(self) -> str:
         return "isnan"
 
+    @property
+    def ftype(self):
+        return _IsNanFType()
+
 
 isnan = _IsNan()
 
 
-class _IsComplexObj(UnaryFinchOperator):
+class _IsComplexObjFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return iscomplexobj
+
+
+class _IsComplexObj(FinchOperator):
     def __call__(self, a):
         return np.iscomplexobj(a)
 
     def __repr__(self) -> str:
         return "iscomplexobj"
 
+    @property
+    def ftype(self):
+        return _IsComplexObjFType()
+
 
 iscomplexobj = _IsComplexObj()
 
 
-class _Real(UnaryFinchOperator):
-    def __call__(self, a):
-        return np.real(a)
+class _RealFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return real
 
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
         return ftype(float)
 
+
+class _Real(FinchOperator):
+    def __call__(self, a):
+        return np.real(a)
+
     def __repr__(self) -> str:
         return "real"
+
+    @property
+    def ftype(self):
+        return _RealFType()
 
 
 real = _Real()
 
 
-class _Imag(UnaryFinchOperator):
-    def __call__(self, a: Any):
-        return np.imag(a)
+class _ImagFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return imag
 
     def return_type(self, a: FType) -> FType:  # type: ignore[override]
         return ftype(float)
 
+
+class _Imag(FinchOperator):
+    def __call__(self, a: Any):
+        return np.imag(a)
+
     def __repr__(self) -> str:
         return "imag"
+
+    @property
+    def ftype(self):
+        return _ImagFType()
 
 
 imag = _Imag()
 
 
-class _Conj(UnaryFinchOperator):
+class _ConjFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return conj
+
+
+class _Conj(FinchOperator):
     def __call__(self, a: Any):
         return np.conj(a)
 
     def __repr__(self) -> str:
         return "conj"
 
+    @property
+    def ftype(self):
+        return _ConjFType()
+
 
 conj = _Conj()
 
 
-class _Clip(FinchOperator):
-    arity = 3
+class _ClipFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return clip
 
-    def __call__(self, a: Any, b: Any, c: Any):
-        return ftype(a)(np.clip(a, b, c))
+    arity = 3
 
     def return_type(self, a: FType, b: FType, c: FType) -> FType:  # type: ignore[override]
         return a
 
+
+class _Clip(FinchOperator):
+    def __call__(self, a: Any, b: Any, c: Any):
+        return ftype(a)(np.clip(a, b, c))
+
     def __repr__(self) -> str:
         return "clip"
+
+    @property
+    def ftype(self):
+        return _ClipFType()
 
 
 clip = _Clip()
 
 
-class _Cast(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _CastFType(SingletonOperatorFType):
+    dtype: FType
+
+    @property
+    def operator(self):
+        return _Cast(self.dtype)
+
     arity = 1
 
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return self.dtype
+
+
+class _Cast(FinchOperator):
     def __init__(self, dtype: FType):
         self.dtype = dtype
 
     def __call__(self, a: Any):
         assert isinstance(self.dtype, FDType)
         return self.dtype(a)
-
-    def return_type(self, a: FType) -> FType:  # type: ignore[override]
-        return self.dtype
 
     def __eq__(self, other):
         return isinstance(other, _Cast) and self.dtype == other.dtype
@@ -895,27 +1418,47 @@ class _Cast(FinchOperator):
     def __repr__(self) -> str:
         return "astype"
 
+    @property
+    def ftype(self):
+        return _CastFType(self.dtype)
+
 
 def astype(dtype: FType):
     return _Cast(dtype)
 
 
-class _Equal(ComparisonFinchOperator):
+class _EqualFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return equal
+
     is_commutative = True
 
+
+class _Equal(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.equal(a, b)
 
     def __repr__(self) -> str:
         return "equal"
 
+    @property
+    def ftype(self):
+        return _EqualFType()
+
 
 equal = _Equal()
 
 
-class _Same(BinaryFinchOperator):
+class _SameFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return same
+
     is_commutative = True
 
+
+class _Same(FinchOperator):
     def __call__(self, a: Any, b: Any):
         same_method = getattr(a, "__same__", None)
         if same_method is not None:
@@ -937,6 +1480,10 @@ class _Same(BinaryFinchOperator):
     def __repr__(self) -> str:
         return "same"
 
+    @property
+    def ftype(self):
+        return _SameFType()
+
 
 same = _Same()
 
@@ -952,76 +1499,145 @@ def samehash(a: Any):
     return a
 
 
-class _NotSame(BinaryFinchOperator):
+class _NotSameFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return not_same
+
     is_commutative = True
 
+
+class _NotSame(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.logical_not(same(a, b))
 
     def __repr__(self) -> str:
         return "not_same"
 
+    @property
+    def ftype(self):
+        return _NotSameFType()
+
 
 not_same = _NotSame()
 
 
-class _NotEqual(ComparisonFinchOperator):
+class _NotEqualFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return not_equal
+
     is_commutative = True
 
+
+class _NotEqual(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.not_equal(a, b)
 
     def __repr__(self) -> str:
         return "not_equal"
 
+    @property
+    def ftype(self):
+        return _NotEqualFType()
+
 
 not_equal = _NotEqual()
 
 
-class _Less(ComparisonFinchOperator):
+class _LessFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return less
+
+
+class _Less(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less(a, b)
 
     def __repr__(self) -> str:
         return "less"
 
+    @property
+    def ftype(self):
+        return _LessFType()
+
 
 less = _Less()
 
 
-class _LessEqual(ComparisonFinchOperator):
+class _LessEqualFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return less_equal
+
+
+class _LessEqual(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.less_equal(a, b)
 
     def __repr__(self) -> str:
         return "less_equal"
 
+    @property
+    def ftype(self):
+        return _LessEqualFType()
+
 
 less_equal = _LessEqual()
 
 
-class _Greater(ComparisonFinchOperator):
+class _GreaterFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return greater
+
+
+class _Greater(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater(a, b)
 
     def __repr__(self) -> str:
         return "greater"
 
+    @property
+    def ftype(self):
+        return _GreaterFType()
+
 
 greater = _Greater()
 
 
-class _GreaterEqual(ComparisonFinchOperator):
+class _GreaterEqualFType(ComparisonFinchOperatorFType):
+    @property
+    def operator(self):
+        return greater_equal
+
+
+class _GreaterEqual(FinchOperator):
     def __call__(self, a: Any, b: Any):
         return np.greater_equal(a, b)
 
     def __repr__(self) -> str:
         return "greater_equal"
 
+    @property
+    def ftype(self):
+        return _GreaterEqualFType()
 
-class _Where(FinchOperator):
+
+class _WhereFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return where
+
     arity = 3
 
+    def return_type(self, cond: FDType, x1: FDType, x2: FDType) -> FDType:  # type: ignore[override]
+        return promote_type(x1, x2)
+
+
+class _Where(FinchOperator):
     def __call__(self, a: Any, b: Any, c: Any):
         if isinstance(b, tuple) and isinstance(c, tuple):
             return b if builtins.bool(a) else c
@@ -1030,11 +1646,12 @@ class _Where(FinchOperator):
             return res[()]
         return res
 
-    def return_type(self, cond: FDType, x1: FDType, x2: FDType) -> FDType:  # type: ignore[override]
-        return promote_type(x1, x2)
-
     def __repr__(self) -> str:
         return "where"
+
+    @property
+    def ftype(self):
+        return _WhereFType()
 
 
 where = _Where()
@@ -1042,144 +1659,274 @@ where = _Where()
 greater_equal = _GreaterEqual()
 
 
-class _Reciprocal(UnaryFinchOperator):
+class _ReciprocalFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return reciprocal
+
+
+class _Reciprocal(FinchOperator):
     def __call__(self, a: Any):
         return np.reciprocal(a)
 
     def __repr__(self) -> str:
         return "reciprocal"
 
+    @property
+    def ftype(self):
+        return _ReciprocalFType()
+
 
 reciprocal = _Reciprocal()
 
 
-class _Sin(UnaryFinchOperator):
+class _SinFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return sin
+
+
+class _Sin(FinchOperator):
     def __call__(self, a: Any):
         return np.sin(a)
 
     def __repr__(self) -> str:
         return "sin"
 
+    @property
+    def ftype(self):
+        return _SinFType()
+
 
 sin = _Sin()
 
 
-class _Cos(UnaryFinchOperator):
+class _CosFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return cos
+
+
+class _Cos(FinchOperator):
     def __call__(self, a: Any):
         return np.cos(a)
 
     def __repr__(self) -> str:
         return "cos"
 
+    @property
+    def ftype(self):
+        return _CosFType()
+
 
 cos = _Cos()
 
 
-class _Tan(UnaryFinchOperator):
+class _TanFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return tan
+
+
+class _Tan(FinchOperator):
     def __call__(self, a: Any):
         return np.tan(a)
 
     def __repr__(self) -> str:
         return "tan"
 
+    @property
+    def ftype(self):
+        return _TanFType()
+
 
 tan = _Tan()
 
 
-class _Sinh(UnaryFinchOperator):
+class _SinhFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return sinh
+
+
+class _Sinh(FinchOperator):
     def __call__(self, a: Any):
         return np.sinh(a)
 
     def __repr__(self) -> str:
         return "sinh"
 
+    @property
+    def ftype(self):
+        return _SinhFType()
+
 
 sinh = _Sinh()
 
 
-class _Cosh(UnaryFinchOperator):
+class _CoshFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return cosh
+
+
+class _Cosh(FinchOperator):
     def __call__(self, a: Any):
         return np.cosh(a)
 
     def __repr__(self) -> str:
         return "cosh"
 
+    @property
+    def ftype(self):
+        return _CoshFType()
+
 
 cosh = _Cosh()
 
 
-class _Tanh(UnaryFinchOperator):
+class _TanhFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return tanh
+
+
+class _Tanh(FinchOperator):
     def __call__(self, a: Any):
         return np.tanh(a)
 
     def __repr__(self) -> str:
         return "tanh"
 
+    @property
+    def ftype(self):
+        return _TanhFType()
+
 
 tanh = _Tanh()
 
 
-class _Atan(UnaryFinchOperator):
+class _AtanFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return atan
+
+
+class _Atan(FinchOperator):
     def __call__(self, a: Any):
         return np.atan(a)
 
     def __repr__(self) -> str:
         return "atan"
 
+    @property
+    def ftype(self):
+        return _AtanFType()
+
 
 atan = _Atan()
 
 
-class _Asinh(UnaryFinchOperator):
+class _AsinhFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return asinh
+
+
+class _Asinh(FinchOperator):
     def __call__(self, a: Any):
         return np.asinh(a)
 
     def __repr__(self) -> str:
         return "asinh"
 
+    @property
+    def ftype(self):
+        return _AsinhFType()
+
 
 asinh = _Asinh()
 
 
-class _Asin(UnaryFinchOperator):
+class _AsinFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return asin
+
+
+class _Asin(FinchOperator):
     def __call__(self, a: Any):
         return np.asin(a)
 
     def __repr__(self) -> str:
         return "asin"
 
+    @property
+    def ftype(self):
+        return _AsinFType()
+
 
 asin = _Asin()
 
 
-class _Acos(UnaryFinchOperator):
+class _AcosFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return acos
+
+
+class _Acos(FinchOperator):
     def __call__(self, a: Any):
         return np.acos(a)
 
     def __repr__(self) -> str:
         return "acos"
 
+    @property
+    def ftype(self):
+        return _AcosFType()
+
 
 acos = _Acos()
 
 
-class _Acosh(UnaryFinchOperator):
+class _AcoshFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return acosh
+
+
+class _Acosh(FinchOperator):
     def __call__(self, a: Any):
         return np.acosh(a)
 
     def __repr__(self) -> str:
         return "acosh"
 
+    @property
+    def ftype(self):
+        return _AcoshFType()
+
 
 acosh = _Acosh()
 
 
-class _Atanh(UnaryFinchOperator):
+class _AtanhFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return atanh
+
+
+class _Atanh(FinchOperator):
     def __call__(self, a: Any):
         return np.atanh(a)
 
     def __repr__(self) -> str:
         return "atanh"
+
+    @property
+    def ftype(self):
+        return _AtanhFType()
 
 
 atanh = _Atanh()
@@ -1193,195 +1940,376 @@ arccosh = acosh
 arctanh = atanh
 
 
-class _Round(UnaryFinchOperator):
+class _RoundFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return round
+
     is_idempotent = True
 
+
+class _Round(FinchOperator):
     def __call__(self, a: Any):
         return np.round(a)
 
     def __repr__(self) -> str:
         return "round"
 
+    @property
+    def ftype(self):
+        return _RoundFType()
+
 
 round = _Round()
 
 
-class _Floor(UnaryFinchOperator):
+class _FloorFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return floor
+
     is_idempotent = True
 
+
+class _Floor(FinchOperator):
     def __call__(self, a: Any):
         return np.floor(a)
 
     def __repr__(self) -> str:
         return "floor"
 
+    @property
+    def ftype(self):
+        return _FloorFType()
+
 
 floor = _Floor()
 
 
-class _Ceil(UnaryFinchOperator):
+class _CeilFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return ceil
+
     is_idempotent = True
 
+
+class _Ceil(FinchOperator):
     def __call__(self, a: Any):
         return np.ceil(a)
 
     def __repr__(self) -> str:
         return "ceil"
 
+    @property
+    def ftype(self):
+        return _CeilFType()
+
 
 ceil = _Ceil()
 
 
-class _Trunc(UnaryFinchOperator):
+class _TruncFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return trunc
+
     is_idempotent = True
 
+
+class _Trunc(FinchOperator):
     def __call__(self, a: Any):
         return np.trunc(a)
 
     def __repr__(self) -> str:
         return "trunc"
 
+    @property
+    def ftype(self):
+        return _TruncFType()
+
 
 trunc = _Trunc()
 
 
-class _Exp(UnaryFinchOperator):
+class _ExpFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return exp
+
+
+class _Exp(FinchOperator):
     def __call__(self, a: Any):
         return np.exp(a)
 
     def __repr__(self) -> str:
         return "exp"
 
+    @property
+    def ftype(self):
+        return _ExpFType()
+
 
 exp = _Exp()
 
 
-class _Expm1(UnaryFinchOperator):
+class _Expm1FType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return expm1
+
+
+class _Expm1(FinchOperator):
     def __call__(self, a: Any):
         return np.expm1(a)
 
     def __repr__(self) -> str:
         return "expm1"
 
+    @property
+    def ftype(self):
+        return _Expm1FType()
+
 
 expm1 = _Expm1()
 
 
-class _Log(UnaryFinchOperator):
+class _LogFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return log
+
+
+class _Log(FinchOperator):
     def __call__(self, a: Any):
         return np.log(a)
 
     def __repr__(self) -> str:
         return "log"
 
+    @property
+    def ftype(self):
+        return _LogFType()
+
 
 log = _Log()
 
 
-class _Log1p(UnaryFinchOperator):
+class _Log1pFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return log1p
+
+
+class _Log1p(FinchOperator):
     def __call__(self, a: Any):
         return np.log1p(a)
 
     def __repr__(self) -> str:
         return "log1p"
 
+    @property
+    def ftype(self):
+        return _Log1pFType()
+
 
 log1p = _Log1p()
 
 
-class _Log2(UnaryFinchOperator):
+class _Log2FType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return log2
+
+
+class _Log2(FinchOperator):
     def __call__(self, a: Any):
         return np.log2(a)
 
     def __repr__(self) -> str:
         return "log2"
 
+    @property
+    def ftype(self):
+        return _Log2FType()
+
 
 log2 = _Log2()
 
 
-class _Log10(UnaryFinchOperator):
+class _Log10FType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return log10
+
+
+class _Log10(FinchOperator):
     def __call__(self, a: Any):
         return np.log10(a)
 
     def __repr__(self) -> str:
         return "log10"
 
+    @property
+    def ftype(self):
+        return _Log10FType()
+
 
 log10 = _Log10()
 
 
-class _Signbit(UnaryFinchOperator):
+class _SignbitFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return signbit
+
+
+class _Signbit(FinchOperator):
     def __call__(self, a: Any):
         return np.signbit(a)
 
     def __repr__(self) -> str:
         return "signbit"
 
+    @property
+    def ftype(self):
+        return _SignbitFType()
+
 
 signbit = _Signbit()
 
 
-class _Sqrt(UnaryFinchOperator):
+class _SqrtFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return sqrt
+
+
+class _Sqrt(FinchOperator):
     def __call__(self, a: Any):
         return np.sqrt(a)
 
     def __repr__(self) -> str:
         return "sqrt"
 
+    @property
+    def ftype(self):
+        return _SqrtFType()
+
 
 sqrt = _Sqrt()
 
 
-class _Square(UnaryFinchOperator):
+class _SquareFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return square
+
+
+class _Square(FinchOperator):
     def __call__(self, a: Any):
         return np.square(a)
 
     def __repr__(self) -> str:
         return "square"
 
+    @property
+    def ftype(self):
+        return _SquareFType()
+
 
 square = _Square()
 
 
-class _Sign(UnaryFinchOperator):
+class _SignFType(UnaryFinchOperatorFType):
+    @property
+    def operator(self):
+        return sign
+
+
+class _Sign(FinchOperator):
     def __call__(self, a: Any):
         return np.sign(a)
 
     def __repr__(self) -> str:
         return "sign"
 
+    @property
+    def ftype(self):
+        return _SignFType()
+
 
 sign = _Sign()
 
 
+@dataclass(unsafe_hash=True)
+class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
+    fill: AbstractFill
+
+    @property
+    def struct_name(self):
+        return "InitWrite"
+
+    @property
+    def struct_fields(self):
+        return [("value", self.fill.ftype)]
+
+    def __call__(self, value):
+        if isinstance(value, _InitWrite) and value.ftype == self:
+            return value
+        raise TypeError(f"Expected an init_write of type {self}")
+
+    def from_fields(self, value):
+        fill = (
+            DynamicFill(value, self.fill.ftype) if is_dynamic(self.fill) else self.fill
+        )
+        return _InitWrite(fill)
+
+    def is_identity(self, val):
+        return not is_dynamic(self.fill) and builtins.bool(
+            np.all(same(val, self.fill.value))
+        )
+
+    def return_type(self, *args: FType) -> FType:
+        if len(args) != 2:
+            raise TypeError("init_write expects two arguments")
+        return args[1]
+
+
 class _InitWrite(FinchOperator):
     """
-    init_write may assert that its first argument is
-    equal to z, and returns its second argument. This is useful when you want to
-    communicate to the compiler that the tensor has already been initialized to
-    a specific value.
+    Write a value to a destination that is assumed to contain the fill.
+
+    init_write(z)(x, y) returns y and may assume that x equals z, matching
+    Julia's initwrite. Under this precondition, a store of z may be omitted.
+    Use overwrite when the destination may already contain a non-fill value.
+
+    StaticFill permits specialization on z. DynamicFill keeps z as a runtime
+    field; pass such operators through callable expressions in compiled code.
     """
 
-    arity = 2
-
     def __init__(self, value):
-        self.value = value
+        self.fill = as_fill(value)
+
+    @property
+    def value(self):
+        return self.fill.value
+
+    @property
+    def ftype(self):
+        return _InitWriteFType(self.fill)
 
     def __eq__(self, other):
-        return isinstance(other, _InitWrite) and self.value == other.value
+        return (
+            isinstance(other, _InitWrite)
+            and self.fill == other.fill
+            and StaticFill(self.value) == StaticFill(other.value)
+        )
 
     def __hash__(self):
-        return hash((self.value,))
+        return hash((type(self), self.fill, StaticFill(self.value)))
 
     def __call__(self, x: Any, y: Any):
-        # A dynamic init has no compile-time value to check against.
-        assert is_dynamic(self.value) or x == self.value, (
-            f"Expected {self.value}, got {x}"
-        )
-        return y
-
-    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
 
     def __repr__(self) -> str:
@@ -1389,16 +2317,18 @@ class _InitWrite(FinchOperator):
 
 
 def init_write(value):
-    # `_InitWrite` carries its value into the IR and into kernel identity, so it
-    # takes a raw value, or a DynamicFill sentinel when nothing may specialize
-    # on it. A StaticFill wrapper must not get that far.
-    match value:
-        case DynamicFill():
-            raise ValueError("init_write cannot be used with DynamicFill")
-        case StaticFill():
-            return _InitWrite(value.value)
-        case _:
-            return _InitWrite(value)
+    return _InitWrite(value)
+
+
+class _OverwriteFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return overwrite
+
+    arity = 2
+
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
+        return y
 
 
 class _Overwrite(FinchOperator):
@@ -1406,19 +2336,29 @@ class _Overwrite(FinchOperator):
     Overwrite(x, y) returns y always.
     """
 
-    arity = 2
-
     def __call__(self, x: Any, y: Any):
-        return y
-
-    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         return y
 
     def __repr__(self) -> str:
         return "overwrite"
 
+    @property
+    def ftype(self):
+        return _OverwriteFType()
+
 
 overwrite = _Overwrite()
+
+
+class _FirstArgFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return first_arg
+
+    arity = math.inf
+
+    def return_type(self, *args: FType) -> FType:
+        return args[0]
 
 
 class _FirstArg(FinchOperator):
@@ -1426,46 +2366,47 @@ class _FirstArg(FinchOperator):
     Returns the first argument passed to it.
     """
 
-    arity = math.inf
-
     def __call__(self, *args):
         return args[0] if args else None
 
-    def return_type(self, *args: FType) -> FType:
-        return args[0]
-
     def __repr__(self) -> str:
         return "first_arg"
+
+    @property
+    def ftype(self):
+        return _FirstArgFType()
 
 
 first_arg = _FirstArg()
 
 
-class _Choose(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
+    fill: AbstractFill
+
+    @property
+    def struct_name(self):
+        return "Choose"
+
+    @property
+    def struct_fields(self):
+        return [("fill_value", self.fill.ftype)]
+
+    def from_fields(self, fill_value):
+        fill = (
+            DynamicFill(fill_value, self.fill.ftype)
+            if is_dynamic(self.fill)
+            else self.fill
+        )
+        return _Choose(fill)
+
     arity = math.inf
 
     is_associative = True
 
-    def __init__(self, fill_value):
-        self.fill_value = fill_value
-
-    def __eq__(self, other):
-        return isinstance(other, _Choose) and builtins.bool(
-            np.all(same(self.fill_value, other.fill_value))
-        )
-
-    def __hash__(self):
-        return hash((type(self), samehash(self.fill_value)))
-
-    def __call__(self, *args: Any) -> Any:
-        for arg in args:
-            if not np.all(same(arg, self.fill_value)):
-                return arg
-        return self.fill_value
-
     def return_type(self, *args: FType) -> FType:
         if not args:
-            return ftype(self.fill_value)
+            return self.fill.ftype
         result_arg = args[0]
         assert isinstance(result_arg, FDType)
         result: FDType = result_arg
@@ -1475,18 +2416,64 @@ class _Choose(FinchOperator):
         return result
 
     def is_identity(self, val: Any) -> builtins.bool:
-        return builtins.bool(np.all(same(val, self.fill_value)))
+        return not is_dynamic(self.fill) and builtins.bool(
+            np.all(same(val, self.fill.value))
+        )
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        return type_(self.fill_value)
+        if is_dynamic(self.fill):
+            raise DynamicFillError("A dynamic choose has no static initial value")
+        return type_(self.fill.value)
+
+
+class _Choose(FinchOperator):
+    def __init__(self, fill_value):
+        self.fill = as_fill(fill_value)
+
+    @property
+    def fill_value(self):
+        return self.fill.value
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, _Choose)
+            and self.fill == other.fill
+            and builtins.bool(np.all(same(self.fill_value, other.fill_value)))
+        )
+
+    def __hash__(self):
+        return hash((type(self), self.fill, samehash(self.fill_value)))
+
+    def __call__(self, *args: Any) -> Any:
+        for arg in args:
+            if not np.all(same(arg, self.fill_value)):
+                return arg
+        return self.fill_value
 
     def __repr__(self) -> str:
         return f"choose({self.fill_value!r})"
 
+    @property
+    def ftype(self):
+        return _ChooseFType(self.fill)
+
 
 def choose(fill_value):
     return _Choose(fill_value)
+
+
+class _IdentityFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return identity
+
+    arity = 1
+
+    is_idempotent = True
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        return x
 
 
 class _Identity(FinchOperator):
@@ -1494,21 +2481,29 @@ class _Identity(FinchOperator):
     Returns the input value unchanged.
     """
 
-    arity = 1
-
-    is_idempotent = True
-
     def __call__(self, x: Any):
-        return x
-
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
         return x
 
     def __repr__(self) -> str:
         return "identity"
 
+    @property
+    def ftype(self):
+        return _IdentityFType()
+
 
 identity = _Identity()
+
+
+class _ConjugateFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return conjugate
+
+    arity = 1
+
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        return x
 
 
 class _Conjugate(FinchOperator):
@@ -1516,87 +2511,133 @@ class _Conjugate(FinchOperator):
     Returns the complex conjugate of the input value.
     """
 
-    arity = 1
-
     def __call__(self, x: Any):
         return np.conjugate(x)
 
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
-        return x
-
     def __repr__(self) -> str:
         return "conjugate"
+
+    @property
+    def ftype(self):
+        return _ConjugateFType()
 
 
 conjugate = _Conjugate()
 
 
-class _MakeTuple(FinchOperator):
+class _MakeTupleFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return make_tuple
+
     arity = math.inf
 
     is_commutative = False
-    is_associative = False
 
-    def __call__(self, *args: Any) -> tuple:
-        return tuple(args)
+    is_associative = False
 
     def return_type(self, *args: FType) -> FType:
         return TupleFType.from_tuple(args)
 
+
+class _MakeTuple(FinchOperator):
+    def __call__(self, *args: Any) -> tuple:
+        return tuple(args)
+
     def __repr__(self) -> str:
         return "make_tuple"
+
+    @property
+    def ftype(self):
+        return _MakeTupleFType()
 
 
 make_tuple = _MakeTuple()
 
 
-class _Last(FinchOperator):
-    arity = 1
+class _LastFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return last
 
-    def __call__(self, x: tuple) -> Any:
-        return x[-1]
+    arity = 1
 
     def return_type(self, x: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType)
         return x.struct_fieldtypes[-1]
 
+
+class _Last(FinchOperator):
+    def __call__(self, x: tuple) -> Any:
+        return x[-1]
+
     def __repr__(self) -> str:
         return "last"
+
+    @property
+    def ftype(self):
+        return _LastFType()
 
 
 last = _Last()
 
 
-class _ScaledSquare(FinchOperator):
+class _ScaledSquareFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return scaled_square
+
     arity = 1
 
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, FDType)
+        return TupleFType.from_tuple((truediv.ftype.return_type(x, x), x))
+
+
+class _ScaledSquare(FinchOperator):
     def __call__(self, x: Any) -> tuple:
         if x == 0:
             return (np.true_divide(type(x)(0), type(x)(1)), x)
         return (np.true_divide(type(x)(1), type(x)(1)), x)
 
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
-        assert isinstance(x, FDType)
-        return TupleFType.from_tuple((truediv.return_type(x, x), x))
-
     def __repr__(self) -> str:
         return "scaled_square"
+
+    @property
+    def ftype(self):
+        return _ScaledSquareFType()
 
 
 scaled_square = _ScaledSquare()
 
 
-class _ScaledPower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _ScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "ScaledPower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _ScaledPower(exponent)
+
     arity = 1
 
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        return scaled_square.ftype.return_type(x)
+
+
+class _ScaledPower(FinchOperator):
     def __init__(self, exponent: float):
         self.exponent = exponent
 
     def __call__(self, x: Any) -> tuple:
         return scaled_square(x)
-
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
-        return scaled_square.return_type(x)
 
     def __eq__(self, other):
         return isinstance(other, _ScaledPower) and self.exponent == other.exponent
@@ -1607,6 +2648,10 @@ class _ScaledPower(FinchOperator):
     def __repr__(self) -> str:
         return f"scaled_power({self.exponent!r})"
 
+    @property
+    def ftype(self):
+        return _ScaledPowerFType(ftype(self.exponent))
+
 
 def scaled_power(exponent: float):
     if exponent == 2.0:
@@ -1614,30 +2659,26 @@ def scaled_power(exponent: float):
     return _ScaledPower(exponent)
 
 
-class _AddScaledPower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _AddScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "AddScaledPower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _AddScaledPower(exponent)
+
     arity = 2
 
     is_associative = True
+
     is_commutative = True
-
-    def __init__(self, exponent: float):
-        self.exponent = exponent
-
-    def __call__(self, x: tuple, y: tuple) -> tuple:
-        x_arg, x_scale = x
-        y_arg, y_scale = y
-        if np.isnan(x_arg) or np.isnan(x_scale) or np.isnan(y_arg) or np.isnan(y_scale):
-            return (np.nan, np.nan)
-        if x_scale < y_scale:
-            x_arg, y_arg = y_arg, x_arg
-            x_scale, y_scale = y_scale, x_scale
-        if x_scale > y_scale:
-            return (
-                x_arg
-                + y_arg * np.power(np.true_divide(y_scale, x_scale), self.exponent),
-                x_scale,
-            )
-        return (x_arg + y_arg, x_scale)
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
@@ -1658,21 +2699,10 @@ class _AddScaledPower(FinchOperator):
     def is_identity(self, val: Any) -> builtins.bool:
         return builtins.bool(val[0] == 0 and val[1] == 0)
 
-    def __eq__(self, other):
-        return isinstance(other, _AddScaledPower) and self.exponent == other.exponent
 
-    def __hash__(self):
-        return hash((type(self), self.exponent))
-
-    def __repr__(self) -> str:
-        return f"add_scaled_power({self.exponent!r})"
-
-
-class _AddScaledSquare(FinchOperator):
-    arity = 2
-
-    is_associative = True
-    is_commutative = True
+class _AddScaledPower(FinchOperator):
+    def __init__(self, exponent: float):
+        self.exponent = exponent
 
     def __call__(self, x: tuple, y: tuple) -> tuple:
         x_arg, x_scale = x
@@ -1683,9 +2713,37 @@ class _AddScaledSquare(FinchOperator):
             x_arg, y_arg = y_arg, x_arg
             x_scale, y_scale = y_scale, x_scale
         if x_scale > y_scale:
-            ratio = np.true_divide(y_scale, x_scale)
-            return (x_arg + y_arg * ratio * ratio, x_scale)
+            return (
+                x_arg
+                + y_arg * np.power(np.true_divide(y_scale, x_scale), self.exponent),
+                x_scale,
+            )
         return (x_arg + y_arg, x_scale)
+
+    def __eq__(self, other):
+        return isinstance(other, _AddScaledPower) and self.exponent == other.exponent
+
+    def __hash__(self):
+        return hash((type(self), self.exponent))
+
+    def __repr__(self) -> str:
+        return f"add_scaled_power({self.exponent!r})"
+
+    @property
+    def ftype(self):
+        return _AddScaledPowerFType(ftype(self.exponent))
+
+
+class _AddScaledSquareFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return add_scaled_square
+
+    arity = 2
+
+    is_associative = True
+
+    is_commutative = True
 
     def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
@@ -1706,8 +2764,27 @@ class _AddScaledSquare(FinchOperator):
     def is_identity(self, val: Any) -> builtins.bool:
         return builtins.bool(val[0] == 0 and val[1] == 0)
 
+
+class _AddScaledSquare(FinchOperator):
+    def __call__(self, x: tuple, y: tuple) -> tuple:
+        x_arg, x_scale = x
+        y_arg, y_scale = y
+        if np.isnan(x_arg) or np.isnan(x_scale) or np.isnan(y_arg) or np.isnan(y_scale):
+            return (np.nan, np.nan)
+        if x_scale < y_scale:
+            x_arg, y_arg = y_arg, x_arg
+            x_scale, y_scale = y_scale, x_scale
+        if x_scale > y_scale:
+            ratio = np.true_divide(y_scale, x_scale)
+            return (x_arg + y_arg * ratio * ratio, x_scale)
+        return (x_arg + y_arg, x_scale)
+
     def __repr__(self) -> str:
         return "add_scaled_square"
+
+    @property
+    def ftype(self):
+        return _AddScaledSquareFType()
 
 
 add_scaled_square = _AddScaledSquare()
@@ -1719,9 +2796,30 @@ def add_scaled_power(exponent: float):
     return _AddScaledPower(exponent)
 
 
-class _ScaledNegativePower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _ScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "ScaledNegativePower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _ScaledNegativePower(exponent)
+
     arity = 1
 
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, FDType)
+        arg = truediv.ftype.return_type(x, x)
+        return TupleFType.from_tuple((arg, arg))
+
+
+class _ScaledNegativePower(FinchOperator):
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1729,11 +2827,6 @@ class _ScaledNegativePower(FinchOperator):
         if x == 0:
             return (np.inf, x)
         return (np.true_divide(type(x)(1), type(x)(1)), x)
-
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
-        assert isinstance(x, FDType)
-        arg = truediv.return_type(x, x)
-        return TupleFType.from_tuple((arg, arg))
 
     def __eq__(self, other):
         return (
@@ -1746,17 +2839,57 @@ class _ScaledNegativePower(FinchOperator):
     def __repr__(self) -> str:
         return f"scaled_negative_power({self.exponent!r})"
 
+    @property
+    def ftype(self):
+        return _ScaledNegativePowerFType(ftype(self.exponent))
+
 
 def scaled_negative_power(exponent: float):
     return _ScaledNegativePower(exponent)
 
 
-class _AddScaledNegativePower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _AddScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "AddScaledNegativePower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _AddScaledNegativePower(exponent)
+
     arity = 2
 
     is_associative = True
+
     is_commutative = True
 
+    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
+        if len(x.struct_fieldtypes) != 2 or len(y.struct_fieldtypes) != 2:
+            raise TypeError("Scaled negative power operands must be 2-tuples.")
+        x_arg, x_scale = x.struct_fieldtypes
+        y_arg, y_scale = y.struct_fieldtypes
+        assert (
+            isinstance(x_arg, FDType)
+            and isinstance(x_scale, FDType)
+            and isinstance(y_arg, FDType)
+            and isinstance(y_scale, FDType)
+        )
+        return TupleFType.from_tuple(
+            (promote_type(x_arg, y_arg), promote_type(x_scale, y_scale))
+        )
+
+    def is_identity(self, val: Any) -> builtins.bool:
+        return builtins.bool(val[0] == 0 and np.isinf(val[1]))
+
+
+class _AddScaledNegativePower(FinchOperator):
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1778,25 +2911,6 @@ class _AddScaledNegativePower(FinchOperator):
             )
         return (x_arg + y_arg, x_scale)
 
-    def return_type(self, x: FType, y: FType) -> FType:  # type: ignore[override]
-        assert isinstance(x, TupleFType) and isinstance(y, TupleFType)
-        if len(x.struct_fieldtypes) != 2 or len(y.struct_fieldtypes) != 2:
-            raise TypeError("Scaled negative power operands must be 2-tuples.")
-        x_arg, x_scale = x.struct_fieldtypes
-        y_arg, y_scale = y.struct_fieldtypes
-        assert (
-            isinstance(x_arg, FDType)
-            and isinstance(x_scale, FDType)
-            and isinstance(y_arg, FDType)
-            and isinstance(y_scale, FDType)
-        )
-        return TupleFType.from_tuple(
-            (promote_type(x_arg, y_arg), promote_type(x_scale, y_scale))
-        )
-
-    def is_identity(self, val: Any) -> builtins.bool:
-        return builtins.bool(val[0] == 0 and np.isinf(val[1]))
-
     def __eq__(self, other):
         return (
             isinstance(other, _AddScaledNegativePower)
@@ -1809,20 +2923,31 @@ class _AddScaledNegativePower(FinchOperator):
     def __repr__(self) -> str:
         return f"add_scaled_negative_power({self.exponent!r})"
 
+    @property
+    def ftype(self):
+        return _AddScaledNegativePowerFType(ftype(self.exponent))
+
 
 def add_scaled_negative_power(exponent: float):
     return _AddScaledNegativePower(exponent)
 
 
-class _RootScaledPower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _RootScaledPowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "RootScaledPower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _RootScaledPower(exponent)
+
     arity = 1
-
-    def __init__(self, exponent: float):
-        self.exponent = exponent
-
-    def __call__(self, x: tuple) -> Any:
-        arg, scale = x
-        return np.power(arg, 1.0 / self.exponent) * scale
 
     def return_type(self, x: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType)
@@ -1830,7 +2955,16 @@ class _RootScaledPower(FinchOperator):
             raise TypeError("Scaled power roots must be taken from 2-tuples.")
         arg, scale = x.struct_fieldtypes
         assert isinstance(arg, FDType) and isinstance(scale, FDType)
-        return mul.return_type(pow.return_type(arg, ftype(float)), scale)
+        return mul.ftype.return_type(pow.ftype.return_type(arg, ftype(float)), scale)
+
+
+class _RootScaledPower(FinchOperator):
+    def __init__(self, exponent: float):
+        self.exponent = exponent
+
+    def __call__(self, x: tuple) -> Any:
+        arg, scale = x
+        return np.power(arg, 1.0 / self.exponent) * scale
 
     def __eq__(self, other):
         return isinstance(other, _RootScaledPower) and self.exponent == other.exponent
@@ -1841,13 +2975,17 @@ class _RootScaledPower(FinchOperator):
     def __repr__(self) -> str:
         return f"root_scaled_power({self.exponent!r})"
 
+    @property
+    def ftype(self):
+        return _RootScaledPowerFType(ftype(self.exponent))
 
-class _RootScaledSquare(FinchOperator):
+
+class _RootScaledSquareFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return root_scaled_square
+
     arity = 1
-
-    def __call__(self, x: tuple) -> Any:
-        arg, scale = x
-        return np.sqrt(arg) * scale
 
     def return_type(self, x: FType) -> FType:  # type: ignore[override]
         assert isinstance(x, TupleFType)
@@ -1855,10 +2993,20 @@ class _RootScaledSquare(FinchOperator):
             raise TypeError("Scaled square roots must be taken from 2-tuples.")
         arg, scale = x.struct_fieldtypes
         assert isinstance(arg, FDType) and isinstance(scale, FDType)
-        return mul.return_type(sqrt.return_type(arg), scale)
+        return mul.ftype.return_type(sqrt.ftype.return_type(arg), scale)
+
+
+class _RootScaledSquare(FinchOperator):
+    def __call__(self, x: tuple) -> Any:
+        arg, scale = x
+        return np.sqrt(arg) * scale
 
     def __repr__(self) -> str:
         return "root_scaled_square"
+
+    @property
+    def ftype(self):
+        return _RootScaledSquareFType()
 
 
 root_scaled_square = _RootScaledSquare()
@@ -1870,9 +3018,33 @@ def root_scaled_power(exponent: float):
     return _RootScaledPower(exponent)
 
 
-class _RootScaledNegativePower(FinchOperator):
+@dataclass(unsafe_hash=True)
+class _RootScaledNegativePowerFType(ImmutableStructFType, FinchOperatorFType):
+    exponent_type: FType
+
+    @property
+    def struct_name(self):
+        return "RootScaledNegativePower"
+
+    @property
+    def struct_fields(self):
+        return [("exponent", self.exponent_type)]
+
+    def from_fields(self, exponent):
+        return _RootScaledNegativePower(exponent)
+
     arity = 1
 
+    def return_type(self, x: FType) -> FType:  # type: ignore[override]
+        assert isinstance(x, TupleFType)
+        if len(x.struct_fieldtypes) != 2:
+            raise TypeError("Scaled negative power roots must be taken from 2-tuples.")
+        arg, scale = x.struct_fieldtypes
+        assert isinstance(arg, FDType) and isinstance(scale, FDType)
+        return mul.ftype.return_type(pow.ftype.return_type(arg, ftype(float)), scale)
+
+
+class _RootScaledNegativePower(FinchOperator):
     def __init__(self, exponent: float):
         self.exponent = exponent
 
@@ -1883,14 +3055,6 @@ class _RootScaledNegativePower(FinchOperator):
         if arg == 0 and np.isinf(scale):
             return scale
         return np.power(arg, 1.0 / self.exponent) * scale
-
-    def return_type(self, x: FType) -> FType:  # type: ignore[override]
-        assert isinstance(x, TupleFType)
-        if len(x.struct_fieldtypes) != 2:
-            raise TypeError("Scaled negative power roots must be taken from 2-tuples.")
-        arg, scale = x.struct_fieldtypes
-        assert isinstance(arg, FDType) and isinstance(scale, FDType)
-        return mul.return_type(pow.return_type(arg, ftype(float)), scale)
 
     def __eq__(self, other):
         return (
@@ -1904,9 +3068,24 @@ class _RootScaledNegativePower(FinchOperator):
     def __repr__(self) -> str:
         return f"root_scaled_negative_power({self.exponent!r})"
 
+    @property
+    def ftype(self):
+        return _RootScaledNegativePowerFType(ftype(self.exponent))
+
 
 def root_scaled_negative_power(exponent: float):
     return _RootScaledNegativePower(exponent)
+
+
+class _ScansearchFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return scansearch
+
+    arity = 4
+
+    def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
+        return hi
 
 
 class _Scansearch(FinchOperator):
@@ -1917,8 +3096,6 @@ class _Scansearch(FinchOperator):
     the index of the smallest element in `arr` that is greater than or equal to `x`.
     If all elements in `arr` are less than `x`, it returns `hi`.
     """
-
-    arity = 4
 
     @staticmethod
     def _func(
@@ -1949,14 +3126,26 @@ class _Scansearch(FinchOperator):
     def __call__(self, *args, **kwargs):
         return self._func(*args, **kwargs)
 
-    def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
-        return hi
-
     def __repr__(self) -> str:
         return "scansearch"
 
+    @property
+    def ftype(self):
+        return _ScansearchFType()
+
 
 scansearch = _Scansearch()
+
+
+class _ResizeIfSmallerFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return resize_if_smaller
+
+    arity = 3
+
+    def return_type(self, arr: FType, new_size: FType, fill_value: FType) -> FType:  # type: ignore[override]
+        return arr
 
 
 class _ResizeIfSmaller(FinchOperator):
@@ -1969,8 +3158,6 @@ class _ResizeIfSmaller(FinchOperator):
     If `new_size` is less than or equal to the current size of `arr`, it
     returns `arr` unchanged.
     """
-
-    arity = 3
 
     @staticmethod
     def _func(
@@ -1985,11 +3172,12 @@ class _ResizeIfSmaller(FinchOperator):
     def __call__(self, *args, **kwargs):
         return self._func(*args, **kwargs)
 
-    def return_type(self, arr: FType, new_size: FType, fill_value: FType) -> FType:  # type: ignore[override]
-        return arr
-
     def __repr__(self) -> str:
         return "resize_if_smaller"
+
+    @property
+    def ftype(self):
+        return _ResizeIfSmallerFType()
 
 
 resize_if_smaller = _ResizeIfSmaller()

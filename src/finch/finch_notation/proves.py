@@ -1,13 +1,13 @@
 import itertools
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from functools import partial
 from typing import TypeVar
 
-from finch.algebra import ffuncs, is_associative, is_idempotent
+from finch.algebra import FinchOperatorFType, ffuncs, is_associative, is_idempotent
 from finch.algebra.utils import all_unique, intersect, is_disjoint, setdiff
 from finch.symbolic import Chain, Fixpoint, Memo, PreWalk, Rewrite
 
-from .nodes import Cached, Call, NotationNode
+from .nodes import Cached, Call, NotationExpression, NotationNode
 from .nodes import Literal as L
 
 NN = TypeVar("NN", bound=NotationNode)
@@ -16,10 +16,10 @@ NN_Seq = Sequence[NN]
 
 
 def _find_first_call(
-    args: NN_Seq, op: Callable
+    args: NN_Seq, op: NotationExpression
 ) -> tuple[NN_Seq, NN_Seq, NN_Seq] | None:
     for i, arg in enumerate(args):
-        if isinstance(arg, Call) and arg.op.val == op:
+        if isinstance(arg, Call) and arg.op == op:
             return args[:i], arg.args, args[i + 1 :]
     return None
 
@@ -41,8 +41,10 @@ def rule_all_literals(ex):
 def rule_idempotent_unique(ex):
     """Remove duplicates from idempotent op."""
     match ex:
-        case Call(L(op), args) if is_idempotent(op) and not all_unique(args):
-            return Call(L(op), tuple(set(args)))
+        case Call(
+            NotationExpression(result_type=FinchOperatorFType() as op_type) as op, args
+        ) if is_idempotent(op_type) and not all_unique(args):
+            return Call(op, tuple(set(args)))
 
 
 def rule_single_arg(ex):
@@ -55,11 +57,14 @@ def rule_single_arg(ex):
 def rule_associative_flatten(ex) -> Call | None:
     """Flatten nested associative ops."""
     match ex:
-        case Call(L(op), args) if (
-            is_associative(op) and (found := _find_first_call(args, op)) is not None
+        case Call(
+            NotationExpression(result_type=FinchOperatorFType() as op_type) as op, args
+        ) if (
+            is_associative(op_type)
+            and (found := _find_first_call(args, op)) is not None
         ):
             before, call_args, after = found
-            return Call(L(op), (*before, *call_args, *after))
+            return Call(op, (*before, *call_args, *after))
 
 
 def rule_equal_same(ex) -> L | None:
@@ -94,7 +99,7 @@ def rule_add_with(ex, func) -> Call | None:
     """
     match ex:
         case Call(L(op), args) if (
-            op == ffuncs.add and (found := _find_first_call(args, func)) is not None
+            op == ffuncs.add and (found := _find_first_call(args, L(func))) is not None
         ):
             before, call_args, after = found
             return Call(
@@ -111,10 +116,10 @@ def rule_disjoint_nested(ex, func1, func2) -> Call | None:
     """Handle nested max/min in min/max."""
     match ex:
         case Call(L(op), args) if (
-            op == func1 and (found := _find_first_call(args, func2)) is not None
+            op == func1 and (found := _find_first_call(args, L(func2))) is not None
         ):
             before, call_args, after = found
-            if (found2 := _find_first_call(call_args, func1)) is not None:
+            if (found2 := _find_first_call(call_args, L(func1))) is not None:
                 before2, call_args2, after2 = found2
                 if not is_disjoint(call_args2, before) or not is_disjoint(
                     call_args2, after
@@ -153,7 +158,7 @@ def rule_disjoint_flat_single(ex, func1, func2) -> Call | None:
     """
     match ex:
         case Call(L(op), args) if (
-            op == func1 and (found := _find_first_call(args, func2)) is not None
+            op == func1 and (found := _find_first_call(args, L(func2))) is not None
         ):
             before, call_args, after = found
             if not is_disjoint(before, call_args) or not is_disjoint(call_args, after):
@@ -173,10 +178,10 @@ def rule_disjoint_flat_pair(ex, func1, func2) -> Call | None:
     """Handle two mins/maxes in max/min."""
     match ex:
         case Call(L(op), args) if (
-            op == func1 and (found := _find_first_call(args, func2)) is not None
+            op == func1 and (found := _find_first_call(args, L(func2))) is not None
         ):
             before, call_args, after = found
-            if (found2 := _find_first_call(after, func2)) is not None:
+            if (found2 := _find_first_call(after, L(func2))) is not None:
                 before2, call_args2, after2 = found2
                 if not is_disjoint(call_args, call_args2):
                     intersection = intersect(call_args, call_args2)

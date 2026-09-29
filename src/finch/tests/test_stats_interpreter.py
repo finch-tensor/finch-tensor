@@ -18,7 +18,6 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reorder,
     Table,
 )
 
@@ -40,25 +39,22 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
 
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),
@@ -88,25 +84,22 @@ def test_stats_matmul_error():
 
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal(a_val), (i, k))),
-            Query(Alias("B"), Table(Literal(b_val), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal(a_val), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal(b_val), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),
@@ -140,25 +133,22 @@ def test_vp_stats_matrix_multiplication(shape_a, shape_b):
 
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),
@@ -188,25 +178,22 @@ def test_vp_stats_matmul_error():
 
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal(a_val), (i, k))),
-            Query(Alias("B"), Table(Literal(b_val), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal(a_val), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal(b_val), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),

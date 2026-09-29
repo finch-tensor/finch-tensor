@@ -47,10 +47,11 @@ def insert_statistics(
             st = stats_factory.mapjoin(op, *args)
             cache[node] = st
             return st
-        case Query():
-            stats = insert_statistics(stats_factory, node.rhs, bindings, replace, cache)
-            if isinstance(node.lhs, Alias):
-                bindings[node.lhs] = stats
+        case Query(Table(Alias() as var, idxs), rhs):
+            if rhs.fields() != idxs:
+                rhs = Reorder(rhs, idxs)
+            stats = insert_statistics(stats_factory, rhs, bindings, replace, cache)
+            bindings[var] = stats
             cache[node] = stats
             return stats
 

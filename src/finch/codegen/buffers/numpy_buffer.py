@@ -225,7 +225,7 @@ class NumpyBufferFType(
         """
         Construct a NumpyBuffer from a C-compatible structure.
         """
-        return NumpyBuffer(c_buffer.contents.arr)
+        return c_buffer.contents.arr
 
     def numba_type(self) -> type:
         return list[np.ndarray]

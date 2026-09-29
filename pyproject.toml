@@ -162,7 +162,7 @@ depends-on = [{task = "compile", environment = "benchmark-julia"}]
 default-environment = "benchmark-julia"
 
 [tool.pixi.feature.test.tasks.type-check]
-cmd = "ty check"
+cmd = 'ty check --python "$CONDA_PREFIX"'
 default-environment = "test"
 
 [tool.pixi.feature.test.tasks.test-array-api]

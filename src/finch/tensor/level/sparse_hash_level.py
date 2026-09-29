@@ -139,9 +139,6 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("sparse hash level doesn't support from_numpy")
-
     def level_asm_unpack(self, ctx, var_n, val):
         raise NotImplementedError(_LOWERING_ERROR)
 
@@ -249,10 +246,6 @@ class SparseHashLevel(SingleDimensionLevel):
     @property
     def shape(self) -> tuple:
         return (self.dimension, *self.lvl.shape)
-
-    @property
-    def stride(self) -> np.integer:
-        return np.intp(0)
 
     @property
     def ftype(self) -> SparseHashLevelFType:

@@ -132,10 +132,10 @@ def test_apply_fill_annihilator_refinement():
 
 def test_predicates_conservative_on_dynamic():
     d = DynamicFill(np.float64(0.0))
-    assert not is_annihilator(ffuncs.mul, d)
-    assert not is_identity(ffuncs.mul, d)
-    assert is_annihilator(ffuncs.mul, 0.0)
-    assert is_identity(ffuncs.mul, 1.0)
+    assert not is_annihilator(ffuncs.mul.ftype, d)
+    assert not is_identity(ffuncs.mul.ftype, d)
+    assert is_annihilator(ffuncs.mul.ftype, 0.0)
+    assert is_identity(ffuncs.mul.ftype, 1.0)
 
 
 @pytest.mark.parametrize(
@@ -246,7 +246,7 @@ def test_constant_scalar_inlines_to_literal():
         == 0
     )
     assert all(isinstance(q, Query) for q in inlined.bodies)
-    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs == y.data]  # ty: ignore[unresolved-attribute]
+    (mapjoin_q,) = [q for q in inlined.bodies if q.lhs.tns == y.data]  # ty: ignore[unresolved-attribute]
     assert isinstance(mapjoin_q, Query)
     match mapjoin_q.rhs:
         case Reorder(MapJoin(Literal(_), args), _):
@@ -257,7 +257,7 @@ def test_constant_scalar_inlines_to_literal():
 
 def test_a_produced_constant_keeps_its_binding():
     """
-    We shouldn't create `Query(a, Literal(v))` via inlining of constants.
+    We shouldn't create `Query(Table(a, ()), Literal(v))` via inlining of constants.
     """
     out = finch.compute(finch.defer(ConstantScalar(1)))
     assert float(np.asarray(out)) == float(np.asarray(ConstantScalar(1)))

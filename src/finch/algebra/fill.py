@@ -181,7 +181,7 @@ def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
             return StaticFill(result)
         return DynamicFill(result)
     for f in fills:
-        if not is_dynamic(f) and op.is_annihilator(f.value):
-            result_type = op.return_type(*(g.ftype for g in fills))
+        if not is_dynamic(f) and op.ftype.is_annihilator(f.value):
+            result_type = op.ftype.return_type(*(g.ftype for g in fills))
             return StaticFill(result_type(f.value))
-    return DynamicFill(op(*values), op.return_type(*(f.ftype for f in fills)))
+    return DynamicFill(op(*values), op.ftype.return_type(*(f.ftype for f in fills)))

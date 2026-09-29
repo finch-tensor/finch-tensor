@@ -1,4 +1,5 @@
 import ctypes
+import json
 import logging
 import shutil
 import subprocess
@@ -14,6 +15,7 @@ import numpy as np
 from finch import algebra
 from finch import finch_assembly as asm
 from finch.algebra import (
+    DynamicFillError,
     FType,
     ImmutableStructFType,
     MutableStructFType,
@@ -23,10 +25,11 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     ftype,
+    is_dynamic,
 )
-from finch.algebra.algebra import FinchOperator
+from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import Context, Namespace, ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, Context, Namespace, ScopedDict, UnvalidatedForm
 from finch.util import config, file_cache
 from finch.util.logging import LOG_BACKEND_C
 
@@ -52,28 +55,28 @@ class COperator(ABC):
         """Returns the C symbol for this operator (e.g., '+', '-', '*')."""
 
     @abstractmethod
-    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+    def c_function_call(self, op: asm.AssemblyExpression, ctx: Any, *args: Any) -> Any:
         """Generates the C function call for this operator."""
 
 
 class CNAryOperator(COperator):
     """Base class for n-ary C operators (operators that take multiple arguments)."""
 
-    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+    def c_function_call(self, op: asm.AssemblyExpression, ctx: Any, *args: Any) -> Any:
         return c_nary_function_call(self.c_symbol, ctx, *args)
 
 
 class CBinaryOperator(COperator):
     """Base class for binary C operators (operators that take exactly two arguments)."""
 
-    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+    def c_function_call(self, op: asm.AssemblyExpression, ctx: Any, *args: Any) -> Any:
         return c_binary_function_call(self.c_symbol, ctx, *args)
 
 
 class CUnaryOperator(COperator):
     """Base class for unary C operators (operators that take exactly one argument)."""
 
-    def c_function_call(self, ctx: Any, *args: Any) -> Any:
+    def c_function_call(self, op: asm.AssemblyExpression, ctx: Any, *args: Any) -> Any:
         return c_unary_function_call(self.c_symbol, ctx, *args)
 
 
@@ -149,12 +152,19 @@ class CKernel(asm.AssemblyKernel):
     A class to represent a C kernel.
     """
 
-    def __init__(self, c_function, ret_type, argtypes):
+    def __init__(self, c_function, type_):
+        super().__init__(type_)
         self.c_function = c_function
+        ret_type, argtypes = type_.result_type, type_.arg_types
         self.ret_type = ret_type
         self.argtypes = argtypes
+        self.c_args = tuple(
+            (i, argtype)
+            for i, argtype in enumerate(argtypes)
+            if c_type(argtype) is not None
+        )
         self.c_function.restype = c_type(ret_type)
-        self.c_function.argtypes = tuple(c_type(argtype) for argtype in argtypes)
+        self.c_function.argtypes = tuple(c_type(t) for _, t in self.c_args)
 
     def __call__(self, *args):
         """
@@ -167,12 +177,10 @@ class CKernel(asm.AssemblyKernel):
         for argtype, arg in zip(self.argtypes, args, strict=False):
             if not fisinstance(arg, argtype):
                 raise TypeError(f"Expected argument of type {argtype}, got {type(arg)}")
-        serial_args = list(map(serialize_to_c, self.argtypes, args))
+        serial_args = [serialize_to_c(t, args[i]) for i, t in self.c_args]
         res = self.c_function(*serial_args)
-        for type_, arg, serial_arg in zip(
-            self.argtypes, args, serial_args, strict=False
-        ):
-            deserialize_from_c(type_, arg, serial_arg)
+        for (i, type_), serial_arg in zip(self.c_args, serial_args, strict=True):
+            deserialize_from_c(type_, args[i], serial_arg)
         if self.ret_type is algebra.none_:
             return None
         return construct_from_c(self.ret_type, res)
@@ -215,8 +223,8 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         self.shared_cflags = shared_cflags
         self.ctx: CLowerer = CGenerator() if ctx is None else ctx
 
-    def lower(self, prgm: asm.Module) -> CLibrary:
-        c_code = self.ctx(prgm).code
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None) -> CLibrary:
+        c_code = self.ctx(prgm, mode=mode).code
         logger.debug(f"Compiling C code:\n{c_code}")
         lib = load_shared_lib(
             c_code=c_code,
@@ -231,10 +239,8 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
             )
         for func in prgm.funcs:
             match func:
-                case asm.Function(asm.Variable(func_name, return_t), args, _):
-                    # return_t = c_type(return_t)
-                    arg_ts = [arg.result_type for arg in args]
-                    kern = CKernel(getattr(lib, func_name), return_t, arg_ts)
+                case asm.Function(asm.Variable(func_name, func_type), _, _):
+                    kern = CKernel(getattr(lib, func_name), func_type)
                     kernels[func_name] = kern
                 case _:
                     raise NotImplementedError(
@@ -243,7 +249,7 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         return CLibrary(lib, kernels)
 
 
-def c_function_name(op: FinchOperator, ctx: Any, *args: Any) -> str:
+def c_function_name(op: FType, ctx: Any, *args: Any) -> str:
     """Returns the C function name corresponding to the given Python function
     and argument types.
 
@@ -259,43 +265,43 @@ def c_function_name(op: FinchOperator, ctx: Any, *args: Any) -> str:
         TypeError: If the C function name is not implemented for the given function.
     """
     match op:
-        case ffuncs.add:
+        case ffuncs._AddFType():
             return "+"
-        case ffuncs.mul:
+        case ffuncs._MulFType():
             return "*"
-        case ffuncs.sub:
+        case ffuncs._SubFType():
             return "-"
-        case ffuncs.truediv | ffuncs.floordiv:
+        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
             return "/"
-        case ffuncs.mod:
+        case ffuncs._ModFType():
             return "%"
-        case ffuncs.lshift:
+        case ffuncs._LShiftFType():
             return "<<"
-        case ffuncs.rshift:
+        case ffuncs._RShiftFType():
             return ">>"
-        case ffuncs.and_:
+        case ffuncs._AndFType():
             return "&"
-        case ffuncs.xor:
+        case ffuncs._XorFType():
             return "^"
-        case ffuncs.or_:
+        case ffuncs._OrFType():
             return "|"
-        case ffuncs.not_:
+        case ffuncs._NotFType():
             return "!"
-        case ffuncs.invert:
+        case ffuncs._InvertFType():
             return "~"
-        case ffuncs.eq:
+        case ffuncs._EqFType():
             return "=="
-        case ffuncs.ne:
+        case ffuncs._NeFType():
             return "!="
-        case ffuncs.gt:
+        case ffuncs._GtFType():
             return ">"
-        case ffuncs.lt:
+        case ffuncs._LtFType():
             return "<"
-        case ffuncs.ge:
+        case ffuncs._GeFType():
             return ">="
-        case ffuncs.le:
+        case ffuncs._LeFType():
             return "<="
-        case ffuncs.pow:
+        case ffuncs._PowFType():
             return "pow"
         case COperator():
             return op.c_symbol
@@ -322,7 +328,31 @@ def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     return f"{c_symbol}{ctx(args[0])}"
 
 
-def c_function_call(op: FinchOperator, ctx: Any, *args: Any) -> str:
+def c_same(ctx, x, y):
+    x, y = ctx.cache("same_x", x), ctx.cache("same_y", y)
+    match x.result_type, y.result_type:
+        case TupleFType() as x_type, TupleFType() as y_type:
+            if x_type.struct_fieldnames != y_type.struct_fieldnames:
+                return "false"
+            comparisons = [
+                c_same(
+                    ctx,
+                    asm.GetAttr(x, asm.Literal(field)),
+                    asm.GetAttr(y, asm.Literal(field)),
+                )
+                for field in x_type.struct_fieldnames
+            ]
+            return f"({' && '.join(comparisons)})" if comparisons else "true"
+        case FDType(), FDType():
+            a, b = ctx(x), ctx(y)
+            return f"(({a} == {b}) || (({a} != {a}) && ({b} != {b})))"
+        case _:
+            raise NotImplementedError(
+                f"Cannot compare {x.result_type} and {y.result_type}"
+            )
+
+
+def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
     """Returns a call to the C function corresponding to the given Python
     function and argument types.
 
@@ -334,32 +364,81 @@ def c_function_call(op: FinchOperator, ctx: Any, *args: Any) -> str:
     Returns:
         The C function call as a string.
     """
-    c_symbol = c_function_name(op, ctx, *args)
-    match op:
-        case ffuncs.add | ffuncs.mul | ffuncs.and_ | ffuncs.xor | ffuncs.or_:
+    op_type = op.result_type
+    match op_type:
+        case ffuncs._CastFType(dtype=dtype):
+            return f"(({ctx.ctype_name(c_type(dtype))})({ctx(args[0])}))"
+        case asm.AssemblyKernelFType():
+            op_type.return_type(*(arg.result_type for arg in args))
+            callee = ctx.cache("callee", op)
+            values = []
+            for arg in args:
+                if c_type(arg.result_type) is None:
+                    ctx.exec(f"{ctx.feed}(void)({ctx(arg)});")
+                else:
+                    values.append(ctx(arg))
+            return f"{ctx(callee)}({', '.join(values)})"
+        case ffuncs._IdentityFType() | ffuncs._FirstArgFType():
+            return ctx(args[0])
+        case ffuncs._OverwriteFType():
+            return ctx(args[1])
+        case ffuncs._InitWriteFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError(
+                    "Pass a dynamic init_write as a runtime operator"
+                )
+            return ctx(args[1])
+        case ffuncs._SameFType():
+            return c_same(ctx, *args)
+        case ffuncs._ChooseFType(fill=fill):
+            if is_dynamic(fill) and isinstance(op, asm.Literal):
+                raise DynamicFillError("Pass a dynamic choose as a runtime operator")
+            value = ctx.cache(
+                "fill",
+                asm.GetAttr(op, asm.Literal("fill_value"))
+                if is_dynamic(fill)
+                else asm.Literal(fill.value),
+            )
+            args = tuple(ctx.cache("choice", arg) for arg in args)
+            result = ctx(value)
+            for arg in reversed(args):
+                result = f"({c_same(ctx, arg, value)} ? {result} : {ctx(arg)})"
+            return result
+        case ffuncs._WhereFType():
+            cond, x, y = args
+            return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
+    c_symbol = c_function_name(op_type, ctx, *args)
+    match op_type:
+        case (
+            ffuncs._AddFType()
+            | ffuncs._MulFType()
+            | ffuncs._AndFType()
+            | ffuncs._XorFType()
+            | ffuncs._OrFType()
+        ):
             return c_nary_function_call(c_symbol, ctx, *args)
         case (
-            ffuncs.sub
-            | ffuncs.truediv
-            | ffuncs.floordiv
-            | ffuncs.mod
-            | ffuncs.lshift
-            | ffuncs.rshift
-            | ffuncs.eq
-            | ffuncs.ne
-            | ffuncs.gt
-            | ffuncs.lt
-            | ffuncs.ge
-            | ffuncs.le
+            ffuncs._SubFType()
+            | ffuncs._TrueDivFType()
+            | ffuncs._FloorDivFType()
+            | ffuncs._ModFType()
+            | ffuncs._LShiftFType()
+            | ffuncs._RShiftFType()
+            | ffuncs._EqFType()
+            | ffuncs._NeFType()
+            | ffuncs._GtFType()
+            | ffuncs._LtFType()
+            | ffuncs._GeFType()
+            | ffuncs._LeFType()
         ):
             return c_binary_function_call(c_symbol, ctx, *args)
-        case ffuncs.not_ | ffuncs.invert:
+        case ffuncs._NotFType() | ffuncs._InvertFType():
             return c_unary_function_call(c_symbol, ctx, *args)
-        case ffuncs.pow:
+        case ffuncs._PowFType():
             a, b = args
             return f"{c_symbol}({ctx(a)}, {ctx(b)})"
         case COperator():
-            return op.c_function_call(ctx, *args)
+            return op_type.c_function_call(op, ctx, *args)
         case _:
             raise TypeError(f"{op} has no C representation.")
 
@@ -376,6 +455,8 @@ def c_literal(ctx: Any, val: Any) -> str:
         The C literal as a string.
     """
     fmt = ftype(val)
+    if c_type(fmt) is None:
+        return "((void)0)"
     match fmt:
         case algebra.int_ | algebra.float_:
             return str(val)
@@ -404,9 +485,14 @@ def c_type(t: FType) -> Any:
         t: The Finch type.
 
     Returns:
-        The corresponding C type as a ctypes type.
+        The corresponding ctypes type, or None for values with no runtime data.
     """
     match t:
+        case asm.AssemblyKernelFType():
+            return ctypes.CFUNCTYPE(
+                c_type(t.result_type),
+                *(c_type(arg) for arg in t.arg_types if c_type(arg) is not None),
+            )
         case CArgumentFType():
             return t.c_type()
         case algebra.int_:
@@ -422,10 +508,12 @@ def c_type(t: FType) -> Any:
         case algebra.ftypes.FDTypeNumpy():
             return np.ctypeslib.as_ctypes_type(t.dtype)
         case TupleFType():
-            return struct_c_type(NamedTupleFType("CTuple", t.struct_fields))
+            return c_type(NamedTupleFType("CTuple", t.struct_fields))
         case MutableStructFType():
             return ctypes.POINTER(struct_c_type(t))
         case ImmutableStructFType():
+            if all(c_type(field) is None for _, field in t.struct_fields):
+                return None
             return struct_c_type(t)
         case _:
             raise NotImplementedError(f"No C type mapping for {t}")
@@ -439,7 +527,14 @@ def struct_c_type(fmt: StructFType):
     res = c_structs.get(fmt)
     if res:
         return res
-    fields = [(name, c_type(fmt)) for name, fmt in fmt.struct_fields]
+    fields = [
+        (name, type_)
+        for name, field in fmt.struct_fields
+        if (type_ := c_type(field)) is not None
+    ]
+    # Empty mutable structs still need storage for their pointer representation.
+    if not fields:
+        fields = [("_padding", ctypes.c_ubyte)]
     new_struct = type(
         c_structnames.freshen("C", fmt.struct_name),
         (ctypes.Structure,),
@@ -484,8 +579,12 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 
 
 class CGenerator(UnvalidatedForm, CLowerer):
-    def lower(self, prgm: asm.AssemblyNode) -> CCode:
-        ctx = CContext()
+    def lower(
+        self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
+    ) -> CCode:
+        ctx = CContext(mode=mode)
+        if ctx.mode.debug:
+            ctx.namespace = Namespace(prgm)
         ctx(prgm)
         return CCode(ctx.emit_global())
 
@@ -628,6 +727,9 @@ class CContext(Context):
             return val
         var_n = self.freshen(name)
         var_t = val.result_type
+        if c_type(var_t) is None:
+            self.exec(f"{self.feed}(void)({self(val)});")
+            return asm.Variable(var_n, var_t)
         var_t_code = self.ctype_name(c_type(var_t))
         self.exec(f"{self.feed}{var_t_code} {var_n} = {self(val)};")
         return asm.Variable(var_n, var_t)
@@ -638,16 +740,32 @@ class CContext(Context):
         lower the program to C code.
         """
         match prgm:
+            case asm.Assert(exp):
+                condition = self(exp)
+                message = json.dumps(f"Finch assertion failed: {exp}\n")
+                self.add_header("#include <stdio.h>")
+                self.add_header("#include <stdlib.h>")
+                self.exec(
+                    f"{feed}if (!({condition})) {{\n"
+                    f"{feed}{self.tab}fputs({message}, stderr);\n"
+                    f"{feed}{self.tab}exit(1);\n"
+                    f"{feed}}}"
+                )
+                return None
             case asm.Literal(value):
                 # in the future, would be nice to be able to pass in constants that
                 # are more complex than C literals, maybe as globals.
                 return c_literal(self, value)
             case asm.Variable(name, t):
-                return name
+                return name if c_type(t) is not None else "((void)0)"
             case asm.Assign(asm.Variable(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
                     raise TypeError(f"Type mismatch: {val.result_type} != {var_t}")
+                if c_type(var_t) is None:
+                    self.types[var_n] = var_t
+                    self.exec(f"{feed}(void)({val_code});")
+                    return None
                 if var_n in self.types:
                     assert var_t == self.types[var_n]
                     self.exec(f"{feed}{var_n} = {val_code};")
@@ -662,6 +780,8 @@ class CContext(Context):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
                 if not obj_t.struct_hasattr(attr.val):
                     raise ValueError("trying to get missing attr")
+                if c_type(obj_t.struct_attrtype(attr.val)) is None:
+                    return f"((void)({self(obj)}))"
                 return c_getattr(obj_t, self, self(obj), attr.val)
             case asm.SetAttr(obj, attr, val):
                 obj = self.cache("obj", obj)
@@ -674,11 +794,19 @@ class CContext(Context):
                         f"{obj_t.struct_attrtype(attr.val)}"
                     )
                 val_code = self(val)
+                if c_type(val.result_type) is None:
+                    self.exec(f"{feed}(void)({val_code});")
+                    return None
                 c_setattr(obj_t, self, self(obj), attr.val, val_code)
                 return None
-            case asm.Call(f, args):
-                assert isinstance(f, asm.Literal)  # TODO: Handle asm.Variable
-                return c_function_call(f.val, self, *args)
+            case asm.Call(asm.Literal() | asm.Variable(), _):
+                return c_function_call(prgm.op, self, *prgm.args)
+            case asm.Call(op, args):
+                if c_type(op.result_type) is None:
+                    op_code = self(op)
+                    call_code = c_function_call(op, self, *args)
+                    return f"({op_code}, {call_code})"
+                return c_function_call(op, self, *args)
             case asm.Unpack(asm.Slot(var_n, var_t), val):
                 val_code = self(val)
                 if val.result_type != var_t:
@@ -711,17 +839,55 @@ class CContext(Context):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.c_load(self, self.resolve(buf), idx)
             case asm.Store(buf, idx, val):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
+                if self.mode.debug:
+                    idx = self.cache("index", idx)
+                    self(
+                        asm.Assert(
+                            asm.Call(
+                                asm.Literal(ffuncs.and_),
+                                (
+                                    asm.Call(
+                                        asm.Literal(ffuncs.ge),
+                                        (idx, asm.Literal(idx.result_type(0))),
+                                    ),
+                                    asm.Call(
+                                        asm.Literal(ffuncs.lt),
+                                        (idx, asm.Length(buf)),
+                                    ),
+                                ),
+                            )
+                        )
+                    )
                 return buf_t.c_store(self, self.resolve(buf), idx, val)
-            case asm.Resize(buf, len):
+            case asm.Resize(buf, size):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
                     raise TypeError(f"Expected C buffer type, got: {buf_t}")
-                return buf_t.c_resize(self, self.resolve(buf), len)
+                return buf_t.c_resize(self, self.resolve(buf), size)
             case asm.Length(buf):
                 buf_t = buf.result_type
                 if not isinstance(buf_t, CBufferFType):
@@ -805,14 +971,19 @@ class CContext(Context):
                     f"else {{\n{else_body_code}\n{feed}}}"
                 )
                 return None
-            case asm.Function(asm.Variable(func_name, return_t), args, body):
+            case asm.Function(
+                asm.Variable(func_name, asm.AssemblyKernelFType(result_type=return_t)),
+                args,
+                body,
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:
                     match arg:
                         case asm.Variable(name, t):
-                            t_name = self.ctype_name(c_type(t))
-                            arg_decls.append(f"{t_name} {name}")
+                            if (type_ := c_type(t)) is not None:
+                                t_name = self.ctype_name(type_)
+                                arg_decls.append(f"{t_name} {name}")
                             ctx_2.types[name] = t
                         case _:
                             raise NotImplementedError(
@@ -830,13 +1001,31 @@ class CContext(Context):
                 )
                 return None
             case asm.Return(value):
-                value = self(value)
-                self.exec(f"{feed}return {value};")
+                value_code = self(value)
+                if c_type(value.result_type) is None:
+                    self.exec(f"{feed}(void)({value_code});")
+                    self.exec(f"{feed}return;")
+                else:
+                    self.exec(f"{feed}return {value_code};")
                 return None
             case asm.Break():
                 self.exec(f"{feed}break;")
                 return None
             case asm.Module(funcs):
+                if len(funcs) > 1:
+                    for func in funcs:
+                        type_ = func.name.result_type
+                        assert isinstance(type_, asm.AssemblyKernelFType)
+                        ret = self.ctype_name(c_type(type_.result_type))
+                        args = (
+                            ", ".join(
+                                self.ctype_name(c_type(t))
+                                for t in type_.arg_types
+                                if c_type(t) is not None
+                            )
+                            or "void"
+                        )
+                        self.add_header(f"FINCH_EXPORT {ret} {func.name.name}({args});")
                 for func in funcs:
                     if not isinstance(func, asm.Function):
                         raise NotImplementedError(
@@ -947,7 +1136,11 @@ def serialize_to_c(fmt: FType, obj: Any) -> Any:
     Returns:
         A ctypes-compatible struct.
     """
+    if c_type(fmt) is None:
+        return None
     match fmt:
+        case asm.AssemblyKernelFType():
+            return ctypes.cast(obj.c_function, c_type(fmt))
         case CArgumentFType():
             return fmt.serialize_to_c(obj)
         case algebra.ftypes.FDTypeNumpy():
@@ -965,8 +1158,13 @@ def serialize_to_c(fmt: FType, obj: Any) -> Any:
 
 
 def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
-    args = [serialize_to_c(fmt, getattr(obj, name)) for name, fmt in fmt.struct_fields]
-    return struct_c_type(fmt)(*args)
+    args = [
+        serialize_to_c(field, getattr(obj, name))
+        for name, field in fmt.struct_fields
+        if c_type(field) is not None
+    ]
+    value = struct_c_type(fmt)(*args)
+    return ctypes.pointer(value) if fmt.is_mutable else value
 
 
 def serialize_tuple_to_c(fmt: TupleFType, obj):
@@ -999,9 +1197,12 @@ def deserialize_from_c(fmt: FType, obj: Any, c_obj: Any) -> None:
 
 def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
     if fmt.is_mutable:
-        for name in fmt.struct_fieldnames:
-            setattr(obj, name, getattr(c_struct, name))
-        return
+        c_struct = c_struct.contents
+    for name, field in fmt.struct_fields:
+        value = getattr(c_struct, name) if c_type(field) is not None else None
+        deserialize_from_c(field, fmt.struct_getattr(obj, name), value)
+        if fmt.is_mutable:
+            fmt.struct_setattr(obj, name, construct_from_c(field, value))
 
 
 def construct_from_c(fmt: FType, c_obj: Any) -> Any:
@@ -1016,6 +1217,8 @@ def construct_from_c(fmt: FType, c_obj: Any) -> Any:
         An instance of the original object type.
     """
     match fmt:
+        case asm.AssemblyKernelFType():
+            return CKernel(c_obj, fmt)
         case CArgumentFType():
             return fmt.construct_from_c(c_obj)
         case algebra.ftypes.FDTypeNumpy():
@@ -1037,13 +1240,19 @@ def construct_from_c(fmt: FType, c_obj: Any) -> Any:
 
 
 def struct_construct_from_c(fmt: StructFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return fmt.__class__(*args)
+    if fmt.is_mutable:
+        c_struct = c_struct.contents
+    args = [
+        construct_from_c(
+            field, getattr(c_struct, name) if c_type(field) is not None else None
+        )
+        for name, field in fmt.struct_fields
+    ]
+    return fmt.from_fields(*args)
 
 
 def tuple_construct_from_c(fmt: TupleFType, c_struct):
-    args = [getattr(c_struct, name) for name in fmt.struct_fieldnames]
-    return tuple(args)
+    return struct_construct_from_c(fmt, c_struct)
 
 
 class CBufferFType(BufferFType, CArgumentFType, ABC):

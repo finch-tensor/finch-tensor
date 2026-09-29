@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
-from finch.algebra import FType, TensorFType, ftype, return_type
-from finch.finch_assembly import AssemblyNode
+from finch import tensor
+from finch.algebra import (
+    CallableFType,
+    DynamicFill,
+    FType,
+    StaticFill,
+    TensorFType,
+    ftype,
+    return_type,
+)
+from finch.finch_assembly import AssemblyExpression, AssemblyKernelFType
 from finch.symbolic import (
     CallTerm,
     Context,
+    ExpressionTerm,
     LiteralTerm,
     NamedTerm,
     Term,
@@ -16,6 +26,11 @@ from finch.symbolic import (
     literal_repr,
 )
 from finch.util import qual_str
+
+if TYPE_CHECKING:
+    from finch.compile.looplets import Looplet as LoopletImpl
+    from finch.compile.lower import FinchTensorFType
+    from finch.tensor.level import LevelFType
 
 
 @dataclass(eq=True, frozen=True)
@@ -54,7 +69,7 @@ class NotationTree(NotationNode, TermTree):
         ...
 
 
-class NotationExpression(NotationNode):
+class NotationExpression(NotationNode, ExpressionTerm):
     """
     Notation AST expression base class.
 
@@ -103,7 +118,7 @@ class Value(NotationExpression):
     type `type_`.
     """
 
-    ex: AssemblyNode
+    ex: AssemblyExpression
     type_: FType
 
     @property
@@ -112,6 +127,18 @@ class Value(NotationExpression):
 
     def __repr__(self) -> str:
         return literal_repr(type(self).__name__, {"ex": self.ex, "type_": self.type_})
+
+
+@dataclass(eq=True, frozen=True)
+class Looplet(NotationExpression):
+    """A typed tensor expression being lowered by a looplet pass."""
+
+    body: LoopletImpl
+    type_: TensorFType
+
+    @property
+    def result_type(self) -> TensorFType:
+        return self.type_
 
 
 @dataclass(eq=True, frozen=True)
@@ -151,14 +178,15 @@ class Call(NotationTree, NotationExpression, CallTerm):
     `args...`.
     """
 
-    op: Literal | Variable
+    op: NotationExpression
     args: tuple[NotationExpression, ...]
 
     @property
     def result_type(self) -> FType:
         arg_types = [a.result_type for a in self.args]
-        assert isinstance(self.op, Literal)  # TODO: handle Variable
-        return return_type(self.op.val, *arg_types)
+        op_type = self.op.result_type
+        assert isinstance(op_type, CallableFType)
+        return return_type(op_type, *arg_types)
 
     @classmethod
     def from_children(cls, op, *args):
@@ -254,6 +282,33 @@ class Access(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class Full(NotationTree, NotationExpression):
+    """A read-only tensor filled with `val`, with scalar shape by default."""
+
+    val: NotationExpression
+    shape: tuple[NotationExpression, ...] = ()
+
+    @property
+    def result_type(self):
+        match self.val:
+            case Literal(val):
+                fill = StaticFill(val)
+            case _:
+                fill = DynamicFill(self.val.result_type(0))
+        return tensor.patterns.FillTensorFType(
+            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+        )
+
+    @classmethod
+    def from_children(cls, val, *shape):
+        return cls(val, tuple(shape))
+
+    @property
+    def children(self):
+        return [self.val, *self.shape]
+
+
+@dataclass(eq=True, frozen=True)
 class Read(AccessMode):
     """
     Notation AST node representing a read-only access mode for a tensor.
@@ -277,7 +332,7 @@ class Update(AccessMode, NotationTree):
         op: The operation used to update the value of the tensor.
     """
 
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):
@@ -401,45 +456,100 @@ class Assign(NotationTree, NotationStatement):
         return [self.lhs, self.rhs]
 
 
-class Cursor(NotationNode):
-    """
-    A cursor path into a tensor's level tree.
-    """
+class Cursor(NotationExpression, ABC):
+    """A level expression that retains its owning tensor."""
+
+    @property
+    @abstractmethod
+    def root(self) -> NotationExpression: ...
+
+    @property
+    @abstractmethod
+    def result_type(self) -> LevelFType: ...
 
 
 @dataclass(eq=True, frozen=True)
-class Root(Cursor):
-    """
-    The root level of a fiber tensor.
-    """
+class Root(NotationTree, Cursor):
+    """The first level of a tensor."""
+
+    tns: NotationExpression
+
+    @property
+    def root(self):
+        return self.tns
+
+    @property
+    def result_type(self):
+        return cast("FinchTensorFType", self.tns.result_type).get_child_type("lvl")
+
+    @property
+    def children(self):
+        return [self.tns]
 
 
 @dataclass(eq=True, frozen=True)
-class Child(Cursor):
-    """
-    A child level reached from another cursor path.
-    """
+class Child(NotationTree, Cursor):
+    """A sublevel of a level expression."""
 
     parent: Cursor
     attr: str = "lvl"
 
-
-@dataclass(eq=True, frozen=True)
-class Fiber(NotationExpression):
-    """
-    A lowering cursor for fiber-tree access.
-    """
-
-    root: Any
-    lvl: Cursor
-    pos: Any
-    type: Any
-    idxs: tuple[Any, ...] = ()
-    dirty: bool = False
+    @property
+    def root(self):
+        return self.parent.root
 
     @property
     def result_type(self):
-        return self.type
+        return self.parent.result_type.level_get_child_type(self.attr)
+
+    @property
+    def children(self):
+        return [self.parent, Literal(self.attr)]
+
+    @classmethod
+    def from_children(cls, parent, attr):
+        return cls(parent, attr.val)
+
+
+@dataclass(eq=True, frozen=True)
+class Fiber(NotationTree, NotationExpression):
+    """A positioned level view, retaining the owning tensor type at the root."""
+
+    lvl: Cursor
+    pos: NotationExpression
+    idxs: tuple[NotationExpression, ...] = ()
+
+    @property
+    def result_type(self):
+        match self.lvl:
+            case Root(tns):
+                return tns.result_type
+        root_type = self.lvl.root.result_type
+        assert isinstance(root_type, TensorFType)
+        return tensor.FiberTensorFType(self.lvl.result_type, root_type.device)
+
+    @property
+    def children(self):
+        return [self.lvl, self.pos, *self.idxs]
+
+    @classmethod
+    def from_children(cls, lvl, pos, *idxs):
+        return cls(lvl, pos, idxs)
+
+
+@dataclass(eq=True, frozen=True)
+class HollowFiber(Fiber):
+    """A candidate sparse fiber, recording whether a non-fill value was written."""
+
+    dirty: Variable = field(kw_only=True)
+
+    @property
+    def children(self):
+        return [self.lvl, self.pos, self.dirty, *self.idxs]
+
+    @classmethod
+    def from_children(cls, lvl, pos, dirty, *idxs):
+        return cls(lvl, pos, idxs, dirty=dirty)
 
 
 @dataclass(eq=True, frozen=True)
@@ -454,7 +564,7 @@ class Slot(NotationExpression, NamedTerm):
     """
 
     name: str
-    type: Any
+    type: FType
 
     @property
     def result_type(self):
@@ -519,7 +629,7 @@ class Declare(NotationTree, NotationStatement):
 
     tns: NotationExpression
     init: Literal
-    op: Literal
+    op: NotationExpression
     shape: tuple[NotationExpression, ...]
 
     @property
@@ -542,7 +652,7 @@ class Freeze(NotationTree, NotationStatement):
     """
 
     tns: NotationExpression
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):
@@ -557,7 +667,7 @@ class Thaw(NotationTree, NotationStatement):
     """
 
     tns: NotationExpression
-    op: Literal
+    op: NotationExpression
 
     @property
     def children(self):
@@ -584,12 +694,10 @@ class Block(NotationTree, NotationStatement):
 @dataclass(eq=True, frozen=True)
 class Function(NotationTree):
     """
-    Represents a logical AST statement that defines a function `fun` on the
-    arguments `args...`.
+    A module-level function definition with arguments `args...`.
 
     Attributes:
-        name: The name of the function to define as a variable typed with the
-            return type of this function.
+        name: The function variable, annotated with its AssemblyKernelFType.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
@@ -685,18 +793,20 @@ class NotationPrinterContext(Context):
                 return str(name)
             case Value(name, _):
                 return str(name)
+            case Looplet(body, _):
+                return f"looplet({body})"
             case Slot(name, _):
                 return str(name)
-            case Root():
-                return "Root"
-            case Child(parent, "lvl"):
-                return f"Child({self(parent)})"
+            case Root(tns):
+                return f"Root({tns})"
             case Child(parent, attr):
                 return f"Child({self(parent)}, {attr})"
-            case Fiber(root, lvl, pos, _):
-                return f"fiber({root}, {self(lvl)}, {pos})"
+            case Fiber(lvl, pos):
+                return f"fiber({self(lvl)}, {pos})"
             case Call(f, args):
                 return f"{self(f)}({', '.join(self(arg) for arg in args)})"
+            case Full(val, shape):
+                return f"full({self(val)}, ({', '.join(self(dim) for dim in shape)}))"
             case Unwrap(tns):
                 return f"unwrap({self(tns)})"
             case Assign(Variable(var_n, var_t), val):
@@ -776,7 +886,9 @@ class NotationPrinterContext(Context):
                     f"{feed}if {cond_code}:\n{body_code}\n{feed}else:\n{else_body_code}"
                 )
                 return None
-            case Function(Variable(func_n, ret_t), args, body):
+            case Function(
+                Variable(func_n, AssemblyKernelFType(result_type=ret_t)), args, body
+            ):
                 ctx_2 = self.subblock()
                 arg_decls = []
                 for arg in args:

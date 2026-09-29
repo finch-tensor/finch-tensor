@@ -93,9 +93,9 @@ class UniformStatsFactory(
             p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
         else:
             raise TypeError("Stats Class must be inherit from NumericStats")
-        if is_annihilator(op, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_value):
             res_p = math.pow(p_old, k)
-        elif is_identity(op, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_value):
             res_p = 1 - math.pow((1 - p_old), k)
         else:
             res_p = 1.0

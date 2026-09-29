@@ -4,17 +4,16 @@ from typing import Any
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs
+from finch.algebra import ImmutableStructFType, ffuncs, is_dynamic
 from finch.compile import looplets as lplt
 
-from .fiber_tensor import FiberTensor, FiberTensorFType
+from .fiber_tensor import FiberTensor
 from .level.level import (
     Level,
     LevelFType,
     MultiDimensionLevelFType,
     SingleDimensionLevelFType,
 )
-from .scalar import Scalar
 
 
 @dataclass(unsafe_hash=True)
@@ -71,9 +70,6 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, val):
-        return LoTriMask(self.lvl_t.from_numpy(shape, val))
-
     def level_lower_freeze(self, ctx, lvl, op, pos):
         return self.body.level_lower_freeze(
             ctx, asm.GetAttr(lvl, asm.Literal("body")), op, pos
@@ -86,10 +82,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
 
     def level_lower_unwrap(self, ctx, obj, pos):
         body = ntn.Fiber(
-            obj.root,
             ntn.Child(obj.lvl, "body"),
             obj.pos,
-            FiberTensorFType(self.body),
             obj.idxs,
         )
         return self.body.level_lower_unwrap(
@@ -100,10 +94,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
         body = ntn.Fiber(
-            obj.root,
             ntn.Child(obj.lvl, "body"),
             obj.pos,
-            FiberTensorFType(self.body),
             obj.idxs,
         )
         return self.body.level_lower_increment(
@@ -119,25 +111,38 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
             ctx, asm.GetAttr(tns, asm.Literal("body")), init, op, shape, pos
         )
 
-    def level_unfurl(self, ctx, lvl: ntn.Fiber, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, fiber: ntn.Fiber, ext, mode, proto, pos):
+        tns = fiber
+        level = tns.lvl
+
         def child_accessor(ctx, idx):
             body_view = ntn.Fiber(
-                lvl.root,
-                ntn.Child(lvl.lvl, "body"),
-                lvl.pos,
-                FiberTensorFType(self.body),
-                lvl.idxs,
+                ntn.Child(level, "body"),
+                tns.pos,
+                tns.idxs,
             )
             return self.body.level_unfurl(ctx, body_view, ext, mode, proto, pos)
 
-        scalar = Scalar(self.fill_value.value, self.fill_value)
-        visited_idxs = lvl.idxs
+        lvl = asm.GetAttr(ctx(tns.lvl), asm.Literal("body"))
+        fill = (
+            ntn.Value(self.body.lower_fill(lvl), self.element_type)
+            if is_dynamic(self.fill_value)
+            else ntn.Literal(self.fill_value.value)
+        )
+        full = ntn.Full(
+            fill,
+            tuple(
+                ntn.Value(self.body.level_lower_dim(ctx, lvl, r), self.shape_type[r])
+                for r in range(1, self.ndim)
+            ),
+        )
+        visited_idxs = tns.idxs
         return lplt.Sequence(
             head=lambda ctx, idx: child_accessor(ctx, idx),
             split=lambda ctx, ext: ntn.Call(
                 ntn.L(ffuncs.add), (visited_idxs[-1], ext.get_unit())
             ),
-            tail=lambda ctx, idx: lplt.Run(scalar),
+            tail=lambda ctx, idx: lplt.Run(full),
         )
 
     def level_lower_dim(self, ctx, obj, r):
@@ -155,7 +160,7 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
 
     @property
     def struct_fields(self):
-        return [("body", self.body), ("stride", self.body.dimension_type)]
+        return [("body", self.body)]
 
 
 @dataclass
@@ -177,10 +182,6 @@ class LoTriMask(Level):
     @property
     def shape(self):
         return self.lvl.shape
-
-    @property
-    def stride(self):
-        return self.lvl.stride
 
     @property
     def body(self):

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, overload
 
 from finch.algebra import fisinstance
-from finch.symbolic import ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, ScopedDict, UnvalidatedForm
 
 from . import nodes as asm
 from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader
@@ -17,13 +17,12 @@ class AssemblyInterpreterKernel(AssemblyKernel):
     This is a simple interpreter that executes the assembly code.
     """
 
-    def __init__(self, ctx, func_n, ret_t):
-        self.ctx = ctx
-        self.func = asm.Variable(func_n, ret_t)
+    def __init__(self, func, type_):
+        super().__init__(type_)
+        self.func = func
 
     def __call__(self, *args):
-        args_i = tuple(asm.Literal(arg) for arg in args)
-        return self.ctx(asm.Call(self.func, args_i))
+        return self.func(*args)
 
 
 class AssemblyInterpreterLibrary(AssemblyLibrary):
@@ -69,6 +68,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         loop_state: HaltState | None = None,
         function_state: HaltState | None = None,
         stdout=None,
+        mode: CompilerMode | None = None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -84,6 +84,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         if stdout is None:
             stdout = sys.stdout
         self.stdout = stdout
+        self.mode = mode if mode is not None else CompilerMode()
 
     def scope(
         self,
@@ -93,6 +94,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
         loop_state=None,
         function_state=None,
         stdout=None,
+        mode=None,
     ):
         """
         Create a new scope for the interpreter.
@@ -117,6 +119,7 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             loop_state=loop_state,
             function_state=function_state,
             stdout=stdout,
+            mode=self.mode if mode is None else mode,
         )
 
     def should_halt(self):
@@ -132,25 +135,32 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             and self.function_state.should_halt
         )
 
-    def lower(self, prgm: asm.Module):
-        return self._dispatch(prgm)
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None):
+        ctx = self if mode is None else self.scope(mode=mode)
+        return ctx._dispatch(prgm)
 
     @overload
-    def __call__(self, prgm: asm.Module) -> AssemblyLibrary: ...
+    def __call__(
+        self, prgm: asm.Module, *, mode: CompilerMode | None = None
+    ) -> AssemblyLibrary: ...
 
     @overload
     def __call__(self, prgm: asm.AssemblyNode) -> Any: ...
 
-    def __call__(self, prgm):
+    def __call__(self, prgm, *, mode=None):
         """
         Run the program.
         """
         if isinstance(prgm, asm.Module):
-            return super().__call__(prgm)
+            return super().__call__(prgm, mode=mode)
         return self._dispatch(prgm)
 
     def _dispatch(self, prgm):
         match prgm:
+            case asm.Assert(exp):
+                if not self(exp):
+                    raise AssertionError(f"Finch assertion failed: {exp}")
+                return None
             case asm.Literal(value):
                 return value
             case asm.Variable(var_n, var_t):
@@ -221,11 +231,15 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             case asm.Load(buf, idx):
                 buf_e = self(buf)
                 idx_e = self(idx)
+                if self.mode.debug and not 0 <= idx_e < buf_e.length():
+                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 val_e = self(val)
+                if self.mode.debug and not 0 <= idx_e < buf_e.length():
+                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
                 buf_e.store(idx_e, val_e)
                 return None
             case asm.Resize(buf, len_):
@@ -291,7 +305,13 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 ctx_2 = self.scope()
                 ctx_2(body)
                 return None
-            case asm.Function(asm.Variable(func_n, ret_t), args, body):
+            case asm.Function(
+                asm.Variable(
+                    func_n, asm.AssemblyKernelFType(result_type=ret_t) as func_type
+                ),
+                args,
+                body,
+            ):
 
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
@@ -327,7 +347,8 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                         f"but expected type {ret_t}."
                     )
 
-                self.bindings[func_n] = my_func
+                self.bindings[func_n] = AssemblyInterpreterKernel(my_func, func_type)
+                self.types[func_n] = func_type
                 return None
             case asm.Return(value):
                 assert self.function_state is not None
@@ -339,19 +360,26 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 self.loop_state.should_halt = True
                 return None
             case asm.Module(funcs):
+                ctx_2 = self.scope()
                 for func in funcs:
-                    self(func)
+                    ctx_2(func)
                 kernels = {}
                 for func in funcs:
                     match func:
-                        case asm.Function(asm.Variable(func_n, ret_t), args, _):
-                            kernel = AssemblyInterpreterKernel(self, func_n, ret_t)
-                            kernels[func_n] = kernel
+                        case asm.Function(
+                            asm.Variable(
+                                func_n,
+                                ret_t,
+                            ),
+                            args,
+                            _,
+                        ):
+                            kernels[func_n] = ctx_2.bindings[func_n]
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"
                             )
-                return AssemblyInterpreterLibrary(self, kernels)
+                return AssemblyInterpreterLibrary(ctx_2, kernels)
             case _:
                 raise NotImplementedError(
                     f"Unrecognized assembly node type: {type(prgm)}"

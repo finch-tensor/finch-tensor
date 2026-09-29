@@ -11,7 +11,10 @@ import math
 from collections.abc import Sequence
 
 from finch.algebra import (
+    CallableFType,
+    FinchOperatorFType,
     arity,
+    ftype,
     is_annihilator,
     is_associative,
     is_commutative,
@@ -21,7 +24,7 @@ from finch.algebra import (
 )
 
 from .rewriters import RwCallable
-from .term import CallTerm, LiteralTerm, Term
+from .term import CallTerm, ExpressionTerm, LiteralTerm, Term
 
 
 def _call_like(node: CallTerm, args: Sequence[Term]) -> Term:
@@ -35,7 +38,10 @@ def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
     don't alter the type of the output.
     """
     vals = [arg.val for arg in args if isinstance(arg, LiteralTerm)]
-    return op.make_term(op.head(), return_type(op.val, *vals)(op.val(*vals)))
+    op_type = ftype(op.val)
+    assert isinstance(op_type, CallableFType)
+    result = return_type(op_type, *(ftype(val) for val in vals))
+    return op.make_term(op.head(), result(op.val(*vals)))
 
 
 def canonicalize_associative(node: Term) -> Term | None:
@@ -55,51 +61,59 @@ def canonicalize_associative(node: Term) -> Term | None:
     - `f(x, k)`         => `f(k, x)`
     """
     match node:
-        case CallTerm(op=op, args=args) if not is_associative(op.val):
-            return None
-        case CallTerm(op=op, args=(x,)):
-            return x
-        case CallTerm(op=op, args=args) if math.isinf(arity(op.val)):
-            flat = [
-                leaf
-                for arg in args
-                for leaf in (
-                    arg.args if isinstance(arg, CallTerm) and arg.op == op else (arg,)
-                )
-            ]
-            if is_commutative(op.val):
-                flat = sorted(flat, key=lambda leaf: not isinstance(leaf, LiteralTerm))
-            return _call_like(node, flat) if flat != list(args) else None
         case CallTerm(
-            op=op,
-            args=(
-                (
+            op=ExpressionTerm(result_type=FinchOperatorFType() as op_type) as op,
+            args=args,
+        ) if is_associative(op_type):
+            if len(args) == 1:
+                return args[0]
+            if math.isinf(arity(op_type)):
+                flat = [
+                    leaf
+                    for arg in args
+                    for leaf in (
+                        arg.args
+                        if isinstance(arg, CallTerm) and arg.op == op
+                        else (arg,)
+                    )
+                ]
+                if is_commutative(op_type):
+                    flat = sorted(
+                        flat, key=lambda leaf: not isinstance(leaf, LiteralTerm)
+                    )
+                return _call_like(node, flat) if flat != list(args) else None
+            match args:
+                case (
                     LiteralTerm() as k1,
                     CallTerm(op=inner, args=(LiteralTerm() as k2, y)),
-                )
-            ),
-        ) if inner == op:
-            return _call_like(node, [_evaluate(op, (k1, k2)), y])
-        case CallTerm(
-            op=op, args=(CallTerm(op=inner, args=(LiteralTerm() as k, x)), y)
-        ) if inner == op:
-            return _call_like(node, [k, _call_like(node, [x, y])])
-        case CallTerm(
-            op=op, args=(x, CallTerm(op=inner, args=(LiteralTerm() as k, y)))
-        ) if inner == op and is_commutative(op.val):
-            return _call_like(node, [k, _call_like(node, [x, y])])
-        case CallTerm(op=op, args=(x, LiteralTerm() as k)) if not isinstance(
-            x, LiteralTerm
-        ) and is_commutative(op.val):
-            return _call_like(node, [k, x])
+                ) if inner == op and isinstance(op, LiteralTerm):
+                    return _call_like(node, [_evaluate(op, (k1, k2)), y])
+                case (
+                    CallTerm(op=inner, args=(LiteralTerm() as k, x)),
+                    y,
+                ) if inner == op:
+                    return _call_like(node, [k, _call_like(node, [x, y])])
+                case (
+                    x,
+                    CallTerm(op=inner, args=(LiteralTerm() as k, y)),
+                ) if inner == op and is_commutative(op_type):
+                    return _call_like(node, [k, _call_like(node, [x, y])])
+                case (x, LiteralTerm() as k) if not isinstance(
+                    x, LiteralTerm
+                ) and is_commutative(op_type):
+                    return _call_like(node, [k, x])
     return None
 
 
 def dedup_idempotent(node: Term) -> Term | None:
     """`f(a..., x, b..., x, c...)` => `f(a..., x, b..., c...)` for idempotent `f`."""
     match node:
-        case CallTerm(op=op, args=args) if (
-            is_idempotent(op.val) and is_associative(op.val) and is_commutative(op.val)
+        case CallTerm(
+            op=ExpressionTerm(result_type=FinchOperatorFType() as op_type), args=args
+        ) if (
+            is_idempotent(op_type)
+            and is_associative(op_type)
+            and is_commutative(op_type)
         ):
             unique = [arg for i, arg in enumerate(args) if arg not in args[:i]]
             if len(unique) != len(args):
@@ -117,10 +131,15 @@ def fold_literals(node: Term) -> Term | None:
       literal pairs of an associative n-ary `f`.
     """
     match node:
-        case CallTerm(op=op, args=args) if args:
+        case CallTerm(op=LiteralTerm() as op, args=args) if args:
             if all(isinstance(arg, LiteralTerm) for arg in args):
                 return _evaluate(op, args)
-            if not (math.isinf(arity(op.val)) and is_associative(op.val)):
+            op_type = op.result_type
+            if not (
+                isinstance(op_type, FinchOperatorFType)
+                and math.isinf(arity(op_type))
+                and is_associative(op_type)
+            ):
                 return None
             new_args = []
             running_literal = op.head()(None)
@@ -152,12 +171,14 @@ def annihilate(node: Term) -> Term | None:
     TODO: add a safe mode for nan
     """
     match node:
-        case CallTerm(op=op, args=args):
+        case CallTerm(
+            op=ExpressionTerm(result_type=FinchOperatorFType() as op_type), args=args
+        ):
             return next(
                 (
                     arg
                     for arg in args
-                    if isinstance(arg, LiteralTerm) and is_annihilator(op.val, arg.val)
+                    if isinstance(arg, LiteralTerm) and is_annihilator(op_type, arg.val)
                 ),
                 None,
             )
@@ -169,22 +190,24 @@ def drop_identities(node: Term) -> Term | None:
     `f(a..., e, b...)` => `f(a..., b...)` when `e` is an identity for `f`.
     """
     match node:
-        case CallTerm(op=op, args=args) if is_associative(op.val):
-            if len(args) == 2 and arity(op.val) == 2:
+        case CallTerm(
+            op=ExpressionTerm(result_type=FinchOperatorFType() as op_type), args=args
+        ) if is_associative(op_type):
+            if len(args) == 2 and arity(op_type) == 2:
                 if isinstance(args[0], LiteralTerm) and is_identity(
-                    op.val, args[0].val
+                    op_type, args[0].val
                 ):
                     return args[1]
                 if isinstance(args[1], LiteralTerm) and is_identity(
-                    op.val, args[1].val
+                    op_type, args[1].val
                 ):
                     return args[0]
-            if math.isinf(arity(op.val)):
+            if math.isinf(arity(op_type)):
                 kept = [
                     arg
                     for arg in args
                     if not (
-                        isinstance(arg, LiteralTerm) and is_identity(op.val, arg.val)
+                        isinstance(arg, LiteralTerm) and is_identity(op_type, arg.val)
                     )
                 ]
                 if len(kept) == len(args):

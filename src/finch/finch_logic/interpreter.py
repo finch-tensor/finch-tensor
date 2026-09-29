@@ -14,8 +14,9 @@ from finch.algebra import (
 )
 from finch.algebra.ftypes import FDTypeBuiltin, FDTypeNumpy
 from finch.algebra.tensor import TensorFType
-from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
+from finch.finch_assembly import AssemblyKernel, AssemblyKernelFType, AssemblyLibrary
 from finch.symbolic import UnvalidatedForm
+from finch.tensor.bufferized_ndarray import BufferizedNDArray
 from finch.tensor.scalar import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
@@ -106,7 +107,7 @@ class LogicMachine:
                             idxs.append(idx)
                             dims[idx] = dim
                 fill_val = op(*[arg.tns.fill_value for arg in args])
-                dtype = return_type(op, *[arg.tns.element_type for arg in args])
+                dtype = return_type(op.ftype, *[arg.tns.element_type for arg in args])
                 assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
                 result = self.make_tensor(
                     tuple(dims[idx] for idx in idxs), fill_val, dtype=dtype
@@ -121,7 +122,7 @@ class LogicMachine:
                 return TableValue(result, tuple(idxs))
             case Aggregate(Literal(op), Literal(init), arg, idxs):
                 arg = self(arg)
-                dtype = fixpoint_type(op, init, arg.tns.element_type)
+                dtype = fixpoint_type(op.ftype, init, arg.tns.element_type)
                 new_shape = tuple(
                     int(dim)
                     for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
@@ -164,18 +165,17 @@ class LogicMachine:
                     in_crds = [node_crds.get(idx, 0) for idx in arg.idxs]
                     result[*crds] = arg.tns[*in_crds].item()
                 return TableValue(result, idxs)
-            case Query(lhs, rhs):
-                rhs = self(rhs)
-                if lhs not in self.bindings:
-                    tns = self.make_tensor(
+            case Query(Table(Alias() as var, idxs), rhs):
+                rhs = self(Reorder(rhs, idxs))
+                if var not in self.bindings:
+                    self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
                         rhs.tns.fill_value,
                         dtype=rhs.tns.element_type,
                     )
-                    self.bindings[lhs] = tns
-                lhs = self(lhs)
+                tns = self.bindings[var]
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
-                    lhs[*crds] = rhs.tns[*crds].item()
+                    tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case Plan(bodies):
                 res = ()
@@ -190,6 +190,32 @@ class LogicMachine:
 
 class MockLogicKernel(AssemblyKernel):
     def __init__(self, prgm, bindings: dict[lgc.Alias, TensorFType]):
+        element_types = prgm.infer_element_type(
+            {var: type_.element_type for var, type_ in bindings.items()}
+        )
+        shape_types = prgm.infer_shape_type(
+            {var: type_.shape_type for var, type_ in bindings.items()}
+        )
+        result_types = dict(bindings)
+        for var, element_type in element_types.items():
+            if var not in result_types:
+                result_types[var] = BufferizedNDArray.from_numpy(
+                    np.empty((0,) * len(shape_types[var]), dtype=np_dtype(element_type))
+                ).ftype
+        outputs = []
+        for arg in prgm.bodies[-1].args:
+            match arg:
+                case lgc.Table(lgc.Alias() as var, _) | (lgc.Alias() as var):
+                    outputs.append(result_types[var])
+                case _:
+                    raise TypeError(f"Expected an output alias or table, got {arg}")
+        super().__init__(
+            AssemblyKernelFType(
+                "main",
+                tuple(bindings.values()),
+                TupleFType.from_tuple(tuple(outputs)),
+            )
+        )
         self.prgm = prgm
         self.bindings = bindings
 
@@ -216,7 +242,8 @@ class MockLogicLibrary(AssemblyLibrary):
 
     def __getattr__(self, name):
         if name == "main":
-            return MockLogicKernel(self.prgm, self.bindings)
+            self.main = MockLogicKernel(self.prgm, self.bindings)
+            return self.main
         if name == "prgm":
             return self.prgm
         raise AttributeError(f"Unknown attribute {name} for InterpreterLibrary")

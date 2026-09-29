@@ -4,7 +4,7 @@ import numpy as np
 
 import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
-from finch.algebra.ffuncs import make_tuple, overwrite
+from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
     DynamicFill,
@@ -19,70 +19,70 @@ from finch.symbolic import PostWalk, Rewrite
 from finch.tensor.patterns import PatternTensorFType
 
 from .julia import jl
-from .runtime import FinchJLRuntime
+from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import _leaf_type_str, ftype_to_jl_constructor_str, ftype_to_jl_type_str
 
 _JULIA_OPS = {
     # arithmetic
-    ffuncs.add: "+",
-    ffuncs.mul: "*",
-    ffuncs.sub: "-",
-    ffuncs.truediv: "/",
-    ffuncs.floordiv: "div",
-    ffuncs.mod: "mod",
-    ffuncs.pow: "^",
-    ffuncs.neg: "-",
-    ffuncs.pos: "+",
-    ffuncs.divide: "/",
-    ffuncs.remainder: "mod",
+    ffuncs.add.ftype: "+",
+    ffuncs.mul.ftype: "*",
+    ffuncs.sub.ftype: "-",
+    ffuncs.truediv.ftype: "/",
+    ffuncs.floordiv.ftype: "div",
+    ffuncs.mod.ftype: "mod",
+    ffuncs.pow.ftype: "^",
+    ffuncs.neg.ftype: "-",
+    ffuncs.pos.ftype: "+",
+    ffuncs.divide.ftype: "/",
+    ffuncs.remainder.ftype: "mod",
     # comparisons
-    ffuncs.eq: "==",
-    ffuncs.equal: "==",
-    ffuncs.ne: "!=",
-    ffuncs.not_equal: "!=",
-    ffuncs.lt: "<",
-    ffuncs.less: "<",
-    ffuncs.le: "<=",
-    ffuncs.less_equal: "<=",
-    ffuncs.gt: ">",
-    ffuncs.greater: ">",
-    ffuncs.ge: ">=",
-    ffuncs.greater_equal: ">=",
+    ffuncs.eq.ftype: "==",
+    ffuncs.equal.ftype: "==",
+    ffuncs.ne.ftype: "!=",
+    ffuncs.not_equal.ftype: "!=",
+    ffuncs.lt.ftype: "<",
+    ffuncs.less.ftype: "<",
+    ffuncs.le.ftype: "<=",
+    ffuncs.less_equal.ftype: "<=",
+    ffuncs.gt.ftype: ">",
+    ffuncs.greater.ftype: ">",
+    ffuncs.ge.ftype: ">=",
+    ffuncs.greater_equal.ftype: ">=",
     # bitwise / logical
-    ffuncs.and_: "&",
-    ffuncs.or_: "|",
-    ffuncs.not_: "!",
-    ffuncs.invert: "~",
-    ffuncs.lshift: "<<",
-    ffuncs.rshift: ">>",
-    ffuncs.logical_and: "Finch.and",
-    ffuncs.logical_or: "Finch.or",
-    ffuncs.logical_not: "!",
-    ffuncs.logical_xor: "xor",
+    ffuncs.and_.ftype: "&",
+    ffuncs.or_.ftype: "|",
+    ffuncs.not_.ftype: "!",
+    ffuncs.invert.ftype: "~",
+    ffuncs.lshift.ftype: "<<",
+    ffuncs.rshift.ftype: ">>",
+    ffuncs.logical_and.ftype: "Finch.and",
+    ffuncs.logical_or.ftype: "Finch.or",
+    ffuncs.logical_not.ftype: "!",
+    ffuncs.logical_xor.ftype: "xor",
     # math / elementwise
-    ffuncs.max: "max",
-    ffuncs.min: "min",
+    ffuncs.max.ftype: "max",
+    ffuncs.min.ftype: "min",
     # misc
-    ffuncs.divmod: "divrem",
-    ffuncs.square: "abs2",
-    ffuncs.reciprocal: "inv",
-    ffuncs.atan2: "atan",
-    ffuncs.conjugate: "conj",
-    ffuncs.where: "ifelse",
-    ffuncs.clip: "clamp",
-    ffuncs.truth: "Bool",
-    ffuncs.first_arg: "first_arg",
+    ffuncs.divmod.ftype: "divrem",
+    ffuncs.square.ftype: "abs2",
+    ffuncs.reciprocal.ftype: "inv",
+    ffuncs.atan2.ftype: "atan",
+    ffuncs.conjugate.ftype: "conj",
+    ffuncs.where.ftype: "ifelse",
+    ffuncs.clip.ftype: "clamp",
+    ffuncs.truth.ftype: "Bool",
+    ffuncs.first_arg.ftype: "first_arg",
 }
 
 _JULIA_REDUCTION_OPS = {
-    ffuncs.add: "+",
-    ffuncs.mul: "*",
-    ffuncs.max: "<<max>>",
-    ffuncs.min: "<<min>>",
-    ffuncs.and_: "&",
-    ffuncs.or_: "|",
-    ffuncs.logical_and: "&",
-    ffuncs.logical_or: "|",
+    ffuncs.add.ftype: "+",
+    ffuncs.mul.ftype: "*",
+    ffuncs.max.ftype: "<<max>>",
+    ffuncs.min.ftype: "<<min>>",
+    ffuncs.and_.ftype: "&",
+    ffuncs.or_.ftype: "|",
+    ffuncs.logical_and.ftype: "&",
+    ffuncs.logical_or.ftype: "|",
 }
 _INFIX_OPS = {
     "+",
@@ -111,10 +111,13 @@ class FinchJLKernel(AssemblyKernel):
         func_name,
         jl_code,
         finch_program: ntn.Function,
+        type_,
         dynamic_args: tuple[int, ...] = (),
         *,
         runtime: FinchJLRuntime,
+        evaluate: bool = True,
     ):
+        super().__init__(type_)
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.finch_program = finch_program
@@ -124,7 +127,8 @@ class FinchJLKernel(AssemblyKernel):
         # Known fills.
         self.dynamic_args = dynamic_args
         self.runtime = runtime
-        jl.seval(self.jl_code)
+        if evaluate:
+            jl.seval(self.jl_code)
 
     def __call__(self, *args):
         return self.runtime.kernel_call(self.func_name, args)
@@ -187,7 +191,7 @@ class FinchJLGenerator:
             case ntn.Assign(lhs, rhs):
                 # Ignore assigns used only to find loop bounds.
                 if isinstance(rhs, ntn.Dimension) or (
-                    isinstance(rhs, ntn.Call) and rhs.op.val == dimension
+                    isinstance(rhs, ntn.Call) and rhs.op.result_type == dimension.ftype
                 ):
                     return ""
 
@@ -231,9 +235,11 @@ class FinchJLGenerator:
 
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
-                if op.val == make_tuple:
+                if op.result_type == make_tuple.ftype:
                     return ",".join(arg_strs)
-                julia_op = _JULIA_OPS.get(op.val, repr(op.val))
+                julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
+                    op, nestingLvl
+                )
                 if len(arg_strs) > 1 and julia_op in _INFIX_OPS:
                     return "(" + f" {julia_op} ".join(arg_strs) + ")"
                 return f"{julia_op}(" + ",".join(arg_strs) + ")"
@@ -258,11 +264,15 @@ class FinchJLGenerator:
                 tab_str = "    " * nestingLvl
                 lhs_str = self.generate_julia(lhs, nestingLvl)
                 rhs_str = self.generate_julia(rhs, nestingLvl)
-                if lhs.mode.op.val == overwrite:
-                    stmt = f"{lhs_str} = {rhs_str}"
-                else:
-                    op = _JULIA_REDUCTION_OPS[lhs.mode.op.val]
-                    stmt = f"{lhs_str} {op}= {rhs_str}"
+                match lhs.mode.op.result_type:
+                    case ffuncs._InitWriteFType():
+                        op = self.generate_julia(lhs.mode.op, nestingLvl)
+                        stmt = f"{lhs_str} <<{op}>>= {rhs_str}"
+                    case ffuncs._OverwriteFType():
+                        stmt = f"{lhs_str} := {rhs_str}"
+                    case _:
+                        op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
+                        stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 
             case ntn.Unwrap(arg):
@@ -291,6 +301,12 @@ class FinchJLGenerator:
                 if name not in self.pack_dict:
                     raise Exception(f"{name} Slot does not exist in registry.")
                 return self.pack_dict[name]
+
+            case ntn.Literal(ffuncs._InitWrite(fill=fill)):
+                if is_dynamic(fill):
+                    raise DynamicFillError("Julia init_write requires a static fill")
+                value = self.generate_julia(ntn.Literal(fill.value), nestingLvl)
+                return f"Finch.initwrite({value})"
 
             case ntn.Literal(val):
                 if isinstance(val, AbstractFill):
@@ -340,8 +356,8 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
 
 
 class FinchJLCompiler(NotationCompiler):
-    def __init__(self, runtime: FinchJLRuntime):
-        self.runtime = runtime
+    def __init__(self, runtime: FinchJLRuntime | None = None):
+        self.runtime = DefaultFinchJLRuntime() if runtime is None else runtime
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
         generator = FinchJLGenerator()
@@ -363,12 +379,23 @@ class FinchJLCompiler(NotationCompiler):
                 jl_name = f"kernel_{uuid.uuid4().hex}"
                 kernel = FinchJLKernel(
                     jl_name,
-                    generated_prgm.replace(func.name.name, jl_name),
+                    generated_prgm.replace(func.name.name, jl_name, 1),
                     func,
+                    func.name.result_type,
                     dynamic_args=dynamic_args,
                     runtime=self.runtime,
                 )
                 self.runtime.cache_kernel(key, kernel)
+            elif kernel.ftype != func.name.result_type:
+                kernel = FinchJLKernel(
+                    kernel.func_name,
+                    kernel.jl_code,
+                    func,
+                    func.name.result_type,
+                    dynamic_args=dynamic_args,
+                    runtime=self.runtime,
+                    evaluate=False,
+                )
             kernel_dict[func.name.name] = kernel
 
         return FinchJLLibrary(kernel_dict)

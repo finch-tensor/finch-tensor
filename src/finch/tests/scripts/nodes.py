@@ -33,7 +33,14 @@ def create_ntn_simple_node():
     return ntn.Module(
         (
             ntn.Function(
-                ntn.Variable("matmul", T),
+                ntn.Variable(
+                    "matmul",
+                    asm.AssemblyKernelFType(
+                        "matmul",
+                        (C.result_type, A.result_type, B.result_type),
+                        T,
+                    ),
+                ),
                 (C, A, B),
                 ntn.Block(
                     (
@@ -116,11 +123,17 @@ def create_log_simple_node():
 
     return log.Plan(
         (
-            log.Query(log.Alias("S"), log.Table(log.Literal(s), (i, j))),
-            log.Query(log.Alias("A"), log.Table(log.Literal(a), (i, k))),
-            log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
-                log.Alias("AB"),
+                log.Table(log.Alias("S"), (i, j)), log.Table(log.Literal(s), (i, j))
+            ),
+            log.Query(
+                log.Table(log.Alias("A"), (i, k)), log.Table(log.Literal(a), (i, k))
+            ),
+            log.Query(
+                log.Table(log.Alias("B"), (k, j)), log.Table(log.Literal(b), (k, j))
+            ),
+            log.Query(
+                log.Table(log.Alias("AB"), (i, j, k)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (
@@ -131,7 +144,7 @@ def create_log_simple_node():
             ),
             # matmul
             log.Query(
-                log.Alias("C"),
+                log.Table(log.Alias("C"), (i, j)),
                 log.Aggregate(
                     log.Literal(ffuncs.add),
                     log.Literal(0),
@@ -141,7 +154,7 @@ def create_log_simple_node():
             ),
             # elemwise
             log.Query(
-                log.Alias("RES"),
+                log.Table(log.Alias("RES"), (i, j)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (
@@ -160,7 +173,9 @@ def create_asm_if_node():
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("if_else", finch.int64),
+                asm.Variable(
+                    "if_else", asm.AssemblyKernelFType("if_else", (), finch.int64)
+                ),
                 (),
                 asm.Block(
                     (
@@ -231,7 +246,14 @@ def create_asm_dot_node():
     return asm.Module(
         (
             asm.Function(
-                asm.Variable("dot_product", finch.float64),
+                asm.Variable(
+                    "dot_product",
+                    asm.AssemblyKernelFType(
+                        "dot_product",
+                        (ab_v.result_type, bb_v.result_type),
+                        finch.float64,
+                    ),
+                ),
                 (
                     ab_v,
                     bb_v,
@@ -287,7 +309,14 @@ def create_asm_comprehensive_node():
     temp = asm.Variable("temp", finch.int64)
 
     helper_func = asm.Function(
-        asm.Variable("compute", finch.int64),
+        asm.Variable(
+            "compute",
+            asm.AssemblyKernelFType(
+                "compute",
+                (finch.int64, finch.int64),
+                finch.int64,
+            ),
+        ),
         (asm.Variable("x", finch.int64), asm.Variable("y", finch.int64)),
         asm.Block(
             (
@@ -305,7 +334,7 @@ def create_asm_comprehensive_node():
     )
 
     main_func = asm.Function(
-        asm.Variable("main", finch.int64),
+        asm.Variable("main", asm.AssemblyKernelFType("main", (), finch.int64)),
         (),
         asm.Block(
             (

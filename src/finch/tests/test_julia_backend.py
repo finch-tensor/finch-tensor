@@ -61,6 +61,107 @@ def _requires_julia_backend():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
 
 
+def test_compile_julia_preserves_definition_type():
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLCompiler
+    from finch.finch_assembly import AssemblyKernelFType
+
+    tensor = ft.asarray(np.arange(6, dtype=np.int64).reshape(2, 3))
+    arg = ntn.Variable("tensor", tensor.ftype)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (arg,))
+    definitions = tuple(
+        ntn.Function(
+            ntn.Variable(
+                "identity",
+                AssemblyKernelFType("identity", (arg.result_type,), result.result_type),
+            ),
+            (arg,),
+            ntn.Block((ntn.Return(result),)),
+        )
+        for _ in range(2)
+    )
+    compiler = FinchJLCompiler()
+    first, second = (
+        compiler(ntn.Module((definition,))).identity for definition in definitions
+    )
+    assert ftype(first) == definitions[0].name.result_type
+    assert ftype(second) == definitions[1].name.result_type
+    assert ftype(first) != ftype(second)
+    for kernel in (first, second):
+        np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
+
+
+@pytest.mark.parametrize(
+    "fill, value",
+    [
+        (np.int64(0), 0),
+        (np.int64(-1), 7),
+        (np.bool_(False), True),
+        (np.float64(0), -0.0),
+        (np.float64(np.inf), 7),
+        (np.float64(np.nan), 7),
+    ],
+)
+def test_compile_julia_init_write(fill, value):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLCompiler, FinchJLGenerator
+    from finch.compile_jl.julia import jl
+    from finch.finch_assembly import AssemblyKernelFType
+    from finch.tensor import BufferizedNDArray
+
+    tensor = BufferizedNDArray.from_numpy(np.array(fill), fill_value=fill)
+    arg = ntn.Variable("output", tensor.ftype)
+    slot = ntn.Slot("output_slot", tensor.ftype)
+    operator = ffuncs.init_write(fill)
+    op = ntn.Literal(operator)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (arg,))
+    value = type(fill)(value)
+    call = ntn.Call(op, (ntn.Literal(fill), ntn.Literal(value)))
+    generated = FinchJLGenerator().generate_julia(call)
+    np.testing.assert_equal(jl.seval(generated), operator(fill, value))
+    program = ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable(
+                    "write",
+                    AssemblyKernelFType(
+                        "write", (arg.result_type,), result.result_type
+                    ),
+                ),
+                (arg,),
+                ntn.Block(
+                    (
+                        ntn.Unpack(slot, arg),
+                        ntn.Declare(slot, ntn.Literal(fill), op, ()),
+                        ntn.Increment(
+                            ntn.Access(slot, ntn.Update(op), ()), ntn.Literal(value)
+                        ),
+                        ntn.Freeze(slot, op),
+                        ntn.Repack(slot, arg),
+                        ntn.Return(result),
+                    )
+                ),
+            ),
+        )
+    )
+    actual = FinchJLCompiler()(program).write(tensor)[0]
+    np.testing.assert_array_equal(actual.to_numpy(), value)
+
+
+def test_compile_julia_init_write_rejects_dynamic_fill():
+    from finch.algebra.fill import DynamicFill, DynamicFillError
+    from finch.compile_jl.compiler import FinchJLGenerator
+
+    tensor = ft.asarray(np.zeros((), dtype=np.int64))
+    op = ntn.Literal(ffuncs.init_write(DynamicFill(np.int64(3))))
+    update = ntn.Increment(
+        ntn.Access(ntn.Variable("output", tensor.ftype), ntn.Update(op), ()),
+        ntn.Literal(np.int64(3)),
+    )
+    with pytest.raises(DynamicFillError, match="static fill"):
+        FinchJLGenerator().generate_julia(update)
+
+
 @pytest.mark.parametrize(
     "mask",
     [

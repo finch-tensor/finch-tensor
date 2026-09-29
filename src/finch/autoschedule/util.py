@@ -5,6 +5,7 @@ from finch.algebra.utils import intersect, is_subsequence, setdiff, with_subsequ
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Field,
     Literal,
     LogicExpression,
     LogicNode,
@@ -18,6 +19,11 @@ from finch.finch_logic import (
     Table,
 )
 from finch.symbolic import Chain, Fixpoint, PostWalk, PreWalk, Rewrite
+
+
+def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
+    """`ex` with its fields in the order `idxs`."""
+    return ex if ex.fields() == idxs else Reorder(ex, idxs)
 
 
 @overload
@@ -87,7 +93,34 @@ def push_fields(root):
                     idxs_2,
                 )
 
-    return Rewrite(PreWalk(Fixpoint(rule_2)))(root)
+    # A query stores its result in the order of its left-hand table, so we
+    # expose that order to `rule_2` as a Reorder and strip it afterwards.
+    def wrap_query(stmt):
+        match stmt:
+            case Query(Table(_, idxs) as lhs, rhs) if rhs.fields() != idxs:
+                return Query(lhs, Reorder(rhs, idxs))
+
+    root = Rewrite(PostWalk(wrap_query))(root)
+    root = Rewrite(PreWalk(Fixpoint(rule_2)))(root)
+    return drop_query_reorders(root)
+
+
+@overload
+def drop_query_reorders(root: LogicStatement) -> LogicStatement: ...
+@overload
+def drop_query_reorders(root: LogicNode) -> LogicNode: ...
+def drop_query_reorders(root):
+    """
+    Remove a Reorder at the root of each query's right-hand side. The table on
+    the left-hand side of a query already fixes the order of its result.
+    """
+
+    def rule(stmt):
+        match stmt:
+            case Query(lhs, Reorder(arg, _)):
+                return Query(lhs, arg)
+
+    return Rewrite(PostWalk(rule))(root)
 
 
 def flatten_plans(root: Plan) -> Plan:
@@ -122,12 +155,9 @@ def propagate_copy_queries(root, bindings):
 
     def rule_1(node):
         match node:
-            case Query(lhs, Table(Alias(_) as rhs, _)) if lhs not in bindings:
-                copies[lhs] = copies.get(rhs, rhs)
-                return Plan()
-            case Query(lhs, Reorder(Table(Alias(_) as rhs, idxs_1), idxs_2)) if (
-                idxs_1 == idxs_2 and lhs not in bindings
-            ):
+            case Query(
+                Table(Alias() as lhs, idxs_1), Table(Alias(_) as rhs, idxs_2)
+            ) if idxs_1 == idxs_2 and lhs not in bindings:
                 copies[lhs] = copies.get(rhs, rhs)
                 return Plan()
 
