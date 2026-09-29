@@ -51,7 +51,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernels: dict[Any, Any] = {}
         self._kernel_metadata: dict[str, _KernalMetadata] = {}
         self._translated_buffers: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
-        self._source_finalizers: dict[_TranslationCacheKey, weakref.finalize] = {}
         self.free_pool = _BufferPool()
 
     def get_cached_kernel(self, key):
@@ -114,27 +113,19 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             return julia_buf
 
         raw = tensor_to_jl(tensor, pin_fill=pin_fill)
+        translation_finalizer = weakref.finalize(
+            tensor, self._translated_buffers.pop, key, None
+        )
         julia_buf = JuliaOwnedTensor(
             tensor.ftype,
             tuple(int(dimension) for dimension in tensor.shape),
             self.release,
             raw,
             pin_fill,
+            translation_finalizer=translation_finalizer,
         )
         self._translated_buffers[key] = julia_buf
-        self._source_finalizers[key] = weakref.finalize(
-            tensor, self._drop_source_buffer, key
-        )
         return julia_buf
-
-    def _drop_source_buffer(self, key: _TranslationCacheKey) -> None:
-        """Drop cached Julia state once its Python source tensor is collected.
-
-        Cached conversions retain Julia-owned buffers, so their entries must not
-        outlive the Python tensor that owns the backing storage.
-        """
-        self._source_finalizers.pop(key, None)
-        self._translated_buffers.pop(key, None)
 
     @staticmethod
     def _translation_cache_key(
@@ -167,9 +158,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             self.free_pool.release_lease(tensor._lease)
 
     def close(self) -> None:
-        for finalizer in self._source_finalizers.values():
-            finalizer.detach()
         self._kernels.clear()
         self._kernel_metadata.clear()
         self._translated_buffers.clear()
-        self._source_finalizers.clear()

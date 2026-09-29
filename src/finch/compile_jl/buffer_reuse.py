@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable
+from weakref import finalize
 
 import numpy as np
 
@@ -63,6 +64,7 @@ class JuliaOwnedTensor(Tensor):
         raw_julia_obj: Any,
         pin_fill: bool,
         lease: _BufferLease | None = None,
+        translation_finalizer: finalize | None = None,
     ) -> None:
         self._ftype = ftype
         self._shape = shape
@@ -70,8 +72,13 @@ class JuliaOwnedTensor(Tensor):
         self._raw_julia_obj = raw_julia_obj
         self._pin_fill = pin_fill
         self._lease = lease
+        # If this tensor is a translation of a python tensor then this finalizer
+        # triggers the garbage collection of this tensor when its python equivalent is killed.
+        self._translation_finalizer = translation_finalizer
 
     def __del__(self) -> None:
+        if self._translation_finalizer is not None:
+            self._translation_finalizer.detach()
         self._release(self)
 
     @property
