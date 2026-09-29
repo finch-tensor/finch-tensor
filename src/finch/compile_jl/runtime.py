@@ -59,19 +59,13 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
     def cache_kernel(self, key, kernel):
         self._kernels[key] = kernel
-
-    def _kernel_metadata_for(self, kernel: Any) -> _KernalMetadata:
-        metadata = self._kernel_metadata.get(kernel.func_name)
-        if metadata is None:
-            metadata = _KernalMetadata(
-                reset_argument_positions(kernel.finch_program),
-                returned_argument_positions(kernel.finch_program),
-            )
-            self._kernel_metadata[kernel.func_name] = metadata
-        return metadata
+        self._kernel_metadata[kernel.func_name] = _KernalMetadata(
+            reset_argument_positions(kernel.finch_program),
+            returned_argument_positions(kernel.finch_program),
+        )
 
     def kernel_call(self, kernel, args):
-        metadata = self._kernel_metadata_for(kernel)
+        metadata = self._kernel_metadata[kernel.func_name]
 
         # Lease Julia buffers only for resettable compiler-created outputs.
         owned_args: list[JuliaOwnedTensor] = []
