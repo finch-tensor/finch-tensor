@@ -219,7 +219,7 @@ def test_compile_julia_pattern_masks(mask):
     from finch.compile_jl.types import ftype_to_jl_constructor_str
 
     jl_mask = tensor_to_jl(mask)
-    prototype = jl.seval(ftype_to_jl_constructor_str(mask.ftype, fill_literal="0"))
+    prototype = jl.seval(ftype_to_jl_constructor_str(mask.ftype))
     assert jl.typeof(jl_mask) == jl.typeof(prototype)
 
     data = np.full(mask.shape or (1,), 2, dtype=np.int64)

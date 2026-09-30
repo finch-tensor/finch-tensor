@@ -22,7 +22,6 @@ from finch.tensor.patterns import PatternTensorFType
 from .julia import jl
 from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
-    _julia_literal,
     _leaf_type_str,
     ftype_to_jl_constructor_str,
     ftype_to_jl_type_str,
@@ -169,9 +168,7 @@ class FinchJLGenerator:
                                 raise DynamicFillError(
                                     "Julia backend does not support dynamic fills"
                                 )
-                            constructor = ftype_to_jl_constructor_str(
-                                type_, fill_literal=_julia_literal(fill.value)
-                            )
+                            constructor = ftype_to_jl_constructor_str(type_)
                             proto_lines.append(f"        {arg_name} = {constructor}")
                             arg_strs.append(arg_name)
                         case ntn.Variable(_, type_):
@@ -371,11 +368,7 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
 def _argument_type_str(arg: ntn.Variable) -> str:
     match arg.type_:
         case TensorFType() as type_:
-            fill = type_.fill_value
-            return ftype_to_jl_type_str(
-                type_,
-                fill_literal=_julia_literal(fill.value),
-            )
+            return ftype_to_jl_type_str(type_)
         case type_:
             raise TypeError(f"Julia kernel argument must be a tensor, got {type_}")
 
