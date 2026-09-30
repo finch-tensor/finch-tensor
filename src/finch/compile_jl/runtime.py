@@ -110,7 +110,9 @@ class JuliaOwnedTensor(OverrideTensor):
 
     def __getitem__(self, index):
         if not self._shape:
-            return self._as_tensor()[index]
+            return Scalar(self.item(), fill_value=self.fill_value, device=self.device)[
+                index
+            ]
         result = self._as_tensor().to_numpy()[index]
         if isinstance(result, np.ndarray):
             return BufferizedNDArray.from_numpy(
