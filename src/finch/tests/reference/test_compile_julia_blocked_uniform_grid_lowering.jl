@@ -6,7 +6,7 @@ eval(let
         v3 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v4 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
         v5 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2,v3,v4,v5)
+    Finch.@finch_kernel function main(v0,v1,v2,v3,v4,v5)
         v3 .= 0
         for v6 = _
             for v7 = _
@@ -34,7 +34,7 @@ eval(let
 end)
 
 # Generated Julia
-function __FINCH_KERNEL_NAME__(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Vector{Int64}}, PlusOneVector{Int64, Vector{Int64}}, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v1::Finch.SwizzleArray{(2, 1), Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}}, v2::Finch.SwizzleArray{(2, 1), Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}})
+function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Vector{Int64}}, PlusOneVector{Int64, Vector{Int64}}, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v1::Finch.SwizzleArray{(2, 1), Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}}, v2::Finch.SwizzleArray{(2, 1), Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}})
     @inbounds @fastmath(begin
                 v0_lvl = v0.lvl
                 v0_lvl_stop = v0_lvl.shape

@@ -4,7 +4,7 @@ eval(let
         v0 = Finch.window(Finch.offset(Finch.diagmask, 0, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0.0, Float64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0.0
         for v3 = _
             for v4 = _
@@ -21,7 +21,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.offset(Finch.uptrimask, 0, 1), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0.0, Float64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0.0
         for v3 = _
             for v4 = _
@@ -38,7 +38,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.pairsummask, Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0.0, Float64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0.0
         for v3 = _
             for v4 = _
@@ -55,7 +55,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.rollmask(1, -4), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0.0, Float64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0.0
         for v3 = _
             for v4 = _
@@ -72,7 +72,7 @@ eval(let
         v0 = Finch.window(Finch.onehotmask(3), Finch.Extent(1, 1))
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[v3]) + v1[v3])
@@ -87,7 +87,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.reshapemask((2, 3), (3, 2)), Finch.Extent(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1)), 4, 3, 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             for v4 = _
@@ -108,7 +108,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.chunkmask(1, 3), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             for v4 = _
@@ -125,7 +125,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             for v4 = _
@@ -142,7 +142,7 @@ eval(let
         v0 = Finch.window(Finch.randommask((), 0.4; seed=UInt64(42)))
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[]) + v1[v3])
@@ -157,7 +157,7 @@ eval(let
         v0 = Finch.window(Finch.randommask((1,), 0.25; seed=UInt64(42)), Finch.Extent(1, 1))
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             v2[v3] <<Finch.initwrite(0)>>= (Bool(v0[v3]) + v1[v3])
@@ -172,7 +172,7 @@ eval(let
         v0 = Finch.swizzle(Finch.window(Finch.randommask((1, 1), 0.5; seed=UInt64(18446744073709551615)), Finch.Extent(1, 1), Finch.Extent(1, 1)), 2, 1)
         v1 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
         v2 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
-    Finch.@finch_kernel function __FINCH_KERNEL_NAME__(v0,v1,v2)
+    Finch.@finch_kernel function main(v0,v1,v2)
         v2 .= 0
         for v3 = _
             for v4 = _

@@ -9,7 +9,7 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import AbstractFill, Tensor, TensorFType, is_dynamic
+from finch.algebra import Tensor, TensorFType
 from finch.tensor import BufferizedNDArray
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
@@ -40,7 +40,6 @@ class _BufferPool:
         self,
         ftype: TensorFType,
         shape: tuple[int, ...],
-        fill_value: AbstractFill | None = None,
     ) -> _BufferLease:
         key = _BufferPoolKey(
             repr(ftype),
@@ -48,9 +47,7 @@ class _BufferPool:
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
-        tensor = (
-            ftype.with_fill(fill_value) if fill_value is not None else ftype
-        ).construct(shape)
+        tensor = ftype.construct(shape)
         return _BufferLease(
             tensor_to_jl(tensor),
             key,
@@ -200,11 +197,6 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 lease = self.free_pool.acquire(
                     tensor.ftype,
                     tensor.shape,
-                    (
-                        tensor.ftype.fill_value
-                        if is_dynamic(tensor.ftype.fill_value)
-                        else None
-                    ),
                 )
                 julia_buf = JuliaOwnedTensor(
                     tensor.ftype,

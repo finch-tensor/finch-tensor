@@ -116,30 +116,17 @@ class FinchJLKernel(AssemblyKernel):
         type_,
         finch_program: ntn.Function,
         runtime: FinchJLRuntime,
-        dynamic_args: tuple[int, ...] = (),
+        func_name: str,
     ):
         super().__init__(type_)
         # We store this code so that we can verify it in pytest
         self.jl_code = jl_code
         self.finch_program = finch_program
-        self.dynamic_args = dynamic_args
-        self.compiled_kernels: dict[tuple[str, ...], str] = {}
         self.runtime = runtime
+        self.func_name = func_name
 
     def __call__(self, *args):
-        fills = tuple(
-            _julia_literal(args[position].ftype.fill_value.value)
-            for position in self.dynamic_args
-        )
-        func_name = self.compiled_kernels.get(fills)
-        if func_name is None:
-            func_name = f"kernel_{uuid.uuid4().hex}"
-            source = self.jl_code.replace("__FINCH_KERNEL_NAME__", func_name)
-            for position, fill in zip(self.dynamic_args, fills, strict=True):
-                source = source.replace(_dynamic_fill_placeholder(position), fill)
-            jl.seval(source)
-            self.compiled_kernels[fills] = func_name
-        return self.runtime.kernel_call(func_name, self, args)
+        return self.runtime.kernel_call(self.func_name, self, args)
 
 
 class FinchJLLibrary(AssemblyLibrary):
@@ -154,7 +141,6 @@ class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
         self.names: dict[str, str] = {}
-        self.dynamic_fill_placeholders: dict[int, str] = {}
 
     def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
@@ -167,26 +153,20 @@ class FinchJLGenerator:
     def generate_julia(self, prgm, nestingLvl=0):
         match prgm:
             case ntn.Function(name, args, body):
-                self.dynamic_fill_placeholders = {
-                    position: _dynamic_fill_placeholder(position)
-                    for position, arg in enumerate(args)
-                    if is_dynamic(getattr(arg.type_, "fill_value", None))
-                }
                 body_str = self.generate_julia(body, nestingLvl + 2)
                 arg_strs = []
                 proto_lines = []
-                for position, arg in enumerate(args):
+                for arg in args:
                     match arg:
                         case ntn.Variable(sym, TensorFType() as type_):
                             arg_name = self.emit_name(sym)
                             fill = type_.fill_value
-                            fill_literal = (
-                                self.dynamic_fill_placeholders[position]
-                                if is_dynamic(fill)
-                                else _julia_literal(fill.value)
-                            )
+                            if is_dynamic(fill):
+                                raise DynamicFillError(
+                                    "Julia backend does not support dynamic fills"
+                                )
                             constructor = ftype_to_jl_constructor_str(
-                                type_, fill_literal=fill_literal
+                                type_, fill_literal=_julia_literal(fill.value)
                             )
                             proto_lines.append(f"        {arg_name} = {constructor}")
                             arg_strs.append(arg_name)
@@ -201,8 +181,7 @@ class FinchJLGenerator:
                 return (
                     "eval(let\n"
                     f"{proto_str}\n"
-                    "    Finch.@finch_kernel function "
-                    f"__FINCH_KERNEL_NAME__({arg_str})\n"
+                    f"    Finch.@finch_kernel function {name}({arg_str})\n"
                     f"{body_str}\n    end\n"
                     "end)"
                 )
@@ -329,13 +308,17 @@ class FinchJLGenerator:
 
             case ntn.Literal(ffuncs._InitWrite(fill=fill)):
                 if is_dynamic(fill):
-                    raise DynamicFillError("Julia init_write requires a static fill")
+                    raise DynamicFillError(
+                        "Julia backend does not support dynamic fills"
+                    )
                 value = self.generate_julia(ntn.Literal(fill.value), nestingLvl)
                 return f"Finch.initwrite({value})"
 
             case ntn.Literal(val):
                 if isinstance(val, AbstractFill) and is_dynamic(val):
-                    raise DynamicFillError("Julia only supports header dynamic fills")
+                    raise DynamicFillError(
+                        "Julia backend does not support dynamic fills"
+                    )
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"
@@ -355,13 +338,8 @@ class FinchJLGenerator:
                 raise Exception(f"Unhandled node type: {type(prgm)}")
 
 
-def unwrap_static_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Unwrap static fills while preserving dynamic fills for runtime binding."""
-    dynamic_args = tuple(
-        position
-        for position, arg in enumerate(func.args)
-        if is_dynamic(getattr(arg.type_, "fill_value", None))
-    )
+def unwrap_static_fills(func: ntn.Function) -> ntn.Function:
+    """Unwrap static fills before Julia source generation."""
 
     def rule(node):
         match node:
@@ -369,11 +347,7 @@ def unwrap_static_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ..
                 return ntn.Literal(fill.value)
         return None
 
-    return Rewrite(PostWalk(rule))(func), dynamic_args
-
-
-def _dynamic_fill_placeholder(position: int) -> str:
-    return f"__FINCH_DYNAMIC_FILL_{position}__"
+    return Rewrite(PostWalk(rule))(func)
 
 
 def _argument_type_str(arg: ntn.Variable) -> str:
@@ -382,11 +356,7 @@ def _argument_type_str(arg: ntn.Variable) -> str:
             fill = type_.fill_value
             return ftype_to_jl_type_str(
                 type_,
-                fill_literal=(
-                    _julia_literal(fill.ftype(0))
-                    if is_dynamic(fill)
-                    else _julia_literal(fill.value)
-                ),
+                fill_literal=_julia_literal(fill.value),
             )
         case type_:
             raise TypeError(f"Julia kernel argument must be a tensor, got {type_}")
@@ -401,18 +371,20 @@ class FinchJLCompiler(NotationCompiler):
 
         kernel_dict = {}
         for orig_func in prgm.children:
-            func, dynamic_args = unwrap_static_fills(orig_func)
+            func = unwrap_static_fills(orig_func)
             generated_prgm = generator(func)
             arg_type_strs = tuple(_argument_type_str(arg) for arg in func.args)
-            key = (generated_prgm, arg_type_strs, dynamic_args)
+            key = (generated_prgm, arg_type_strs)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
+                func_name = f"kernel_{uuid.uuid4().hex}"
+                jl.seval(generated_prgm.replace(func.name.name, func_name, 1))
                 kernel = FinchJLKernel(
-                    generated_prgm,
+                    generated_prgm.replace(func.name.name, func_name, 1),
                     func.name.result_type,
                     func,
                     self.runtime,
-                    dynamic_args,
+                    func_name,
                 )
                 self.runtime.cache_kernel(key, kernel)
             elif kernel.ftype != func.name.result_type:
@@ -421,7 +393,7 @@ class FinchJLCompiler(NotationCompiler):
                     func.name.result_type,
                     func,
                     self.runtime,
-                    dynamic_args,
+                    kernel.func_name,
                 )
                 self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel

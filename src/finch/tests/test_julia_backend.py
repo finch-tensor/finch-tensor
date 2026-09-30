@@ -17,7 +17,7 @@ from finch import (
     ffuncs,
     ftype,
 )
-from finch.algebra import DynamicFill
+from finch.algebra import DynamicFill, DynamicFillError
 from finch.autoschedule import (
     DefaultLogicFactorizer,
     DefaultLoopOrderer,
@@ -94,35 +94,23 @@ def test_compile_julia_preserves_definition_type():
         np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
 
 
-def test_compile_julia_binds_dynamic_fills_at_invocation():
-    _requires_julia_backend()
+def test_compile_julia_rejects_dynamic_fill_arguments():
+    from finch.compile_jl.compiler import FinchJLGenerator
 
-    def definition(tensor):
-        arg = ntn.Variable("tensor", tensor.ftype)
-        result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (arg,))
-        return ntn.Module(
-            (
-                ntn.Function(
-                    ntn.Variable(
-                        "identity",
-                        AssemblyKernelFType(
-                            "identity", (arg.result_type,), result.result_type
-                        ),
-                    ),
-                    (arg,),
-                    ntn.Block((ntn.Return(result),)),
-                ),
-            )
-        )
+    tensor = BufferizedNDArray.from_numpy(np.array([1.0, 2.0]), DynamicFill(3.0))
+    arg = ntn.Variable("tensor", tensor.ftype)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (arg,))
+    definition = ntn.Function(
+        ntn.Variable(
+            "identity",
+            AssemblyKernelFType("identity", (arg.result_type,), result.result_type),
+        ),
+        (arg,),
+        ntn.Block((ntn.Return(result),)),
+    )
 
-    first = BufferizedNDArray.from_numpy(np.array([1.0, 2.0]), DynamicFill(3.0))
-    second = BufferizedNDArray.from_numpy(np.array([1.0, 2.0]), DynamicFill(7.0))
-    kernel = FinchJLCompiler()(definition(first)).identity
-
-    assert "__FINCH_DYNAMIC_FILL_0__" in kernel.jl_code
-    assert first.ftype == second.ftype
-    assert kernel(first)[0].ftype.fill_value.value == 3.0
-    assert kernel(second)[0].ftype.fill_value.value == 7.0
+    with pytest.raises(DynamicFillError, match="does not support dynamic fills"):
+        FinchJLGenerator().generate_julia(definition)
 
 
 @pytest.mark.parametrize(
@@ -181,7 +169,6 @@ def test_compile_julia_init_write(fill, value):
 
 
 def test_compile_julia_init_write_rejects_dynamic_fill():
-    from finch.algebra.fill import DynamicFill, DynamicFillError
     from finch.compile_jl.compiler import FinchJLGenerator
 
     tensor = ft.asarray(np.zeros((), dtype=np.int64))
@@ -190,7 +177,7 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         ntn.Access(ntn.Variable("output", tensor.ftype), ntn.Update(op), ()),
         ntn.Literal(np.int64(3)),
     )
-    with pytest.raises(DynamicFillError, match="static fill"):
+    with pytest.raises(DynamicFillError, match="does not support dynamic fills"):
         FinchJLGenerator().generate_julia(update)
 
 
@@ -342,7 +329,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 
         def __call__(self, prgm):
             for func in prgm.children:
-                func, _ = unwrap_static_fills(func)
+                func = unwrap_static_fills(func)
                 self.sources.append(FinchJLGenerator()(func))
             return super().__call__(prgm)
 
@@ -388,7 +375,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
 
         def __call__(self, prgm):
             for func in prgm.children:
-                func, _ = unwrap_static_fills(func)
+                func = unwrap_static_fills(func)
                 source = FinchJLGenerator()(func)
                 expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
                 self.sources.append(
@@ -441,7 +428,7 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
 
         def __call__(self, prgm):
             for func in prgm.children:
-                func, _ = unwrap_static_fills(func)
+                func = unwrap_static_fills(func)
                 source = FinchJLGenerator()(func)
                 expanded = jl.seval(source.removeprefix("eval(").removesuffix(")"))
                 self.sources.append(
@@ -663,7 +650,7 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
 
         def __call__(self, prgm):
             for func in prgm.children:
-                func, _ = unwrap_static_fills(func)
+                func = unwrap_static_fills(func)
                 source = FinchJLGenerator()(func)
                 # @finch_kernel returns the expanded function expression;
                 # omit the outer eval to inspect Finch's sparse loops.
