@@ -12,6 +12,8 @@ import numpy as np
 from finch.algebra import AbstractFill, Tensor, TensorFType, is_dynamic
 from finch.tensor import BufferizedNDArray
 from finch.tensor.np_wrapper import NumPyWrapper
+from finch.tensor.override_tensor import OverrideTensor
+from finch.tensor.scalar import Scalar
 
 from .analyze import reset_argument_positions, returned_argument_positions
 from .interop import jl_tensor_to_python, tensor_to_jl
@@ -59,7 +61,7 @@ class _BufferPool:
         free_leases.setdefault(id(lease), lease)
 
 
-class JuliaOwnedTensor(Tensor):
+class JuliaOwnedTensor(OverrideTensor):
     """A Finch tensor handle for storage owned by the Julia runtime."""
 
     def __init__(
@@ -108,8 +110,15 @@ class JuliaOwnedTensor(Tensor):
 
     def __getitem__(self, index):
         if not self._shape:
-            return self.item()
-        return self._as_tensor().to_numpy()[index]
+            return self._as_tensor()[index]
+        result = self._as_tensor().to_numpy()[index]
+        if isinstance(result, np.ndarray):
+            return BufferizedNDArray.from_numpy(
+                result,
+                fill_value=self.fill_value,
+                device=self.device,
+            )
+        return Scalar(result, fill_value=self.fill_value, device=self.device)
 
     def to_numpy(self):
         return self._as_tensor().to_numpy()
@@ -117,11 +126,13 @@ class JuliaOwnedTensor(Tensor):
     def __array__(self, dtype=None, copy=None):
         out = np.asarray(self.to_numpy())
         if dtype is not None and out.dtype != dtype:
-            if copy is not None and not copy:
+            if copy is False:
                 raise ValueError(
                     "Unable to avoid copy while creating an array as requested."
                 )
             out = out.astype(dtype)
+        if copy is True:
+            return out.copy()
         return out
 
     def to_scipy(self):
