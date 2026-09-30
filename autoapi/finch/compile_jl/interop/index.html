@@ -2750,6 +2750,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../analyze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analyze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../buffer/" class="md-nav__link">
         
   
@@ -2957,6 +2985,34 @@
     
   
     profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    runtime
   
 
     
@@ -5477,7 +5533,9 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">403</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
 <span class="normal">404</span>
 <span class="normal">405</span>
 <span class="normal">406</span>
@@ -5513,9 +5571,7 @@
 <span class="normal">436</span>
 <span class="normal">437</span>
 <span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
+<span class="normal">439</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep Julia-owned tensor buffers alive across kernel invocations."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5537,7 +5593,7 @@
         <span class="k">return</span> <span class="p">(</span><span class="s2">"object"</span><span class="p">,</span> <span class="nb">id</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-        <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache_key</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cache_key</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span> <span class="n">pin_fill</span><span class="p">)</span>
         <span class="n">cached</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tensors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">cached</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
@@ -5590,9 +5646,7 @@
 
     <div class="doc doc-contents ">
 
-        <p>Convert a level to its Julia counterpart. With <code>pin_fill</code>, the leaf
-fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
-<code>compile_jl.compiler</code> for why this backend does that.</p>
+        <p>Convert a level to its Julia counterpart, optionally pinning its fill.</p>
 
 
             <details class="mkdocstrings-source">
@@ -5676,12 +5730,8 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
 <span class="normal">156</span>
 <span class="normal">157</span>
 <span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Convert a level to its Julia counterpart. With `pin_fill`, the leaf</span>
-<span class="sd">    fill is forced to a zero of its dtype -- see `zero_dynamic_fills` in</span>
-<span class="sd">    `compile_jl.compiler` for why this backend does that."""</span>
+<span class="normal">159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert a level to its Julia counterpart, optionally pinning its fill."""</span>
     <span class="k">match</span> <span class="n">level</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">ElementLevel</span><span class="p">():</span>
             <span class="n">fill</span> <span class="o">=</span> <span class="n">level</span><span class="o">.</span><span class="n">fill_value</span>
@@ -5777,14 +5827,14 @@ fill is forced to a zero of its dtype -- see <code>zero_dynamic_fills</code> in
 
     <div class="doc doc-contents ">
 
-        <p>Convert a tensor to its Julia counterpart. With <code>pin_fill</code>, fills are
-forced to a zero of their dtype so the argument types line up with a
-kernel compiled under <code>zero_dynamic_fills</code>.</p>
+        <p>Convert a tensor to its Julia counterpart, optionally pinning its fill.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">349</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
 <span class="normal">352</span>
@@ -5812,12 +5862,10 @@ kernel compiled under <code>zero_dynamic_fills</code>.</p>
 <span class="normal">374</span>
 <span class="normal">375</span>
 <span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Convert a tensor to its Julia counterpart. With `pin_fill`, fills are</span>
-<span class="sd">    forced to a zero of their dtype so the argument types line up with a</span>
-<span class="sd">    kernel compiled under `zero_dynamic_fills`."""</span>
+<span class="normal">377</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Convert a tensor to its Julia counterpart, optionally pinning its fill."""</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">"raw_julia_obj"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">raw_julia_obj</span>
     <span class="k">if</span> <span class="n">is_julia_obj</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">and</span> <span class="n">jl</span><span class="o">.</span><span class="n">isa</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">jl</span><span class="o">.</span><span class="n">Finch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">obj</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">FiberTensor</span><span class="p">):</span>

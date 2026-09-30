@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../config/">
+        <link rel="prev" href="../">
       
       
-        <link rel="next" href="../print/">
+        <link rel="next" href="../buffer/">
       
       
         
@@ -23,7 +23,7 @@
     
     
       
-        <title>logging - Finch Tensor</title>
+        <title>analyze - Finch Tensor</title>
       
     
     
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#finch.util.logging" class="md-skip">
+        <a href="#finch.compile_jl.analyze" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +102,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              logging
+              analyze
             
           </span>
         </div>
@@ -2698,18 +2698,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_6" checked>
         
           
           <label class="md-nav__link" for="__nav_3_2_6" id="__nav_3_2_6_label" tabindex="0">
@@ -2730,7 +2732,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3_2_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -2745,10 +2747,35 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../compile_jl/analyze/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analyze
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -2764,6 +2791,57 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.analyze" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        analyze
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.analyze.reset_argument_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reset_argument_positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.analyze.returned_argument_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        returned_argument_positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2776,7 +2854,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/buffer/" class="md-nav__link">
+      <a href="../buffer/" class="md-nav__link">
         
   
   
@@ -2804,7 +2882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/compiler/" class="md-nav__link">
+      <a href="../compiler/" class="md-nav__link">
         
   
   
@@ -2832,7 +2910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/interop/" class="md-nav__link">
+      <a href="../interop/" class="md-nav__link">
         
   
   
@@ -2860,7 +2938,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/julia/" class="md-nav__link">
+      <a href="../julia/" class="md-nav__link">
         
   
   
@@ -2888,7 +2966,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/profiling/" class="md-nav__link">
+      <a href="../profiling/" class="md-nav__link">
         
   
   
@@ -2916,7 +2994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/runtime/" class="md-nav__link">
+      <a href="../runtime/" class="md-nav__link">
         
   
   
@@ -2944,7 +3022,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../compile_jl/types/" class="md-nav__link">
+      <a href="../types/" class="md-nav__link">
         
   
   
@@ -5124,20 +5202,18 @@
                 
   
   
-    
   
   
-  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_15" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2_15" >
         
           
           <label class="md-nav__link" for="__nav_3_2_15" id="__nav_3_2_15_label" tabindex="0">
@@ -5158,7 +5234,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_15_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_3_2_15_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3_2_15">
             <span class="md-nav__icon md-icon"></span>
             
@@ -5176,7 +5252,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cache/" class="md-nav__link">
+      <a href="../../util/cache/" class="md-nav__link">
         
   
   
@@ -5204,7 +5280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../config/" class="md-nav__link">
+      <a href="../../util/config/" class="md-nav__link">
         
   
   
@@ -5229,35 +5305,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    logging
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../util/logging/" class="md-nav__link">
         
   
   
@@ -5273,35 +5324,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#finch.util.logging" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        logging
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -5314,7 +5336,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../print/" class="md-nav__link">
+      <a href="../../util/print/" class="md-nav__link">
         
   
   
@@ -5383,10 +5405,32 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#finch.util.logging" class="md-nav__link">
+  <a href="#finch.compile_jl.analyze" class="md-nav__link">
     <span class="md-ellipsis">
       
-        logging
+        analyze
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.analyze.reset_argument_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        reset_argument_positions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.analyze.returned_argument_positions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        returned_argument_positions
       
     </span>
   </a>
@@ -5413,48 +5457,16 @@
   
 
 
-  <h1>logging</h1>
+  <h1>analyze</h1>
 
 <div class="doc doc-object doc-module">
 
 
 
-<a id="finch.util.logging"></a>
+<a id="finch.compile_jl.analyze"></a>
     <div class="doc doc-contents first">
 
-        <p>Finch logging module.</p>
-<p>This file contains all available filters for customizing your Finch program.
-The <code>compilation_stage</code> log field is designed in a hierarchical way, to allow
-quick filtering of generated IRs. Each segment consists of sub-segments which
-build a path to a log record.</p>
-<pre><code>──&gt; root
-    ├──&gt; logic
-         ├──&gt; pre-opt
-         ├──&gt; TODO: Add logging after each opt stage
-         ├──&gt; post-opt
-    ├──&gt; notation
-    ├──&gt; assembly
-    ├──&gt; galley
-    └──&gt; codegen
-         ├──&gt; c-backend
-         └──&gt; numba-backend
-</code></pre>
-<p>For example <code>root.logic</code> will print two Logic IRs - pre and post scheduler
-optimizations. <code>root.codegen.numba-backend</code> will provide only Numba
-generated kernel.</p>
-<p>Fiters can be combined with <code>,</code> when passing to <code>get_logger_handler</code>.</p>
-<p>Instead of full names, you can use abbrevations, listed in <code>_abbr_mapping</code>
-dictionary. We also encourage to use Finch's custom logging <code>FORMAT</code> for
-your logger setup.</p>
-<p>Here's an example of logger setup:</p>
-<pre><code class="language-py">import logging
-from finch.util.logging import get_logger_handler, FORMAT
-
-handler = get_logger_handler(filter_pattern=&quot;r.l.pre,r.c.nb&quot;)
-logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
-
-# ...Finch code...
-</code></pre>
+        <p>Facts about Julia kernels used to manage reusable result buffers.</p>
 
 
 
@@ -5475,6 +5487,92 @@ logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.compile_jl.analyze.reset_argument_positions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reset_argument_positions</span><span class="p">(</span><span class="n">function</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return arguments reset before the kernel reads their previous values.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/analyze.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reset_argument_positions</span><span class="p">(</span><span class="n">function</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return arguments reset before the kernel reads their previous values."""</span>
+    <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span>
+        <span class="n">position</span>
+        <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">argument</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">_is_reset_before_read</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">_argument_aliases</span><span class="p">(</span><span class="n">function</span><span class="p">,</span> <span class="n">argument</span><span class="p">))</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.compile_jl.analyze.returned_argument_positions" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">returned_argument_positions</span><span class="p">(</span><span class="n">function</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return the formal argument positions returned by a Julia kernel.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/analyze.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">returned_argument_positions</span><span class="p">(</span><span class="n">function</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Function</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return the formal argument positions returned by a Julia kernel."""</span>
+    <span class="n">positions</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">argument</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">position</span> <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">argument</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">function</span><span class="o">.</span><span class="n">args</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="n">returned</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">Rewrite</span><span class="p">(</span><span class="n">PostWalk</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">_return_rule</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">returned</span><span class="p">)))(</span><span class="n">function</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">returned</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">returned</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Julia kernels must contain one concrete return"</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="n">returned</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Variable</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">positions</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Julia kernels must return formal arguments"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">positions</span><span class="p">[</span><span class="n">value</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

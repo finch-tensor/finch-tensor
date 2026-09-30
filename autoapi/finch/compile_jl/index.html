@@ -12,7 +12,7 @@
         <link rel="prev" href="../compile/stages/">
       
       
-        <link rel="next" href="buffer/">
+        <link rel="next" href="analyze/">
       
       
         
@@ -2750,6 +2750,34 @@
   
   
     <li class="md-nav__item">
+      <a href="analyze/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    analyze
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="buffer/" class="md-nav__link">
         
   
@@ -2870,6 +2898,34 @@
     
   
     profiling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="runtime/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    runtime
   
 
     
@@ -5284,6 +5340,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.compile_jl.DefaultFinchJLRuntime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DefaultFinchJLRuntime
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.compile_jl.FinchJLRuntime" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FinchJLRuntime
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.compile_jl.JuliaElementFType" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5369,6 +5447,362 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.compile_jl.DefaultFinchJLRuntime" class="doc doc-heading">
+            <code>DefaultFinchJLRuntime</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FinchJLRuntime (finch.compile_jl.runtime.FinchJLRuntime)" href="runtime/#finch.compile_jl.runtime.FinchJLRuntime">FinchJLRuntime</a></code></p>
+
+
+
+        <p>Julia runtime with cached conversions and reusable result storage.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/compile_jl/runtime.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultFinchJLRuntime</span><span class="p">(</span><span class="n">FinchJLRuntime</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Julia runtime with cached conversions and reusable result storage."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernels</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernel_metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">_KernalMetadata</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_translated_tensors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">_TranslationCacheKey</span><span class="p">,</span> <span class="n">JuliaOwnedTensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">free_pool</span> <span class="o">=</span> <span class="n">_StoragePool</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cached_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kernels</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cache_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">kernel</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernels</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">kernel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernel_metadata</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">kernel</span><span class="p">)]</span> <span class="o">=</span> <span class="n">_KernalMetadata</span><span class="p">(</span>
+            <span class="n">reset_argument_positions</span><span class="p">(</span><span class="n">kernel</span><span class="o">.</span><span class="n">finch_program</span><span class="p">),</span>
+            <span class="n">returned_argument_positions</span><span class="p">(</span><span class="n">kernel</span><span class="o">.</span><span class="n">finch_program</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">kernel_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="n">metadata</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_kernel_metadata</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">kernel</span><span class="p">)]</span>
+
+        <span class="c1"># Lease Julia storage only for resettable compiler-created outputs.</span>
+        <span class="n">julia_buf_args</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">JuliaOwnedTensor</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">position</span><span class="p">,</span> <span class="n">tensor</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+            <span class="n">pin_fill</span> <span class="o">=</span> <span class="n">position</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="s2">"dynamic_args"</span><span class="p">,</span> <span class="p">())</span>
+            <span class="k">if</span> <span class="n">position</span> <span class="ow">in</span> <span class="n">metadata</span><span class="o">.</span><span class="n">reset_positions</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+                <span class="n">tensor</span><span class="p">,</span> <span class="n">JuliaOwnedTensor</span>
+            <span class="p">):</span>
+                <span class="n">lease</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">free_pool</span><span class="o">.</span><span class="n">acquire</span><span class="p">(</span>
+                    <span class="n">tensor</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span>
+                    <span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+                    <span class="n">pin_fill</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">julia_buf</span> <span class="o">=</span> <span class="n">JuliaOwnedTensor</span><span class="p">(</span>
+                    <span class="n">tensor</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span>
+                    <span class="n">lease</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">,</span>
+                    <span class="n">lease</span><span class="o">.</span><span class="n">raw</span><span class="p">,</span>
+                    <span class="n">lease</span><span class="o">.</span><span class="n">key</span><span class="o">.</span><span class="n">pin_fill</span><span class="p">,</span>
+                    <span class="n">lease</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">julia_buf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_julia_owned_tensor</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">)</span>
+            <span class="n">julia_buf_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">julia_buf</span><span class="p">)</span>
+
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">jl</span><span class="p">,</span> <span class="n">func_name</span><span class="p">)(</span><span class="o">*</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">raw_julia_obj</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">julia_buf_args</span><span class="p">))</span>
+
+        <span class="c1"># Associate returned tensors with their Python ownership handles.</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">julia_buf_args</span><span class="p">[</span><span class="n">position</span><span class="p">]</span> <span class="k">for</span> <span class="n">position</span> <span class="ow">in</span> <span class="n">metadata</span><span class="o">.</span><span class="n">returned_positions</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_julia_owned_tensor</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JuliaOwnedTensor</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">JuliaOwnedTensor</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">tensor</span><span class="o">.</span><span class="n">_pin_fill</span> <span class="o">==</span> <span class="n">pin_fill</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">tensor</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_julia_owned_tensor</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">_as_tensor</span><span class="p">(),</span> <span class="n">pin_fill</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_translation_cache_key</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">)</span>
+        <span class="n">julia_tensor</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_translated_tensors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">julia_tensor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">julia_tensor</span>
+
+        <span class="n">raw</span> <span class="o">=</span> <span class="n">tensor_to_jl</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="o">=</span><span class="n">pin_fill</span><span class="p">)</span>
+        <span class="n">translation_finalizer</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">finalize</span><span class="p">(</span>
+            <span class="n">tensor</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_translated_tensors</span><span class="o">.</span><span class="n">pop</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="n">julia_tensor</span> <span class="o">=</span> <span class="n">JuliaOwnedTensor</span><span class="p">(</span>
+            <span class="n">tensor</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span> <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">release</span><span class="p">,</span>
+            <span class="n">raw</span><span class="p">,</span>
+            <span class="n">pin_fill</span><span class="p">,</span>
+            <span class="n">translation_finalizer</span><span class="o">=</span><span class="n">translation_finalizer</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_translated_tensors</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">julia_tensor</span>
+        <span class="k">return</span> <span class="n">julia_tensor</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_translation_cache_key</span><span class="p">(</span>
+        <span class="n">tensor</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_TranslationCacheKey</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">BufferizedNDArray</span><span class="p">):</span>
+            <span class="n">array</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">_TranslationCacheKey</span><span class="p">(</span>
+                <span class="n">pin_fill</span><span class="p">,</span>
+                <span class="s2">"numpy"</span><span class="p">,</span>
+                <span class="c1"># The first data-interface entry is the array's memory address.</span>
+                <span class="n">array</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">"data"</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span> <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">stride</span><span class="p">)</span> <span class="k">for</span> <span class="n">stride</span> <span class="ow">in</span> <span class="n">array</span><span class="o">.</span><span class="n">strides</span><span class="p">),</span>
+                <span class="n">array</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">NumPyWrapper</span><span class="p">):</span>
+            <span class="n">array</span> <span class="o">=</span> <span class="n">tensor</span><span class="o">.</span><span class="n">_data</span>
+            <span class="k">return</span> <span class="n">_TranslationCacheKey</span><span class="p">(</span>
+                <span class="n">pin_fill</span><span class="p">,</span>
+                <span class="s2">"numpy"</span><span class="p">,</span>
+                <span class="c1"># The first data-interface entry is the array's memory address.</span>
+                <span class="n">array</span><span class="o">.</span><span class="n">__array_interface__</span><span class="p">[</span><span class="s2">"data"</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span> <span class="k">for</span> <span class="n">dimension</span> <span class="ow">in</span> <span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">stride</span><span class="p">)</span> <span class="k">for</span> <span class="n">stride</span> <span class="ow">in</span> <span class="n">array</span><span class="o">.</span><span class="n">strides</span><span class="p">),</span>
+                <span class="n">array</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">str</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">_TranslationCacheKey</span><span class="p">(</span><span class="n">pin_fill</span><span class="p">,</span> <span class="s2">"object"</span><span class="p">,</span> <span class="nb">id</span><span class="p">(</span><span class="n">tensor</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">release</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">JuliaOwnedTensor</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">tensor</span><span class="o">.</span><span class="n">_lease</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">free_pool</span><span class="o">.</span><span class="n">release_lease</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">_lease</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernels</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_kernel_metadata</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_translated_tensors</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.compile_jl.FinchJLRuntime" class="doc doc-heading">
+            <code>FinchJLRuntime</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+
+
+
+        <p>Runtime services used by the Julia compiler and its kernels.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/compile_jl/runtime.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLRuntime</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Runtime services used by the Julia compiler and its kernels."""</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cached_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cache_kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">kernel</span><span class="p">):</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">kernel_call</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func_name</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span> <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
