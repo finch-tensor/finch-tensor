@@ -158,7 +158,7 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         ntn.Access(ntn.Variable("output", tensor.ftype), ntn.Update(op), ()),
         ntn.Literal(np.int64(3)),
     )
-    with pytest.raises(DynamicFillError, match="does not support dynamic fills"):
+    with pytest.raises(DynamicFillError, match="requires a static fill"):
         FinchJLGenerator().generate_julia(update)
 
 

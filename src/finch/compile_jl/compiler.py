@@ -161,20 +161,11 @@ class FinchJLGenerator:
                 proto_lines = []
                 for arg in args:
                     match arg:
-                        case ntn.Variable(sym, TensorFType() as type_):
+                        case ntn.Variable(sym, type_):
                             arg_name = self.emit_name(sym)
-                            fill = type_.fill_value
-                            if is_dynamic(fill):
-                                raise DynamicFillError(
-                                    "Julia backend does not support dynamic fills"
-                                )
                             constructor = ftype_to_jl_constructor_str(type_)
                             proto_lines.append(f"        {arg_name} = {constructor}")
                             arg_strs.append(arg_name)
-                        case ntn.Variable(_, type_):
-                            raise TypeError(
-                                f"Julia kernel argument must be a tensor, got {type_}"
-                            )
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
@@ -309,16 +300,15 @@ class FinchJLGenerator:
 
             case ntn.Literal(ffuncs._InitWrite(fill=fill)):
                 if is_dynamic(fill):
-                    raise DynamicFillError(
-                        "Julia backend does not support dynamic fills"
-                    )
+                    raise DynamicFillError("Julia init_write requires a static fill")
                 value = self.generate_julia(ntn.Literal(fill.value), nestingLvl)
                 return f"Finch.initwrite({value})"
 
             case ntn.Literal(val):
-                if isinstance(val, AbstractFill) and is_dynamic(val):
+                if isinstance(val, AbstractFill):
+                    # str() would silently emit broken source.
                     raise DynamicFillError(
-                        "Julia backend does not support dynamic fills"
+                        "cannot emit a wrapped fill as a Julia literal"
                     )
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
@@ -340,11 +330,14 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Pin dynamic fills to zero before Julia source generation."""
+    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
+    which argument positions carried a Dynamic fill. This is a necessary but
+    potentially unsound rewrite which should be removed eventually.
+    """
 
     dynamic_args = tuple(
-        position
-        for position, arg in enumerate(func.args)
+        i
+        for i, arg in enumerate(func.args)
         if is_dynamic(getattr(arg.type_, "fill_value", None))
     )
 
