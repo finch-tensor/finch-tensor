@@ -344,6 +344,8 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
 
 def tensor_to_jl(obj):
     """Convert a tensor to its Julia counterpart."""
+    if hasattr(obj, "raw_julia_obj"):
+        return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, FiberTensor):
