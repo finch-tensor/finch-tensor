@@ -7,10 +7,12 @@ import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
+    DynamicFill,
     DynamicFillError,
     StaticFill,
     is_dynamic,
 )
+from finch.algebra.ftypes import ftype
 from finch.algebra.tensor import TensorFType
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -117,6 +119,7 @@ class FinchJLKernel(AssemblyKernel):
         finch_program: ntn.Function,
         runtime: FinchJLRuntime,
         func_name: str,
+        dynamic_args: tuple[int, ...] = (),
     ):
         super().__init__(type_)
         # We store this code so that we can verify it in pytest
@@ -124,6 +127,7 @@ class FinchJLKernel(AssemblyKernel):
         self.finch_program = finch_program
         self.runtime = runtime
         self.func_name = func_name
+        self.dynamic_args = dynamic_args
 
     def __call__(self, *args):
         return self.runtime.kernel_call(self.func_name, self, args)
@@ -338,16 +342,30 @@ class FinchJLGenerator:
                 raise Exception(f"Unhandled node type: {type(prgm)}")
 
 
-def unwrap_static_fills(func: ntn.Function) -> ntn.Function:
-    """Unwrap static fills before Julia source generation."""
+def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
+    """Pin dynamic fills to zero before Julia source generation."""
+
+    dynamic_args = tuple(
+        position
+        for position, arg in enumerate(func.args)
+        if is_dynamic(getattr(arg.type_, "fill_value", None))
+    )
 
     def rule(node):
         match node:
+            case ntn.Variable(name, TensorFType() as type_) if is_dynamic(
+                type_.fill_value
+            ):
+                return ntn.Variable(
+                    name, type_.with_fill(ftype(type_.fill_value.value)(0))
+                )
+            case ntn.Literal(DynamicFill() as fill):
+                return ntn.Literal(ftype(fill.value)(0))
             case ntn.Literal(StaticFill() as fill):
                 return ntn.Literal(fill.value)
         return None
 
-    return Rewrite(PostWalk(rule))(func)
+    return Rewrite(PostWalk(rule))(func), dynamic_args
 
 
 def _argument_type_str(arg: ntn.Variable) -> str:
@@ -371,10 +389,10 @@ class FinchJLCompiler(NotationCompiler):
 
         kernel_dict = {}
         for orig_func in prgm.children:
-            func = unwrap_static_fills(orig_func)
+            func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
             arg_type_strs = tuple(_argument_type_str(arg) for arg in func.args)
-            key = (generated_prgm, arg_type_strs)
+            key = (generated_prgm, arg_type_strs, dynamic_args)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
                 func_name = f"kernel_{uuid.uuid4().hex}"
@@ -385,6 +403,7 @@ class FinchJLCompiler(NotationCompiler):
                     func,
                     self.runtime,
                     func_name,
+                    dynamic_args,
                 )
                 self.runtime.cache_kernel(key, kernel)
             elif kernel.ftype != func.name.result_type:
@@ -394,6 +413,7 @@ class FinchJLCompiler(NotationCompiler):
                     func,
                     self.runtime,
                     kernel.func_name,
+                    dynamic_args,
                 )
                 self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel

@@ -77,22 +77,24 @@ def _plus_one_buffer_to_jl(buffer: Buffer):
     return jl.Finch.PlusOneVector(_buffer_to_jl(buffer))
 
 
-def level_to_jl(level: Level):
-    """Convert a level to its Julia counterpart."""
+def level_to_jl(level: Level, pin_fill: bool = False):
+    """Convert a level to its Julia counterpart, optionally pinning its fill."""
     match level:
         case ElementLevel():
             fill = level.fill_value
+            if pin_fill:
+                fill = ftype(fill)(0)
             return jl.ElementLevel(
                 _as_julia_scalar(fill),
                 _buffer_to_jl(level.val),
             )
         case DenseLevel(lvl=lvl, dimension=dimension):
-            return jl.DenseLevel(level_to_jl(lvl), int(dimension))
+            return jl.DenseLevel(level_to_jl(lvl, pin_fill), int(dimension))
         case SparseListLevel(lvl=lvl, dimension=dimension, ptr=ptr, idx=idx):
             if ptr is None or idx is None:
                 raise ValueError("SparseListLevel must have ptr and idx buffers")
             return jl.SparseListLevel(
-                level_to_jl(lvl),
+                level_to_jl(lvl, pin_fill),
                 int(dimension),
                 _plus_one_buffer_to_jl(cast(Buffer, ptr)),
                 _plus_one_buffer_to_jl(cast(Buffer, idx)),
@@ -105,7 +107,7 @@ def level_to_jl(level: Level):
                     "SparseByteMapLevel must have ptr, tbl, and srt buffers"
                 )
             return jl.SparseByteMapLevel(
-                level_to_jl(lvl),
+                level_to_jl(lvl, pin_fill),
                 int(dimension),
                 _plus_one_buffer_to_jl(cast(Buffer, ptr)),
                 _buffer_to_jl(cast(Buffer, tbl)),
@@ -114,7 +116,7 @@ def level_to_jl(level: Level):
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             assert isinstance(tbl, tuple)
             return jl.SparseCOOLevel(
-                level_to_jl(lvl),
+                level_to_jl(lvl, pin_fill),
                 tuple(int(dim) for dim in coo_shape),
                 _plus_one_buffer_to_jl(ptr),
                 tuple(_plus_one_buffer_to_jl(idx) for idx in tbl),
@@ -144,7 +146,7 @@ def level_to_jl(level: Level):
             dimension = _as_julia_scalar(np.asarray(dimension).item())
             constructor = jl.SparseHashLevel[(jl.typeof(dimension), single_writer)]
             return constructor(
-                level_to_jl(lvl),
+                level_to_jl(lvl, pin_fill),
                 dimension,
                 int(subtables),
                 _plus_one_buffer_to_jl(cast(Buffer, ptr)),
@@ -342,8 +344,8 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
     return mask
 
 
-def tensor_to_jl(obj):
-    """Convert a tensor to its Julia counterpart."""
+def tensor_to_jl(obj, pin_fill: bool = False):
+    """Convert a tensor to its Julia counterpart, optionally pinning its fill."""
     if hasattr(obj, "raw_julia_obj"):
         return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
@@ -351,13 +353,15 @@ def tensor_to_jl(obj):
     if isinstance(obj, FiberTensor):
         if obj.pos != 0:
             raise ValueError("Only root-position FiberTensor objects can use Julia")
-        return jl.Tensor(level_to_jl(obj.lvl))
+        return jl.Tensor(level_to_jl(obj.lvl, pin_fill))
     if isinstance(obj, BufferizedNDArray):
-        return _ndarray_to_jl_tensor(obj.to_numpy(), obj.fill_value, copy=False)
+        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        return _ndarray_to_jl_tensor(obj.to_numpy(), fill, copy=False)
     if isinstance(obj, NumPyWrapper):
-        return _ndarray_to_jl_tensor(obj._data, obj.fill_value, copy=False)
+        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
-        return scalar_to_jl(obj.val)
+        return scalar_to_jl(obj.val, pin_fill=pin_fill)
     if isinstance(obj, PatternTensor):
         return _pattern_tensor_to_jl(obj)
     if isinstance(obj, FillTensor):
@@ -369,13 +373,14 @@ def tensor_to_jl(obj):
         fill = np.asarray(0, dtype=obj.dtype)[()]
         return _ndarray_to_jl_tensor(obj, fill, copy=False)
     if np.isscalar(obj):
-        return scalar_to_jl(obj)
+        return scalar_to_jl(obj, pin_fill=pin_fill)
     raise ValueError(f"Unsupported Julia backend argument type: {type(obj)}")
 
 
-def scalar_to_jl(val):
+def scalar_to_jl(val, pin_fill: bool = False):
     buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(val), jl.Vector(buf)))
+    fill = ftype(val)(0) if pin_fill else val
+    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
 
 
 def jl_tensor_to_python(obj):
@@ -414,13 +419,13 @@ class JuliaBufferContext:
         # FiberTensors reuse their ids so we restrict cache keys to id.
         return ("object", id(obj))
 
-    def tensor_to_jl(self, obj):
-        key = self._cache_key(obj)
+    def tensor_to_jl(self, obj, *, pin_fill: bool = False):
+        key = (self._cache_key(obj), pin_fill)
         cached = self._tensors.get(key)
         if cached is not None:
             return cached[1]
 
-        jl_obj = tensor_to_jl(obj)
+        jl_obj = tensor_to_jl(obj, pin_fill=pin_fill)
         self._tensors[key] = (obj, jl_obj)
         return jl_obj
 

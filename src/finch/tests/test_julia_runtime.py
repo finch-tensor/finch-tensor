@@ -71,6 +71,7 @@ def test_julia_owned_tensor_addition():
         source.shape,
         lambda _: None,
         tensor_to_jl(source),
+        False,
     )
 
     assert (ft.add(tensor, 1).to_numpy() == np.arange(1, 5)).all()
@@ -81,7 +82,7 @@ def test_default_runtime_uses_a_free_buffer():
         {"test_runtime_free_buffer": _KernalMetadata(frozenset({0}), (0,))}
     )
     tensor = ft.asarray(np.arange(4, dtype=np.float64))
-    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape)
+    lease = runtime.free_pool.acquire(tensor.ftype, tensor.shape, False)
     runtime.free_pool.release_lease(lease)
 
     result = runtime.kernel_call(
