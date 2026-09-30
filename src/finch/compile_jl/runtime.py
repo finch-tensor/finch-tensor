@@ -21,39 +21,39 @@ from .julia import jl
 
 
 @dataclass
-class _BufferLease:
+class _StorageLease:
     raw: Any
-    key: _BufferPoolKey
+    key: _StoragePoolKey
 
 
 @dataclass(frozen=True)
-class _BufferPoolKey:
+class _StoragePoolKey:
     ftype: str
     shape: tuple[int, ...]
 
 
-class _BufferPool:
+class _StoragePool:
     def __init__(self) -> None:
-        self._free: dict[_BufferPoolKey, dict[int, _BufferLease]] = defaultdict(dict)
+        self._free: dict[_StoragePoolKey, dict[int, _StorageLease]] = defaultdict(dict)
 
     def acquire(
         self,
         ftype: TensorFType,
         shape: tuple[int, ...],
-    ) -> _BufferLease:
-        key = _BufferPoolKey(
+    ) -> _StorageLease:
+        key = _StoragePoolKey(
             repr(ftype),
             tuple(int(dimension) for dimension in shape),
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
         tensor = ftype.construct(shape)
-        return _BufferLease(
+        return _StorageLease(
             tensor_to_jl(tensor),
             key,
         )
 
-    def release_lease(self, lease: _BufferLease) -> None:
+    def release_lease(self, lease: _StorageLease) -> None:
         free_leases = self._free[lease.key]
         free_leases.setdefault(id(lease), lease)
 
@@ -67,7 +67,7 @@ class JuliaOwnedTensor(OverrideTensor):
         shape: tuple[int, ...],
         release: Callable[[JuliaOwnedTensor], None],
         raw_julia_obj: Any,
-        lease: _BufferLease | None = None,
+        lease: _StorageLease | None = None,
         translation_finalizer: weakref.finalize | None = None,
     ) -> None:
         self._ftype = ftype
@@ -167,13 +167,13 @@ class FinchJLRuntime(ABC):
 
 
 class DefaultFinchJLRuntime(FinchJLRuntime):
-    """Julia runtime with cached conversions and reusable result buffers."""
+    """Julia runtime with cached conversions and reusable result storage."""
 
     def __init__(self) -> None:
         self._kernels: dict[Any, Any] = {}
         self._kernel_metadata: dict[int, _KernalMetadata] = {}
-        self._translated_buffers: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
-        self.free_pool = _BufferPool()
+        self._translated_tensors: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
+        self.free_pool = _StoragePool()
 
     def get_cached_kernel(self, key):
         return self._kernels.get(key)
@@ -188,7 +188,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def kernel_call(self, func_name, kernel, args):
         metadata = self._kernel_metadata[id(kernel)]
 
-        # Lease Julia buffers only for resettable compiler-created outputs.
+        # Lease Julia storage only for resettable compiler-created outputs.
         julia_buf_args: list[JuliaOwnedTensor] = []
         for position, tensor in enumerate(args):
             if position in metadata.reset_positions and not isinstance(
@@ -211,7 +211,7 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
 
         getattr(jl, func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
 
-        # Associate returned buffers with their Python ownership handles.
+        # Associate returned tensors with their Python ownership handles.
         return tuple(
             julia_buf_args[position] for position in metadata.returned_positions
         )
@@ -220,23 +220,23 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         if isinstance(tensor, JuliaOwnedTensor):
             return tensor
         key = self._translation_cache_key(tensor)
-        julia_buf = self._translated_buffers.get(key)
-        if julia_buf is not None:
-            return julia_buf
+        julia_tensor = self._translated_tensors.get(key)
+        if julia_tensor is not None:
+            return julia_tensor
 
         raw = tensor_to_jl(tensor)
         translation_finalizer = weakref.finalize(
-            tensor, self._translated_buffers.pop, key, None
+            tensor, self._translated_tensors.pop, key, None
         )
-        julia_buf = JuliaOwnedTensor(
+        julia_tensor = JuliaOwnedTensor(
             tensor.ftype,
             tuple(int(dimension) for dimension in tensor.shape),
             self.release,
             raw,
             translation_finalizer=translation_finalizer,
         )
-        self._translated_buffers[key] = julia_buf
-        return julia_buf
+        self._translated_tensors[key] = julia_tensor
+        return julia_tensor
 
     @staticmethod
     def _translation_cache_key(tensor: Tensor) -> _TranslationCacheKey:
@@ -269,4 +269,4 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def close(self) -> None:
         self._kernels.clear()
         self._kernel_metadata.clear()
-        self._translated_buffers.clear()
+        self._translated_tensors.clear()
