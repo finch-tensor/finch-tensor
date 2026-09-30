@@ -378,8 +378,8 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 
 
 def scalar_to_jl(val, pin_fill: bool = False):
-    buf = np.asarray([val])
     fill = ftype(val)(0) if pin_fill else val
+    buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
 
 
