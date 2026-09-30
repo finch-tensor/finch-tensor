@@ -198,21 +198,24 @@ class FusedCFGBuilder:
                 self.current_block = after_block
             case While(cond, body):
                 before_block = self.current_block
-                condition_block = self.cfg.new_block()
+                self.emit(cond)
+
+                # create blocks for the loop body and the code after the loop
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
 
-                before_block.add_successor(condition_block)
+                # connect before block to the loop body and the after block
+                before_block.add_successor(body_block)
+                before_block.add_successor(after_block)
 
-                self.current_block = condition_block
-                self.emit(cond)
-                condition_block.add_successor(body_block)
-                condition_block.add_successor(after_block)
-
+                # fill in the loop body
                 self.current_block = body_block
                 self(body, after_block, return_block)
+                self.emit(cond)
 
-                self.current_block.add_successor(condition_block)
+                # connect the end of loop body back to the beginning to form the loop
+                self.current_block.add_successor(body_block)
+                self.current_block.add_successor(after_block)
                 self.current_block = after_block
             case For(_, iter, body):
                 before_block = self.current_block

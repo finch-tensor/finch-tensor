@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read # required for actions/checkout
-      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v7
@@ -36,11 +35,7 @@ jobs:
           pixi-version: v0.71.3
           environments: benchmark-julia
       - name: Run Julia benchmarks
-        uses: CodSpeedHQ/action@v4
-        with:
-          mode: walltime
-          run: |
-            pixi run benchmark-julia -vvv -m "not slow"
+        run: pixi run benchmark-julia -vvv -m "not slow"
 
 on:
   push:
