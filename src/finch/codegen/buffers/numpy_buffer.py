@@ -33,6 +33,7 @@ class CBufferFields(NamedTuple):
 
 class MLIRBufferFields(NamedTuple):
     buffer: str
+    obj: str
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -46,6 +47,15 @@ def numpy_buffer_resize_callback(buf_ptr, new_length):
 
 
 class CNumpyBuffer(ctypes.Structure):
+    _fields_ = [
+        ("arr", ctypes.py_object),
+        ("data", ctypes.c_void_p),
+        ("length", ctypes.c_size_t),
+        ("resize", type(numpy_buffer_resize_callback)),
+    ]
+
+
+class MLIRNumpyBuffer(ctypes.Structure):
     _fields_ = [
         ("arr", ctypes.py_object),
         ("data", ctypes.c_void_p),

@@ -1074,6 +1074,31 @@ class MLIRStackFType(ABC):
         ...
 
 
+class MLIRUnpackableFType(ABC):
+    """
+    Abstract base class for unpackable formats in MLIR. Unpackable formats must also
+    support other functions with unpacked inputs in addition to variable ones.
+    """
+
+    @abstractmethod
+    def mlir_unpack(self, ctx, lhs, rhs):
+        """
+        Convert a value to an unpacked representation in MLIR. Returns a NamedTuple
+        of unpacked variable names, etc. The `lhs` is the variable namespace to
+        assign to.
+        """
+        ...
+
+    @abstractmethod
+    def mlir_repack(self, ctx, lhs, rhs):
+        """
+        Update an object based on an unpacked representation. The `rhs` is the
+        unpacked representation to update from, and `lhs` is a variable name referring
+        to the original object to update.
+        """
+        ...
+
+
 class MLIRContext(Context):
     """
     A context for generating MLIR code.

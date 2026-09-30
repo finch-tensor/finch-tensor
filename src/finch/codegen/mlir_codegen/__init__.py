@@ -1,5 +1,4 @@
 from .mlir import (
-    MLIRArgumentFType,
     MLIRBinaryOperator,
     MLIRBufferFType,
     MLIRCompiler,
@@ -13,6 +12,7 @@ from .mlir import (
     construct_from_mlir,
     deserialize_from_mlir,
     mlir_binary_function_call,
+    mlir_cast_value,
     mlir_ctype,
     mlir_function_call,
     mlir_function_name,
@@ -23,7 +23,6 @@ from .mlir import (
 from .stages import MLIRCode, MLIRLowerer
 
 __all__ = [
-    "MLIRArgumentFType",
     "MLIRBinaryOperator",
     "MLIRBufferFType",
     "MLIRCode",
@@ -39,6 +38,7 @@ __all__ = [
     "construct_from_mlir",
     "deserialize_from_mlir",
     "mlir_binary_function_call",
+    "mlir_cast_value",
     "mlir_ctype",
     "mlir_function_call",
     "mlir_function_name",
