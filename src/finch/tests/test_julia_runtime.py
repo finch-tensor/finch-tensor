@@ -70,9 +70,7 @@ def _runtime(monkeypatch, metadata):
     monkeypatch.setattr(runtime_module, "tensor_to_jl", tensor_to_julia)
     monkeypatch.setattr(runtime_module, "jl", julia)
     runtime = DefaultFinchJLRuntime()
-    runtime._kernels = {
-        name: SimpleNamespace(finch_program=None) for name in metadata
-    }
+    runtime._kernels = {name: SimpleNamespace(finch_program=None) for name in metadata}
     runtime._kernel_metadata = {
         id(runtime._kernels[name]): value for name, value in metadata.items()
     }

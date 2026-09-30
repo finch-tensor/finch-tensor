@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 from weakref import finalize
 
 import numpy as np
@@ -68,8 +69,8 @@ class JuliaOwnedTensor(Tensor):
         self._release = release
         self._raw_julia_obj = raw_julia_obj
         self._lease = lease
-        # If this tensor is a translation of a python tensor then this finalizer
-        # triggers the garbage collection of this tensor when its python equivalent is killed.
+        # If this is a translation of a Python tensor, this finalizer triggers its
+        # garbage collection when that tensor is killed.
         self._translation_finalizer = translation_finalizer
 
     def __del__(self) -> None:

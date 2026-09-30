@@ -330,9 +330,7 @@ class FinchJLGenerator:
 
             case ntn.Literal(val):
                 if isinstance(val, AbstractFill) and is_dynamic(val):
-                    raise DynamicFillError(
-                        "Julia only supports header dynamic fills"
-                    )
+                    raise DynamicFillError("Julia only supports header dynamic fills")
                 # Julia booleans are lowercase; numpy.bool_ is not a bool subclass.
                 if isinstance(val, bool | np.bool_):
                     return "true" if val else "false"

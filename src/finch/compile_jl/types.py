@@ -226,25 +226,19 @@ def _level_constructor_str(level_ftype: LevelFType, fill_literal: str) -> str:
         # scalar (level type param Ti) is always plain Julia Int (Int64),
         # regardless of the declared dimension_type -- only index/pointer
         # *buffers* actually preserve dimension_type/position_type.
-        lvl = _level_constructor_str(
-            level_ftype.lvl_t, fill_literal=fill_literal
-        )
+        lvl = _level_constructor_str(level_ftype.lvl_t, fill_literal=fill_literal)
         return f"Finch.DenseLevel({lvl}, 1)"
     if isinstance(level_ftype, SparseListLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
-        lvl = _level_constructor_str(
-            level_ftype.lvl_t, fill_literal=fill_literal
-        )
+        lvl = _level_constructor_str(level_ftype.lvl_t, fill_literal=fill_literal)
         return (
             f"Finch.SparseListLevel({lvl}, "
             f"1, {_plus_one_ctor_str(pos_t)}, {_plus_one_ctor_str(dim_t)})"
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
-        lvl = _level_constructor_str(
-            level_ftype.lvl_t, fill_literal=fill_literal
-        )
+        lvl = _level_constructor_str(level_ftype.lvl_t, fill_literal=fill_literal)
         return (
             f"Finch.SparseByteMapLevel({lvl}, "
             f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
@@ -258,9 +252,7 @@ def _level_constructor_str(level_ftype: LevelFType, fill_literal: str) -> str:
         ]
         dims = ",".join("1" for _ in dim_ts)
         idxs = ",".join(_plus_one_ctor_str(t) for t in dim_ts)
-        lvl = _level_constructor_str(
-            level_ftype.lvl_t, fill_literal=fill_literal
-        )
+        lvl = _level_constructor_str(level_ftype.lvl_t, fill_literal=fill_literal)
         return (
             f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
             f"{lvl}, ({dims},), "
@@ -271,9 +263,7 @@ def _level_constructor_str(level_ftype: LevelFType, fill_literal: str) -> str:
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         single_writer = "true" if level_ftype.single_writer else "false"
         tbl_entry_t = f"Tuple{{{pos_t},{dim_t},{pos_t}}}"
-        lvl = _level_constructor_str(
-            level_ftype.lvl_t, fill_literal=fill_literal
-        )
+        lvl = _level_constructor_str(level_ftype.lvl_t, fill_literal=fill_literal)
         # interop.py derives Ti from `np.asarray(dimension).item()`, which
         # (like DenseLevel above) always yields plain Julia Int (Int64).
         return (
