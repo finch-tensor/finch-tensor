@@ -201,40 +201,21 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
-        *,
-        output_fields: dict[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        if output_fields is None:
-            output_fields = {}
         stats_bindings = dict(stats)
         cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
                     idxs_2 = loop_order_bfs(
-                        arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
+                        arg, stats_factory, stats_bindings, out_idxs, k=self.k
                     )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    aggregate_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                        output_idxs,
+                    new_queries.append(
+                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
                     )
-                    new_queries.append(Query(lhs, aggregate_2))
-                case Query(
-                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
-                ):
-                    idxs_2 = loop_order_bfs(
-                        arg, stats_factory, stats_bindings, rhs.fields(), k=self.k
-                    )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    reorder_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                        output_idxs,
-                    )
-                    new_queries.append(Query(lhs, reorder_2))
-                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
                     raise Exception(f"Invalid node: {query} in BFSLoopOrderer")
@@ -252,40 +233,21 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
-        *,
-        output_fields: MutableMapping[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        if output_fields is None:
-            output_fields = {}
         stats_bindings = dict(stats)
         cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
                     idxs_2 = loop_order_dfs(
-                        arg, stats_factory, stats_bindings, rhs.fields()
+                        arg, stats_factory, stats_bindings, out_idxs
                     )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    aggregate_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                        output_idxs,
+                    new_queries.append(
+                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
                     )
-                    new_queries.append(Query(lhs, aggregate_2))
-                case Query(
-                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
-                ):
-                    idxs_2 = loop_order_dfs(
-                        arg, stats_factory, stats_bindings, rhs.fields()
-                    )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    reorder_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                        output_idxs,
-                    )
-                    new_queries.append(Query(lhs, reorder_2))
-                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
                     raise Exception(f"Invalid node: {query} in DFSLoopOrderer")
@@ -303,40 +265,21 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         prgm: Plan,
         stats: MutableMapping[Alias, NS],
         stats_factory: StatsFactory[NS],
-        *,
-        output_fields: MutableMapping[Alias, tuple[Field, ...]] | None = None,
     ) -> Plan:
-        if output_fields is None:
-            output_fields = {}
         stats_bindings = dict(stats)
         cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
             match query:
-                case Query(lhs, Aggregate(op, init, arg, idxs) as rhs):
+                case Query(Table(_, out_idxs) as lhs, Aggregate(op, init, arg, idxs)):
                     idxs_2 = loop_order_brute_force(
-                        arg, stats_factory, stats_bindings, rhs.fields()
+                        arg, stats_factory, stats_bindings, out_idxs
                     )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    aggregate_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), idxs),
-                        output_idxs,
+                    new_queries.append(
+                        Query(lhs, Aggregate(op, init, Reorder(arg, idxs_2), idxs))
                     )
-                    new_queries.append(Query(lhs, aggregate_2))
-                case Query(
-                    lhs, Reorder(Aggregate(op, init, arg, ag_idxs), idxs) as rhs
-                ):
-                    idxs_2 = loop_order_brute_force(
-                        arg, stats_factory, stats_bindings, rhs.fields()
-                    )
-                    output_idxs = output_fields.get(lhs, rhs.fields())
-                    reorder_2 = Reorder(
-                        Aggregate(op, init, Reorder(arg, idxs_2), ag_idxs),
-                        output_idxs,
-                    )
-                    new_queries.append(Query(lhs, reorder_2))
-                case Query(_, Reorder(Table(Alias(), _), _)) as q:
+                case Query(_, Table(Alias(), _)) as q:
                     new_queries.append(q)
                 case _:
                     raise Exception(f"Invalid node: {query} in BruteForceLoopOrderer")

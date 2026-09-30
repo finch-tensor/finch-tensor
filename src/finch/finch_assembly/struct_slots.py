@@ -114,7 +114,7 @@ class _LowerPackedStructSlotsContext:
                 expr_2 = asm.GetAttr(obj_2, attr)
                 return self._field_replacement(expr_2) or expr_2
             case asm.Call(op, args):
-                return asm.Call(op, tuple(self.expr(arg) for arg in args))
+                return asm.Call(self.expr(op), tuple(self.expr(arg) for arg in args))
             case asm.Load(buffer, index):
                 return asm.Load(self.expr(buffer), self.expr(index))
             case asm.Length(buffer):

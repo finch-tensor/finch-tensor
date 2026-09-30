@@ -56,7 +56,7 @@ class AnnotatedQuery(Generic[TS]):
     connected_components: list[list[Field]]
     connected_idxs: OrderedDict[Field, set[Field]]
     bindings: OrderedDict[Alias, TS]
-    output_order: list[Field] | None = None
+    output_order: list[Field]
 
     def __init__(
         self,
@@ -73,14 +73,14 @@ class AnnotatedQuery(Generic[TS]):
         stats_factory : StatsFactory
             Concrete stats factory used to create statistics.
         q : Query
-            Logical query of the form `Query(name, rhs)` whose `rhs` may contain
-            `Aggregate` nodes.
+            Logical query of the form `Query(Table(name, idxs), rhs)` whose
+            `rhs` may contain `Aggregate` nodes.
         bindings : OrderedDict[Alias, TensorStats], optional
             Existing alias→stats environment to seed the analysis.
         """
         assert isinstance(q, Query), (
             "Annotated Queries can only be built from queries of the form: "
-            "Query(lhs, rhs)"
+            "Query(Table(lhs, idxs), rhs)"
         )
         self.stats_factory = stats_factory
         if bindings is None:
@@ -95,14 +95,12 @@ class AnnotatedQuery(Generic[TS]):
             cache=cache,
         )
         self.cache = cache
-        output_name = q.lhs
+        output_name = q.lhs.tns
+        assert isinstance(output_name, Alias)
+        output_order = list(q.lhs.idxs)
         expr = q.rhs
-        output_order: None | list[Field] = []
         if isinstance(expr, Reorder):
-            output_order = list(expr.idxs)
             expr = expr.arg
-        else:
-            output_order = None
         starting_reduce_idxs: list[Field] = []
         idx_starting_path: OrderedDict[Field, Path] = OrderedDict()
         idx_top_order: OrderedDict[Field, int] = OrderedDict()
@@ -223,8 +221,8 @@ class AnnotatedQuery(Generic[TS]):
                     connected_idxs[idx1].add(idx2)
                 mergeable_agg_op = (
                     idx1_op == idx2_op
-                    and is_associative(idx1_op)
-                    and is_commutative(idx1_op)
+                    and is_associative(idx1_op.ftype)
+                    and is_commutative(idx1_op.ftype)
                 )
                 # If idx1 isn't a parent of idx2, then idx2 can't restrict the
                 # summation of idx1. idx2 is a parent when its starting root
@@ -273,9 +271,7 @@ class AnnotatedQuery(Generic[TS]):
         new.connected_idxs = OrderedDict(
             (m, set(n)) for m, n in self.connected_idxs.items()
         )
-        new.output_order = (
-            None if self.output_order is None else list(self.output_order)
-        )
+        new.output_order = list(self.output_order)
         new.bindings = OrderedDict(self.bindings.items())
         new.cache = OrderedDict(self.cache.items())
         new.cache_point = OrderedDict(self.cache_point.items())
@@ -550,13 +546,13 @@ class AnnotatedQuery(Generic[TS]):
                     (i, arg) for i, arg in enumerate(args) if idx not in arg.fields()
                 ]
 
-                if len(with_idx) == 1 and is_distributive(mj_op, op):
+                if len(with_idx) == 1 and is_distributive(mj_op.ftype, op.ftype):
                     i, arg = with_idx[0]
                     return AnnotatedQuery.find_lowest_roots(
                         op, idx, arg, (*base, i + 1)
                     )
 
-                if cansplitpush(op, mj_op):
+                if op == mj_op and cansplitpush(op.ftype):
                     roots_without = [(*base, i + 1) for i, _ in without_idx]
                     roots_with: list[Path] = []
                     for i, arg in with_idx:
@@ -619,7 +615,7 @@ class AnnotatedQuery(Generic[TS]):
         use_root = False
         match root_node:
             case MapJoin(Literal(FinchOperator() as op), args) if is_distributive(
-                op, reduce_op
+                op.ftype, reduce_op.ftype
             ):
                 # If you're already reducing one index, then it may
                 # make sense to reduce others as well.
@@ -691,7 +687,7 @@ class AnnotatedQuery(Generic[TS]):
         # applying the operator over |Dom(idx)| identical values is the repeat
         # operator, i.e. sum_i B = B * |Dom(i)|.
         kernel_order = stats_cache[query_expr].index_order
-        repeat_op = repeat_operator(agg_op)
+        repeat_op = repeat_operator(agg_op.ftype)
         repeated = (
             []
             if repeat_op is None
@@ -724,7 +720,7 @@ class AnnotatedQuery(Generic[TS]):
             stats_cache[query_expr.arg],
         )
 
-        query = Query(Alias(gensym("A")), query_expr)
+        query = Query(Table(Alias(gensym("A")), query_expr.fields()), query_expr)
         return query, replace_path, removal_paths, reduced_idxs
 
     def reduce_idx(self, reduce_idx: Field, do_condense: bool = False) -> Query:
@@ -760,7 +756,8 @@ class AnnotatedQuery(Generic[TS]):
             reduce_idx
         )
 
-        alias_expr = Alias(query.lhs.name)
+        alias_expr = query.lhs.tns
+        assert isinstance(alias_expr, Alias)
         stats_cache = self.cache_point
         insert_statistics(
             self.stats_factory,
@@ -839,7 +836,6 @@ class AnnotatedQuery(Generic[TS]):
         Always returns a `Query` binding ``self.output_name``.
         """
         expr = self.point_expr
-        output_order = tuple(self.output_order or expr.fields())
         if not isinstance(expr, Table):
             match self.cache_point[expr].fill_value:
                 case DynamicFill() as fill:
@@ -852,9 +848,10 @@ class AnnotatedQuery(Generic[TS]):
                 cast(LogicExpression, expr),
                 (),
             )
-        if self.output_order is not None:
-            expr = Reorder(cast(LogicExpression, expr), output_order)
-        return Query(self.output_name, expr)
+        return Query(
+            Table(self.output_name, tuple(self.output_order)),
+            cast(LogicExpression, expr),
+        )
 
     def get_cost_of_reduce_idx(self, reduce_idx: Field) -> float:
         """

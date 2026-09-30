@@ -422,7 +422,7 @@ class SamplingStatsFactory(
         reduce_fields = tuple(reduce_set)
 
         # check is_annihilator
-        if is_identity(op, stats.fill_value):
+        if is_identity(op.ftype, stats.fill_value):
             new_sketch = (
                 Aggregate(
                     Literal(ffuncs.add),
@@ -434,7 +434,7 @@ class SamplingStatsFactory(
                 else stats.sketch
             )
 
-        elif is_annihilator(op, stats.fill_value):
+        elif is_annihilator(op.ftype, stats.fill_value):
             exists: LogicExpression = MapJoin(
                 Literal(ffuncs.gt), (stats.sketch, Literal(0.0))
             )
@@ -544,13 +544,13 @@ class SamplingStats(NumericStats):
             n_a, dn_a, f1_a = Alias("n"), Alias("d_n"), Alias("f_1")
             bodies = [
                 Query(
-                    n_a,
+                    Table(n_a, ()),
                     Aggregate(
                         Literal(ffuncs.add), Literal(np.intp(0)), self.sketch, fields
                     ),
                 ),
                 Query(
-                    dn_a,
+                    Table(dn_a, ()),
                     Aggregate(
                         Literal(ffuncs.add),
                         Literal(np.intp(0)),
@@ -559,7 +559,7 @@ class SamplingStats(NumericStats):
                     ),
                 ),
                 Query(
-                    f1_a,
+                    Table(f1_a, ()),
                     Aggregate(
                         Literal(ffuncs.add),
                         Literal(np.intp(0)),
@@ -575,7 +575,7 @@ class SamplingStats(NumericStats):
                 max_a = Alias("max_val")
                 bodies.append(
                     Query(
-                        max_a,
+                        Table(max_a, ()),
                         Aggregate(
                             Literal(ffuncs.max),
                             Literal(np.intp(0)),
@@ -599,7 +599,7 @@ class SamplingStats(NumericStats):
                     freq_alias = [Alias(f"f_{i}") for i in range(1, max_val + 1)]
                     freq_bodies = [
                         Query(
-                            a,
+                            Table(a, ()),
                             Aggregate(
                                 Literal(ffuncs.add),
                                 Literal(np.intp(0)),
@@ -634,7 +634,7 @@ class SamplingStats(NumericStats):
                 continue
             out = Alias("sampled_count")
             query = Query(
-                out,
+                Table(out, ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(np.intp(0)),

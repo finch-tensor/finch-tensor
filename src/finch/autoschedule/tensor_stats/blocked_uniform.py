@@ -62,7 +62,7 @@ def build_grid_uniform(
     size_outputs = tuple(Alias(f"block_sizes_{axis}") for axis in range(len(masks)))
     size_queries = tuple(
         Query(
-            size_out,
+            Table(size_out, (block_idx,)),
             Aggregate(
                 Literal(ffuncs.add),
                 Literal(np.intp(0)),
@@ -75,7 +75,11 @@ def build_grid_uniform(
         )
     )
     prgm = Plan(
-        (Query(out, nnz_grid_expr), *size_queries, Produces((out, *size_outputs)))
+        (
+            Query(Table(out, block_order), nnz_grid_expr),
+            *size_queries,
+            Produces((out, *size_outputs)),
+        )
     )
     nnz_grid, *sizes = NON_RECURSIVE_STANDARD_SCHEDULER(prgm)
 
@@ -229,16 +233,16 @@ class BlockedUniformStatsFactory(
             shape[axis] = -1
             k = k * stats.block_sizes[idx].reshape(shape)
 
-        if is_annihilator(op, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_value):
             local_p = np.power(density, k)
-        elif is_identity(op, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_value):
             local_p = 1 - np.power(1 - density, k)
         else:
             local_p = np.ones_like(density)
 
-        if is_annihilator(op, base.fill_value):
+        if is_annihilator(op.ftype, base.fill_value):
             combined_p = np.prod(local_p, axis=reduce_axes)
-        elif is_identity(op, base.fill_value):
+        elif is_identity(op.ftype, base.fill_value):
             combined_p = 1 - np.prod(1 - local_p, axis=reduce_axes)
         else:
             combined_p = np.mean(local_p, axis=reduce_axes)

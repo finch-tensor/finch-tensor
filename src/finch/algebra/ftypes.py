@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, overload
 import numpy as np
 
 if TYPE_CHECKING:
+    from finch.algebra.algebra import FinchOperator, FinchOperatorFType
     from finch.algebra.tensor import Tensor, TensorFType
     from finch.codegen.buffers import NumpyBuffer, NumpyBufferFType
 
@@ -49,6 +50,11 @@ class FType(ABC):
         Check if `other` is an instance of this ftype.
         """
         return ftype(other) == self
+
+
+class CallableFType(FType, ABC):
+    @abstractmethod
+    def return_type(self, *args: FType) -> FType: ...
 
 
 # https://data-apis.org/array-api/latest/API_specification/data_types.html#data-type-categories
@@ -786,11 +792,6 @@ class ImmutableStructFType(StructFType):
 
 
 class MutableStructFType(StructFType):
-    """
-    Class for a mutable struct type.
-    It is currently not used anywhere, but maybe it will be useful in the future?
-    """
-
     @property
     def is_mutable(self) -> builtins.bool:
         return True
@@ -932,7 +933,7 @@ class NamedTupleFType(ImmutableStructFType):
             fisinstance(a, f)
             for a, f in zip(args, self.struct_fieldtypes, strict=False)
         )
-        return namedtuple(self.struct_name, self.struct_fieldnames)(args)
+        return namedtuple(self.struct_name, self.struct_fieldnames)(*args)
 
     def __call__(self, *args):
         return self.from_fields(*args)
@@ -976,6 +977,10 @@ def isdtype(dtype, kind):
 
 
 FT = TypeVar("FT", bound=FType)
+
+
+@overload
+def ftype(x: FinchOperator) -> FinchOperatorFType: ...
 
 
 @overload

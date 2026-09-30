@@ -67,7 +67,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.original_idx = OrderedDict()
     aq.connected_components = []
     aq.connected_idxs = OrderedDict()
-    aq.output_order = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
 
     result = [field.name for field in AnnotatedQuery.get_reducible_idxs(aq)]
@@ -114,7 +114,7 @@ def test_get_reducible_idxs_for_component(
     aq.original_idx = OrderedDict()
     aq.connected_components = []
     aq.connected_idxs = OrderedDict()
-    aq.output_order = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
 
     result = [
@@ -536,7 +536,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
     aq.connected_components = []
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
-    aq.output_order = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 
@@ -699,7 +699,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
     aq.connected_components = []
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
-    aq.output_order = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 
@@ -720,7 +720,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected_query
 
-    alias_expr = Alias(query.lhs.name)
+    alias_expr = query.lhs.tns
     assert aq.point_expr == expected_point_expr(alias_expr)
 
 
@@ -748,7 +748,7 @@ def rename_aliases(expr):
     [
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("i"),)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
@@ -759,7 +759,7 @@ def rename_aliases(expr):
             ),
             [],
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("i"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -776,7 +776,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -792,7 +792,7 @@ def rename_aliases(expr):
             ),
             [Field("i")],
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -809,7 +809,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -827,7 +827,7 @@ def rename_aliases(expr):
             [Field("i"), Field("j")],
             # Expect: Query(out, overwrite-Aggregate wrapping the same MapJoin)
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -864,7 +864,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 1: sum_{i,j,k} A[i,j] * A[j,k], reduce over i
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -890,7 +890,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 2: same chain, reduce over j
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -922,7 +922,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 3: same chain, reduce over k
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -948,7 +948,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 4: chain_expr = sum_{i,j,k} max(A[i,j], A[j,k])
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -981,7 +981,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             # Case 5:  sum_{j,k} max( sum_i A[i,j], A[j,k] )
             # inner Aggregate(+ over i) is already inside the MapJoin.
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -1044,7 +1044,7 @@ def test_greedy_query_multi_component():
     aq.original_idx = OrderedDict({fi: fi, fj: fj})
     aq.connected_components = [[fi], [fj]]
     aq.connected_idxs = OrderedDict({fi: set(), fj: set()})
-    aq.output_order = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 

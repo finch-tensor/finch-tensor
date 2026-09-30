@@ -4,8 +4,15 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Self
 
-from finch.algebra import ftype, return_type
-from finch.symbolic import Context, NamedTerm, Term, TermTree, literal_repr
+from finch.algebra import CallableFType, ftype, return_type
+from finch.symbolic import (
+    Context,
+    ExpressionTerm,
+    NamedTerm,
+    Term,
+    TermTree,
+    literal_repr,
+)
 from finch.util import qual_str
 
 """
@@ -50,7 +57,7 @@ class FusedTree(FusedNode, TermTree, ABC):
         ...
 
 
-class FusedExpression(FusedNode, ABC):
+class FusedExpression(FusedNode, ExpressionTerm, ABC):
     @property
     @abstractmethod
     def result_type(self) -> Any: ...
@@ -141,8 +148,8 @@ class Call(FusedTree, FusedExpression):
     def result_type(self):
         arg_types = [arg.result_type for arg in self.args]
         arg_types.extend(kw.value.result_type for kw in self.kwargs)
-        if isinstance(self.fn, Literal):
-            return return_type(self.fn.val, *arg_types)
+        if isinstance(op_type := self.fn.result_type, CallableFType):
+            return return_type(op_type, *arg_types)
         return None
 
 
@@ -173,10 +180,8 @@ class BinaryOp(FusedTree, FusedExpression):
 
     @property
     def result_type(self):
-        if isinstance(self.op, Literal):
-            return return_type(
-                self.op.val, self.left.result_type, self.right.result_type
-            )
+        if isinstance(op_type := self.op.result_type, CallableFType):
+            return return_type(op_type, self.left.result_type, self.right.result_type)
         return None
 
 

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Generic, Self, TypeVar
 
+from finch.algebra.ftypes import FType, FTyped
+
 """
 This module contains definitions for common functions that are useful for symbolic
 expression manipulation. Its purpose is to provide a shared interface between various
@@ -65,6 +67,16 @@ class Term:
         ...
 
 
+class ExpressionTerm(Term, FTyped, ABC):
+    @property
+    def ftype(self) -> FType:
+        return self.result_type
+
+    @property
+    @abstractmethod
+    def result_type(self) -> FType: ...
+
+
 @dataclass(frozen=True, eq=True)
 class TermTree(Term, ABC):
     @property
@@ -85,10 +97,10 @@ class LiteralTerm(Term, ABC, Generic[T]):
 
 class CallTerm(TermTree, ABC):
     """
-    A tree term which applies the operator held by the literal `op` to `args`.
+    A tree term which applies the operator computed by the expression `op` to `args`.
     """
 
-    op: LiteralTerm
+    op: ExpressionTerm
     args: tuple[Term, ...]
 
 

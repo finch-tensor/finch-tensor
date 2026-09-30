@@ -12,10 +12,11 @@ from finch.algebra import (
     StaticFill,
     ffuncs,
     ftypes,
+    is_dynamic,
 )
 from finch.algebra.tensor import TensorFType
 from finch.compile.lower import make_extent
-from finch.finch_assembly import AssemblyLibrary
+from finch.finch_assembly import AssemblyKernelFType, AssemblyLibrary
 from finch.finch_logic import (
     Alias,
     LogicLoader,
@@ -262,40 +263,43 @@ class NotationContext:
         match prgm:
             case lgc.Plan(bodies):
                 return ntn.Block(tuple(self(body) for body in bodies))
-            case lgc.Query(lhs, lgc.Reorder(lgc.Table(lgc.Alias(), _) as arg, idxs_2)):
-                body = self._lower_query_of_reorder(lhs, ffuncs.overwrite, arg, idxs_2)
+            case lgc.Query(
+                lgc.Table(lgc.Alias() as lhs, idxs_2), lgc.Table(lgc.Alias(), _) as arg
+            ):
                 match self.bindings[lhs].fill_value:
                     case DynamicFill() as fill:
                         init = ntn.Literal(fill)
+                        op = ffuncs.overwrite
                     case StaticFill() as fill:
                         init = ntn.Literal(fill.value)
+                        op = ffuncs.init_write(fill.value)
+                body = self._lower_query_of_reorder(lhs, op, arg, idxs_2)
                 return ntn.Block(
                     (
                         ntn.Declare(
                             self.slots[lhs],
                             init,
-                            ntn.Literal(ffuncs.overwrite),
+                            ntn.Literal(op),
                             (),
                         ),
                         body,
                         ntn.Freeze(
                             self.slots[lhs],
-                            ntn.Literal(ffuncs.overwrite),
+                            ntn.Literal(op),
                         ),
                     )
                 )
             case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.Aggregate(
-                        lgc.Literal(op),
-                        lgc.Literal(init),
-                        lgc.Reorder(arg, _) as arg_2,
-                        idxs_2,
-                    ),
-                    output_idxs,
+                lgc.Table(lgc.Alias() as lhs, output_idxs),
+                lgc.Aggregate(
+                    lgc.Literal(op),
+                    lgc.Literal(init),
+                    lgc.Reorder(arg, _) as arg_2,
+                    idxs_2,
                 ),
             ):
+                if op == ffuncs.overwrite and not idxs_2 and not is_dynamic(init):
+                    op = ffuncs.init_write(init)
                 body = self._lower_query_of_aggregate(lhs, op, arg_2, output_idxs)
                 return ntn.Block(
                     (
@@ -313,21 +317,18 @@ class NotationContext:
                     )
                 )
             case lgc.Query(
-                lhs,
-                lgc.Reorder(
-                    lgc.MapJoin(
-                        lgc.Literal(op),
-                        (
-                            lgc.Table(lhs_1, idxs_1),
-                            lgc.Aggregate(
-                                lgc.Literal(op_1),
-                                lgc.Literal(init),
-                                lgc.Reorder() as agg_arg,
-                                _,
-                            ),
+                lgc.Table(lgc.Alias() as lhs, idxs_2),
+                lgc.MapJoin(
+                    lgc.Literal(op),
+                    (
+                        lgc.Table(lhs_1, idxs_1),
+                        lgc.Aggregate(
+                            lgc.Literal(op_1),
+                            lgc.Literal(init),
+                            lgc.Reorder() as agg_arg,
+                            _,
                         ),
                     ),
-                    idxs_2,
                 ),
             ) if lhs_1 == lhs and idxs_1 == idxs_2 and op_1 in (op, ffuncs.overwrite):
                 body = self._lower_query_of_aggregate(lhs, op_1, agg_arg, idxs_2)
@@ -417,7 +418,14 @@ class NotationGenerator(LogicNotationLowerer):
         return ntn.Module(
             (
                 ntn.Function(
-                    ntn.Variable("main", ret_t),
+                    ntn.Variable(
+                        "main",
+                        AssemblyKernelFType(
+                            "main",
+                            tuple(arg.result_type for arg in args.values()),
+                            ret_t,
+                        ),
+                    ),
                     tuple(args.values()),
                     ntn.Block((*preamble, body)),
                 ),
