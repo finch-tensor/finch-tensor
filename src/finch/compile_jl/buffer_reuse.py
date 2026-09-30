@@ -8,7 +8,7 @@ from weakref import finalize
 
 import numpy as np
 
-from finch.algebra import Tensor, TensorFType
+from finch.algebra import AbstractFill, Tensor, TensorFType
 
 
 @dataclass
@@ -31,7 +31,7 @@ class _BufferPool:
         self,
         ftype: TensorFType,
         shape: tuple[int, ...],
-        fill_value: Any = None,
+        fill_value: AbstractFill | None = None,
     ) -> _BufferLease:
         from .interop import tensor_to_jl
 
@@ -41,7 +41,9 @@ class _BufferPool:
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
-        tensor = ftype.construct(shape, fill_value=fill_value)
+        tensor = (
+            ftype.with_fill(fill_value) if fill_value is not None else ftype
+        ).construct(shape)
         return _BufferLease(
             tensor_to_jl(tensor),
             key,

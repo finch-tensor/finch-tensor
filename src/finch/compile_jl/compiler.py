@@ -11,6 +11,7 @@ from finch.algebra.fill import (
     StaticFill,
     is_dynamic,
 )
+from finch.algebra.tensor import TensorFType
 from finch.compile import NotationCompiler, dimension
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
@@ -176,7 +177,7 @@ class FinchJLGenerator:
                 proto_lines = []
                 for position, arg in enumerate(args):
                     match arg:
-                        case ntn.Variable(sym, type_):
+                        case ntn.Variable(sym, TensorFType() as type_):
                             arg_name = self.emit_name(sym)
                             fill = type_.fill_value
                             fill_literal = (
@@ -189,6 +190,10 @@ class FinchJLGenerator:
                             )
                             proto_lines.append(f"        {arg_name} = {constructor}")
                             arg_strs.append(arg_name)
+                        case ntn.Variable(_, type_):
+                            raise TypeError(
+                                f"Julia kernel argument must be a tensor, got {type_}"
+                            )
                         case _:
                             raise NotImplementedError
                 arg_str = ",".join(arg_strs)
@@ -371,6 +376,22 @@ def _dynamic_fill_placeholder(position: int) -> str:
     return f"__FINCH_DYNAMIC_FILL_{position}__"
 
 
+def _argument_type_str(arg: ntn.Variable) -> str:
+    match arg.type_:
+        case TensorFType() as type_:
+            fill = type_.fill_value
+            return ftype_to_jl_type_str(
+                type_,
+                fill_literal=(
+                    _julia_literal(fill.ftype(0))
+                    if is_dynamic(fill)
+                    else _julia_literal(fill.value)
+                ),
+            )
+        case type_:
+            raise TypeError(f"Julia kernel argument must be a tensor, got {type_}")
+
+
 class FinchJLCompiler(NotationCompiler):
     def __init__(self, runtime: FinchJLRuntime | None = None):
         self.runtime = DefaultFinchJLRuntime() if runtime is None else runtime
@@ -382,18 +403,7 @@ class FinchJLCompiler(NotationCompiler):
         for orig_func in prgm.children:
             func, dynamic_args = unwrap_static_fills(orig_func)
             generated_prgm = generator(func)
-            arg_type_strs = tuple(
-                ftype_to_jl_type_str(
-                    arg.type_,
-                    fill_literal=(
-                        _julia_literal(arg.type_.fill_value.ftype(0))
-                        if is_dynamic(arg.type_.fill_value)
-                        else _julia_literal(arg.type_.fill_value.value)
-                    ),
-                )
-                for arg in func.args
-                if arg.type_ is not None
-            )
+            arg_type_strs = tuple(_argument_type_str(arg) for arg in func.args)
             key = (generated_prgm, arg_type_strs, dynamic_args)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
