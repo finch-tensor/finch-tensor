@@ -21,22 +21,6 @@ jobs:
           run: |
             pixi run benchmark -vvv -m "not slow"
 
-  benchmark-julia:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read # required for actions/checkout
-    steps:
-      - name: Checkout Repo
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - uses: prefix-dev/setup-pixi@v0.10.0
-        with:
-          pixi-version: v0.71.3
-          environments: benchmark-julia
-      - name: Run Julia benchmarks
-        run: pixi run benchmark-julia -vvv -m "not slow"
-
 on:
   push:
     branches:
