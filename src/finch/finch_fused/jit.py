@@ -1,5 +1,8 @@
+import functools
+
 from finch.autoschedule.default_schedulers import get_default_scheduler
 
+from .calls import positional_args, wrap_calls
 from .dataflow import insert_lazy_and_compute
 from .parser import fused_function_to_python_function, parse_fused_function
 
@@ -12,7 +15,10 @@ def jit(f, /, ctx=None):
     Parameters:
     - f: The function to be marked for JIT compilation. This function can use
         basic python control flow and operations (e.g. while, for, if). However,
-        it shouldn't use more complex features like generators, classes, or recursion.
+        it shouldn't use more complex features like generators or classes.
+        Calls to other Python functions are traced into when their source can be
+        parsed, so tensors stay lazy and are fused across the call boundary.
+        Other calls receive computed tensors.
     - ctx: The scheduler to use for computation. Defaults to the result of
         `get_default_scheduler()`.
 
@@ -44,6 +50,16 @@ def jit(f, /, ctx=None):
     """
     if ctx is None:
         ctx = get_default_scheduler()
-    fused_fn = parse_fused_function(f)
+    fused_fn = wrap_calls(parse_fused_function(f))
     transformed_fn = insert_lazy_and_compute(fused_fn)
-    return fused_function_to_python_function(transformed_fn)
+    opt_fn = fused_function_to_python_function(transformed_fn)
+    if f.__code__.co_kwonlyargcount or f.__defaults__:
+        compiled_fn = opt_fn
+
+        @functools.wraps(f)
+        def opt_fn(*args, **kwargs):
+            return compiled_fn(*positional_args(f, args, kwargs))
+
+    # Lets jit-compiled callers trace into this function instead of calling it.
+    opt_fn.__finch_jit_wrapped__ = f  # ty: ignore[unresolved-attribute]
+    return opt_fn

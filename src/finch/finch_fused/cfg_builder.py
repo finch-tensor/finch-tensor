@@ -7,6 +7,7 @@ from .nodes import (
     Assign,
     Block,
     Break,
+    ExprStmt,
     For,
     Function,
     FusedNode,
@@ -78,7 +79,7 @@ def number_statements(node: FusedNode, sid: int = 0) -> tuple[FusedNode, int]:
             case For(target, iter, body):
                 return For(target, iter, cast(Block, go(body)))
             case node:
-                if isinstance(node, (Assign, Return, Break)):
+                if isinstance(node, (Assign, ExprStmt, Return, Break)):
                     nonlocal sid
                     s = NumberedStatement(node, sid)
                     sid += 1
@@ -217,7 +218,7 @@ class FusedCFGBuilder:
                 self.current_block.add_successor(body_block)
                 self.current_block.add_successor(after_block)
                 self.current_block = after_block
-            case For(_, iter, body):
+            case For(target, iter, body):
                 before_block = self.current_block
                 body_block = self.cfg.new_block()
                 after_block = self.cfg.new_block()
@@ -227,8 +228,9 @@ class FusedCFGBuilder:
                 before_block.add_successor(after_block)
 
                 # fill in the loop body
+                # The loop target is (re)defined from the iterable on every iteration.
                 self.current_block = body_block
-                self.emit(iter)
+                self.emit(Assign(target, iter))
                 self(body, after_block, return_block)
 
                 # connect the end of loop body back to the beginning to form the loop
