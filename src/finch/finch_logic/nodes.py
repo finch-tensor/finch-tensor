@@ -291,7 +291,8 @@ class LogicStatement(LogicNode):
     ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
+        fills = self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
+        return {alias: as_fill(fill) for alias, fill in fills.items()}
 
 
 @dataclass(eq=True, frozen=True)
