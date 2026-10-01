@@ -63,7 +63,7 @@ _transparent_cache: dict[types.CodeType, Callable | None] = {}
 
 
 def _is_lazy_aware(fn: Any) -> bool:
-    if isinstance(fn, np.ufunc) or getattr(fn, "__finch_lazy_aware__", False):
+    if isinstance(fn, np.ufunc):
         return True
     try:
         if fn in _LAZY_AWARE_BUILTINS:

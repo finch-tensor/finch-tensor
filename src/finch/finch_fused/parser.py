@@ -77,13 +77,11 @@ class _FusedFunctionParser:
     def __init__(
         self,
         fn: types.FunctionType,
-        fn_def: ast.FunctionDef | ast.Lambda,
+        fn_def: ast.FunctionDef,
         closure_as_params: bool = False,
-        line_offset: int = 0,
     ):
         self.fn = fn
         self.fn_def = fn_def
-        self.line_offset = line_offset
         self.globals = getattr(fn, "__globals__", {})
         self.closurevars: dict[str, Any] = {}
         self.closure_params: tuple[fzd.Variable, ...] = ()
@@ -115,12 +113,8 @@ class _FusedFunctionParser:
                 for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)
             ),
         )
-        match self.fn_def:
-            case ast.Lambda(body=body):
-                block = fzd.Block((fzd.Return((self._parse_expr(body),)),))
-                return fzd.Function(fzd.Literal("_lambda"), params, block)
-            case ast.FunctionDef(name=name, body=body):
-                return fzd.Function(fzd.Literal(name), params, self._parse_block(body))
+        body = self._parse_block(self.fn_def.body)
+        return fzd.Function(fzd.Literal(self.fn_def.name), params, body)
 
     def _parse_parameter(self, arg: ast.arg) -> fzd.Variable:
         self.locals.add(arg.arg)
@@ -275,67 +269,11 @@ class _FusedFunctionParser:
                         return fzd.Literal(getattr(module, attr))
                     case base:
                         return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
-            case ast.Lambda() as lambda_expr:
-                return self._parse_lambda(lambda_expr)
             case _:
                 raise self._unsupported(
                     expr,
                     f"Unsupported expression type: {type(expr).__name__}",
                 )
-
-    def _parse_lambda(self, expr: ast.Lambda) -> fzd.FusedExpression:
-        """
-        Lower a lambda to a call of a factory that takes the enclosing variables
-        the lambda uses. The factory is compiled with the original file name and
-        line numbers so that the lambda it creates is a real closure whose source
-        can be found again by `jit`, and can be traced into when called.
-        """
-        lambda_args = expr.args
-        lambda_params = {
-            arg.arg
-            for arg in (
-                *lambda_args.posonlyargs,
-                *lambda_args.args,
-                *lambda_args.kwonlyargs,
-                *filter(None, (lambda_args.vararg, lambda_args.kwarg)),
-            )
-        }
-        free_names = sorted(
-            {
-                node.id
-                for node in ast.walk(expr.body)
-                if isinstance(node, ast.Name)
-                and node.id not in lambda_params
-                and (node.id in self.locals or node.id in self.closurevars)
-            }
-        )
-        factory_def = ast.FunctionDef(
-            name="_lambda_factory",
-            args=ast.arguments(
-                posonlyargs=[],
-                args=[ast.arg(arg=name) for name in free_names],
-                kwonlyargs=[],
-                kw_defaults=[],
-                defaults=[],
-            ),
-            body=[ast.Return(value=expr)],
-            decorator_list=[],
-            type_params=[],
-        )
-        ast.copy_location(factory_def, expr)
-        module = ast.fix_missing_locations(ast.Module([factory_def], type_ignores=[]))
-        ast.increment_lineno(module, self.line_offset)
-        module_code = compile(module, self.fn.__code__.co_filename, "exec")
-        factory_code = next(
-            const
-            for const in module_code.co_consts
-            if isinstance(const, types.CodeType)
-        )
-        factory = types.FunctionType(factory_code, self.globals, "_lambda_factory")
-        factory.__finch_lazy_aware__ = True  # ty: ignore[unresolved-attribute]
-        return fzd.Call(
-            fzd.Literal(factory), tuple(self._parse_name(name) for name in free_names)
-        )
 
     def _parse_name(self, name: str) -> fzd.FusedExpression:
         if name in self.locals:
@@ -395,52 +333,20 @@ class _FusedFunctionParser:
         return ValueError(f"{message} (line {lineno})")
 
 
-def _find_lambda(fn: types.FunctionType, tree: ast.Module) -> ast.Lambda:
-    code = fn.__code__
-    n_params = code.co_argcount + code.co_kwonlyargcount
-    param_names = list(code.co_varnames[:n_params])
-    candidates = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Lambda)
-        and [
-            arg.arg
-            for arg in (
-                *node.args.posonlyargs,
-                *node.args.args,
-                *node.args.kwonlyargs,
-            )
-        ]
-        == param_names
-    ]
-    if len(candidates) != 1:
-        raise ValueError("Could not uniquely locate the source of the lambda.")
-    return candidates[0]
-
-
 def parse_fused_function(
     fn: types.FunctionType, closure_as_params: bool = False
 ) -> fzd.Function:
     if inspect.unwrap(fn) is not fn:
         # getsource follows __wrapped__, so the parsed source would not match `fn`.
         raise ValueError("Wrapped functions are not supported in finch_fused parser.")
-    source_lines, first_line = inspect.getsourcelines(fn)
-    tree = ast.parse(textwrap.dedent("".join(source_lines)))
-    line_offset = max(first_line - 1, 0)
+    source = textwrap.dedent(inspect.getsource(fn))
+    tree = ast.parse(source)
     fn_name = getattr(fn, "__name__", None)
-
-    if fn_name == "<lambda>":
-        lambda_node = _find_lambda(fn, tree)
-        return _FusedFunctionParser(
-            fn, lambda_node, closure_as_params, line_offset
-        ).parse()
 
     for node in tree.body:
         match node:
             case ast.FunctionDef(name=name) if fn_name is None or name == fn_name:
-                return _FusedFunctionParser(
-                    fn, node, closure_as_params, line_offset
-                ).parse()
+                return _FusedFunctionParser(fn, node, closure_as_params).parse()
             case ast.AsyncFunctionDef(name=name) if fn_name is None or name == fn_name:
                 raise ValueError(
                     "Async functions are not supported in finch_fused parser draft."

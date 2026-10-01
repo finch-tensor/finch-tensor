@@ -918,38 +918,6 @@ def test_jit_function_valued_local():
     finch_assert_allclose(opt_fn(u, "square"), simple_fn(u, "square"))
 
 
-def _integrate(f, y, steps):
-    for i in range(steps):
-        y = y + f(i, y)
-    return y
-
-
-def test_jit_lambda_closing_over_tensors():
-    """A lambda closing over tensors compiles once and is reused for new values."""
-
-    def simple_fn(A, B, y):
-        return _integrate(lambda t, y: matmul(A, y) + B, y, 2)
-
-    @jit
-    def opt_fn(A, B, y):
-        return _integrate(lambda t, y: matmul(A, y) + B, y, 2)
-
-    A = asarray(np.array([[0.5, 0.0], [0.0, 0.5]]))
-    B = asarray(np.array([1.0, 2.0]))
-    y = asarray(np.array([1.0, 1.0]))
-
-    finch_assert_allclose(opt_fn(A, B, y), simple_fn(A, B, y))
-    A_2 = asarray(np.array([[1.0, 1.0], [0.0, 1.0]]))
-    finch_assert_allclose(opt_fn(A_2, y, B), simple_fn(A_2, y, B))
-    lambda_codes = [
-        code
-        for code in _transparent_cache
-        if code.co_name == "<lambda>" and code.co_filename == __file__
-    ]
-    assert len(lambda_codes) == 1
-    assert _transparent_cache[lambda_codes[0]] is not None
-
-
 def _eager_helper(x):
     k = int(finch.max(x))
     try:
