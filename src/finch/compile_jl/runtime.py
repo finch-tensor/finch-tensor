@@ -50,7 +50,7 @@ class _StoragePool:
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
-        tensor = ftype.construct(shape)
+        tensor = ftype.construct(shape, fill_value=0) if pin_fill else ftype.construct(shape)
         return _StorageLease(
             tensor_to_jl(tensor, pin_fill=pin_fill),
             key,

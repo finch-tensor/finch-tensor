@@ -43,10 +43,11 @@ class ScalarFType(TensorFType, ImmutableStructFType):
             (self._element_type, ffuncs.samehash(self._fill_value), self.device)
         )
 
-    def construct(self, shape: tuple) -> Scalar:
+    def construct(self, shape: tuple, fill_value: Any = None) -> Scalar:
         if shape != ():
             raise ValueError("ScalarFType can only be called with empty shape ()")
-        return self._element_type(self._fill_value.value)
+        fill = self._fill_value if fill_value is None else as_fill(fill_value)
+        return self._element_type(fill.value)
 
     def __call__(self, val: Any) -> Scalar:
         """
