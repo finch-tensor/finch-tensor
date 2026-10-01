@@ -199,12 +199,18 @@ def _julia_literal(value: Any) -> str:
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
         return "true" if value else "false"
+    literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):
-            return "-Inf" if value < 0 else "Inf"
-        if math.isnan(value):
-            return "NaN"
-    return str(value)
+            literal = "-Inf" if value < 0 else "Inf"
+        elif math.isnan(value):
+            literal = "NaN"
+    # Julia reads untyped literals as Float64 or Int64. Fills are type
+    # parameters of Julia levels, so other widths (e.g. Float32) must be
+    # constructed explicitly for prototypes to match the real arguments.
+    if isinstance(value, np.number) and value.dtype not in (np.float64, np.int64):
+        return f"{_leaf_type_str(type(value))}({literal})"
+    return literal
 
 
 def _leaf_type_str(T: Any) -> str:
