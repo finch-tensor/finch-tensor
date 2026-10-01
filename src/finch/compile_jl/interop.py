@@ -78,9 +78,7 @@ def _plus_one_buffer_to_jl(buffer: Buffer):
 
 
 def level_to_jl(level: Level, pin_fill: bool = False):
-    """Convert a level to its Julia counterpart. With `pin_fill`, the leaf
-    fill is forced to a zero of its dtype -- see `zero_dynamic_fills` in
-    `compile_jl.compiler` for why this backend does that."""
+    """Convert a level to its Julia counterpart, optionally pinning its fill."""
     match level:
         case ElementLevel():
             fill = level.fill_value
@@ -347,9 +345,9 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
 
 
 def tensor_to_jl(obj, pin_fill: bool = False):
-    """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
-    forced to a zero of their dtype so the argument types line up with a
-    kernel compiled under `zero_dynamic_fills`."""
+    """Convert a tensor to its Julia counterpart, optionally pinning its fill."""
+    if hasattr(obj, "raw_julia_obj"):
+        return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, FiberTensor):
@@ -422,7 +420,7 @@ class JuliaBufferContext:
         return ("object", id(obj))
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
-        key = self._cache_key(obj)
+        key = (self._cache_key(obj), pin_fill)
         cached = self._tensors.get(key)
         if cached is not None:
             return cached[1]
