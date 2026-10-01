@@ -665,6 +665,28 @@ def test_compile_julia_sums_sparse_list_level():
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.int32, np.float64, np.int64])
+@pytest.mark.parametrize("scheduler", ["COMPILE_JULIA", "COMPILE_JULIA_GALLEY"])
+def test_compile_julia_sparse_fill_value_dtypes(dtype, scheduler):
+    """Kernel prototypes must carry the fill type of non-default-width dtypes."""
+    _requires_julia_backend()
+    from finch import autoschedule
+
+    elem_ftype = element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)
+    level = SparseListLevel(
+        ElementLevel(elem_ftype, NumpyBuffer(STORED_VALUES.astype(dtype))),
+        COLS,
+        ROW_PTR,
+        COL_IDX,
+    )
+    arg = ft.defer(FiberTensor(DenseLevel(level, ROWS)))
+
+    with with_default_scheduler(getattr(autoschedule, scheduler)):
+        result = ft.compute(ft.sum(arg + arg, axis=1))
+
+    np.testing.assert_array_equal(result.to_numpy(), 2 * EXPECTED_ROW_SUMS)
+
+
 def test_compile_julia_sums_sparse_coo_level():
     _requires_julia_backend()
     level = SparseCOOLevel(
