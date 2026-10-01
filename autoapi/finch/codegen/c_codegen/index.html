@@ -9372,7 +9372,7 @@ and argument types.</p>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@file_cache</span><span class="p">(</span><span class="n">ext</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"shared_library_suffix"</span><span class="p">),</span> <span class="n">domain</span><span class="o">=</span><span class="s2">"c"</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">create_shared_lib</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">c_code</span><span class="p">,</span> <span class="n">cc</span><span class="p">,</span> <span class="n">cflags</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_shared_lib</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">c_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cc</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cflags</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compiles a C function into a shared library and returns the path.</span>
 
@@ -9398,7 +9398,7 @@ and argument types.</p>
             <span class="nb">str</span><span class="p">(</span><span class="n">shared_lib_path</span><span class="p">),</span>
             <span class="nb">str</span><span class="p">(</span><span class="n">c_file_path</span><span class="p">),</span>
         <span class="p">]</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">cc</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">Path</span><span class="p">(</span><span class="n">cc</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">"Compiler '</span><span class="si">{</span><span class="n">cc</span><span class="si">}</span><span class="s2">' not found. Ensure it is installed and in your PATH."</span>
             <span class="p">)</span>
