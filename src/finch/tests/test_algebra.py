@@ -58,12 +58,9 @@ def test_tuple_numpy_dtype_roundtrip():
     dtype = TupleFType.from_tuple(
         (finch.int32, TupleFType.from_tuple((finch.float64, finch.bool)))
     )
-    expected = np.dtype(
-        [
-            ("element_0", np.int32),
-            ("element_1", [("element_0", np.float64), ("element_1", np.bool_)]),
-        ]
-    )
+    # aligned like a C struct or a Julia tuple
+    inner = np.dtype([("element_0", np.float64), ("element_1", np.bool_)], align=True)
+    expected = np.dtype([("element_0", np.int32), ("element_1", inner)], align=True)
     assert dtype.dtype == expected
     assert np.dtype(dtype) == expected
     assert np_dtype(dtype) == expected

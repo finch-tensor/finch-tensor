@@ -897,3 +897,13 @@ def test_compile_julia_full_reduction_returns_a_scalar(scheduler):
 
     assert result.shape == ()
     np.testing.assert_allclose(np.array(result), data.sum())
+
+
+def test_julia_floor_divide_floors_like_numpy():
+    if not julia_available():
+        pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
+    from finch.compile_jl.compiler import _JULIA_OPS
+
+    op = jl.seval(_JULIA_OPS[ffuncs.floordiv.ftype])
+    for x, y in ((-7.0, 2.0), (7.0, -2.0), (1.0, 0.1), (-7, 2)):
+        assert op(x, y) == np.floor_divide(x, y)

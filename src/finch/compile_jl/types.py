@@ -176,8 +176,58 @@ def to_jl_value(T, value, *, offset: int = 0):
     return _as_julia_scalar(T(value))
 
 
-def to_jl_vector(T, values, *, offset: int = 0):
+def _wrappable(T, arr: np.ndarray) -> Any:
+    """The Julia element type `arr` can be aliased as, or None."""
+    if arr.ndim != 1 or not arr.flags["C_CONTIGUOUS"] or arr.dtype.kind not in "biufcV":
+        return None
+    try:
+        jl_type = to_jl_type(T)
+    except NotImplementedError:
+        return None
+    jl = get_jl()
+    if int(jl.sizeof(jl_type)) != arr.itemsize or not jl.isbitstype(jl_type):
+        return None
+    if arr.dtype.fields is not None:
+        offsets = [arr.dtype.fields[name][1] for name in arr.dtype.names]
+        julia = [int(jl.fieldoffset(jl_type, i + 1)) for i in range(len(offsets))]
+        if offsets != julia:
+            return None
+    return jl_type
+
+
+def _alias(jl_type, arr: np.ndarray):
+    jl = get_jl()
+    if arr.size == 0:
+        return jl.Vector[jl_type]()
+    pointer = jl.Ptr[jl_type](int(arr.__array_interface__["data"][0]))
+    return jl.unsafe_wrap(jl.Array, pointer, int(arr.size), own=False)
+
+
+def _with_offset(T, arr: np.ndarray, offset: int) -> np.ndarray:
+    if arr.dtype.fields is None:
+        return np.ascontiguousarray(arr + offset)
+    out = np.empty(arr.shape, dtype=T.dtype)
+    for name, src in zip(T.dtype.names, arr.dtype.names, strict=True):
+        out[name] = arr[src] + offset
+    return out
+
+
+def to_jl_owned_vector(T, values, *, offset: int = 0):
+    """A Julia-owned `Vector` holding a copy of `values` (plus `offset`)."""
     T = to_fl_dtype(T)
+    arr = np.asarray(values)
+    if not isinstance(T, JuliaElementFType):
+        if offset:
+            arr = _with_offset(T, arr, offset)
+        arr = np.ascontiguousarray(arr.reshape(-1))
+        jl_type = _wrappable(T, arr)
+        if jl_type is not None:
+            # memcpy out of the aliasing view while `arr` is still alive
+            return get_jl().copy(_alias(jl_type, arr))
+    return _to_jl_vector_slow(T, values, offset=offset)
+
+
+def _to_jl_vector_slow(T, values, *, offset: int = 0):
     if isinstance(T, JuliaElementFType):
         return T.julia_vector(values, offset=offset)
     if isinstance(T, TupleFType) or offset:
@@ -187,6 +237,25 @@ def to_jl_vector(T, values, *, offset: int = 0):
             [to_jl_value(T, value, offset=offset) for value in values],
         )
     return get_jl().Vector(values)
+
+
+def to_jl_vector(T, values, *, offset: int = 0):
+    """A Julia `Vector` for `values`.
+
+    A 1-D contiguous ndarray whose layout matches the Julia element type is
+    aliased, not copied: the caller keeps `values` alive while Julia may use the
+    result. Julia (1.11+) may still grow the vector, which moves it into Julia
+    memory. A nonzero `offset` or any other input gets a Julia-owned copy.
+    """
+    T = to_fl_dtype(T)
+    if isinstance(values, np.ndarray) and not isinstance(T, JuliaElementFType):
+        if offset:
+            return to_jl_owned_vector(T, values, offset=offset)
+        jl_type = _wrappable(T, values)
+        if jl_type is not None:
+            return _alias(jl_type, values)
+        return to_jl_owned_vector(T, values)
+    return _to_jl_vector_slow(T, values, offset=offset)
 
 
 def _julia_literal(value: Any) -> str:

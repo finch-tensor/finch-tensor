@@ -805,8 +805,10 @@ class TupleFType(ImmutableStructFType, FDType):
 
     @property
     def dtype(self) -> np.dtype:
+        # aligned like a C struct or a Julia tuple, so buffers alias across backends
         return np.dtype(
-            [(name, np_dtype(field_type)) for name, field_type in self.struct_fields]
+            [(name, np_dtype(field_type)) for name, field_type in self.struct_fields],
+            align=True,
         )
 
     def __repr__(self):

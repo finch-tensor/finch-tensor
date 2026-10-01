@@ -271,12 +271,11 @@ def _ndarray_to_jl_tensor(
     *,
     copy: bool = False,
 ):
-    if copy:
-        arr = arr.copy() if arr.flags["C_CONTIGUOUS"] else np.ascontiguousarray(arr)
-    elif not arr.flags["C_CONTIGUOUS"]:
-        arr = np.ascontiguousarray(arr)
-
-    buf = jl_dtypes.to_jl_vector(ftype(arr.dtype), arr.reshape(-1))
+    if copy or not arr.flags["C_CONTIGUOUS"]:
+        # strided memory cannot be a Vector, and a copy made here has no other owner
+        buf = jl_dtypes.to_jl_owned_vector(ftype(arr.dtype), arr)
+    else:
+        buf = jl_dtypes.to_jl_vector(ftype(arr.dtype), arr.reshape(-1))
     fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
@@ -345,7 +344,11 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
 
 
 def tensor_to_jl(obj, pin_fill: bool = False):
-    """Convert a tensor to its Julia counterpart, optionally pinning its fill."""
+    """Convert a tensor to its Julia counterpart, optionally pinning its fill.
+
+    The result aliases `obj`'s numpy buffers (see `to_jl_vector`): keep `obj`
+    alive while Julia may use it.
+    """
     if hasattr(obj, "raw_julia_obj"):
         return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
@@ -379,8 +382,8 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 
 def scalar_to_jl(val, pin_fill: bool = False):
     fill = ftype(val)(0) if pin_fill else val
-    buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
+    buf = jl_dtypes.to_jl_owned_vector(ftype(val), np.asarray([val]))
+    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), buf))
 
 
 def jl_tensor_to_python(obj):
