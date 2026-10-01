@@ -17,6 +17,7 @@ from finch import (
     ffuncs,
     ftype,
 )
+from finch.algebra import DynamicFill, DynamicFillError
 from finch.autoschedule import (
     DefaultLogicFactorizer,
     DefaultLoopOrderer,
@@ -27,7 +28,11 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
-from finch.compile_jl.julia import julia_available
+from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
+from finch.compile_jl.julia import jl, julia_available
+from finch.finch_assembly import AssemblyKernelFType
+from finch.tensor import BufferizedNDArray
 from finch.tensor.patterns import (
     ChunkMaskTensor,
     EyeTensor,
@@ -63,8 +68,6 @@ def _requires_julia_backend():
 
 def test_compile_julia_preserves_definition_type():
     _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLCompiler
-    from finch.finch_assembly import AssemblyKernelFType
 
     tensor = ft.asarray(np.arange(6, dtype=np.int64).reshape(2, 3))
     arg = ntn.Variable("tensor", tensor.ftype)
@@ -104,10 +107,8 @@ def test_compile_julia_preserves_definition_type():
 )
 def test_compile_julia_init_write(fill, value):
     _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLCompiler, FinchJLGenerator
+    from finch.compile_jl.compiler import FinchJLGenerator
     from finch.compile_jl.julia import jl
-    from finch.finch_assembly import AssemblyKernelFType
-    from finch.tensor import BufferizedNDArray
 
     tensor = BufferizedNDArray.from_numpy(np.array(fill), fill_value=fill)
     arg = ntn.Variable("output", tensor.ftype)
@@ -149,7 +150,6 @@ def test_compile_julia_init_write(fill, value):
 
 
 def test_compile_julia_init_write_rejects_dynamic_fill():
-    from finch.algebra.fill import DynamicFill, DynamicFillError
     from finch.compile_jl.compiler import FinchJLGenerator
 
     tensor = ft.asarray(np.zeros((), dtype=np.int64))
@@ -158,7 +158,7 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         ntn.Access(ntn.Variable("output", tensor.ftype), ntn.Update(op), ()),
         ntn.Literal(np.int64(3)),
     )
-    with pytest.raises(DynamicFillError, match="static fill"):
+    with pytest.raises(DynamicFillError, match="requires a static fill"):
         FinchJLGenerator().generate_julia(update)
 
 
@@ -305,6 +305,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -350,6 +351,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -402,6 +404,7 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -575,9 +578,6 @@ def _compile_julia_fd(formatter):
 def _to_csr(fbr: FiberTensor) -> FiberTensor:
     """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
     own reformat, regardless of its current level structure (e.g. SparseHash)."""
-    from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
-    from finch.compile_jl.julia import jl
-
     jl_obj = tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
     return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
@@ -626,6 +626,7 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
