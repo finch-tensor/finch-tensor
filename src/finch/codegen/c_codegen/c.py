@@ -1,11 +1,11 @@
 import ctypes
 import json
 import logging
-import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -81,7 +81,7 @@ class CUnaryOperator(COperator):
 
 
 @file_cache(ext=config.get("shared_library_suffix"), domain="c")
-def create_shared_lib(filename, c_code, cc, cflags):
+def create_shared_lib(filename: str, c_code: str, cc: str, cflags: Iterable[str]):
     """
     Compiles a C function into a shared library and returns the path.
 
@@ -107,7 +107,7 @@ def create_shared_lib(filename, c_code, cc, cflags):
             str(shared_lib_path),
             str(c_file_path),
         ]
-        if not shutil.which(str(cc)):
+        if not Path(cc).exists():
             raise FileNotFoundError(
                 f"Compiler '{cc}' not found. Ensure it is installed and in your PATH."
             )
