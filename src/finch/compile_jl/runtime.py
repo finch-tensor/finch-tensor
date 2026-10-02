@@ -24,6 +24,8 @@ from .julia import jl
 class _StorageLease:
     raw: Any
     key: _StoragePoolKey
+    # the Python tensor whose buffers `raw` aliases (tensor_to_jl does not copy)
+    source: Any = None
 
 
 @dataclass(frozen=True)
@@ -51,10 +53,7 @@ class _StoragePool:
         if self._free[key]:
             return self._free[key].popitem()[1]
         tensor = ftype.construct(shape)
-        return _StorageLease(
-            tensor_to_jl(tensor, pin_fill=pin_fill),
-            key,
-        )
+        return _StorageLease(tensor_to_jl(tensor, pin_fill=pin_fill), key, tensor)
 
     def release_lease(self, lease: _StorageLease) -> None:
         free_leases = self._free[lease.key]
@@ -73,6 +72,7 @@ class JuliaOwnedTensor(OverrideTensor):
         pin_fill: bool,
         lease: _StorageLease | None = None,
         translation_finalizer: weakref.finalize | None = None,
+        source: Any = None,
     ) -> None:
         self._ftype = ftype
         self._shape = shape
@@ -83,6 +83,9 @@ class JuliaOwnedTensor(OverrideTensor):
         # If this is a translation of a Python tensor, this finalizer triggers its
         # garbage collection when that tensor is killed.
         self._translation_finalizer = translation_finalizer
+        # the Python tensor whose buffers raw_julia_obj aliases, when this handle
+        # can outlive the caller's reference to it
+        self._source = source
 
     def __del__(self) -> None:
         if self._translation_finalizer is not None:
@@ -179,6 +182,9 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernels: dict[Any, Any] = {}
         self._kernel_metadata: dict[int, _KernalMetadata] = {}
         self._translated_tensors: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
+        self._returned_handles: weakref.WeakValueDictionary[
+            _TranslationCacheKey, JuliaOwnedTensor
+        ] = weakref.WeakValueDictionary()
         self.free_pool = _StoragePool()
 
     def get_cached_kernel(self, key):
@@ -194,8 +200,11 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def kernel_call(self, func_name, kernel, args):
         metadata = self._kernel_metadata[id(kernel)]
 
-        # Lease Julia storage only for resettable compiler-created outputs.
+        # Lease Julia storage only for resettable compiler-created outputs. Other
+        # arguments alias their numpy buffers: a kernel writes them in place, and
+        # growing one moves it into Julia memory.
         julia_buf_args: list[JuliaOwnedTensor] = []
+        sources: dict[int, Tensor] = {}
         for position, tensor in enumerate(args):
             pin_fill = position in getattr(kernel, "dynamic_args", ())
             if position in metadata.reset_positions and not isinstance(
@@ -216,14 +225,37 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 )
             else:
                 julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
+                if not isinstance(tensor, JuliaOwnedTensor):
+                    sources[position] = tensor
             julia_buf_args.append(julia_buf)
 
         getattr(jl, func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
 
-        # Associate returned tensors with their Python ownership handles.
+        # Associate returned tensors with their Python ownership handles. A
+        # returned translation still aliases the argument's numpy buffers, so its
+        # handle holds that tensor.
         return tuple(
-            julia_buf_args[position] for position in metadata.returned_positions
+            self._returned(julia_buf_args[position], sources.get(position))
+            for position in metadata.returned_positions
         )
+
+    def _returned(self, buf: JuliaOwnedTensor, source: Any) -> JuliaOwnedTensor:
+        if source is None:
+            return buf
+        # weakly cached, so a handle is reused while held but never pins `source`
+        key = self._translation_cache_key(source, buf._pin_fill)
+        handle = self._returned_handles.get(key)
+        if handle is None or handle.raw_julia_obj is not buf.raw_julia_obj:
+            handle = JuliaOwnedTensor(
+                buf.ftype,
+                buf.shape,
+                self.release,
+                buf.raw_julia_obj,
+                buf._pin_fill,
+                source=source,
+            )
+            self._returned_handles[key] = handle
+        return handle
 
     def _to_julia_owned_tensor(
         self, tensor: Tensor, pin_fill: bool = False
@@ -288,3 +320,4 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernels.clear()
         self._kernel_metadata.clear()
         self._translated_tensors.clear()
+        self._returned_handles.clear()

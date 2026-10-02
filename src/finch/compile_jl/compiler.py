@@ -28,7 +28,7 @@ _JULIA_OPS = {
     ffuncs.mul.ftype: "*",
     ffuncs.sub.ftype: "-",
     ffuncs.truediv.ftype: "/",
-    ffuncs.floordiv.ftype: "div",
+    ffuncs.floordiv.ftype: "fld",
     ffuncs.mod.ftype: "mod",
     ffuncs.pow.ftype: "^",
     ffuncs.neg.ftype: "-",
