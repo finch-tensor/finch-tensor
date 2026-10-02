@@ -123,16 +123,36 @@ def positional_args(
     return tuple(bound.arguments.values())
 
 
+def _deferred_value(x: Any) -> Any:
+    """The wrapped array of a `defer`red tensor with no pending operations."""
+    from finch.finch_logic import Literal as LogicLiteral
+    from finch.finch_logic import Query, Table
+    from finch.interface.lazy import EffectBlob
+
+    match x.ctx:
+        case EffectBlob(
+            stmt=Query(Table(alias, _), Table(LogicLiteral(val=value), _)), blobs=()
+        ) if alias == x.data:
+            return value
+    return None
+
+
 def _materialize(args: tuple, kwargs: dict[str, Any]) -> tuple[tuple, dict[str, Any]]:
     from finch.interface import compute
     from finch.interface.lazy import LazyTensor
 
     lazies: dict[int, LazyTensor] = {}
+    computed: dict[int, Any] = {}
 
     def collect(x):
         match x:
             case LazyTensor():
-                lazies[id(x)] = x
+                # Unwrap tensors that were only deferred instead of computing them.
+                value = _deferred_value(x)
+                if value is None:
+                    lazies[id(x)] = x
+                else:
+                    computed[id(x)] = value
             case tuple() | list():
                 for x_i in x:
                     collect(x_i)
@@ -141,11 +161,12 @@ def _materialize(args: tuple, kwargs: dict[str, Any]) -> tuple[tuple, dict[str, 
                     collect(x_i)
 
     collect((args, kwargs))
-    if not lazies:
+    if not lazies and not computed:
         return args, kwargs
 
     # Compute all lazy arguments together so that they can share work.
-    computed = dict(zip(lazies, compute(tuple(lazies.values())), strict=True))
+    if lazies:
+        computed.update(zip(lazies, compute(tuple(lazies.values())), strict=True))
 
     def rebuild(x):
         match x:

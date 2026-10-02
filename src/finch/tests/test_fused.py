@@ -1036,3 +1036,37 @@ def test_jit_branch_on_traced_helper_result():
     A = asarray(np.array([[0.5, 0.5], [0.0, 1.0]]))
 
     finch_assert_allclose(opt_fn(A, 5), simple_fn(A, 5))
+
+
+def _opaque_identity(x):
+    try:
+        return x
+    except TypeError:
+        return x
+
+
+def test_jit_opaque_call_unwraps_deferred_inputs(scheduler_calls):
+    """Inputs that were only deferred are passed to opaque calls without a compute."""
+
+    @jit
+    def opt_fn(A):
+        return _opaque_identity(A)
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
+    assert opt_fn(A) is A
+    assert len(scheduler_calls) == 0
+
+
+class _ForwardingNamespace:
+    def __getattr__(self, name):
+        return getattr(finch, name)
+
+
+def test_maybedefer_skips_attribute_forwarding_objects():
+    namespace = _ForwardingNamespace()
+    A = asarray(np.array([1.0, 2.0]))
+
+    deferred_namespace, deferred_A = maybedefer((namespace, A))
+    assert deferred_namespace is namespace
+    assert isinstance(deferred_A, LazyTensor)

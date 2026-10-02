@@ -164,7 +164,9 @@ def _insert_compute(
 def maybedefer(arrs):
     from finch import defer
 
-    return tuple(defer(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
+    # Check the type, as objects that forward attribute access (e.g. array API
+    # namespace wrappers) may appear to have `ndim`.
+    return tuple(defer(arr) if hasattr(type(arr), "ndim") else arr for arr in arrs)
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
