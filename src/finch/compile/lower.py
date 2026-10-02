@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, overload
+from typing import Any, TypeVar, overload
 
 import numpy as np
 
@@ -41,8 +43,10 @@ from .stages import NotationLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_ASSEMBLY)
 
+FT = TypeVar("FT", bound=FType)
 
-class FinchTensorFType(TensorFType, ABC):
+
+class FinchTensorFType(TensorFType[FT], ABC):
     @abstractmethod
     def get_child_type(self, attr: str) -> FType:
         """Return the type of a logical child level."""
@@ -98,8 +102,71 @@ class FinchTensorFType(TensorFType, ABC):
         """
 
 
+@dataclass(eq=True, frozen=True)
+class ExtentFType(ImmutableStructFType):
+    start_t: FType
+    end_t: FType
+
+    def __repr__(self):
+        return f"ExtentFType(start={self.start_t}, end={self.end_t})"
+
+    @property
+    def struct_name(self):
+        return "Extent"
+
+    @property
+    def struct_fields(self):
+        return [("start", self.start_t), ("end", self.end_t)]
+
+    def from_fields(self, start, end) -> Extent:
+        return Extent(start, end)
+
+    def __call__(self, *args):
+        raise TypeError(f"{self.struct_name} is not callable")
+
+    def lower_loop(
+        self,
+        ctx: AssemblyContext,
+        idx: ntn.Variable,
+        ext: SymbolicExtent,
+        body: ntn.NotationExpression,
+    ):
+        """
+        Lower a loop with the given index and body.
+        This is used to compile the loop into assembly.
+        """
+        lower_looplets(ctx, idx, ext, body)
+        return
+
+    def default_loop(self, ctx, idx, ext: SymbolicExtent, body):
+        def assert_lowered(node):
+            match node:
+                case ntn.Access(_, _, (j, *_)):
+                    if j == idx:
+                        raise FinchCompileError(
+                            node, f"Access with {j} should have been lowered already"
+                        )
+            return
+
+        for node in PostOrderDFS(body):
+            assert_lowered(node)
+
+        ctx_2 = ctx.scope()
+        ctx_2(body)
+        body_3 = asm.Block(ctx_2.emit())
+        ctx.exec(
+            asm.ForLoop(
+                ctx(idx),
+                ctx(ext.get_start()),
+                ctx(ext.get_end()),
+                body_3,
+            )
+        )
+        return
+
+
 @dataclass(frozen=True)
-class Extent(FTyped):
+class Extent(FTyped[ExtentFType]):
     """
     A class to represent the extent of a loop variable. This is used to define
     the start and end values of a loop.
@@ -198,7 +265,7 @@ class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
 
 
 @dataclass(frozen=True)
-class SymbolicExtent(FTyped):
+class SymbolicExtent(FTyped[ExtentFType]):
     start_sym: ntn.NotationExpression
     end_sym: ntn.NotationExpression
 
@@ -232,13 +299,13 @@ class SymbolicExtent(FTyped):
     def get_measure(self):
         return ntn.Call(ntn.Literal(ffuncs.sub), (self.end_sym, self.start_sym))
 
-    def bound_below(self, size) -> "SymbolicExtent":
+    def bound_below(self, size) -> SymbolicExtent:
         return self._bound_ext(size, ffuncs.max)
 
-    def bound_above(self, size) -> "SymbolicExtent":
+    def bound_above(self, size) -> SymbolicExtent:
         return self._bound_ext(size, ffuncs.min)
 
-    def _bound_ext(self, size, func) -> "SymbolicExtent":
+    def _bound_ext(self, size, func) -> SymbolicExtent:
         return SymbolicExtent(
             self.start_sym,
             ntn.Cached(
@@ -256,69 +323,6 @@ class SymbolicExtent(FTyped):
     @property
     def ftype(self):
         return ExtentFType(self.start_sym.result_type, self.end_sym.result_type)
-
-
-@dataclass(eq=True, frozen=True)
-class ExtentFType(ImmutableStructFType):
-    start_t: FType
-    end_t: FType
-
-    def __repr__(self):
-        return f"ExtentFType(start={self.start_t}, end={self.end_t})"
-
-    @property
-    def struct_name(self):
-        return "Extent"
-
-    @property
-    def struct_fields(self):
-        return [("start", self.start_t), ("end", self.end_t)]
-
-    def from_fields(self, start, end) -> "Extent":
-        return Extent(start, end)
-
-    def __call__(self, *args):
-        raise TypeError(f"{self.struct_name} is not callable")
-
-    def lower_loop(
-        self,
-        ctx: "AssemblyContext",
-        idx: ntn.Variable,
-        ext: SymbolicExtent,
-        body: ntn.NotationExpression,
-    ):
-        """
-        Lower a loop with the given index and body.
-        This is used to compile the loop into assembly.
-        """
-        lower_looplets(ctx, idx, ext, body)
-        return
-
-    def default_loop(self, ctx, idx, ext: SymbolicExtent, body):
-        def assert_lowered(node):
-            match node:
-                case ntn.Access(_, _, (j, *_)):
-                    if j == idx:
-                        raise FinchCompileError(
-                            node, f"Access with {j} should have been lowered already"
-                        )
-            return
-
-        for node in PostOrderDFS(body):
-            assert_lowered(node)
-
-        ctx_2 = ctx.scope()
-        ctx_2(body)
-        body_3 = asm.Block(ctx_2.emit())
-        ctx.exec(
-            asm.ForLoop(
-                ctx(idx),
-                ctx(ext.get_start()),
-                ctx(ext.get_end()),
-                body_3,
-            )
-        )
-        return
 
 
 @dataclass(eq=True)
@@ -689,7 +693,7 @@ class AssemblyContext(Context):
                 raise Exception(f"{other} not recognized.")
 
 
-def get_undeclared_slots(prgm):
+def get_undeclared_slots(prgm: ntn.NotationNode) -> set[str]:
     undeclared = set()
     for node in PostOrderDFS(prgm):
         match node:
@@ -727,7 +731,7 @@ def instantiate(ctx, prgm):
 
 
 def lower_looplets(
-    ctx: "AssemblyContext",
+    ctx: AssemblyContext,
     idx: ntn.Variable,
     ext: SymbolicExtent,
     body: ntn.NotationExpression,
@@ -792,7 +796,7 @@ class LoopletPass(ABC):
         assert isinstance(other, LoopletPass)
         return self.priority < other.priority
 
-    def combine_with(self, other: "LoopletPass"):
+    def combine_with(self, other: LoopletPass):
         return max(self, other)
 
 
@@ -801,7 +805,7 @@ class DefaultPass(LoopletPass):
     def priority(self):
         return float("-inf")
 
-    def __call__(self, ctx: "LoopletContext", idx, ext: SymbolicExtent, body):
+    def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
         """
         Default pass that does nothing. This is used when no other pass is selected.
         """
