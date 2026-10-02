@@ -224,6 +224,24 @@ def test_compiler_form(stmt, valid):
             CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
+@pytest.mark.parametrize("form", [LoopOrderedForm, FormattedForm])
+@pytest.mark.parametrize(
+    "stmt",
+    [
+        QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)),
+        QueryInto(Table(D, (j, i)), OVERWRITE, Reorder(Table(A, (i, j)), (j, i))),
+    ],
+)
+def test_loop_ordered_form_accepts_compiler_form(form, stmt):
+    binds = {
+        **bindings(),
+        D: BufferizedNDArray.from_numpy(np.zeros((2, 2))),
+    }
+    plan = Plan((stmt, Produces((C,))))
+    ftypes = {var: tns.ftype for var, tns in binds.items()}
+    form.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
 def test_compiler_form_lowerer():
     arg = Reorder(Table(A, (i, j)), (i, j))
     plan = Plan(

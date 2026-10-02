@@ -132,15 +132,19 @@ class SingleAggregateForm(AliasedForm):
 class LoopOrderedForm(SingleAggregateForm):
     """
     LoopOrderedForm assumes that the input query has had its loop order set.
-    There are three valid forms for a query in LoopOrderedForm:
+    There are four valid forms for a query in LoopOrderedForm:
         1) transpose queries
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
             Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
         3) in-place queries
             QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
+        4) in-place initializations
+            QueryInto(Table(_, _), _, Literal(_))
     For aggregate and in-place queries, the loop order includes every lhs
-    field and visits those fields in order.
+    field and visits those fields in order. The Tables of arg follow the loop
+    order, except that an in-place query of a single Table may read it in
+    another order, representing a transpose.
     """
 
     @staticmethod
@@ -163,7 +167,11 @@ class LoopOrderedForm(SingleAggregateForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body, loop_order)
-                case Query(Table(), Table()):
+                case Query(Table(), Table()) | QueryInto(Table(), _, Literal()):
+                    return None
+                case QueryInto(Table(_, lhs_idxs), _, Reorder(Table(), idxs)):
+                    if not cls._check_loop_order(lhs_idxs, idxs):
+                        raise ValueError("Table index order does not match loop order.")
                     return None
                 case Query(
                     Table(_, lhs_idxs), Aggregate(_, _, Reorder(arg, idxs), _)
@@ -240,11 +248,11 @@ class FormattedForm(LoopOrderedForm):
         validate(term)
 
 
-class CompilerForm(AliasedForm):
+class CompilerForm(FormattedForm):
     """
-    CompilerForm is the input of the notation lowerer. Every statement but the
-    final Produces is a QueryInto, and initialization is explicit. There are
-    two valid kinds of statement:
+    CompilerForm is the input of the notation lowerer. It is a FormattedForm
+    where every statement but the final Produces is a QueryInto, and
+    initialization is explicit. There are two valid kinds of statement:
     1) initializations
         QueryInto(Table(lhs, _), overwrite, Literal(init))
     (Every element of lhs is set to init.)
@@ -272,21 +280,8 @@ class CompilerForm(AliasedForm):
     ) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
 
-        def validate(node, loop_order):
-            match node:
-                case MapJoin(_, args):
-                    for arg in args:
-                        validate(arg, loop_order)
-                case Table(tns, idxs):
-                    if tns not in bindings:
-                        raise ValueError(f"Alias {tns} has no TensorFType.")
-                    if not LoopOrderedForm._check_loop_order(idxs, loop_order):
-                        raise ValueError("Table index order does not match loop order.")
-                case Literal():
-                    return
-                case _:
-                    raise ValueError(f"Unsupported expression in a fold: {node}")
-
+        # FormattedForm has checked the grammar of each fold, its bindings,
+        # and that it visits the lhs and its Tables in loop order.
         match term:
             case Plan((*bodies, Produces())):
                 pass
@@ -294,9 +289,7 @@ class CompilerForm(AliasedForm):
                 raise ValueError("The last body of a plan must be a Produces node.")
         for body in bodies:
             match body:
-                case QueryInto(Table(lhs, lhs_idxs), Literal(op), rhs):
-                    if lhs not in bindings:
-                        raise ValueError(f"Alias {lhs} has no TensorFType.")
+                case QueryInto(Table(lhs, _), Literal(op), rhs):
                     if lhs in PostOrderDFS(rhs):
                         raise ValueError(f"QueryInto can't both read and write {lhs}.")
                     match rhs:
@@ -312,19 +305,6 @@ class CompilerForm(AliasedForm):
                                 raise ValueError(
                                     "Loop order must include every RHS field."
                                 )
-                            if not LoopOrderedForm._check_loop_order(
-                                lhs_idxs, loop_order
-                            ):
-                                raise ValueError(
-                                    "Table index order does not match loop order."
-                                )
-                            match arg:
-                                case Table():
-                                    validate(arg, arg.idxs)
-                                case _:
-                                    validate(arg, loop_order)
-                        case _:
-                            raise ValueError(f"Unsupported QueryInto: {body}")
                 case _:
                     raise ValueError(f"CompilerForm only allows QueryInto, not {body}")
 
