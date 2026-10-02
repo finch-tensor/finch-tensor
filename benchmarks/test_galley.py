@@ -64,14 +64,11 @@ def _plan_from_lazy(expr):
     args = (expr,)
     vars_ = tuple(Alias(gensym("A")) for _ in args)
     ctx = args[0].ctx.join()
-    bodies = tuple(
-        Query(
-            var,
-            Table(a.data, tuple(Field(gensym("i")) for _ in range(len(a.shape)))),
-        )
-        for a, var in zip(args, vars_, strict=True)
-    )
-    return Plan(ctx.trace() + bodies + (Produces(vars_),))
+    bodies = []
+    for arg, var in zip(args, vars_, strict=True):
+        idxs = tuple(Field(gensym("i")) for _ in range(len(arg.shape)))
+        bodies.append(Query(Table(var, idxs), Table(arg.data, idxs)))
+    return Plan(ctx.trace() + tuple(bodies) + (Produces(vars_),))
 
 
 def _csr(matrix: np.ndarray) -> FiberTensor:
