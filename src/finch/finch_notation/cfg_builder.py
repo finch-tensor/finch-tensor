@@ -65,6 +65,8 @@ def notation_desugar(root: NotationNode, sid: int) -> NotationNode:
     - `If(cond, body)` -> `IfElse(cond, body, Block())`
     - function parameters get explicit numbered `Assign(arg, arg)` statements
       at function entry so they can be referenced in the CFG
+    - loop indices get an explicit numbered `Assign(idx, idx)` at the top of
+      the loop body, since the index is redefined on every iteration
     """
 
     def _number_stmt(stmt: NotationStatement) -> NumberedStatement:
@@ -106,7 +108,12 @@ def notation_desugar(root: NotationNode, sid: int) -> NotationNode:
             case IfElse(cond, body, else_body):
                 return IfElse(cond, go(body), go(else_body))
             case Loop(idx, ext, body):
-                return Loop(idx, ext, go(body))
+                idx_def = _number_stmt(Assign(idx, idx))
+                match go(body):
+                    case Block(bodies):
+                        return Loop(idx, ext, Block((idx_def, *bodies)))
+                    case body_stmt:
+                        return Loop(idx, ext, Block((idx_def, body_stmt)))
             case node:
                 return node
 
