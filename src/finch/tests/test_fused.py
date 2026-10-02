@@ -1,4 +1,5 @@
 import ast
+import importlib
 import operator
 import textwrap
 
@@ -18,6 +19,7 @@ from finch.autoschedule import (
 )
 from finch.finch_fused import jit
 from finch.finch_fused import nodes as fzd
+from finch.finch_fused.calls import _transparent_cache, wrap_calls
 from finch.finch_fused.cfg_builder import (
     fused_build_cfg,
     fused_desugar,
@@ -257,7 +259,7 @@ def _all_live_names(liveness, cfg):
 
 
 def _transformed_jit_source(fn):
-    transformed_fn = insert_lazy_and_compute(parse_fused_function(fn))
+    transformed_fn = insert_lazy_and_compute(wrap_calls(parse_fused_function(fn)))
     assert isinstance(transformed_fn, fzd.Function)
     return ast.unparse(fused_function_to_python_ast(transformed_fn)) + "\n"
 
@@ -780,3 +782,291 @@ def test_jit_local_module_function_inserted_code(file_regression):
         return C
 
     file_regression.check(_transformed_jit_source(opt_fn), extension=".py")
+
+
+def _transparent_jit_source(fn):
+    fused_fn = wrap_calls(parse_fused_function(fn, closure_as_params=True))
+    transformed_fn = insert_lazy_and_compute(fused_fn, transparent=True)
+    assert isinstance(transformed_fn, fzd.Function)
+    return ast.unparse(fused_function_to_python_ast(transformed_fn)) + "\n"
+
+
+@pytest.fixture
+def scheduler_calls(monkeypatch):
+    """Counts how many times `compute` invokes the scheduler."""
+    fuse_module = importlib.import_module("finch.interface.fuse")
+    get_scheduler = fuse_module.get_default_scheduler
+    calls = []
+
+    def counting_scheduler():
+        scheduler = get_scheduler()
+
+        def run(prgm):
+            calls.append(prgm)
+            return scheduler(prgm)
+
+        return run
+
+    monkeypatch.setattr(fuse_module, "get_default_scheduler", counting_scheduler)
+    return calls
+
+
+def _whose_turn(xp, S):
+    return xp.sum(S)
+
+
+def _generate_child(xp, S, W):
+    turn = _whose_turn(xp, S)
+    return S + W, turn * 2
+
+
+def _helper_chain(xp, A, B):
+    C, turn = _generate_child(xp, A, B)
+    return xp.matmul(C, B) + turn
+
+
+def test_jit_traces_into_helpers(scheduler_calls):
+    """Straight-line helpers are fused with their caller into a single kernel."""
+
+    @jit
+    def opt_fn(A, B):
+        D = _helper_chain(finch, A, B)
+        return D  # noqa: RET504
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+    B = asarray(np.array([[1.0, 0.0], [2.0, 1.0]]))
+
+    result = opt_fn(A, B)
+    assert len(scheduler_calls) == 1
+    finch_assert_allclose(result, _helper_chain(finch, A, B))
+
+
+def test_jit_transparent_helper_inserted_code(file_regression):
+    file_regression.check(_transparent_jit_source(_generate_child), extension=".py")
+
+
+def _matrix_power(A, n):
+    if n == 1:
+        return A
+    return matmul(A, _matrix_power(A, n - 1))
+
+
+def test_jit_recursive_helper():
+    @jit
+    def opt_fn(A):
+        return _matrix_power(A, 3)
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
+    finch_assert_allclose(opt_fn(A), _matrix_power(A, 3))
+    assert _transparent_cache[_matrix_power.__code__] is not None
+
+
+class _NormMixin:
+    def _norm(self, xp, b):
+        return xp.sqrt(xp.sum(b * b))
+
+
+class _Solver(_NormMixin):
+    def residual(self, xp, b, *, scale=2.0):
+        n = self._norm(xp, b)
+        return n * scale
+
+
+def test_jit_method_helpers():
+    """Bound methods, mixins and keyword-only defaults are traced into."""
+    solver = _Solver()
+
+    @jit
+    def opt_fn(b):
+        return solver.residual(finch, b)
+
+    b = asarray(np.array([3.0, 4.0]))
+
+    finch_assert_allclose(opt_fn(b), solver.residual(finch, b))
+    assert _transparent_cache[_Solver.residual.__code__] is not None
+    assert _transparent_cache[_NormMixin._norm.__code__] is not None
+
+
+def _double(u):
+    return u + u
+
+
+def _square(u):
+    return u * u
+
+
+def _pick_flux(name):
+    if name == "double":
+        return _double
+    return _square
+
+
+def test_jit_function_valued_local():
+    def simple_fn(u, name):
+        flux = _pick_flux(name)
+        return flux(u)
+
+    @jit
+    def opt_fn(u, name):
+        flux = _pick_flux(name)
+        return flux(u)
+
+    u = asarray(np.array([1.0, 2.0, 3.0]))
+
+    finch_assert_allclose(opt_fn(u, "double"), simple_fn(u, "double"))
+    finch_assert_allclose(opt_fn(u, "square"), simple_fn(u, "square"))
+
+
+def _eager_helper(x):
+    k = int(finch.max(x))
+    try:
+        return x * k
+    except TypeError:
+        return x
+
+
+def test_jit_opaque_helper_receives_computed_tensors():
+    """Helpers that cannot be traced into receive computed tensors."""
+
+    def simple_fn(A):
+        B = A + 1
+        return _eager_helper(B), np.asarray(B)
+
+    @jit
+    def opt_fn(A):
+        B = A + 1
+        return _eager_helper(B), np.asarray(B)
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
+    result, array = opt_fn(A)
+    expected, expected_array = simple_fn(A)
+    finch_assert_allclose(result, expected)
+    np.testing.assert_allclose(array, expected_array)
+    assert _transparent_cache[_eager_helper.__code__] is None
+
+
+def test_jit_subscripts_break_and_expression_statements(capsys):
+    def simple_fn(A, meta):
+        x = A[0, 1:]
+        limit = meta["limit"]
+        i = 0
+        while i < 10:
+            i = i + 1
+            if i > limit:
+                break
+        print(i)
+        return x * i
+
+    @jit
+    def opt_fn(A, meta):
+        x = A[0, 1:]
+        limit = meta["limit"]
+        i = 0
+        while i < 10:
+            i = i + 1
+            if i > limit:
+                break
+        print(i)
+        return x * i
+
+    A = asarray(np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
+
+    finch_assert_allclose(opt_fn(A, {"limit": 3}), simple_fn(A, {"limit": 3}))
+    assert capsys.readouterr().out == "4\n4\n"
+
+
+def test_jit_lazy_tensor_item():
+    @jit
+    def opt_fn(A):
+        total = sum(A)
+        return total.item() + 1
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
+    assert opt_fn(A) == 11.0
+
+
+def test_jit_keyword_only_and_default_parameters():
+    def simple_fn(A, B=None, *, scale=2.0):
+        return A * scale
+
+    @jit
+    def opt_fn(A, B=None, *, scale=2.0):
+        return A * scale
+
+    A = asarray(np.array([1.0, 2.0]))
+
+    finch_assert_allclose(opt_fn(A), simple_fn(A))
+    finch_assert_allclose(opt_fn(A, scale=3.0), simple_fn(A, scale=3.0))
+
+
+def _allclose(xp, a, b):
+    return xp.all(xp.abs(a - b) <= 1e-8)
+
+
+def _prune(xp, matrix, threshold):
+    mask = (matrix >= threshold) | (matrix == xp.max(matrix, axis=0))
+    return matrix * mask
+
+
+def test_jit_branch_on_traced_helper_result():
+    """Conditions are computed even when they come from a traced helper."""
+
+    def simple_fn(A, iterations):
+        current = A
+        for i in range(iterations):
+            previous = current
+            current = _prune(finch, matmul(current, current), 0.1)
+            if i > 0 and _allclose(finch, current, previous):
+                break
+        return current
+
+    @jit
+    def opt_fn(A, iterations):
+        current = A
+        for i in range(iterations):
+            previous = current
+            current = _prune(finch, matmul(current, current), 0.1)
+            if i > 0 and _allclose(finch, current, previous):
+                break
+        return current
+
+    A = asarray(np.array([[0.5, 0.5], [0.0, 1.0]]))
+
+    finch_assert_allclose(opt_fn(A, 5), simple_fn(A, 5))
+
+
+def _opaque_identity(x):
+    try:
+        return x
+    except TypeError:
+        return x
+
+
+def test_jit_opaque_call_unwraps_deferred_inputs(scheduler_calls):
+    """Inputs that were only deferred are passed to opaque calls without a compute."""
+
+    @jit
+    def opt_fn(A):
+        return _opaque_identity(A)
+
+    A = asarray(np.array([[1.0, 2.0], [3.0, 4.0]]))
+
+    assert opt_fn(A) is A
+    assert len(scheduler_calls) == 0
+
+
+class _ForwardingNamespace:
+    def __getattr__(self, name):
+        return getattr(finch, name)
+
+
+def test_maybedefer_skips_attribute_forwarding_objects():
+    namespace = _ForwardingNamespace()
+    A = asarray(np.array([1.0, 2.0]))
+
+    deferred_namespace, deferred_A = maybedefer((namespace, A))
+    assert deferred_namespace is namespace
+    assert isinstance(deferred_A, LazyTensor)

@@ -38,6 +38,16 @@ def get_variables_in_stmt(stmt: FusedNode) -> set[Variable]:
     return var_set
 
 
+def get_assigned_variables(lhs: FusedNode) -> set[Variable]:
+    match lhs:
+        case Variable() as var:
+            return {var}
+        case Call(Literal(val=fn), args) if fn is tuple:
+            return set().union(*(get_assigned_variables(arg) for arg in args))
+        case _:
+            return set()
+
+
 class LivenessAnalysis(DataFlowAnalysis):
     def stmt_str(self, stmt: FusedNode, state: dict) -> str:
         str_state = ", ".join(f"{var}" for var in state)
@@ -49,14 +59,9 @@ class LivenessAnalysis(DataFlowAnalysis):
         new_state = state.copy()
         for stmt in reversed(stmts):
             match stmt:
-                case NumberedStatement(Assign(lhs, rhs), _):
-                    if lhs in new_state:
-                        del new_state[lhs]
-                    for var in get_variables_in_stmt(rhs):
-                        new_state[var] = True
-                case Assign(lhs, rhs):
-                    if lhs in new_state:
-                        del new_state[lhs]
+                case NumberedStatement(Assign(lhs, rhs), _) | Assign(lhs, rhs):
+                    for var in get_assigned_variables(lhs):
+                        new_state.pop(var, None)
                     for var in get_variables_in_stmt(rhs):
                         new_state[var] = True
                 case stmt:
@@ -88,12 +93,22 @@ def _get_stmt_bounds(stmts: list[FusedNode]) -> tuple[int, int]:
 
 
 def _insert_compute(
-    prgm: FusedNode, compute_sid, vars: set[Variable], nspc: Namespace
+    prgm: FusedNode,
+    compute_sid,
+    vars: set[Variable],
+    nspc: Namespace,
+    transparent: bool = False,
 ) -> FusedNode:
-    from finch.interface import compute, defer
+    from finch.interface import compute
 
     def _visitor(node):
         match node:
+            # Transparent functions hand their (possibly lazy) results back to the
+            # caller so that fusion can continue across the call boundary.
+            case NumberedStatement(Return() as ret, sid) if (
+                sid == compute_sid and transparent
+            ):
+                return ret
             # In the case of returns, we need to assign the expressions,
             # compute them, and then return the computed variables.
             case NumberedStatement(Return(ret_expr), sid) if sid == compute_sid:
@@ -103,7 +118,9 @@ def _insert_compute(
                 lazy_vars = tuple(sorted(vars, key=lambda var: var.name))
                 lazy_vars_tuple = Call(Literal(tuple), lazy_vars)
                 lazies = (
-                    Assign(lazy_vars_tuple, Call(Literal(defer), (lazy_vars_tuple,))),
+                    Assign(
+                        lazy_vars_tuple, Call(Literal(maybedefer), (lazy_vars_tuple,))
+                    ),
                 )
                 exprs_to_compute = ()
                 return_vars = ()
@@ -147,7 +164,9 @@ def _insert_compute(
 def maybedefer(arrs):
     from finch import defer
 
-    return tuple(defer(arr) if hasattr(arr, "ndim") else arr for arr in arrs)
+    # Check the type, as objects that forward attribute access (e.g. array API
+    # namespace wrappers) may appear to have `ndim`.
+    return tuple(defer(arr) if hasattr(type(arr), "ndim") else arr for arr in arrs)
 
 
 def _insert_lazy(prgm: FusedNode, lazy_sid: int, vars: set[Variable]) -> FusedNode:
@@ -193,7 +212,7 @@ def _unnest_block(node: FusedNode) -> FusedNode:
             return node
 
 
-def insert_lazy_and_compute(prgm: Function) -> Function:
+def insert_lazy_and_compute(prgm: Function, transparent: bool = False) -> Function:
     # desugar the input name and number additional statements for CFG construction
     nspc = Namespace(prgm)
     numbered_prgm, _ = number_statements(prgm)
@@ -210,7 +229,9 @@ def insert_lazy_and_compute(prgm: Function) -> Function:
         )  # Backwards analysis, so live inputs are the output state of the block
         min_id, max_id = _get_stmt_bounds(block.statements)
         numbered_prgm = _insert_lazy(numbered_prgm, min_id, live_inputs)
-        numbered_prgm = _insert_compute(numbered_prgm, max_id, live_outputs, nspc)
+        numbered_prgm = _insert_compute(
+            numbered_prgm, max_id, live_outputs, nspc, transparent
+        )
     return Rewrite(PostWalk(Chain([_unwrap_numbered_stmt, _unnest_block])))(
         numbered_prgm
     )

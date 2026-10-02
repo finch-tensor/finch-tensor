@@ -47,9 +47,20 @@ _UNARY_OPS = {
     ast.Not: operator.not_,
 }
 
+
+def _logical_and(a, b):
+    return a and b
+
+
+def _logical_or(a, b):
+    return a or b
+
+
+# Distinct from `operator.and_`/`operator.or_` so that `&`/`|` are not lowered to
+# `and`/`or`.
 _BOOL_OPS = {
-    ast.And: operator.and_,
-    ast.Or: operator.or_,
+    ast.And: _logical_and,
+    ast.Or: _logical_or,
 }
 
 _REV_BIN_OPS = {fn: op for op, fn in _BIN_OPS.items()}
@@ -58,36 +69,65 @@ _REV_UNARY_OPS = {fn: op for op, fn in _UNARY_OPS.items()}
 _REV_BOOL_OPS = {fn: op for op, fn in _BOOL_OPS.items()}
 
 
+def _if_expr(cond, then_val, else_val):
+    return then_val if cond else else_val
+
+
 class _FusedFunctionParser:
-    def __init__(self, fn: types.FunctionType, fn_def: ast.FunctionDef):
+    def __init__(
+        self,
+        fn: types.FunctionType,
+        fn_def: ast.FunctionDef,
+        closure_as_params: bool = False,
+    ):
         self.fn = fn
         self.fn_def = fn_def
         self.globals = getattr(fn, "__globals__", {})
         self.closurevars: dict[str, Any] = {}
-        if hasattr(fn, "__code__") and hasattr(fn, "__closure__") and fn.__closure__:
-            for name, cell in zip(fn.__code__.co_freevars, fn.__closure__, strict=True):
-                self.closurevars[name] = cell.cell_contents
+        self.closure_params: tuple[fzd.Variable, ...] = ()
         self.locals: set[str] = set()
+        if hasattr(fn, "__code__") and hasattr(fn, "__closure__") and fn.__closure__:
+            if closure_as_params:
+                # Closure cells are passed as leading parameters, so one compiled
+                # kernel can be reused across closures over different values.
+                self.closure_params = tuple(
+                    fzd.Variable(name) for name in fn.__code__.co_freevars
+                )
+                self.locals.update(fn.__code__.co_freevars)
+            else:
+                for name, cell in zip(
+                    fn.__code__.co_freevars, fn.__closure__, strict=True
+                ):
+                    self.closurevars[name] = cell.cell_contents
 
     def parse(self) -> fzd.Function:
-        if len(self.fn_def.decorator_list) > 1:  # The @jit decorator is in this list
+        args = self.fn_def.args
+        if args.vararg is not None or args.kwarg is not None:
             raise self._unsupported(
-                self.fn_def,
-                "Decorated functions are not supported in finch_fused parser draft.",
+                self.fn_def, "*args and **kwargs parameters are not supported."
             )
-
-        params = tuple(self._parse_parameter(arg) for arg in self.fn_def.args.args)
+        params = (
+            *self.closure_params,
+            *(
+                self._parse_parameter(arg)
+                for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs)
+            ),
+        )
         body = self._parse_block(self.fn_def.body)
         return fzd.Function(fzd.Literal(self.fn_def.name), params, body)
 
     def _parse_parameter(self, arg: ast.arg) -> fzd.Variable:
-        if arg.annotation is not None:
-            raise self._unsupported(arg, "Annotated parameters are not supported.")
         self.locals.add(arg.arg)
         return fzd.Variable(arg.arg)
 
     def _parse_block(self, stmts: list[ast.stmt]) -> fzd.Block:
-        return fzd.Block(tuple(self._parse_stmt(stmt) for stmt in stmts))
+        return fzd.Block(
+            tuple(
+                self._parse_stmt(stmt)
+                for stmt in stmts
+                if not isinstance(stmt, ast.Pass)
+            )
+        )
 
     def _parse_stmt(self, stmt: ast.stmt) -> fzd.FusedStatement:
         match stmt:
@@ -95,6 +135,16 @@ class _FusedFunctionParser:
                 rhs = self._parse_expr(value)
                 self.locals.add(name)
                 return fzd.Assign(fzd.Variable(name), rhs)
+            case ast.Assign(targets=[ast.Tuple(elts=elts)], value=value) if all(
+                isinstance(elt, ast.Name) for elt in elts
+            ):
+                rhs = self._parse_expr(value)
+                names = [elt.id for elt in elts if isinstance(elt, ast.Name)]
+                self.locals.update(names)
+                lhs = fzd.Call(
+                    fzd.Literal(tuple), tuple(fzd.Variable(name) for name in names)
+                )
+                return fzd.Assign(lhs, rhs)
             case ast.AugAssign(target=ast.Name(id=name), op=op, value=value):
                 lhs = fzd.Variable(name)
                 rhs = fzd.BinaryOp(lhs, self._parse_op(op), self._parse_expr(value))
@@ -116,6 +166,8 @@ class _FusedFunctionParser:
                     self._parse_expr(iterable),
                     self._parse_block(body),
                 )
+            case ast.Break():
+                return fzd.Break()
             case ast.Return(value=None):
                 return fzd.Return(())
             case ast.Return(value=value):
@@ -175,9 +227,32 @@ class _FusedFunctionParser:
                     fzd.Literal(tuple),
                     tuple(self._parse_expr(elt) for elt in elts),
                 )
+            case ast.List(elts=elts):
+                return fzd.Call(
+                    fzd.Literal(list),
+                    (
+                        fzd.Call(
+                            fzd.Literal(tuple),
+                            tuple(self._parse_expr(elt) for elt in elts),
+                        ),
+                    ),
+                )
+            case ast.Subscript(value=value, slice=index):
+                return fzd.Call(
+                    fzd.Literal(operator.getitem),
+                    (self._parse_expr(value), self._parse_expr(index)),
+                )
+            case ast.Slice(lower=lower, upper=upper, step=step):
+                return fzd.Call(
+                    fzd.Literal(slice),
+                    tuple(
+                        fzd.Literal(None) if bound is None else self._parse_expr(bound)
+                        for bound in (lower, upper, step)
+                    ),
+                )
             case ast.IfExp(test=test, body=body, orelse=orelse):
                 return fzd.Call(
-                    fzd.Literal(lambda cond, t, f: t if cond else f),
+                    fzd.Literal(_if_expr),
                     (
                         self._parse_expr(test),
                         self._parse_expr(body),
@@ -185,10 +260,15 @@ class _FusedFunctionParser:
                     ),
                 )
             case ast.Attribute(value=value, attr=attr):
-                base = self._parse_expr(value)
-                return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
-            case ast.Break():
-                return fzd.Break()  # ty: ignore[invalid-return-type]
+                match self._parse_expr(value):
+                    # Resolve module attributes (e.g. `np.where`) at parse time so
+                    # that calls to them can be classified statically.
+                    case fzd.Literal(val=types.ModuleType() as module) if hasattr(
+                        module, attr
+                    ):
+                        return fzd.Literal(getattr(module, attr))
+                    case base:
+                        return fzd.Call(fzd.Literal(getattr), (base, fzd.Literal(attr)))
             case _:
                 raise self._unsupported(
                     expr,
@@ -229,7 +309,7 @@ class _FusedFunctionParser:
                 self._parse_op(cmp.ops[i]),
                 self._parse_expr(cmp.comparators[i]),
             )
-            expr = fzd.BinaryOp(expr, fzd.Literal(operator.and_), next_cmp)
+            expr = fzd.BinaryOp(expr, fzd.Literal(_logical_and), next_cmp)
         return expr
 
     def _parse_bool_op(
@@ -253,7 +333,12 @@ class _FusedFunctionParser:
         return ValueError(f"{message} (line {lineno})")
 
 
-def parse_fused_function(fn: types.FunctionType) -> fzd.Function:
+def parse_fused_function(
+    fn: types.FunctionType, closure_as_params: bool = False
+) -> fzd.Function:
+    if inspect.unwrap(fn) is not fn:
+        # getsource follows __wrapped__, so the parsed source would not match `fn`.
+        raise ValueError("Wrapped functions are not supported in finch_fused parser.")
     source = textwrap.dedent(inspect.getsource(fn))
     tree = ast.parse(source)
     fn_name = getattr(fn, "__name__", None)
@@ -261,7 +346,7 @@ def parse_fused_function(fn: types.FunctionType) -> fzd.Function:
     for node in tree.body:
         match node:
             case ast.FunctionDef(name=name) if fn_name is None or name == fn_name:
-                return _FusedFunctionParser(fn, node).parse()
+                return _FusedFunctionParser(fn, node, closure_as_params).parse()
             case ast.AsyncFunctionDef(name=name) if fn_name is None or name == fn_name:
                 raise ValueError(
                     "Async functions are not supported in finch_fused parser draft."
@@ -286,6 +371,9 @@ class _FusedToPythonAST:
     def parse_function(self, function: fzd.Function) -> ast.FunctionDef:
         if not isinstance(function.name.val, str):
             raise ValueError("Fused function name must be a string literal.")
+        # Reserve the function's own name so that literals sharing it (e.g. the
+        # original function in a recursive call) are not shadowed by the new def.
+        self._extra_globals.setdefault(function.name.val, None)
 
         args = ast.arguments(
             posonlyargs=[],
@@ -361,6 +449,8 @@ class _FusedToPythonAST:
                         ctx=ast.Load(),
                     )
                 )
+            case fzd.Break():
+                return ast.Break()
             case _:
                 raise ValueError(
                     f"Unsupported fused statement type: {type(stmt).__name__}"
@@ -394,6 +484,17 @@ class _FusedToPythonAST:
                 if isinstance(fn, fzd.Literal) and fn.val is tuple:
                     return ast.Tuple(
                         elts=[self._expr_to_ast(arg) for arg in args],
+                        ctx=ast.Load(),
+                    )
+                if (
+                    isinstance(fn, fzd.Literal)
+                    and fn.val is operator.getitem
+                    and len(args) == 2
+                    and not kwargs
+                ):
+                    return ast.Subscript(
+                        value=self._expr_to_ast(args[0]),
+                        slice=self._expr_to_ast(args[1]),
                         ctx=ast.Load(),
                     )
                 return ast.Call(
@@ -439,21 +540,29 @@ class _FusedToPythonAST:
         ):
             return ast.Constant(value=value)
 
-        if callable(value):
-            if getattr(builtins, getattr(value, "__name__", ""), None) is value:
-                return ast.Name(id=value.__name__, ctx=ast.Load())  # type: ignore[union-attr]
+        if callable(value) and (
+            getattr(builtins, getattr(value, "__name__", ""), None) is value
+        ):
+            return ast.Name(id=value.__name__, ctx=ast.Load())  # type: ignore[union-attr]
 
-            name = getattr(value, "__name__", None)
-            if name is not None and name.isidentifier():
-                self._extra_globals[name] = value
-                return ast.Name(id=name, ctx=ast.Load())
-
-        if isinstance(value, types.ModuleType):
-            name = value.__name__
-            self._extra_globals[name] = value
-            return ast.Name(id=name, ctx=ast.Load())
-
-        raise ValueError(f"Literal cannot be represented in Python AST: {value!r}")
+        # Everything else is bound to a global of the generated module. Names are
+        # freshened so that distinct objects sharing a name (e.g. `np.add` and
+        # `finch.add`) do not clobber each other.
+        name = getattr(value, "__name__", None)
+        if not isinstance(name, str) or not (
+            name.isidentifier() or isinstance(value, types.ModuleType)
+        ):
+            name = "_literal"
+        fresh_name = name
+        counter = 1
+        while (
+            fresh_name in self._extra_globals
+            and self._extra_globals[fresh_name] is not value
+        ):
+            fresh_name = f"{name}_{counter}"
+            counter += 1
+        self._extra_globals[fresh_name] = value
+        return ast.Name(id=fresh_name, ctx=ast.Load())
 
 
 def fused_function_to_python_ast(function: fzd.Function) -> ast.FunctionDef:
