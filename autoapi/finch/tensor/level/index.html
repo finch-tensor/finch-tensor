@@ -7614,7 +7614,7 @@ compiled against a dynamic fill.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="FTyped (finch.algebra.FTyped)" href="../../algebra/#finch.algebra.FTyped">FTyped</a></code>, <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="FTyped (finch.algebra.FTyped)" href="../../algebra/#finch.algebra.FTyped">FTyped</a>[<span title="finch.tensor.level.level.LT">LT</span>]</code>, <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
 
 
 
@@ -7630,10 +7630,7 @@ a tensor.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">195</span>
 <span class="normal">196</span>
 <span class="normal">197</span>
 <span class="normal">198</span>
@@ -7680,8 +7677,11 @@ a tensor.</p>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Level</span><span class="p">(</span><span class="n">FTyped</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Level</span><span class="p">(</span><span class="n">FTyped</span><span class="p">[</span><span class="n">LT</span><span class="p">],</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An abstract base class representing a fiber allocator that manages fibers in</span>
 <span class="sd">    a tensor.</span>
@@ -8056,7 +8056,7 @@ dynamic vs static.</p>
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Type of elements stored in the fibers.</span>
 <span class="sd">        """</span>
