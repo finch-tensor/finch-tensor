@@ -19,6 +19,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 LOG_FLOOR = -64.0
 LOG_CEIL = 64.0
 
+
 class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
@@ -41,25 +42,24 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
         stats_factory: StatsFactory,
     ):
         prgm_key = (prgm, tuple(bindings.items()), stats_factory)
-        entries = self.cache.setdefault(prgm_key,[])
+        entries = self.cache.setdefault(prgm_key, [])
 
         current_vec = None
         parts = [
-            s.get_embedding()
-            for s in stats.values()
-            if isinstance(s, NumericStats)
-
+            s.get_embedding() for s in stats.values() if isinstance(s, NumericStats)
         ]
-        if parts : 
+        if parts:
             embedding = np.concatenate(parts).astype(float)
 
-            embedding = np.nan_to_num(embedding,nan=LOG_FLOOR,neginf=LOG_FLOOR,posinf=LOG_CEIL)
+            embedding = np.nan_to_num(
+                embedding, nan=LOG_FLOOR, neginf=LOG_FLOOR, posinf=LOG_CEIL
+            )
             factor = vector_norm(np.ones(len(embedding)), ord=self.norm_order)
             current_vec = embedding / factor
 
         idx = None
         if entries and current_vec is None:
-            idx = len(entries)-1
+            idx = len(entries) - 1
         elif entries:
             distances = [
                 vector_norm(np.abs(emb - current_vec), ord=self.norm_order)
@@ -78,7 +78,7 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
         )
         result = self.ctx(prgm, bindings, stats, stats_factory)
 
-        entries.append((current_vec,result))
-        if len(entries)> self.max_depth:
+        entries.append((current_vec, result))
+        if len(entries) > self.max_depth:
             entries.pop(0)
         return result
