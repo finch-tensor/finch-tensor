@@ -25,6 +25,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
     FusedAlias,
     HardAlias,
     Literal,
@@ -252,6 +253,8 @@ class LogicMachine:
                 return (rhs,)
             case QueryInto() as stmt:
                 return self(stmt.as_query())
+            case Fuse(_, body):
+                return self(body)
             case Plan(bodies):
                 res = ()
                 for body in bodies:

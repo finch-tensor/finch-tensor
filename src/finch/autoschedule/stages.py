@@ -9,6 +9,9 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
+    FusedAlias,
+    HardAlias,
     Literal,
     LogicStatement,
     LogicTree,
@@ -334,6 +337,77 @@ class CompilerForm(FormattedForm):
                                 )
                 case _:
                     raise ValueError(f"CompilerForm only allows QueryInto, not {body}")
+
+
+class FusedForm(Form):
+    """
+    Each Fuse field occurs in a HardAlias table in its body. The leading n
+    indices of every FusedAlias table match the first n enclosing Fuse fields,
+    from outermost to innermost.
+
+    Within each Fuse body, a tensor accessed by that Fuse's field in a stored
+    dimension cannot occur on both a query lhs and a query rhs, even in separate
+    queries. Different alias views refer to the same tensor for this check.
+    These constraints apply independently of the query's lowering stage.
+    """
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> None:
+        def validate(node, fused_idxs):
+            match node:
+                case Fuse(idx, body):
+                    hard_idxs = set()
+                    stored = set()
+                    reads = set()
+                    writes = set()
+                    for child in PostOrderDFS(body):
+                        match child:
+                            case Table(HardAlias() as tns, idxs):
+                                hard_idxs.update(idxs)
+                                if idx in idxs:
+                                    stored.add(tns)
+                            case Table(FusedAlias(tns, n), idxs):
+                                if idx in idxs[n:]:
+                                    stored.add(tns)
+                            case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
+                                Table(Alias() as lhs, _), _, rhs
+                            ):
+                                writes.add(lhs.unfused)
+                                for arg in PostOrderDFS(rhs):
+                                    match arg:
+                                        case Alias() as tns:
+                                            reads.add(tns.unfused)
+                    if idx not in hard_idxs:
+                        raise ValueError(
+                            f"Fuse field {idx} must occur in a HardAlias table "
+                            "in its body."
+                        )
+                    conflicts = stored & reads & writes
+                    if conflicts:
+                        names = ", ".join(sorted(tns.name for tns in conflicts))
+                        raise ValueError(
+                            f"Fuse field {idx} accesses a non-fused dimension of "
+                            f"{names}, which cannot occur on both lhs and rhs "
+                            "in its body."
+                        )
+                    validate(body, (*fused_idxs, idx))
+                case Table(FusedAlias(tns, n), idxs):
+                    if n > len(fused_idxs) or idxs[:n] != fused_idxs[:n]:
+                        raise ValueError(
+                            f"Fused indices of {tns} must match the enclosing "
+                            "Fuse fields in order."
+                        )
+                case LogicTree():
+                    for child in node.children:
+                        validate(child, fused_idxs)
+
+        validate(term, ())
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):

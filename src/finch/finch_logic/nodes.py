@@ -849,6 +849,40 @@ class QueryInto(LogicTree, LogicStatement):
 
 
 @dataclass(eq=True, frozen=True)
+class Fuse(LogicTree, LogicStatement):
+    """
+    Executes `body` together for each value of `idx`. Enclosing Fuse nodes,
+    from outermost to innermost, bind the leading indices of FusedAlias tables.
+
+    Attributes:
+        idx: The field over which to fuse the body.
+        body: The statement to execute for each value of the field.
+    """
+
+    idx: Field
+    body: LogicStatement
+
+    @property
+    def children(self):
+        return [self.idx, self.body]
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        return self.body.infer_dimmap(op, dim_bindings)
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        return self.body.infer_valmap(f, g, bindings)
+
+
+@dataclass(eq=True, frozen=True)
 class Produces(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that returns `args...` from the current plan.
@@ -1002,6 +1036,11 @@ class LogicPrinterContext(Context):
                 return None
             case QueryInto(Table() as lhs, op, rhs):
                 self.exec(f"{feed}{self(lhs)} <<{self(op)}>>= {self(rhs)}")
+                return None
+            case Fuse(idx, body):
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                self.exec(f"{feed}fuse({self(idx)}):\n{ctx_2.emit()}")
                 return None
             case Plan(bodies):
                 ctx_2 = self.block()

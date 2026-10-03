@@ -91,6 +91,8 @@ def test_fused_alias_interpreter(shape, n):
             lgc.Produces((out, fused)),
         )
     )
+    for idx in reversed(idxs[:n]):
+        plan = lgc.Fuse(idx, plan)
     bindings = {a: ft.asarray(data)}
     result, mock = lgc.LogicInterpreter()(plan, bindings)
     np.testing.assert_array_equal(result.to_numpy(), data * 6)
