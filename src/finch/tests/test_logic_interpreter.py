@@ -10,8 +10,8 @@ import finch.finch_logic as lgc
 from finch.algebra import ffuncs
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     LogicInterpreter,
     MapJoin,
@@ -47,25 +47,25 @@ def test_matrix_multiplication(a, b):
 
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 
@@ -83,25 +83,25 @@ def test_plan_repr():
     # To avoid equality issues with numpy arrays, we use string literals here instead
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal("A"), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal("B"), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal("A"), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal("B"), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 
@@ -117,33 +117,33 @@ def test_materialize():
     p = Plan(
         (
             Query(
-                Table(Alias("A"), (i, j)),
+                Table(HardAlias("A"), (i, j)),
                 Table(Literal(ft.asarray(np.array([[1, 2], [3, 4]]))), (i, j)),
             ),
             Query(
-                Table(Alias("B"), (i, j)),
+                Table(HardAlias("B"), (i, j)),
                 Table(Literal(ft.asarray(np.array([[1, 1], [1, 1]]))), (i, j)),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
-                    (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j))),
+                    (Table(HardAlias("A"), (i, j)), Table(HardAlias("B"), (i, j))),
                 ),
             ),
             Query(
-                Table(Alias("D"), (i, j)),
+                Table(HardAlias("D"), (i, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j))),
+                    (Table(HardAlias("C"), (i, j)), Table(HardAlias("A"), (i, j))),
                 ),
             ),
-            Query(Table(Alias("C"), (i, j)), Table(Alias("B"), (i, j))),
-            Produces((Alias("D"), Alias("C"))),
+            Query(Table(HardAlias("C"), (i, j)), Table(HardAlias("B"), (i, j))),
+            Produces((HardAlias("D"), HardAlias("C"))),
         )
     )
 
-    result = LogicInterpreter()(p, {Alias("C"): C})[0]
+    result = LogicInterpreter()(p, {HardAlias("C"): C})[0]
 
     expected = ft.asarray(
         np.array([[((1 + 1) * 1), ((2 + 1) * 2)], [((3 + 1) * 3), ((4 + 1) * 4)]])

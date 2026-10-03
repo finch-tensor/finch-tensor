@@ -12,8 +12,8 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory, UniformStatsFacto
 from finch.autoschedule.tensor_stats.blocked_stats import BlockedStatsFactory
 from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -58,8 +58,8 @@ def test_logic_cache_embeddings_norms_linf():
     # - Expected MISS
     plan_1_u = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_1), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_1), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Using dense stats
@@ -70,8 +70,8 @@ def test_logic_cache_embeddings_norms_linf():
     # hence same stats to see if we get a HIT
     plan_1_u_sim = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_2), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_2), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Same stats as above
@@ -84,8 +84,8 @@ def test_logic_cache_embeddings_norms_linf():
     )
     plan_mul = Plan(
         (
-            Query(Table(Alias("result"), mul_node.fields()), mul_node),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node.fields()), mul_node),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -95,8 +95,8 @@ def test_logic_cache_embeddings_norms_linf():
     )
     plan_mul_2 = Plan(
         (
-            Query(Table(Alias("result"), mul_node_2.fields()), mul_node_2),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node_2.fields()), mul_node_2),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -145,8 +145,8 @@ def test_logic_cache_embeddings_norms_l1():
     # - Expected MISS
     plan_1_d = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_1), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_1), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Using dense stats
@@ -157,8 +157,8 @@ def test_logic_cache_embeddings_norms_l1():
     # hence same stats to see if we get a HIT
     plan_1_d_sim = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_2), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_2), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Same stats as above
@@ -171,8 +171,8 @@ def test_logic_cache_embeddings_norms_l1():
     )
     plan_mul = Plan(
         (
-            Query(Table(Alias("result"), mul_node.fields()), mul_node),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node.fields()), mul_node),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -182,8 +182,8 @@ def test_logic_cache_embeddings_norms_l1():
     )
     plan_mul_2 = Plan(
         (
-            Query(Table(Alias("result"), mul_node_2.fields()), mul_node_2),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node_2.fields()), mul_node_2),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -232,8 +232,8 @@ def test_logic_cache_embeddings_norms_l2():
     # Expected MISS
     plan_1_d = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_1), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_1), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Using dense stats
@@ -245,8 +245,8 @@ def test_logic_cache_embeddings_norms_l2():
     # hence same stats to see if we get a HIT
     plan_1_d_sim = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_2), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_2), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
     # Same stats as above
@@ -259,8 +259,8 @@ def test_logic_cache_embeddings_norms_l2():
     )
     plan_mul = Plan(
         (
-            Query(Table(Alias("result"), mul_node.fields()), mul_node),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node.fields()), mul_node),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -270,8 +270,8 @@ def test_logic_cache_embeddings_norms_l2():
     )
     plan_mul_2 = Plan(
         (
-            Query(Table(Alias("result"), mul_node_2.fields()), mul_node_2),
-            Produces((Table(Alias("result"), (i, j)),)),
+            Query(Table(HardAlias("result"), mul_node_2.fields()), mul_node_2),
+            Produces((Table(HardAlias("result"), (i, j)),)),
         )
     )
 
@@ -308,8 +308,8 @@ def test_blocked_vector_embedding():
 
     plan_1_d = Plan(
         (
-            Query(Table(Alias("out"), (i, j)), Table(Literal(data_1), (i, j))),
-            Produces((Table(Alias("out"), (i, j)),)),
+            Query(Table(HardAlias("out"), (i, j)), Table(Literal(data_1), (i, j))),
+            Produces((Table(HardAlias("out"), (i, j)),)),
         )
     )
 

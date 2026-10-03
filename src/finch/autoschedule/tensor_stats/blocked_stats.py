@@ -10,8 +10,8 @@ import finch as ft
 from finch.algebra import FinchOperator, ffuncs
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -78,7 +78,7 @@ def get_blocks_subtensor(
             starts[f], ends[f] = start, end
 
         expr = build_block_expr(arr, fields, starts, ends, coord)
-        out = Alias(f"block_{'_'.join(str(c) for c in coord)}")
+        out = HardAlias(f"block_{'_'.join(str(c) for c in coord)}")
         prgm = Plan((Query(Table(out, expr.fields()), expr), Produces((out,))))
         (result,) = NON_RECURSIVE_SCHEDULER(prgm)
         blocks[coord] = result

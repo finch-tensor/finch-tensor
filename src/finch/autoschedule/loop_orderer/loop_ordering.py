@@ -13,6 +13,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     LogicExpression,
     LogicLoader,
     LogicStatement,
@@ -47,7 +48,7 @@ def concordize(
                     return Reorder(
                         Table(
                             needed_swizzles.setdefault(var, {}).setdefault(
-                                perm, Alias(namespace.freshen(var.name))
+                                perm, HardAlias(namespace.freshen(var.name))
                             ),
                             idxs_subseq,
                         ),
