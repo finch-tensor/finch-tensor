@@ -30,8 +30,8 @@ from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.julia import julia_available
 from finch.finch_logic import (
+    Alias,
     Field,
-    HardAlias,
     LogicSimplify,
     Plan,
     Produces,
@@ -62,7 +62,7 @@ def _plan_from_lazy(expr):
     Build the same `Plan` as `finch.interface.fuse.compute`.
     """
     args = (expr,)
-    vars_ = tuple(HardAlias(gensym("A")) for _ in args)
+    vars_ = tuple(Alias(gensym("A")) for _ in args)
     ctx = args[0].ctx.join()
     bodies = []
     for arg, var in zip(args, vars_, strict=True):

@@ -8,8 +8,8 @@ import numpy as np
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -541,7 +541,7 @@ class SamplingStats(NumericStats):
             n, d_n, f_1, frequencies = self.scan_cache
         else:
             fields = tuple(self.index_order)
-            n_a, dn_a, f1_a = HardAlias("n"), HardAlias("d_n"), HardAlias("f_1")
+            n_a, dn_a, f1_a = Alias("n"), Alias("d_n"), Alias("f_1")
             bodies = [
                 Query(
                     Table(n_a, ()),
@@ -572,7 +572,7 @@ class SamplingStats(NumericStats):
             outputs = [n_a, dn_a, f1_a]
             max_a = None
             if needs_freq:
-                max_a = HardAlias("max_val")
+                max_a = Alias("max_val")
                 bodies.append(
                     Query(
                         Table(max_a, ()),
@@ -596,7 +596,7 @@ class SamplingStats(NumericStats):
             if needs_freq:
                 max_val = int(round(float(np.asarray(results[3])[()])))
                 if max_val >= 1:
-                    freq_alias = [HardAlias(f"f_{i}") for i in range(1, max_val + 1)]
+                    freq_alias = [Alias(f"f_{i}") for i in range(1, max_val + 1)]
                     freq_bodies = [
                         Query(
                             Table(a, ()),
@@ -632,7 +632,7 @@ class SamplingStats(NumericStats):
             mask = self.masks_ref.get((field, size))
             if mask is None or size == 0:
                 continue
-            out = HardAlias("sampled_count")
+            out = Alias("sampled_count")
             query = Query(
                 Table(out, ()),
                 Aggregate(

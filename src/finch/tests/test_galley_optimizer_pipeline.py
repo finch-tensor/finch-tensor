@@ -11,8 +11,8 @@ from finch.algebra import ffuncs
 from finch.autoschedule import INTERPRET_NOTATION_GALLEY
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     Plan,
     Produces,
@@ -513,7 +513,7 @@ def test_aggregate_over_no_indices_keeps_init(op, init, expected):
     # Galley starts each reduction from the init of the indices it reduces, so
     # an aggregate which reduces no indices must still apply its init.
     i, j = Field("i"), Field("j")
-    A, B = HardAlias("A"), HardAlias("B")
+    A, B = Alias("A"), Alias("B")
     data = np.array([[1.0, 2.0], [3.0, 4.0]])
     plan = Plan(
         (

@@ -36,7 +36,6 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -410,10 +409,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             )
 
     i, j = Field("i"), Field("j")
-    A, B = HardAlias("A"), HardAlias("B")
+    A, B = Alias("A"), Alias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
+    stats = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = RecordingSmartFormatter(capture)
     prgm = Plan(
@@ -437,10 +436,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
 
 def test_fd_formatter_uses_dense_levels_for_dense_properties():
     i, j = Field("i"), Field("j")
-    A, B = HardAlias("A"), HardAlias("B")
+    A, B = Alias("A"), Alias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
+    stats = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = FDFormatter(capture)
     prgm = Plan(

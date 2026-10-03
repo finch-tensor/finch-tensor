@@ -176,28 +176,15 @@ class SmartFormatter(LogicFormatter):
                     assert isinstance(rhs_stats, TensorStats)
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    match lhs:
-                        case lgc.FusedAlias(alias, nfused):
-                            pass
-                        case lgc.Alias() as alias:
-                            nfused = 0
-                    if alias not in bindings:
-                        format_stats = rhs_stats
-                        if nfused:
-                            format_stats = stats_factory.aggregate(
-                                ffuncs.or_,
-                                False,
-                                rhs_stats.index_order[:nfused],
-                                rhs_stats,
-                            )
+                    if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[alias][nfused:]
+                            for dim in shape_types[lhs]
                         )
-                        bindings[alias] = self.get_tensor_ftype(
-                            fill_values[alias],
+                        bindings[lhs] = self.get_tensor_ftype(
+                            fill_values[lhs],
                             shape_type,
-                            format_stats,
+                            rhs_stats,
                         )
 
                     return node

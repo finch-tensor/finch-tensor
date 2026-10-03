@@ -57,7 +57,6 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
-                    lhs = lhs.unfused
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)

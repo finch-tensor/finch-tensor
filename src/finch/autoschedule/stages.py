@@ -11,7 +11,6 @@ from finch.finch_logic import (
     Field,
     Literal,
     LogicStatement,
-    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -22,17 +21,14 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finch.symbolic import Form, PostOrderDFS, Stage
+from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
 
 
 class AliasedForm(Form):
     """
     AliasedForm requires that all aliases in the input are defined
     in the bindings or in previous queries and that all Tables
-    are wrapping Aliases. Defining an alias selects its view, which is either
-    the HardAlias or a FusedAlias with some number of fused dimensions, and
-    invalidates every other view of that alias. Statements may only read or
-    update the current view of an alias. Bindings define the HardAlias view.
+    are wrapping Aliases.
     """
 
     @classmethod
@@ -43,45 +39,28 @@ class AliasedForm(Form):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> None:
-        views: dict[Alias, Alias] = {var.unfused: var for var in bindings}
+        defined_aliases = set(bindings.keys())
 
         def validate(node):
             match node:
-                case Query(Table(Alias() as lhs, _), rhs):
-                    # The rhs is read before the lhs is defined.
-                    validate(rhs)
-                    views[lhs.unfused] = lhs
-                case QueryInto(
-                    Table(Alias() as lhs, _), Literal(ffuncs.overwrite), rhs
-                ) if issubclass(cls, CompilerForm):
-                    validate(rhs)
-                    views[lhs.unfused] = lhs
-                case QueryInto(Table(Alias() as lhs, _), _, rhs):
-                    validate(rhs)
-                    if lhs.unfused not in views:
+                case Query(Table(Alias() as lhs, _), _):
+                    defined_aliases.add(lhs)
+                case QueryInto(Table(Alias() as lhs, _), _, _):
+                    if lhs not in defined_aliases:
                         raise ValueError(
                             f"QueryInto updates alias {lhs.name}, which is not defined."
                         )
-                    validate(lhs)
-                case Alias() as var:
-                    view = views.get(var.unfused)
-                    if view is None:
-                        raise ValueError(
-                            f"Alias {var.name} is not defined in bindings."
-                        )
-                    if view != var:
-                        raise ValueError(
-                            f"{var} was invalidated by the definition of {view}."
-                        )
-                case Table(Alias() as tns, _):
-                    validate(tns)
-                case Table():
-                    raise ValueError("Table nodes must wrap an Alias.")
-                case LogicTree():
-                    for child in node.children:
-                        validate(child)
+                case Query(lhs, _) | QueryInto(lhs, _, _):
+                    raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
+                case Alias(name):
+                    if node not in defined_aliases:
+                        raise ValueError(f"Alias {name} is not defined in bindings.")
+                case Table(tns, _):
+                    if not isinstance(tns, Alias):
+                        raise ValueError("Table nodes must wrap an Alias.")
+            return node
 
-        validate(term)
+        Rewrite(PreWalk(validate))(term)
 
 
 class SingleAggregateForm(AliasedForm):
@@ -254,8 +233,8 @@ class FormattedForm(LoopOrderedForm):
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg)
-                case Table(Alias() as tns, _):
-                    if tns.unfused not in bindings:
+                case Table(tns, _):
+                    if tns not in bindings:
                         raise ValueError(
                             f"Alias {tns.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
@@ -288,8 +267,7 @@ class CompilerForm(FormattedForm):
     A transpose or fold which overwrites lhs also initializes it, starting from
     the init of a preceding initialization, or else the fill value of lhs.
     Every alias must have a TensorFType in the bindings, and a statement can't
-    read the alias it writes. Since initialization is explicit, a statement
-    which overwrites its lhs defines the view of the lhs.
+    read the alias it writes.
     """
 
     @classmethod
@@ -312,12 +290,7 @@ class CompilerForm(FormattedForm):
         for body in bodies:
             match body:
                 case QueryInto(Table(lhs, _), Literal(op), rhs):
-                    assert isinstance(lhs, Alias)
-                    if any(
-                        node.unfused == lhs.unfused
-                        for node in PostOrderDFS(rhs)
-                        if isinstance(node, Alias)
-                    ):
+                    if lhs in PostOrderDFS(rhs):
                         raise ValueError(f"QueryInto can't both read and write {lhs}.")
                     match rhs:
                         case Literal():

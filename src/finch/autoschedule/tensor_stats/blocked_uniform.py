@@ -9,8 +9,8 @@ import finch as fl
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -58,8 +58,8 @@ def build_grid_uniform(
         Reorder(joined, loop_order),
         index_order,
     )
-    out = HardAlias("blocked_uniform_nnz_grid")
-    size_outputs = tuple(HardAlias(f"block_sizes_{axis}") for axis in range(len(masks)))
+    out = Alias("blocked_uniform_nnz_grid")
+    size_outputs = tuple(Alias(f"block_sizes_{axis}") for axis in range(len(masks)))
     size_queries = tuple(
         Query(
             Table(size_out, (block_idx,)),

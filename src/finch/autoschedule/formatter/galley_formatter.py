@@ -226,32 +226,17 @@ class GalleyFormatter(LogicFormatter):
                         raise TypeError("GalleyFormatter requires NumericStats.")
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    match lhs:
-                        case lgc.FusedAlias(alias, nfused):
-                            pass
-                        case lgc.Alias() as alias:
-                            nfused = 0
-                    if alias not in bindings:
-                        format_stats = stats_bindings[lhs]
-                        loop_order = query_loop_order(rhs)
-                        if nfused:
-                            fused_indices = format_stats.index_order[:nfused]
-                            format_stats = stats_factory.aggregate(
-                                ffuncs.or_, False, fused_indices, format_stats
-                            )
-                            loop_order = tuple(
-                                idx for idx in loop_order if idx not in fused_indices
-                            )
+                    if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[alias][nfused:]
+                            for dim in shape_types[lhs]
                         )
-                        bindings[alias] = self.get_tensor_ftype(
-                            fill_values[alias],
+                        bindings[lhs] = self.get_tensor_ftype(
+                            fill_values[lhs],
                             shape_type,
-                            format_stats,
+                            rhs_stats,
                             stats_factory,
-                            loop_order,
+                            query_loop_order(rhs),
                         )
 
                     return node

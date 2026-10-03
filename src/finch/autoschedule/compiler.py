@@ -55,7 +55,7 @@ class PointwiseContext:
             case lgc.Table(lgc.Alias() as var, idxs):
                 return ntn.Unwrap(
                     ntn.Access(
-                        self.ctx.slots[var.unfused],
+                        self.ctx.slots[var],
                         ntn.Read(),
                         tuple(loops[idx] for idx in idxs),
                     )
@@ -304,7 +304,6 @@ class NotationContext:
                 lgc.Literal(ffuncs.overwrite),
                 lgc.Literal(init),
             ):
-                lhs = lhs.unfused
                 # An initialization is declared by the statement which next
                 # uses the tensor, since the declaration needs to know the op
                 # the tensor will be updated with. An earlier init which is still
@@ -316,11 +315,8 @@ class NotationContext:
             case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs), lgc.Literal(op), rhs
             ):
-                lhs = lhs.unfused
                 reads = dict.fromkeys(
-                    node.unfused
-                    for node in PostOrderDFS(rhs)
-                    if isinstance(node, lgc.Alias)
+                    node for node in PostOrderDFS(rhs) if isinstance(node, lgc.Alias)
                 )
                 stmts = tuple(stmt for var in reads for stmt in self.freeze(var))
                 if op == ffuncs.overwrite:
@@ -347,7 +343,7 @@ class NotationContext:
                 vars: list[lgc.Alias] = []
                 for var in args:
                     assert isinstance(var, lgc.Alias)
-                    vars.append(var.unfused)
+                    vars.append(var)
                 return ntn.Block(
                     (
                         *(stmt for var in self.bindings for stmt in self.freeze(var)),
