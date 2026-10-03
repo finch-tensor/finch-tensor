@@ -5533,7 +5533,7 @@
                     <span class="n">var</span> <span class="o">=</span> <span class="n">ids</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">tns</span><span class="p">)]</span>
                     <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
                 <span class="c1"># If we don't have an Alias for the tensor we just found we create one</span>
-                <span class="n">var</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">HardAlias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span>
+                <span class="n">var</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span>
                 <span class="c1"># Updating the ids and bindings</span>
                 <span class="n">ids</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">tns</span><span class="p">)]</span> <span class="o">=</span> <span class="n">var</span>
                 <span class="n">bindings</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">tns</span>

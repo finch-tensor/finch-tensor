@@ -14477,7 +14477,8 @@ to access it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">238</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
+<span class="normal">238</span>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
@@ -14605,8 +14606,7 @@ to access it.</p>
 <span class="normal">363</span>
 <span class="normal">364</span>
 <span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LazyTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">366</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LazyTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">data</span><span class="p">:</span> <span class="n">Alias</span><span class="p">,</span>
@@ -14858,14 +14858,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">357</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
+<span class="normal">357</span>
 <span class="normal">358</span>
 <span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
 <span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a bool.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -14896,14 +14896,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">330</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">329</span>
+<span class="normal">330</span>
 <span class="normal">331</span>
 <span class="normal">332</span>
 <span class="normal">333</span>
 <span class="normal">334</span>
 <span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__complex__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span><span class="p">:</span>
+<span class="normal">336</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__complex__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a complex number.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -14934,14 +14934,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">339</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">338</span>
+<span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
 <span class="normal">342</span>
 <span class="normal">343</span>
 <span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__float__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__float__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a float.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -14972,14 +14972,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">348</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">347</span>
+<span class="normal">348</span>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
 <span class="normal">352</span>
 <span class="normal">353</span>
-<span class="normal">354</span>
-<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__int__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="normal">354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__int__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to an int.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -20880,7 +20880,8 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">430</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">429</span>
+<span class="normal">430</span>
 <span class="normal">431</span>
 <span class="normal">432</span>
 <span class="normal">433</span>
@@ -20971,8 +20972,7 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 <span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
-<span class="normal">521</span>
-<span class="normal">522</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">asarray</span><span class="p">(</span>
+<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">asarray</span><span class="p">(</span>
     <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="o">/</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -21307,7 +21307,7 @@ entire operation in an optimized manner using the provided scheduler.</p>
             <span class="n">lazy_arg_idxs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">lazy_args</span><span class="p">:</span>
-        <span class="nb">vars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">HardAlias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">)</span>
+        <span class="nb">vars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">)</span>
         <span class="n">ctx_2</span> <span class="o">=</span> <span class="n">lazy_args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">ctx</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">lazy_args</span><span class="p">[</span><span class="mi">1</span><span class="p">:]])</span>
         <span class="n">bodies</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">arg_i</span><span class="p">,</span> <span class="n">var</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">lazy_args</span><span class="p">,</span> <span class="nb">vars</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
@@ -21361,7 +21361,8 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">533</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">532</span>
+<span class="normal">533</span>
 <span class="normal">534</span>
 <span class="normal">535</span>
 <span class="normal">536</span>
@@ -21388,8 +21389,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="normal">557</span>
 <span class="normal">558</span>
 <span class="normal">559</span>
-<span class="normal">560</span>
-<span class="normal">561</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="normal">560</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    - defer(arr) -&gt; LazyTensor:</span>
 <span class="sd">    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is</span>
@@ -21411,7 +21411,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
         <span class="n">arr</span> <span class="o">=</span> <span class="n">ConstantScalar</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_specializable_value</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span> <span class="k">else</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">arr</span> <span class="o">=</span> <span class="n">asarray</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
-    <span class="n">tns</span> <span class="o">=</span> <span class="n">HardAlias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span>
+    <span class="n">tns</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">))</span>
     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"i"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">EffectBlob</span><span class="p">(</span><span class="n">stmt</span><span class="o">=</span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>

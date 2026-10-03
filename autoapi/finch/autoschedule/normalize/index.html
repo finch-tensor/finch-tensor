@@ -5502,7 +5502,13 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/normalize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 81</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
 <span class="normal"> 82</span>
 <span class="normal"> 83</span>
 <span class="normal"> 84</span>
@@ -5578,13 +5584,7 @@
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inline_constant_scalars</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
+<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inline_constant_scalars</span><span class="p">(</span><span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Replace each reference to a bound `ConstantScalar` with its value.</span>
 <span class="sd">    """</span>
@@ -5700,7 +5700,9 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/normalize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
 <span class="normal">46</span>
@@ -5729,13 +5731,7 @@
 <span class="normal">69</span>
 <span class="normal">70</span>
 <span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_names</span><span class="p">(</span>
+<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">normalize_names</span><span class="p">(</span>
     <span class="n">prgm</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicNode</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">T</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -5748,16 +5744,12 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">rule_0</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">FusedAlias</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
-                <span class="n">renamed</span> <span class="o">=</span> <span class="n">rule_0</span><span class="p">(</span><span class="n">alias</span><span class="p">)</span>
-                <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">renamed</span><span class="p">,</span> <span class="n">HardAlias</span><span class="p">)</span>
-                <span class="k">return</span> <span class="n">FusedAlias</span><span class="p">(</span><span class="n">renamed</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">Alias</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">HardAlias</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+                    <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
                 <span class="n">new_name</span> <span class="o">=</span> <span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)</span>
                 <span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_name</span>
-                <span class="k">return</span> <span class="n">HardAlias</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">Alias</span><span class="p">(</span><span class="n">new_name</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">Field</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">renames</span><span class="p">:</span>
                     <span class="k">return</span> <span class="n">Field</span><span class="p">(</span><span class="n">renames</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
