@@ -199,9 +199,6 @@ def _julia_literal(value: Any) -> str:
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
         return "true" if value else "false"
-    if isinstance(value, tuple):
-        elts = [_julia_literal(elt) for elt in value]
-        return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
     literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):
