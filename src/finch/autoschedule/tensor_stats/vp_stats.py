@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -191,8 +192,11 @@ class VPStats(NumericStats):
         self.nnz = float(nnz)
         self.V = dict(V)
 
-    def estimate_non_fill_values(self) -> float:
-        return self.nnz
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        # Non-fill values are spread evenly over the slices which hold any.
+        fields = set(max) & set(self.index_order)
+        slices = min(math.prod(self.V[idx] for idx in fields), self.nnz)
+        return self.nnz / slices if slices >= 1 else self.nnz
 
     def get_embedding(self):
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

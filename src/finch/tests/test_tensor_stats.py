@@ -3579,3 +3579,93 @@ def test_lp_norm_endpoints():
 def test_lpdc_is_hashable_frozen():
     dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
     assert dc in {dc}
+
+
+_MAX_DATA = np.array(
+    [
+        [1, 1, 1, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 1],
+    ],
+    dtype=float,
+)
+_MAX_I, _MAX_J = Field("i"), Field("j")
+
+
+def _max_slice(fields):
+    axes = tuple(axis for axis, idx in enumerate((_MAX_I, _MAX_J)) if idx not in fields)
+    return float(np.max(np.count_nonzero(_MAX_DATA, axis=axes), initial=0))
+
+
+_MAX_FIELDS = [(), (_MAX_I,), (_MAX_J,), (_MAX_I, _MAX_J), (Field("k"),)]
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        DenseStatsFactory(),
+        UniformStatsFactory(),
+        VPStatsFactory(),
+        ExactStatsFactory(),
+        SamplingStatsFactory(sample_prob=1.0),
+        BlockedUniformStatsFactory(blocks_per_dim={_MAX_I: 2, _MAX_J: 2}),
+        BlockedStatsFactory(ExactStatsFactory(), blocks_per_dim={_MAX_I: 2, _MAX_J: 2}),
+        DCStatsFactory(),
+        LPStatsFactory(),
+    ],
+)
+def test_estimate_non_fill_values_max_without_tensor_fields(factory):
+    stats = factory(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    total = stats.estimate_non_fill_values()
+    assert stats.estimate_non_fill_values(max=()) == total
+    # Fields the tensor doesn't have don't split it into slices.
+    assert stats.estimate_non_fill_values(max=(Field("k"),)) == pytest.approx(total)
+
+
+@pytest.mark.parametrize("fields", _MAX_FIELDS)
+@pytest.mark.parametrize(
+    "factory",
+    [
+        ExactStatsFactory(),
+        # Blocks of single elements are exact.
+        BlockedUniformStatsFactory(blocks_per_dim={_MAX_I: 4, _MAX_J: 6}),
+        BlockedStatsFactory(ExactStatsFactory(), blocks_per_dim={_MAX_I: 4, _MAX_J: 6}),
+    ],
+)
+def test_estimate_non_fill_values_max_is_exact(factory, fields):
+    stats = factory(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    assert stats.estimate_non_fill_values(max=fields) == _max_slice(fields)
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory(), LPStatsFactory()])
+def test_estimate_non_fill_values_max_is_bounded(factory, fields):
+    stats = factory(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    bound = stats.estimate_non_fill_values(max=fields)
+    assert _max_slice(fields) <= bound <= stats.estimate_non_fill_values()
+
+
+@pytest.mark.parametrize("fields", _MAX_FIELDS)
+def test_estimate_non_fill_values_max_uniform(fields):
+    sizes = {_MAX_I: 4, _MAX_J: 6}
+    slices = math.prod(sizes[idx] for idx in fields if idx in sizes)
+    dense = DenseStatsFactory()(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    assert dense.estimate_non_fill_values(max=fields) == 24 / slices
+    uniform = UniformStatsFactory()(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    assert uniform.estimate_non_fill_values(max=fields) == pytest.approx(7 / slices)
+    sampling = SamplingStatsFactory(sample_prob=1.0)(
+        ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J)
+    )
+    assert sampling.estimate_non_fill_values(max=fields) == pytest.approx(7 / slices)
+    for factory in (DCStatsFactory(), LPStatsFactory()):
+        bound = factory(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+        total = bound.estimate_non_fill_values()
+        assert bound.estimate_non_fill_values(max=fields) == pytest.approx(
+            total / slices
+        )
+    # Three rows and five columns hold a non-fill value.
+    nonempty = {(): 1, (_MAX_I,): 3, (_MAX_J,): 5, (_MAX_I, _MAX_J): 7}
+    vp = VPStatsFactory()(ft.asarray(_MAX_DATA), (_MAX_I, _MAX_J))
+    expected = 7 / nonempty.get(tuple(fields), 1)
+    assert vp.estimate_non_fill_values(max=fields) == pytest.approx(expected)
+

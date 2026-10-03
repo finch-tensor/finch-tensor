@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from functools import cached_property
 from typing import Any
@@ -98,20 +99,28 @@ class ExactStats(NumericStats):
 
     @cached_property
     def nnz(self) -> float:
+        return self._max_slice_nnz(())
+
+    def _max_slice_nnz(self, fields: tuple[Field, ...]) -> float:
         if self.expr is None:
             return 0.0
 
-        expr = Aggregate(
-            Literal(ffuncs.add), Literal(np.intp(0)), self.expr, self.expr.fields()
-        )
+        rest = tuple(idx for idx in self.expr.fields() if idx not in fields)
+        expr = Aggregate(Literal(ffuncs.add), Literal(np.intp(0)), self.expr, rest)
+        fixed = tuple(idx for idx in self.expr.fields() if idx in fields)
+        if fixed:
+            expr = Aggregate(Literal(ffuncs.max), Literal(np.intp(0)), expr, fixed)
         result = get_default_scheduler()(expr)
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
         return float(result.tns)
 
-    def estimate_non_fill_values(self) -> float:
-        return self.nnz
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        fields = tuple(max)
+        if not set(fields) & set(self.index_order):
+            return self.nnz
+        return self._max_slice_nnz(fields)
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

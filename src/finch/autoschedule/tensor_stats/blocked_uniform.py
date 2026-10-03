@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -336,8 +336,17 @@ class BlockedUniformStats(NumericStats):
         shape = [next(it) if idx in self.index_order else 1 for idx in base_index_order]
         return density.reshape(shape)
 
-    def estimate_non_fill_values(self) -> float:
-        return float(np.sum(self.nnz_grid))
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        # Within a block, non-fill values are spread evenly over its slices.
+        fields = set(max)
+        fixed = tuple(idx for idx in self.index_order if idx in fields)
+        rest = tuple(
+            axis for axis, idx in enumerate(self.index_order) if idx not in fields
+        )
+        nnz = np.sum(self.nnz_grid, axis=rest, dtype=float)
+        vol = _block_volume_grid(fixed, self.block_sizes)
+        slices = np.divide(nnz, vol, out=np.zeros_like(nnz), where=vol > 0)
+        return float(np.max(slices, initial=0.0))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -53,10 +54,12 @@ class DenseStatsFactory(
 
 
 class DenseStats(NumericStats):
-    def estimate_non_fill_values(self) -> float:
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        fields = set(max)
         total = 1.0
-        for size in self.dim_sizes.values():
-            total *= size
+        for idx, size in self.dim_sizes.items():
+            if idx not in fields:
+                total *= size
         return total
 
     def get_embedding(self) -> np.ndarray:

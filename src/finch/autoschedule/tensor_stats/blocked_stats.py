@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any, Generic, TypeVar
 
 import numpy as np
@@ -314,8 +314,16 @@ class BlockedStats(NumericStats, Generic[NS]):
 
         return blocks_grid
 
-    def estimate_non_fill_values(self):
-        return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        fields = tuple(max)
+        counts = np.array(
+            [b.estimate_non_fill_values(max=fields) for b in self.blocks.flat],
+            dtype=float,
+        ).reshape(self.blocks.shape)
+        rest = tuple(
+            axis for axis, idx in enumerate(self.index_order) if idx not in fields
+        )
+        return float(np.max(np.sum(counts, axis=rest), initial=0.0))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

@@ -58,8 +58,9 @@ class BoundStats(NumericStats):
     number of non-fill values, built from ``ell_p``-norms of degree sequences.
 
     Subclasses differ only in which ``p`` values they keep (``ps``) and how they
-    turn the constraints into an estimate (:meth:`estimate_non_fill_values`); the
-    scan and all propagation (in :class:`BoundStatsFactory`) are shared.
+    turn the constraints into an estimate
+    (:meth:`estimate_total_non_fill_values`); the scan and all propagation (in
+    :class:`BoundStatsFactory`) are shared.
     """
 
     default_ps: ClassVar[tuple[float, ...]] = ()
@@ -74,8 +75,13 @@ class BoundStats(NumericStats):
         self.ps: tuple[float, ...] = tuple(self.default_ps if ps is None else ps)
         self.dcs = set(dcs)
 
+    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+        # Non-fill values are spread evenly over the slices which fix `max`.
+        slices = self.get_dim_space_size(tuple(set(max) & set(self.index_order)))
+        return self.estimate_total_non_fill_values() / slices
+
     @abstractmethod
-    def estimate_non_fill_values(self) -> float: ...
+    def estimate_total_non_fill_values(self) -> float: ...
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
@@ -256,7 +262,7 @@ class DCStats(BoundStats):
 
     default_ps: ClassVar[tuple[float, ...]] = (math.inf,)
 
-    def estimate_non_fill_values(self) -> float:
+    def estimate_total_non_fill_values(self) -> float:
         """Smallest degree-constraint product covering all indices, clamped by
         dense capacity."""
         idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
@@ -447,7 +453,7 @@ class LPStats(BoundStats):
 
     default_ps: ClassVar[tuple[float, ...]] = DEFAULT_PS
 
-    def estimate_non_fill_values(self) -> float:
+    def estimate_total_non_fill_values(self) -> float:
         idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
         if len(idx) == 0:
             return 1.0
