@@ -336,9 +336,9 @@ class BlockedUniformStats(NumericStats):
         shape = [next(it) if idx in self.index_order else 1 for idx in base_index_order]
         return density.reshape(shape)
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         # Within a block, non-fill values are spread evenly over its slices.
-        fields = set(max)
+        fields = set(over)
         fixed = tuple(idx for idx in self.index_order if idx in fields)
         rest = tuple(
             axis for axis, idx in enumerate(self.index_order) if idx not in fields

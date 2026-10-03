@@ -93,11 +93,8 @@ def test_statistics_for_alias_views_do_not_collide(monkeypatch, formatter_cls):
 
 @pytest.mark.parametrize("nfused", range(5))
 @pytest.mark.parametrize("shape", [(2, 2, 3, 4), (0, 2, 3, 4)])
-@pytest.mark.parametrize(
-    "formatter_cls", [StorageCostFormatter, IterCostFormatter, GalleyFormatter]
-)
-def test_formatters_use_support_projected_over_fused_dimensions(
-    monkeypatch, nfused, shape, formatter_cls
+def test_galley_uses_support_projected_over_fused_dimensions(
+    monkeypatch, nfused, shape
 ):
     data = np.zeros(shape, dtype=np.float64)
     if data.size:
@@ -118,28 +115,54 @@ def test_formatters_use_support_projected_over_fused_dimensions(
             lgc.Produces((fused,)),
         )
     )
-    formatter_cls(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
+    GalleyFormatter(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
 
     projected = np.any(data, axis=tuple(range(nfused))).astype(data.dtype)
     projected_stats = factory(ft.asarray(projected), fields[nfused:])
-    formatter = formatter_cls()
-    match formatter:
-        case GalleyFormatter():
-            expected = formatter.get_tensor_ftype(
-                stats.fill_value,
-                tensor.shape_type[nfused:],
-                projected_stats,
-                factory,
-                fields[nfused:],
-            )
-        case _:
-            formatter._stats_factory = factory
-            expected = formatter.get_tensor_ftype(
-                stats.fill_value, tensor.shape_type[nfused:], projected_stats
-            )
+    expected = GalleyFormatter().get_tensor_ftype(
+        stats.fill_value,
+        tensor.shape_type[nfused:],
+        projected_stats,
+        factory,
+        fields[nfused:],
+    )
     assert capture.last_bindings[scratch] == expected
     assert capture.last_stats[fused].index_order == fields
     assert stats.index_order == fields
+
+
+@pytest.mark.parametrize("formatter_cls", [StorageCostFormatter, IterCostFormatter])
+def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_cls):
+    # Each slice of the diagonal holds one value, though every slice together
+    # covers the whole of each row.
+    t, i = fields = tuple(map(lgc.Field, "ti"))
+    tensor = ft.asarray(np.eye(8))
+    a, scratch = lgc.HardAlias("a"), lgc.HardAlias("scratch")
+    fused = lgc.FusedAlias(scratch, 1)
+    factory = ExactStatsFactory()
+    stats = factory(tensor, fields)
+    capture = LogicCapture()
+    monkeypatch.setattr(capture, "ctx", lambda *args: None)
+    plan = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)),
+            lgc.Produces((fused,)),
+        )
+    )
+    formatter_cls(capture).lower(plan, {a: tensor.ftype}, {a: stats}, factory)
+    fmt = capture.last_bindings[scratch]
+    assert isinstance(fmt, ft.FiberTensorFType)
+    assert isinstance(fmt.lvl_t, ft.SparseHashLevelFType)
+
+    # The support projected over the fused dimension would be dense.
+    formatter = formatter_cls()
+    formatter._stats_factory = factory
+    projected = factory(ft.asarray(np.ones(8)), (i,))
+    projected_fmt = formatter.get_tensor_ftype(
+        stats.fill_value, tensor.shape_type[1:], projected
+    )
+    assert isinstance(projected_fmt, ft.FiberTensorFType)
+    assert isinstance(projected_fmt.lvl_t, ft.DenseLevelFType)
 
 
 @pytest.mark.parametrize("transpose", [False, True])

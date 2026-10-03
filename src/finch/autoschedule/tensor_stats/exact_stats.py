@@ -116,8 +116,8 @@ class ExactStats(NumericStats):
 
         return float(result.tns)
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
-        fields = tuple(max)
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        fields = tuple(over)
         if not set(fields) & set(self.index_order):
             return self.nnz
         return self._max_slice_nnz(fields)

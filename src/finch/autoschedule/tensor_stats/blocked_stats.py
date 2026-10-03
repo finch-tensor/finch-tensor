@@ -314,10 +314,10 @@ class BlockedStats(NumericStats, Generic[NS]):
 
         return blocks_grid
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
-        fields = tuple(max)
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        fields = tuple(over)
         counts = np.array(
-            [b.estimate_non_fill_values(max=fields) for b in self.blocks.flat],
+            [b.estimate_non_fill_values(over=fields) for b in self.blocks.flat],
             dtype=float,
         ).reshape(self.blocks.shape)
         rest = tuple(

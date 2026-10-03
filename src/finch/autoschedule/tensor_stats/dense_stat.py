@@ -54,8 +54,8 @@ class DenseStatsFactory(
 
 
 class DenseStats(NumericStats):
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
-        fields = set(max)
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        fields = set(over)
         total = 1.0
         for idx, size in self.dim_sizes.items():
             if idx not in fields:

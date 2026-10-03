@@ -131,9 +131,9 @@ class UniformStats(NumericStats):
         super().__init__(base)
         self.nnz = float(nnz)
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         # Non-fill values are spread evenly over the slices.
-        slices = self.get_dim_space_size(tuple(set(max) & set(self.index_order)))
+        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
         return self.nnz / slices
 
     def get_embedding(self) -> np.ndarray:

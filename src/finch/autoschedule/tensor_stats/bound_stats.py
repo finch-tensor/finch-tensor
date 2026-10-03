@@ -75,9 +75,9 @@ class BoundStats(NumericStats):
         self.ps: tuple[float, ...] = tuple(self.default_ps if ps is None else ps)
         self.dcs = set(dcs)
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
-        # Non-fill values are spread evenly over the slices which fix `max`.
-        slices = self.get_dim_space_size(tuple(set(max) & set(self.index_order)))
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        # Non-fill values are spread evenly over the slices which fix `over`.
+        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
         return self.estimate_total_non_fill_values() / slices
 
     @abstractmethod

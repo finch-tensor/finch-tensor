@@ -192,9 +192,9 @@ class VPStats(NumericStats):
         self.nnz = float(nnz)
         self.V = dict(V)
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         # Non-fill values are spread evenly over the slices which hold any.
-        fields = set(max) & set(self.index_order)
+        fields = set(over) & set(self.index_order)
         slices = min(math.prod(self.V[idx] for idx in fields), self.nnz)
         return self.nnz / slices if slices >= 1 else self.nnz
 

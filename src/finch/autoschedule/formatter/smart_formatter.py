@@ -30,13 +30,13 @@ if TYPE_CHECKING:
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-def nnz_after(fields, stats, stats_factory, level):
+def nnz_after(fields, stats, stats_factory, level, over=()):
     reduce_fields = tuple(fields[level + 1 :])
     if reduce_fields:
         reduced = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
     else:
         reduced = stats
-    return reduced.estimate_non_fill_values()
+    return reduced.estimate_non_fill_values(over=over)
 
 
 def optimize_format(
@@ -47,6 +47,7 @@ def optimize_format(
     fill_value,
     candidates,
     leaf_cost_fn,
+    over=(),
 ):
     n = len(fields)
     fill_ftype = ftype(fill_value)
@@ -78,7 +79,7 @@ def optimize_format(
             return memo[key]
 
         n_l = stats.get_dim_size(fields[level])
-        nnz_l = nnz_after(fields, stats, stats_factory, level)
+        nnz_l = nnz_after(fields, stats, stats_factory, level, over)
 
         best_cost = None
         best_format = None
@@ -101,7 +102,15 @@ def optimize_format(
 
 
 def total_tree_cost(
-    lvl, fields, stats, stats_factory, num_pos, level, candidates, leaf_cost_fn
+    lvl,
+    fields,
+    stats,
+    stats_factory,
+    num_pos,
+    level,
+    candidates,
+    leaf_cost_fn,
+    over=(),
 ):
     val_size = np_dtype(ftype(lvl.fill_value)).itemsize
     pos_size = np_dtype(ftype(lvl.position_type)).itemsize
@@ -111,7 +120,7 @@ def total_tree_cost(
 
     option = next(o for o in candidates if o.level_type is type(lvl))
     n_l = stats.get_dim_size(fields[level])
-    nnz_l = nnz_after(fields, stats, stats_factory, level)
+    nnz_l = nnz_after(fields, stats, stats_factory, level, over)
     local_cost = option.cost_fn(num_pos, n_l, nnz_l, val_size, pos_size)
     child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
     return local_cost + total_tree_cost(
@@ -123,6 +132,7 @@ def total_tree_cost(
         level + 1,
         candidates,
         leaf_cost_fn,
+        over,
     )
 
 
@@ -142,7 +152,10 @@ class SmartFormatter(LogicFormatter):
         fill_value: AbstractFill,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
-    ) -> TensorFType: ...
+        over: tuple[lgc.Field, ...] = (),
+    ) -> TensorFType:
+        """The format of a tensor with the given stats. If `over` lists
+        fields, each tensor stores one slice which fixes those fields."""
 
     def lower(
         self,
@@ -182,14 +195,6 @@ class SmartFormatter(LogicFormatter):
                         case lgc.Alias() as alias:
                             nfused = 0
                     if alias not in bindings:
-                        format_stats = rhs_stats
-                        if nfused:
-                            format_stats = stats_factory.aggregate(
-                                ffuncs.or_,
-                                False,
-                                rhs_stats.index_order[:nfused],
-                                rhs_stats,
-                            )
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
                             for dim in shape_types[alias][nfused:]
@@ -197,7 +202,8 @@ class SmartFormatter(LogicFormatter):
                         bindings[alias] = self.get_tensor_ftype(
                             fill_values[alias],
                             shape_type,
-                            format_stats,
+                            rhs_stats,
+                            rhs_stats.index_order[:nfused],
                         )
 
                     return node
@@ -221,20 +227,24 @@ class FDFormatter(SmartFormatter):
         fill_value: AbstractFill,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
+        over: tuple[lgc.Field, ...] = (),
     ) -> FiberTensorFType:
         if not isinstance(stats, FDStats):
             raise TypeError("FDFormatter requires FDStats.")
-        if len(shape_type) != len(stats.index_order):
+        fields = tuple(idx for idx in stats.index_order if idx not in over)
+        if len(shape_type) != len(fields):
             raise ValueError(
                 f"Got {len(shape_type)} shape dimensions for "
-                f"{len(stats.index_order)} stats dimensions."
+                f"{len(fields)} stats dimensions."
             )
 
+        # Slices are formatted by the support of every slice, so the fields of
+        # `over` are dropped from the dense dimensions.
         fill_ftype = ftype(fill_value)
         lvl = element(fill_value, fill_ftype)
-        for dim in reversed(range(len(stats.index_order))):
-            field = stats.index_order[dim]
-            outer_fields = frozenset(stats.index_order[:dim])
+        for dim in reversed(range(len(fields))):
+            field = fields[dim]
+            outer_fields = frozenset(fields[:dim])
             required_fields = outer_fields | {field}
             is_dense = any(
                 required_fields.issubset(dense_fields)
@@ -322,17 +332,19 @@ class CostFormatter(SmartFormatter):
         self._stats_factory = stats_factory
         return super().lower(prgm, bindings, stats, stats_factory)
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
+    def get_tensor_ftype(self, fill_value, shape_type, stats, over=()):
         if self._stats_factory is None:
             raise ValueError("CostFormatter requires StatsFactory")
+        # Each level is costed by the non-fill values of the largest slice.
         lvl = optimize_format(
-            stats.index_order,
+            tuple(idx for idx in stats.index_order if idx not in over),
             shape_type,
             stats,
             self._stats_factory,
             fill_value,
             self.candidates,
             self.leaf_cost_fn,
+            over,
         )
         return fiber_tensor(lvl)
 

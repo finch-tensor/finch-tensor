@@ -652,10 +652,10 @@ class SamplingStats(NumericStats):
             return d_n_raw
         return d_n_raw / coverage
 
-    def estimate_non_fill_values(self, max: Iterable[Field] = ()) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         """ "
         Non-fill values are assumed to be spread evenly over the slices which
-        fix the fields of `max`.
+        fix the fields of `over`.
 
         Using un-smoothened first order jackknife estimator
         D_uj1 = (1-(1-q)*f_1/n)^{-1} * d_n
@@ -716,7 +716,7 @@ class SamplingStats(NumericStats):
                 f"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1"
             )
 
-        slices = self.get_dim_space_size(tuple(set(max) & set(self.index_order)))
+        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
         return float(formula_est) / slices
 
     def get_embedding(self) -> np.ndarray:

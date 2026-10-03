@@ -608,8 +608,8 @@ class RecordingFDFormatter(FDFormatter):
         super().__init__(loader)
         self.output_ftypes = []
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
-        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats)
+    def get_tensor_ftype(self, fill_value, shape_type, stats, over=()):
+        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats, over)
         self.output_ftypes.append(tensor_ftype)
         return tensor_ftype
 
