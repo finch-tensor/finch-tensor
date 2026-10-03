@@ -99,7 +99,7 @@ def test_default_runtime_reuses_a_sparse_free_buffer():
     source = ft.asarray(sps.csr_array([[1, 0], [0, 2]], dtype=np.float64))
     target = ft.FiberTensor(
         ft.dense(ft.sparse_hash(ft.element(0.0), ft.intp), ft.intp).construct(
-            (2, 2), pos=0
+            (2, 2), pos=1
         )
     )
 

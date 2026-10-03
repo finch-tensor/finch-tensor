@@ -4,11 +4,14 @@ from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
 from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.util import (
+    desugar_query_into,
     drop_query_reorders,
     flatten_plans,
     propagate_copy_queries,
     push_fields,
     reorder_to,
+    resugar_query_into,
+    split_aggregate_inits,
 )
 from finch.finch_logic import (
     Aggregate,
@@ -174,9 +177,13 @@ def optimize(
 
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
+        prgm = resugar_query_into(prgm)
         prgm = add_aggregates(prgm, bindings)
         return prgm, bindings
 
+    prgm = split_aggregate_inits(
+        desugar_query_into(prgm), bindings, broadcast_only=True
+    )
     prgm, bindings = with_unique_lhs(transform, prgm, bindings)
     assert isinstance(prgm, Plan)
     return flatten_plans(prgm), bindings

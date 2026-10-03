@@ -801,15 +801,19 @@ class LoopletPass(ABC):
 
 
 class DefaultPass(LoopletPass):
+    """Lower the remaining loop after all tensor looplets have been handled."""
+
     @property
     def priority(self):
         return float("-inf")
 
     def __call__(self, ctx: LoopletContext, idx, ext: SymbolicExtent, body):
-        """
-        Default pass that does nothing. This is used when no other pass is selected.
-        """
-        ext.ftype.default_loop(ctx.ctx, idx, ext, body)
+        if ext.is_sym_point():
+            if ext.get_start() != idx:
+                ctx.exec(asm.Assign(ctx.ctx(idx), ctx.ctx(ext.get_start())))
+            ctx.ctx(body)
+        else:
+            ext.ftype.default_loop(ctx.ctx, idx, ext, body)
 
 
 class LoopletContext(Context):
