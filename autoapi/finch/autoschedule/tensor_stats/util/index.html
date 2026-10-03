@@ -5589,8 +5589,7 @@ constraints are built from:</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 25</span>
-<span class="normal"> 26</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 26</span>
 <span class="normal"> 27</span>
 <span class="normal"> 28</span>
 <span class="normal"> 29</span>
@@ -5684,7 +5683,8 @@ constraints are built from:</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_lp_norms</span><span class="p">(</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_lp_norms</span><span class="p">(</span>
     <span class="n">arr</span><span class="p">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span> <span class="n">norms</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""Scan ``arr`` and return the Lp norms of each axis' degree sequence.</span>
@@ -5725,7 +5725,7 @@ constraints are built from:</p>
     <span class="n">bodies</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Query</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">outputs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fields</span><span class="p">):</span>
-        <span class="n">degrees</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"degrees_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">degrees</span> <span class="o">=</span> <span class="n">HardAlias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"degrees_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">bodies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
             <span class="n">Query</span><span class="p">(</span>
                 <span class="n">Table</span><span class="p">(</span><span class="n">degrees</span><span class="p">,</span> <span class="p">(</span><span class="n">field</span><span class="p">,)),</span>
@@ -5740,7 +5740,7 @@ constraints are built from:</p>
         <span class="n">degree_table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span><span class="n">degrees</span><span class="p">,</span> <span class="p">(</span><span class="n">field</span><span class="p">,))</span>
 
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">norm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">norms</span><span class="p">):</span>
-            <span class="n">out</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"norm_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">HardAlias</span><span class="p">(</span><span class="sa">f</span><span class="s2">"norm_</span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
             <span class="n">rhs</span><span class="p">:</span> <span class="n">Aggregate</span>
             <span class="k">if</span> <span class="n">norm</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="n">rhs</span> <span class="o">=</span> <span class="n">Aggregate</span><span class="p">(</span>

@@ -5586,8 +5586,7 @@ tensors.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
-<span class="normal"> 75</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
 <span class="normal"> 78</span>
@@ -5646,7 +5645,8 @@ tensors.</p>
 <span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
+<span class="normal">134</span>
+<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
     <span class="n">f</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -5665,7 +5665,7 @@ tensors.</p>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">rhs</span><span class="p">):</span>
                 <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">bound</span><span class="p">:</span>
-                    <span class="n">var</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+                    <span class="n">var</span> <span class="o">=</span> <span class="n">HardAlias</span><span class="p">(</span><span class="n">spc</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
                     <span class="n">renames</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">var</span>
                     <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
                         <span class="n">writes</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">var</span>
