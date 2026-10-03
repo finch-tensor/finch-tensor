@@ -1,4 +1,5 @@
 from .mlir import (
+    MLIRArgumentFType,
     MLIRBinaryOperator,
     MLIRBufferFType,
     MLIRCompiler,
@@ -23,6 +24,7 @@ from .mlir import (
 from .stages import MLIRCode, MLIRLowerer
 
 __all__ = [
+    "MLIRArgumentFType",
     "MLIRBinaryOperator",
     "MLIRBufferFType",
     "MLIRCode",
