@@ -11,7 +11,9 @@ from .fiber_tensor import FiberTensor
 from .level.level import (
     Level,
     LevelFType,
+    MultiDimensionLevel,
     MultiDimensionLevelFType,
+    SingleDimensionLevel,
     SingleDimensionLevelFType,
 )
 
@@ -169,11 +171,13 @@ class LoTriMask(Level):
     Lower triangular mask level.
     """
 
-    lvl: Level
+    lvl: SingleDimensionLevel | MultiDimensionLevel
 
     @property
     def ftype(self) -> LoTriMaskFType:
-        return LoTriMaskFType(self.lvl.ftype)  # type: ignore[abstract]
+        ftype = self.lvl.ftype
+        assert isinstance(ftype, SingleDimensionLevelFType | MultiDimensionLevelFType)
+        return LoTriMaskFType(ftype)
 
     @property
     def val(self) -> Any:

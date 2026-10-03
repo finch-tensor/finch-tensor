@@ -112,12 +112,12 @@ class TableValueFType(FType):
 
 
 @dataclass(frozen=True)
-class TableValue(FTyped):
+class TableValue(FTyped[TableValueFType]):
     tns: Any
     idxs: tuple[Field, ...]
 
     @property
-    def ftype(self):
+    def ftype(self) -> TableValueFType:
         return TableValueFType(ftype(self.tns), self.idxs)
 
     def __post_init__(self) -> None:
