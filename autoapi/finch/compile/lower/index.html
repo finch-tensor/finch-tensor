@@ -2786,23 +2786,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="DefaultPass">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile.lower.DefaultPass.__call__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __call__
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5751,23 +5734,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="DefaultPass">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile.lower.DefaultPass.__call__" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        __call__
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -7242,6 +7208,8 @@ This is used to determine if the function has returned.</p>
 
 
 
+        <p>Lower the remaining loop after all tensor looplets have been handled.</p>
+
 
 
 
@@ -7260,16 +7228,24 @@ This is used to determine if the function has returned.</p>
 <span class="normal">809</span>
 <span class="normal">810</span>
 <span class="normal">811</span>
-<span class="normal">812</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultPass</span><span class="p">(</span><span class="n">LoopletPass</span><span class="p">):</span>
+<span class="normal">812</span>
+<span class="normal">813</span>
+<span class="normal">814</span>
+<span class="normal">815</span>
+<span class="normal">816</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultPass</span><span class="p">(</span><span class="n">LoopletPass</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Lower the remaining loop after all tensor looplets have been handled."""</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">priority</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"-inf"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">LoopletContext</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Default pass that does nothing. This is used when no other pass is selected.</span>
-<span class="sd">        """</span>
-        <span class="n">ext</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">is_sym_point</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">()</span> <span class="o">!=</span> <span class="n">idx</span><span class="p">:</span>
+                <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Assign</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">),</span> <span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">())))</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ext</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -7285,37 +7261,6 @@ This is used to determine if the function has returned.</p>
 
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="finch.compile.lower.DefaultPass.__call__" class="doc doc-heading">
-            <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span></code>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Default pass that does nothing. This is used when no other pass is selected.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/compile/lower.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">808</span>
-<span class="normal">809</span>
-<span class="normal">810</span>
-<span class="normal">811</span>
-<span class="normal">812</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">LoopletContext</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">:</span> <span class="n">SymbolicExtent</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Default pass that does nothing. This is used when no other pass is selected.</span>
-<span class="sd">    """</span>
-    <span class="n">ext</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">default_loop</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">ext</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
 
 
 

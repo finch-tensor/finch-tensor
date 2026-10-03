@@ -3074,6 +3074,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.compile_jl.types.scalar_type_str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scalar_type_str
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.compile_jl.types.to_fl_dtype" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5527,6 +5538,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.compile_jl.types.scalar_type_str" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        scalar_type_str
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.compile_jl.types.to_fl_dtype" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5768,15 +5790,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">297</span>
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
@@ -5855,7 +5869,14 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">373</span>
 <span class="normal">374</span>
 <span class="normal">375</span>
-<span class="normal">376</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia source text constructing a minimal instance of `ftype`, for</span>
 <span class="sd">    embedding directly in generated kernel source (see compiler.py)."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
@@ -5875,39 +5896,37 @@ embedding directly in generated kernel source (see compiler.py).</p>
             <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)"</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">FillTensorFType</span><span class="p">):</span>
-        <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.PatternLevel()"</span>
-        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span><span class="p">):</span>
-            <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)"</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)"</span>
+        <span class="c1"># Matches interop.py, which passes a fill tensor as a Finch scalar.</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">scalar_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span><span class="w"> </span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span><span class="si">}</span><span class="s2">()"</span>
     <span class="k">match</span> <span class="n">ftype</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">PatternTensorFType</span><span class="p">():</span>
             <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)</span> <span class="o">*</span> <span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span>
             <span class="n">obj</span> <span class="o">=</span> <span class="n">ftype</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
-            <span class="n">reverse_axes</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="c1"># This matches the masks built by `_pattern_tensor_to_jl`.</span>
+            <span class="n">swizzle</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">match</span> <span class="n">obj</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">EyeTensor</span><span class="p">():</span>
                     <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.diagmask"</span>
                     <span class="k">if</span> <span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">:</span>
                         <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.offset(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 0, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
-                    <span class="n">reverse_axes</span> <span class="o">=</span> <span class="kc">False</span>
                 <span class="k">case</span> <span class="n">UpperTriangleTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.offset(Finch.uptrimask, 0, </span><span class="si">{</span><span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.offset(Finch.lotrimask, 0, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">LowerTriangleTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.offset(Finch.lotrimask, 0, </span><span class="si">{</span><span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.offset(Finch.uptrimask, 0, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">PairSumTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.pairsummask"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.repeatmask(2)"</span>
                 <span class="k">case</span> <span class="n">PairCarryTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.paircarrymask"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="s2">"Finch.offset(Finch.pairsummask, 0, -1)"</span>
                 <span class="k">case</span> <span class="n">ReverseTensor</span><span class="p">():</span>
                     <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.reversemask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">RollTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.rollmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.rollmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">RepeatTensor</span><span class="p">():</span>
                     <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.repeatmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">ChunkMaskTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.chunkmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_b</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.chunkmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">_b</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">SplitMaskTensor</span><span class="p">():</span>
-                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.splitmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.splitmask(</span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">int</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="si">}</span><span class="s2">)"</span>
                 <span class="k">case</span> <span class="n">RandomMaskTensor</span><span class="p">():</span>
                     <span class="n">ctor</span> <span class="o">=</span> <span class="p">(</span>
                         <span class="sa">f</span><span class="s2">"Finch.randommask(</span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">_p</span><span class="si">}</span><span class="s2">; seed=UInt64(</span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">_seed</span><span class="si">}</span><span class="s2">))"</span>
@@ -5930,13 +5949,14 @@ embedding directly in generated kernel source (see compiler.py).</p>
                     <span class="n">old_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">_old_shape</span><span class="p">)</span>
                     <span class="n">new_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">_new_shape</span><span class="p">)</span>
                     <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.reshapemask(</span><span class="si">{</span><span class="n">old_shape</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">new_shape</span><span class="si">}</span><span class="s2">)"</span>
+                    <span class="n">swizzle</span> <span class="o">=</span> <span class="kc">True</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                         <span class="sa">f</span><span class="s2">"Unsupported Julia pattern tensor type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                     <span class="p">)</span>
             <span class="n">dims</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">"Finch.Extent(1, 1)"</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">shape</span><span class="p">)</span>
             <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.window(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}{</span><span class="s1">', '</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">dims</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">''</span><span class="si">}{</span><span class="n">dims</span><span class="si">}</span><span class="s2">)"</span>
-            <span class="k">if</span> <span class="n">reverse_axes</span> <span class="ow">and</span> <span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">swizzle</span> <span class="ow">and</span> <span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
                 <span class="n">axes</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))))</span>
                 <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.swizzle(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">axes</span><span class="si">}</span><span class="s2">)"</span>
             <span class="k">return</span> <span class="n">ctor</span>
@@ -5965,16 +5985,16 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">389</span>
 <span class="normal">390</span>
-<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia type as source text (e.g. for a cache key). Cached per ftype."""</span>
     <span class="n">cached</span> <span class="o">=</span> <span class="n">_TYPE_STR_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -5984,6 +6004,33 @@ embedding directly in generated kernel source (see compiler.py).</p>
     <span class="n">type_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">jl</span><span class="o">.</span><span class="n">string</span><span class="p">(</span><span class="n">jl</span><span class="o">.</span><span class="n">typeof</span><span class="p">(</span><span class="n">jl</span><span class="o">.</span><span class="n">seval</span><span class="p">(</span><span class="n">ctor</span><span class="p">))))</span>
     <span class="n">_TYPE_STR_CACHE</span><span class="p">[</span><span class="n">ftype</span><span class="p">]</span> <span class="o">=</span> <span class="n">type_str</span>
     <span class="k">return</span> <span class="n">type_str</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.compile_jl.types.scalar_type_str" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">scalar_type_str</span><span class="p">(</span><span class="n">fill</span><span class="p">,</span> <span class="n">element_type</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The Julia type of a Finch scalar with the given fill and element type.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scalar_type_str</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">element_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The Julia type of a Finch scalar with the given fill and element type."""</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Scalar</span><span class="se">{{</span><span class="si">{</span><span class="n">_julia_literal</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">element_type</span><span class="p">)</span><span class="si">}</span><span class="se">}}</span><span class="s2">"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

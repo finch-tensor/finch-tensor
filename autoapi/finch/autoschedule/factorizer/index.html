@@ -5443,13 +5443,7 @@ inside <code>branch_and_bound_dfs</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/galley_optimize.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
@@ -5481,7 +5475,25 @@ inside <code>branch_and_bound_dfs</code>.</p>
 <span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
-<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicFactorizer</span><span class="p">(</span><span class="n">LogicFactorizer</span><span class="p">):</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicFactorizer</span><span class="p">(</span><span class="n">LogicFactorizer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),</span>
 <span class="sd">    then forwards the Plan to the downstream loader ``ctx``.</span>
@@ -5512,14 +5524,26 @@ inside <code>branch_and_bound_dfs</code>.</p>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported program type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">term</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Optimizing plan: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
-        <span class="n">term</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
-            <span class="n">term</span><span class="p">,</span>
-            <span class="n">stats_factory</span><span class="p">,</span>
-            <span class="n">stats</span><span class="p">,</span>
-            <span class="n">use_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_components</span><span class="p">,</span>
-            <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">):</span>
+            <span class="n">prgm</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
+                <span class="n">prgm</span><span class="p">,</span>
+                <span class="n">stats_factory</span><span class="p">,</span>
+                <span class="n">stats</span><span class="p">,</span>
+                <span class="n">use_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_components</span><span class="p">,</span>
+                <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span>
+
+        <span class="c1"># Galley only keeps the queries that compute produced aliases, so each</span>
+        <span class="c1"># write to a bound tensor, including an in-place update, is renamed and</span>
+        <span class="c1"># produced, then copied back to the tensor it updates. Galley only</span>
+        <span class="c1"># reduces from literals, so aggregates which start from a tensor are</span>
+        <span class="c1"># split first.</span>
+        <span class="n">term</span> <span class="o">=</span> <span class="n">split_aggregate_inits</span><span class="p">(</span><span class="n">desugar_query_into</span><span class="p">(</span><span class="n">term</span><span class="p">),</span> <span class="n">bindings</span><span class="p">)</span>
+        <span class="n">term</span><span class="p">,</span> <span class="n">bindings</span> <span class="o">=</span> <span class="n">with_unique_lhs</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">flatten_plans</span><span class="p">(</span><span class="n">term</span><span class="p">),</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5562,10 +5586,7 @@ tensors.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 74</span>
 <span class="normal"> 75</span>
 <span class="normal"> 76</span>
 <span class="normal"> 77</span>
@@ -5622,7 +5643,10 @@ tensors.</p>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
-<span class="normal">131</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_unique_lhs</span><span class="p">(</span>
     <span class="n">f</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">LogicStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""</span>

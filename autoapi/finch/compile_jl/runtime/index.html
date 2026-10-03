@@ -5535,13 +5535,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/runtime.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
@@ -5650,7 +5644,17 @@
 <span class="normal">287</span>
 <span class="normal">288</span>
 <span class="normal">289</span>
-<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultFinchJLRuntime</span><span class="p">(</span><span class="n">FinchJLRuntime</span><span class="p">):</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DefaultFinchJLRuntime</span><span class="p">(</span><span class="n">FinchJLRuntime</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Julia runtime with cached conversions and reusable result storage."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -5696,7 +5700,11 @@
                 <span class="n">julia_buf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_julia_owned_tensor</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">)</span>
             <span class="n">julia_buf_args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">julia_buf</span><span class="p">)</span>
 
-        <span class="nb">getattr</span><span class="p">(</span><span class="n">jl</span><span class="p">,</span> <span class="n">func_name</span><span class="p">)(</span><span class="o">*</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">raw_julia_obj</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">julia_buf_args</span><span class="p">))</span>
+        <span class="n">raw_args</span> <span class="o">=</span> <span class="p">[</span><span class="n">arg</span><span class="o">.</span><span class="n">raw_julia_obj</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">julia_buf_args</span><span class="p">]</span>
+        <span class="n">raw_args</span> <span class="o">+=</span> <span class="p">[</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="n">axis</span><span class="p">])</span> <span class="k">for</span> <span class="n">pos</span><span class="p">,</span> <span class="n">axis</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">kernel</span><span class="p">,</span> <span class="s2">"extents"</span><span class="p">,</span> <span class="p">())</span>
+        <span class="p">]</span>
+        <span class="nb">getattr</span><span class="p">(</span><span class="n">jl</span><span class="p">,</span> <span class="n">func_name</span><span class="p">)(</span><span class="o">*</span><span class="n">raw_args</span><span class="p">)</span>
 
         <span class="c1"># Associate returned tensors with their Python ownership handles.</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span>
@@ -5818,17 +5826,17 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/runtime.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">168</span>
 <span class="normal">169</span>
 <span class="normal">170</span>
 <span class="normal">171</span>
-<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLRuntime</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FinchJLRuntime</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Runtime services used by the Julia compiler and its kernels."""</span>
 
     <span class="nd">@abstractmethod</span>
@@ -5891,13 +5899,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/runtime.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
 <span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
@@ -5970,7 +5972,13 @@
 <span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaOwnedTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaOwnedTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A Finch tensor handle for storage owned by the Julia runtime."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>

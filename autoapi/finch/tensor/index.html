@@ -6215,6 +6215,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.tensor.RepeatTensor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RepeatTensor
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.tensor.Scalar" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7918,7 +7929,9 @@ This includes the fill value, element type, and shape type.</p>
 
 
         <p>Map <code>n</code> indices to chunks of size <code>b</code>.</p>
-<p><code>shape</code> is <code>(n, ceil(n / b))</code>; the last chunk may be shorter.</p>
+<p><code>shape</code> is <code>(ceil(n / b), n)</code>, and row <code>j</code> holds the indices of chunk
+<code>j</code>, so that the efficient row-major traversal visits each chunk and then
+its indices. The last chunk may be shorter.</p>
 
 
 
@@ -7929,14 +7942,7 @@ This includes the fill value, element type, and shape type.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">604</span>
-<span class="normal">605</span>
-<span class="normal">606</span>
-<span class="normal">607</span>
-<span class="normal">608</span>
-<span class="normal">609</span>
-<span class="normal">610</span>
-<span class="normal">611</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">611</span>
 <span class="normal">612</span>
 <span class="normal">613</span>
 <span class="normal">614</span>
@@ -7954,10 +7960,21 @@ This includes the fill value, element type, and shape type.</p>
 <span class="normal">626</span>
 <span class="normal">627</span>
 <span class="normal">628</span>
-<span class="normal">629</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChunkMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span>
+<span class="normal">636</span>
+<span class="normal">637</span>
+<span class="normal">638</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChunkMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Map ``n`` indices to chunks of size ``b``.</span>
 
-<span class="sd">    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.</span>
+<span class="sd">    ``shape`` is ``(ceil(n / b), n)``, and row ``j`` holds the indices of chunk</span>
+<span class="sd">    ``j``, so that the efficient row-major traversal visits each chunk and then</span>
+<span class="sd">    its indices. The last chunk may be shorter.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -7972,13 +7989,13 @@ This includes the fill value, element type, and shape type.</p>
             <span class="n">pattern_value</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">b</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_b</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">n</span><span class="p">,</span> <span class="n">chunks</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">chunks</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"n must be nonnegative"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">chunks</span> <span class="o">!=</span> <span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_b</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">_b</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"shape[1] must equal ceil(shape[0] / b)"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"shape[0] must equal ceil(shape[1] / b)"</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">j</span> <span class="o">==</span> <span class="n">i</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">_b</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -13567,7 +13584,8 @@ An omitted <code>seed</code> draws one random 64-bit seed from <code>rng</code> 
 generator by default). Reads consume no randomness; a fixed seed and
 coordinates give the same value even if the shape changes.</p>
 <p>Like Finch.jl, indexed masks mix the seed, then each one-based coordinate
-from the last axis to the first. Scalar masks use the seed directly.
+from the first axis to the last, which is Finch.jl's order once the axes
+are reversed like other tensors. Scalar masks use the seed directly.
 The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code>p</code>.</p>
 
 
@@ -13579,18 +13597,7 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">670</span>
-<span class="normal">671</span>
-<span class="normal">672</span>
-<span class="normal">673</span>
-<span class="normal">674</span>
-<span class="normal">675</span>
-<span class="normal">676</span>
-<span class="normal">677</span>
-<span class="normal">678</span>
-<span class="normal">679</span>
-<span class="normal">680</span>
-<span class="normal">681</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">681</span>
 <span class="normal">682</span>
 <span class="normal">683</span>
 <span class="normal">684</span>
@@ -13641,7 +13648,19 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 <span class="normal">729</span>
 <span class="normal">730</span>
 <span class="normal">731</span>
-<span class="normal">732</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+<span class="normal">732</span>
+<span class="normal">733</span>
+<span class="normal">734</span>
+<span class="normal">735</span>
+<span class="normal">736</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A reproducible random mask with true probability ``p`` and no stored entries.</span>
 
 <span class="sd">    ``shape`` may be an integer for a vector, or a tuple (including ``()``).</span>
@@ -13650,7 +13669,8 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 <span class="sd">    coordinates give the same value even if the shape changes.</span>
 
 <span class="sd">    Like Finch.jl, indexed masks mix the seed, then each one-based coordinate</span>
-<span class="sd">    from the last axis to the first. Scalar masks use the seed directly.</span>
+<span class="sd">    from the first axis to the last, which is Finch.jl's order once the axes</span>
+<span class="sd">    are reversed like other tensors. Scalar masks use the seed directly.</span>
 <span class="sd">    The high 53 bits give a value in ``[0, 1)`` that is compared with ``p``.</span>
 <span class="sd">    """</span>
 
@@ -13696,7 +13716,7 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
         <span class="k">if</span> <span class="ow">not</span> <span class="n">idxs</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">_randommask_uniform</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p</span>
         <span class="n">state</span> <span class="o">=</span> <span class="n">_randommask_mix</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_seed</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">idxs</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">:</span>
             <span class="n">state</span> <span class="o">=</span> <span class="n">_randommask_mix</span><span class="p">(</span><span class="n">state</span> <span class="o">^</span> <span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">_randommask_uniform</span><span class="p">(</span><span class="n">state</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_p</span>
 
@@ -13704,6 +13724,96 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot convert non-scalar tensor to Python scalar."</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="p">[()]</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.tensor.RepeatTensor" class="doc doc-heading">
+            <code>RepeatTensor</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="finch.tensor.patterns.PatternTensor">PatternTensor</span></code></p>
+
+
+
+        <p>Map each of <code>n</code> indices to <code>k</code> repeated indices.</p>
+<p><code>shape</code> is <code>(n, n * k)</code>, and row <code>i</code> holds the repeats <code>j</code> of <code>i</code>,
+so that the efficient row-major traversal visits each index and then its
+repeats. For <code>k &lt;= 0</code>, all entries are false.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RepeatTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Map each of ``n`` indices to ``k`` repeated indices.</span>
+
+<span class="sd">    ``shape`` is ``(n, n * k)``, and row ``i`` holds the repeats ``j`` of ``i``,</span>
+<span class="sd">    so that the efficient row-major traversal visits each index and then its</span>
+<span class="sd">    repeats. For ``k &lt;= 0``, all entries are false.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">k</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_k</span> <span class="o">=</span> <span class="n">k</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_k</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_level_format_properties</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ndim</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">FormatProperty</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">Blocked</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span> <span class="n">Repeated</span><span class="p">((</span><span class="mi">0</span><span class="p">,),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_k</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">i</span> <span class="o">==</span> <span class="n">j</span> <span class="o">//</span> <span class="bp">self</span><span class="o">.</span><span class="n">_k</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -15791,7 +15901,9 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 
 
         <p>Partition <code>n</code> indices into <code>p</code> contiguous regions of nearly equal size.</p>
-<p><code>shape</code> is <code>(n, p)</code>. Region <code>j</code> covers <code>n*j//p &lt;= i &lt; n*(j+1)//p</code>.</p>
+<p><code>shape</code> is <code>(p, n)</code>, and row <code>j</code> covers <code>n*j//p &lt;= i &lt; n*(j+1)//p</code>,
+so that the efficient row-major traversal visits each region and then its
+indices.</p>
 
 
 
@@ -15802,16 +15914,7 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">632</span>
-<span class="normal">633</span>
-<span class="normal">634</span>
-<span class="normal">635</span>
-<span class="normal">636</span>
-<span class="normal">637</span>
-<span class="normal">638</span>
-<span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">641</span>
 <span class="normal">642</span>
 <span class="normal">643</span>
 <span class="normal">644</span>
@@ -15824,10 +15927,23 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 <span class="normal">651</span>
 <span class="normal">652</span>
 <span class="normal">653</span>
-<span class="normal">654</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SplitMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+<span class="normal">654</span>
+<span class="normal">655</span>
+<span class="normal">656</span>
+<span class="normal">657</span>
+<span class="normal">658</span>
+<span class="normal">659</span>
+<span class="normal">660</span>
+<span class="normal">661</span>
+<span class="normal">662</span>
+<span class="normal">663</span>
+<span class="normal">664</span>
+<span class="normal">665</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SplitMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.</span>
 
-<span class="sd">    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p &lt;= i &lt; n*(j+1)//p``.</span>
+<span class="sd">    ``shape`` is ``(p, n)``, and row ``j`` covers ``n*j//p &lt;= i &lt; n*(j+1)//p``,</span>
+<span class="sd">    so that the efficient row-major traversal visits each region and then its</span>
+<span class="sd">    indices.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -15838,14 +15954,14 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
             <span class="n">fill_value</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">pattern_value</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">p</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"n must be nonnegative"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">p</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"shape[1] must be positive"</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"shape[0] must be positive"</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="n">n</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">p</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">return</span> <span class="n">n</span> <span class="o">*</span> <span class="n">j</span> <span class="o">//</span> <span class="n">p</span> <span class="o">&lt;=</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n</span> <span class="o">*</span> <span class="p">(</span><span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">p</span>
 </code></pre></div></td></tr></table></div>
               </details>

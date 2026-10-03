@@ -5546,13 +5546,7 @@ inside <code>branch_and_bound_dfs</code>.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/galley_optimize.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
@@ -5584,7 +5578,25 @@ inside <code>branch_and_bound_dfs</code>.</p>
 <span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
-<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicFactorizer</span><span class="p">(</span><span class="n">LogicFactorizer</span><span class="p">):</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">GalleyLogicFactorizer</span><span class="p">(</span><span class="n">LogicFactorizer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LogicLoader stage that runs Galley on each ``Query`` body (see ``optimizer``),</span>
 <span class="sd">    then forwards the Plan to the downstream loader ``ctx``.</span>
@@ -5615,14 +5627,26 @@ inside <code>branch_and_bound_dfs</code>.</p>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported program type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">term</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Optimizing plan: </span><span class="si">%s</span><span class="s2">"</span><span class="p">,</span> <span class="n">term</span><span class="p">)</span>
-        <span class="n">term</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
-            <span class="n">term</span><span class="p">,</span>
-            <span class="n">stats_factory</span><span class="p">,</span>
-            <span class="n">stats</span><span class="p">,</span>
-            <span class="n">use_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_components</span><span class="p">,</span>
-            <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">):</span>
+            <span class="n">prgm</span> <span class="o">=</span> <span class="n">optimize_plan</span><span class="p">(</span>
+                <span class="n">prgm</span><span class="p">,</span>
+                <span class="n">stats_factory</span><span class="p">,</span>
+                <span class="n">stats</span><span class="p">,</span>
+                <span class="n">use_components</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">use_components</span><span class="p">,</span>
+                <span class="n">optimizer</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">optimizer</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span>
+
+        <span class="c1"># Galley only keeps the queries that compute produced aliases, so each</span>
+        <span class="c1"># write to a bound tensor, including an in-place update, is renamed and</span>
+        <span class="c1"># produced, then copied back to the tensor it updates. Galley only</span>
+        <span class="c1"># reduces from literals, so aggregates which start from a tensor are</span>
+        <span class="c1"># split first.</span>
+        <span class="n">term</span> <span class="o">=</span> <span class="n">split_aggregate_inits</span><span class="p">(</span><span class="n">desugar_query_into</span><span class="p">(</span><span class="n">term</span><span class="p">),</span> <span class="n">bindings</span><span class="p">)</span>
+        <span class="n">term</span><span class="p">,</span> <span class="n">bindings</span> <span class="o">=</span> <span class="n">with_unique_lhs</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">Plan</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">flatten_plans</span><span class="p">(</span><span class="n">term</span><span class="p">),</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5665,43 +5689,43 @@ pass through non-Query bodies (Produces), and update stats bindings.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/galley_optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_plan</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_plan</span><span class="p">(</span>
     <span class="n">plan</span><span class="p">,</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
     <span class="n">stats_bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
@@ -5761,13 +5785,7 @@ greedy, bfs, or dfs.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/galley_optimize.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
@@ -5777,7 +5795,13 @@ greedy, bfs, or dfs.</p>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_query</span><span class="p">(</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">optimize_query</span><span class="p">(</span>
     <span class="n">query</span><span class="p">,</span>
     <span class="n">stats_factory</span><span class="p">,</span>
     <span class="n">stats_bindings</span><span class="p">,</span>

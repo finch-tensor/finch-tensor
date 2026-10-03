@@ -1474,6 +1474,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.loop_orderer.loop_ordering.with_loop_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_loop_order
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5395,6 +5406,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.loop_orderer.loop_ordering.with_loop_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        with_loop_order
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5443,6 +5465,74 @@
 
 
 
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="finch.autoschedule.loop_orderer.loop_ordering.with_loop_order" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">with_loop_order</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Set the loop order of a query. An aggregate query holds its loop order in
+a Reorder of the aggregate's argument, and an in-place update holds it in a
+Reorder of its right-hand side. An in-place update can't change the layout
+of the table it updates, so its loop order is permuted to visit the fields
+of that table in order. Aggregate queries also include output-only unit
+dimensions and visit the output fields in order.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/loop_orderer/loop_ordering.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_loop_order</span><span class="p">(</span>
+    <span class="n">stmt</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Set the loop order of a query. An aggregate query holds its loop order in</span>
+<span class="sd">    a Reorder of the aggregate's argument, and an in-place update holds it in a</span>
+<span class="sd">    Reorder of its right-hand side. An in-place update can't change the layout</span>
+<span class="sd">    of the table it updates, so its loop order is permuted to visit the fields</span>
+<span class="sd">    of that table in order. Aggregate queries also include output-only unit</span>
+<span class="sd">    dimensions and visit the output fields in order.</span>
+<span class="sd">    """</span>
+    <span class="k">match</span> <span class="n">stmt</span><span class="p">:</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">)</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)):</span>
+            <span class="n">loop_order</span> <span class="o">=</span> <span class="n">with_subsequence</span><span class="p">(</span><span class="n">intersect</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span> <span class="n">loop_order</span><span class="p">)</span>
+            <span class="n">loop_order</span> <span class="o">=</span> <span class="n">toposort</span><span class="p">([</span><span class="nb">list</span><span class="p">(</span><span class="n">loop_order</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">)])</span>
+            <span class="k">return</span> <span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span> <span class="n">idxs</span><span class="p">))</span>
+        <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">)</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+            <span class="n">loop_order</span> <span class="o">=</span> <span class="n">with_subsequence</span><span class="p">(</span><span class="n">intersect</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span> <span class="n">loop_order</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">QueryInto</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">))</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Expected an aggregate or in-place query, got </span><span class="si">{</span><span class="n">stmt</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

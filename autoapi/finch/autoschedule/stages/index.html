@@ -1548,6 +1548,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.autoschedule.stages.CompilerForm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompilerForm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.autoschedule.stages.FormattedForm" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5589,6 +5600,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#finch.autoschedule.stages.CompilerForm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CompilerForm
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#finch.autoschedule.stages.FormattedForm" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5870,7 +5892,12 @@ are wrapping Aliases.</p>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AliasedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AliasedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    AliasedForm requires that all aliases in the input are defined</span>
 <span class="sd">    in the bindings or in previous queries and that all Tables</span>
@@ -5891,7 +5918,12 @@ are wrapping Aliases.</p>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">_</span><span class="p">):</span>
                     <span class="n">defined_aliases</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
-                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">lhs</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">defined_aliases</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">"QueryInto updates alias </span><span class="si">{</span><span class="n">lhs</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">, which is not defined."</span>
+                        <span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">)</span> <span class="o">|</span> <span class="n">QueryInto</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Query must write to a Table of an Alias: </span><span class="si">{</span><span class="n">lhs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="k">case</span> <span class="n">Alias</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
                     <span class="k">if</span> <span class="n">node</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">defined_aliases</span><span class="p">:</span>
@@ -5902,6 +5934,192 @@ are wrapping Aliases.</p>
             <span class="k">return</span> <span class="n">node</span>
 
         <span class="n">Rewrite</span><span class="p">(</span><span class="n">PreWalk</span><span class="p">(</span><span class="n">validate</span><span class="p">))(</span><span class="n">term</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.autoschedule.stages.CompilerForm" class="doc doc-heading">
+            <code>CompilerForm</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FormattedForm (finch.autoschedule.stages.FormattedForm)" href="#finch.autoschedule.stages.FormattedForm">FormattedForm</a></code></p>
+
+
+
+        <p>CompilerForm is the input of the notation lowerer. It is a FormattedForm
+where every statement but the final Produces is a QueryInto, and
+initialization is explicit. There are two valid kinds of statement:
+1) initializations
+    QueryInto(Table(lhs, _), overwrite, Literal(init))
+(Every element of lhs is set to init.)
+2) folds
+    QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
+(Here, arg is made of Tables, Literals, and MapJoins. The loop order
+contains each field once and visits all fields of lhs_idxs in order.
+Tables in a MapJoin must also follow loop order.
+A single Table argument may have a different storage order, representing a
+transpose; notation lowering inserts equality-constrained loops to read it
+in storage order. Fields absent from lhs_idxs are reduced with op.)
+A transpose or fold which overwrites lhs also initializes it, starting from
+the init of a preceding initialization, or else the fill value of lhs.
+Every alias must have a TensorFType in the bindings, and a statement can't
+read the alias it writes.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompilerForm</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    CompilerForm is the input of the notation lowerer. It is a FormattedForm</span>
+<span class="sd">    where every statement but the final Produces is a QueryInto, and</span>
+<span class="sd">    initialization is explicit. There are two valid kinds of statement:</span>
+<span class="sd">    1) initializations</span>
+<span class="sd">        QueryInto(Table(lhs, _), overwrite, Literal(init))</span>
+<span class="sd">    (Every element of lhs is set to init.)</span>
+<span class="sd">    2) folds</span>
+<span class="sd">        QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))</span>
+<span class="sd">    (Here, arg is made of Tables, Literals, and MapJoins. The loop order</span>
+<span class="sd">    contains each field once and visits all fields of lhs_idxs in order.</span>
+<span class="sd">    Tables in a MapJoin must also follow loop order.</span>
+<span class="sd">    A single Table argument may have a different storage order, representing a</span>
+<span class="sd">    transpose; notation lowering inserts equality-constrained loops to read it</span>
+<span class="sd">    in storage order. Fields absent from lhs_idxs are reduced with op.)</span>
+<span class="sd">    A transpose or fold which overwrites lhs also initializes it, starting from</span>
+<span class="sd">    the init of a preceding initialization, or else the fill value of lhs.</span>
+<span class="sd">    Every alias must have a TensorFType in the bindings, and a statement can't</span>
+<span class="sd">    read the alias it writes.</span>
+<span class="sd">    """</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_inputs</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">term</span><span class="p">:</span> <span class="n">Plan</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">],</span>
+        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">validate_inputs</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
+
+        <span class="c1"># FormattedForm has checked the grammar of each fold, its bindings,</span>
+        <span class="c1"># and that it visits the lhs and its Tables in loop order.</span>
+        <span class="k">match</span> <span class="n">term</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">Plan</span><span class="p">((</span><span class="o">*</span><span class="n">bodies</span><span class="p">,</span> <span class="n">Produces</span><span class="p">())):</span>
+                <span class="k">pass</span>
+            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The last body of a plan must be a Produces node."</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">:</span>
+            <span class="k">match</span> <span class="n">body</span><span class="p">:</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">rhs</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">lhs</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">rhs</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"QueryInto can't both read and write </span><span class="si">{</span><span class="n">lhs</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+                    <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
+                        <span class="k">case</span> <span class="n">Literal</span><span class="p">():</span>
+                            <span class="k">if</span> <span class="n">op</span> <span class="o">!=</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">:</span>
+                                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">"Initializing </span><span class="si">{</span><span class="n">lhs</span><span class="si">}</span><span class="s2"> must overwrite it, not </span><span class="si">{</span><span class="n">op</span><span class="si">}</span><span class="s2">."</span>
+                                <span class="p">)</span>
+                        <span class="k">case</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">loop_order</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">loop_order</span><span class="p">):</span>
+                                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Loop order must not repeat fields."</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">loop_order</span><span class="p">):</span>
+                                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                                    <span class="s2">"Loop order must include every RHS field."</span>
+                                <span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CompilerForm only allows QueryInto, not </span><span class="si">{</span><span class="n">body</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5956,7 +6174,21 @@ of a query are those of LoopOrderedForm.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">220</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
 <span class="normal">221</span>
 <span class="normal">222</span>
 <span class="normal">223</span>
@@ -5984,21 +6216,7 @@ of a query are those of LoopOrderedForm.</p>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormattedForm</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormattedForm</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    FormattedForm requires that the input query has had its tensor formats</span>
 <span class="sd">    set. Every alias must have a TensorFType in the bindings. The valid forms</span>
@@ -6020,7 +6238,7 @@ of a query are those of LoopOrderedForm.</p>
                 <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
                         <span class="n">validate</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
-                <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span> <span class="o">|</span> <span class="n">QueryInto</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
                     <span class="n">validate</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
                     <span class="n">validate</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">|</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
@@ -6091,19 +6309,19 @@ of a query are those of LoopOrderedForm.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicEinsumLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicEinsumLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6153,18 +6371,18 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6216,24 +6434,24 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFactorizer</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFactorizer</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6288,23 +6506,23 @@ make decisions about materialization.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6361,23 +6579,23 @@ make decisions about materialization.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFormatter</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicFormatter</span><span class="p">(</span><span class="n">LoopOrderedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6430,22 +6648,22 @@ make decisions about materialization.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6501,24 +6719,24 @@ make decisions about materialization.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoopOrderer</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicLoopOrderer</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6573,23 +6791,23 @@ necessary.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6633,7 +6851,7 @@ necessary.</p>
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-internal" title="FormattedForm (finch.autoschedule.stages.FormattedForm)" href="#finch.autoschedule.stages.FormattedForm">FormattedForm</a></code>, <code><span title="finch.symbolic.Stage">Stage</span></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="CompilerForm (finch.autoschedule.stages.CompilerForm)" href="#finch.autoschedule.stages.CompilerForm">CompilerForm</a></code>, <code><span title="finch.symbolic.Stage">Stage</span></code></p>
 
 
 
@@ -6646,19 +6864,19 @@ necessary.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicNotationLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LogicNotationLowerer</span><span class="p">(</span><span class="n">CompilerForm</span><span class="p">,</span> <span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6708,18 +6926,18 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
@@ -6763,14 +6981,19 @@ return a dictionary including additional tables needed to run the kernel.</p>
 
 
         <p>LoopOrderedForm assumes that the input query has had its loop order set.
-There are three valid forms for a query in LoopOrderedForm:
+There are four valid forms for a query in LoopOrderedForm:
     1) transpose queries
         Query(Table(<em>, output_order), Table(</em>, <em>))
     2) aggregate queries
         Query(Table(</em>, output_order), Aggregate(<em>, </em>, Reorder(arg, loop_order), <em>))
     3) in-place queries
-        Query(Table(lhs, lhs_idxs), MapJoin(</em>, (Table(lhs, lhs_idxs),
-            Aggregate(<em>, </em>, Reorder(agg_arg, loop_order), _))))</p>
+        QueryInto(Table(</em>, lhs_idxs), <em>, Reorder(arg, loop_order))
+    4) in-place initializations
+        QueryInto(Table(</em>, <em>), </em>, Literal(_))
+For aggregate and in-place queries, the loop order includes every lhs
+field and visits those fields in order. The Tables of arg follow the loop
+order, except that an in-place query of a single Table may read it in
+another order, representing a transpose.</p>
 
 
 
@@ -6781,7 +7004,15 @@ There are three valid forms for a query in LoopOrderedForm:
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">140</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span>
@@ -6844,31 +7075,22 @@ There are three valid forms for a query in LoopOrderedForm:
 <span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LoopOrderedForm</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">):</span>
+<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LoopOrderedForm</span><span class="p">(</span><span class="n">SingleAggregateForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    LoopOrderedForm assumes that the input query has had its loop order set.</span>
-<span class="sd">    There are three valid forms for a query in LoopOrderedForm:</span>
+<span class="sd">    There are four valid forms for a query in LoopOrderedForm:</span>
 <span class="sd">        1) transpose queries</span>
 <span class="sd">            Query(Table(_, output_order), Table(_, _))</span>
 <span class="sd">        2) aggregate queries</span>
 <span class="sd">            Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))</span>
 <span class="sd">        3) in-place queries</span>
-<span class="sd">            Query(Table(lhs, lhs_idxs), MapJoin(_, (Table(lhs, lhs_idxs),</span>
-<span class="sd">                Aggregate(_, _, Reorder(agg_arg, loop_order), _))))</span>
+<span class="sd">            QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))</span>
+<span class="sd">        4) in-place initializations</span>
+<span class="sd">            QueryInto(Table(_, _), _, Literal(_))</span>
+<span class="sd">    For aggregate and in-place queries, the loop order includes every lhs</span>
+<span class="sd">    field and visits those fields in order. The Tables of arg follow the loop</span>
+<span class="sd">    order, except that an in-place query of a single Table may read it in</span>
+<span class="sd">    another order, representing a transpose.</span>
 <span class="sd">    """</span>
 
     <span class="nd">@staticmethod</span>
@@ -6891,40 +7113,29 @@ There are three valid forms for a query in LoopOrderedForm:
                 <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
                         <span class="n">validate</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
-                <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Table</span><span class="p">()):</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Table</span><span class="p">())</span> <span class="o">|</span> <span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="k">_</span><span class="p">,</span> <span class="n">Literal</span><span class="p">()):</span>
                     <span class="k">return</span> <span class="kc">None</span>
-                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">)):</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">idxs</span><span class="p">)):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+                <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
+                    <span class="n">Table</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">)</span>
+                <span class="p">)</span> <span class="o">|</span> <span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                         <span class="s2">"All aggregates must wrap a Reorder node specifying</span><span class="se">\</span>
 <span class="s2">                             the loop order."</span>
                     <span class="p">)</span>
-                <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
-                    <span class="n">Table</span><span class="p">(),</span>
-                    <span class="n">MapJoin</span><span class="p">(</span>
-                        <span class="n">_</span><span class="p">,</span>
-                        <span class="p">(</span>
-                            <span class="n">Table</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span>
-                            <span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">agg_arg</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">),</span> <span class="n">_</span><span class="p">),</span>
-                        <span class="p">),</span>
-                    <span class="p">),</span>
-                <span class="p">):</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">lhs_idxs</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
-                    <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">agg_arg</span><span class="p">,</span> <span class="n">idxs_1</span><span class="p">)</span>
-                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">MapJoin</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">()))):</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                        <span class="s2">"In-place queries must have an interior loop order!"</span>
-                    <span class="p">)</span>
+                <span class="k">case</span> <span class="n">QueryInto</span><span class="p">():</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"In-place queries must have a loop order!"</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">MapJoin</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
                         <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
-                <span class="k">case</span> <span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
-                    <span class="c1"># Implicit patterns have no row-major storage to preserve.</span>
-                    <span class="k">match</span> <span class="n">bindings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">tns</span><span class="p">):</span>
-                        <span class="k">case</span> <span class="n">PatternTensorFType</span><span class="p">():</span>
-                            <span class="k">return</span> <span class="kc">None</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">):</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_loop_order</span><span class="p">(</span><span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Table index order does not match loop order."</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="k">_</span><span class="p">):</span>
@@ -6982,11 +7193,11 @@ already been optimized for this query. There are three valid kinds of input quer
 1) transpose queries
     Query(Table(<em>, output_order), Table(</em>, <em>))
 2) aggregate queries
-    Query(Table(</em>, output_order), Aggregate(<em>, </em>, arg, <em>))
+    Query(Table(</em>, output_order), Aggregate(<em>, Literal(), arg, </em>))
 3) in-place queries
-    Query(Table(lhs, output_order), MapJoin(op1, (Table(lhs, output_order),
-        Aggregate(op2, </em>, arg, _))))
-(Here, op2 can be ffunc.overwrite or it can be equal to op1).</p>
+    QueryInto(Table(_, output_order), op, arg)
+(Here, arg has no aggregates. The fields of arg which are not in
+output_order are reduced with op.)</p>
 
 
 
@@ -6997,12 +7208,7 @@ already been optimized for this query. There are three valid kinds of input quer
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 66</span>
 <span class="normal"> 67</span>
 <span class="normal"> 68</span>
 <span class="normal"> 69</span>
@@ -7065,26 +7271,18 @@ already been optimized for this query. There are three valid kinds of input quer
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingleAggregateForm</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">):</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingleAggregateForm</span><span class="p">(</span><span class="n">AliasedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    SingleAggregateForm assumes that the fusion strategy has</span>
 <span class="sd">    already been optimized for this query. There are three valid kinds of input query:</span>
 <span class="sd">    1) transpose queries</span>
 <span class="sd">        Query(Table(_, output_order), Table(_, _))</span>
 <span class="sd">    2) aggregate queries</span>
-<span class="sd">        Query(Table(_, output_order), Aggregate(_, _, arg, _))</span>
+<span class="sd">        Query(Table(_, output_order), Aggregate(_, Literal(), arg, _))</span>
 <span class="sd">    3) in-place queries</span>
-<span class="sd">        Query(Table(lhs, output_order), MapJoin(op1, (Table(lhs, output_order),</span>
-<span class="sd">            Aggregate(op2, _, arg, _))))</span>
-<span class="sd">    (Here, op2 can be ffunc.overwrite or it can be equal to op1).</span>
+<span class="sd">        QueryInto(Table(_, output_order), op, arg)</span>
+<span class="sd">    (Here, arg has no aggregates. The fields of arg which are not in</span>
+<span class="sd">    output_order are reduced with op.)</span>
 <span class="sd">    """</span>
 
     <span class="nd">@classmethod</span>
@@ -7108,28 +7306,15 @@ already been optimized for this query. There are three valid kinds of input quer
                         <span class="n">validate</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
                 <span class="k">case</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Table</span><span class="p">()):</span>
                     <span class="k">return</span> <span class="kc">None</span>
-                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(),</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-                <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
-                    <span class="n">Table</span><span class="p">(</span><span class="n">lhs1</span><span class="p">,</span> <span class="n">output_order1</span><span class="p">),</span>
-                    <span class="n">MapJoin</span><span class="p">(</span>
-                        <span class="n">op1</span><span class="p">,</span> <span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">lhs2</span><span class="p">,</span> <span class="n">output_order2</span><span class="p">),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="n">op2</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">))</span>
-                    <span class="p">),</span>
-                <span class="p">):</span>
-                    <span class="k">if</span> <span class="n">lhs1</span> <span class="o">!=</span> <span class="n">lhs2</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">"In-place queries must have the same alias on the </span><span class="se">\</span>
-<span class="s2">                                left-hand side and inside the MapJoin."</span>
-                        <span class="p">)</span>
-                    <span class="k">if</span> <span class="n">output_order1</span> <span class="o">!=</span> <span class="n">output_order2</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">"In-place queries must read and write in the same order."</span>
-                        <span class="p">)</span>
-                    <span class="k">if</span> <span class="n">op2</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">op1</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="s2">"The aggregate operator in an in-place query must be</span><span class="se">\</span>
-<span class="s2">                            either ffunc.overwrite or the same as the MapJoin operator."</span>
-                        <span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"Aggregate queries must start from a literal, not </span><span class="si">{</span><span class="n">init</span><span class="si">}</span><span class="s2">. "</span>
+                        <span class="s2">"Copy the init into the output and update it with a "</span>
+                        <span class="s2">"QueryInto instead."</span>
+                    <span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="k">_</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
                     <span class="k">return</span> <span class="n">validate</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported query right-hand side: </span><span class="si">{</span><span class="n">rhs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
