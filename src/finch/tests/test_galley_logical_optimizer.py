@@ -16,6 +16,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Query,
@@ -730,7 +731,7 @@ def rename_aliases(expr):
             rename_aliases(expr.tns), tuple(rename_aliases(idx) for idx in expr.idxs)
         )
     if isinstance(expr, Alias):
-        return Alias("A")
+        return HardAlias("A")
     if isinstance(expr, MapJoin):
         return MapJoin(expr.op, tuple(rename_aliases(arg) for arg in expr.args))
     if isinstance(expr, Aggregate):
@@ -748,7 +749,7 @@ def rename_aliases(expr):
     [
         (
             Query(
-                Table(Alias("out"), (Field("i"),)),
+                Table(HardAlias("out"), (Field("i"),)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
@@ -759,7 +760,7 @@ def rename_aliases(expr):
             ),
             [],
             Query(
-                Table(Alias("out"), (Field("i"),)),
+                Table(HardAlias("out"), (Field("i"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -776,7 +777,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Table(Alias("out"), (Field("j"),)),
+                Table(HardAlias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -792,14 +793,14 @@ def rename_aliases(expr):
             ),
             [Field("i")],
             Query(
-                Table(Alias("out"), (Field("j"),)),
+                Table(HardAlias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
-                            Table(Alias("A"), ()),
+                            Table(HardAlias("A"), ()),
                             Table(Literal(A), (Field("j"),)),
                         ),
                     ),
@@ -809,7 +810,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Table(Alias("out"), (Field("k"),)),
+                Table(HardAlias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -827,15 +828,15 @@ def rename_aliases(expr):
             [Field("i"), Field("j")],
             # Expect: Query(out, overwrite-Aggregate wrapping the same MapJoin)
             Query(
-                Table(Alias("out"), (Field("k"),)),
+                Table(HardAlias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
-                            Table(Alias("A"), ()),
-                            Table(Alias("B"), ()),
+                            Table(HardAlias("A"), ()),
+                            Table(HardAlias("B"), ()),
                             Table(Literal(A), (Field("k"),)),
                         ),
                     ),
@@ -864,7 +865,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 1: sum_{i,j,k} A[i,j] * A[j,k], reduce over i
             Query(
-                Table(Alias("out"), ()),
+                Table(HardAlias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -890,7 +891,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 2: same chain, reduce over j
             Query(
-                Table(Alias("out"), ()),
+                Table(HardAlias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -922,7 +923,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 3: same chain, reduce over k
             Query(
-                Table(Alias("out"), ()),
+                Table(HardAlias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -948,7 +949,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 4: chain_expr = sum_{i,j,k} max(A[i,j], A[j,k])
             Query(
-                Table(Alias("out"), ()),
+                Table(HardAlias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -981,7 +982,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             # Case 5:  sum_{j,k} max( sum_i A[i,j], A[j,k] )
             # inner Aggregate(+ over i) is already inside the MapJoin.
             Query(
-                Table(Alias("out"), ()),
+                Table(HardAlias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -1029,7 +1030,7 @@ def test_greedy_query_multi_component():
     )
     aq = object.__new__(AnnotatedQuery)
     aq.stats_factory = DenseStatsFactory()
-    aq.output_name = Alias("out")
+    aq.output_name = HardAlias("out")
     aq.reduce_idxs = [fi, fj]
     aq.point_expr = point_expr
     aq.idx_lowest_path = OrderedDict({fi: (1,), fj: (2,)})

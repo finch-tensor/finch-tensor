@@ -423,7 +423,11 @@ def test_logic_lowering_preserves_literal_callee(compiler, fill):
     from finch.tensor import BufferizedNDArray
 
     op = lgc.Literal(ffuncs.choose(StaticFill(np.int64(fill))))
-    source, output, index = lgc.Alias("source"), lgc.Alias("output"), lgc.Field("i")
+    source, output, index = (
+        lgc.HardAlias("source"),
+        lgc.HardAlias("output"),
+        lgc.Field("i"),
+    )
     expression = lgc.MapJoin(
         op, (lgc.Table(source, (index,)), lgc.Literal(np.int64(9)))
     )
