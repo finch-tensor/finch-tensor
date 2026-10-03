@@ -8,3 +8,4 @@
   another approach for new changes. For example, use structural pattern matching instead of
   `isinstance()` for dataclasses.
 - Read `CONTRIBUTING.md` file for more details how to build the project and run tests.
+- If you're making unit tests that the user hasn't asked for explicitly, put them in a separate test file called test_agents.py. This is to avoid cluttering the main test files
