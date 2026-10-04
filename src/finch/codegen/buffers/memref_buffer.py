@@ -23,7 +23,7 @@ from finch.finch_assembly.nodes import AssemblyExpression
 
 @dataclass
 class MLIRMemrefBufferFields:
-    ptr: str
+    box: str
 
 
 @dataclass
@@ -240,10 +240,11 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
         descriptor = library.alloc(length)
         return MemrefBuffer(descriptor, self.element_type, library)
 
-    # MemrefBuffer crosses the ABI as a pointer to its mutable descriptor.
+    # This is the pointer type pass into the params
     def mlir_type(self):
         return "!llvm.ptr"
 
+    # This is the rank-1 sized memref type used for MLIR buffer operations.
     def mlir_buffer_type(self):
         return f"memref<?x{mlir_type(self.element_type)}>"
 
@@ -255,7 +256,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
     def mlir_length(self, ctx: MLIRContext, buf: MLIRMemrefBufferFields):
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.ptr} : !llvm.ptr -> {desc_t}")
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
         buffer = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
@@ -278,7 +279,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
     ):
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.ptr} : !llvm.ptr -> {desc_t}")
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
         buffer = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
@@ -302,7 +303,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
     ):
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.ptr} : !llvm.ptr -> {desc_t}")
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
         buffer = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
@@ -324,7 +325,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
     ):
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.ptr} : !llvm.ptr -> {desc_t}")
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
         buffer = ctx.new_ssa()
         ctx.exec(
             f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
@@ -342,9 +343,9 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
             f"{ctx.feed}{desc} = builtin.unrealized_conversion_cast "
             f"{result} : {memref_t} to {desc_t}"
         )
-        ctx.exec(f"{ctx.feed}llvm.store {desc}, {buf.ptr} : {desc_t}, !llvm.ptr")
+        ctx.exec(f"{ctx.feed}llvm.store {desc}, {buf.box} : {desc_t}, !llvm.ptr")
 
-    # Use the incoming pointer as the mutable descriptor box.
+    # Use the pointer as the descriptor box.
     def mlir_unpack(self, ctx: MLIRContext, _, val):
         return MLIRMemrefBufferFields(ctx(val))
 
@@ -352,7 +353,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
         # Buffer operations already update the incoming descriptor in place.
         pass
 
-    # Pass a pointer to the mutable memref descriptor.
+    # Pass the address of the Python-owned descriptor across the MLIR ABI.
     def serialize_to_mlir(self, obj: MemrefBuffer):
         return ctypes.c_void_p(ctypes.addressof(obj.buffer))
 
