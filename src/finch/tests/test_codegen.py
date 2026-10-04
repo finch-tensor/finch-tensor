@@ -1602,11 +1602,17 @@ def test_resize_mlir_regression(file_regression):
 
 # Test for resize with MemrefBuffer
 @pytest.mark.mlir_backend
-@pytest.mark.parametrize("compiler", [asm.AssemblyInterpreter(), MLIRCompiler()])
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (MLIRCompiler(), MemrefBufferFType),
+        (asm.AssemblyInterpreter(), MemrefBufferFType),
+    ],
+)
 @pytest.mark.parametrize("new_size", [1, 5, 10])
-def test_memref_resize(compiler, new_size):
+def test_memref_resize(compiler, buffer, new_size):
     values = [1.0, 4.0, 3.0, 4.0]
-    ab = MemrefBufferFType(ftypes.float64)(len(values))
+    ab = buffer(ftypes.float64)(len(values))
     for i, value in enumerate(values):
         ab.store(i, value)
 
