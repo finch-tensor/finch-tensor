@@ -1,18 +1,18 @@
-"""Compare estimator accuracy against JSON and PNG files in ``reference/``.
+"""Compare full-size estimator accuracy against JSON and PNG references.
 
 Regenerate with::
 
     pixi run -e test-julia pytest src/finch/tests/test_accuracy.py --regen-all
 
-The synthetic datasets need no downloads. Sampling uses fresh, seeded factories;
-JSON values are rounded to six decimals to suppress floating-point noise.
+Bundled Matrix Market inputs retain their full dimensions. Input values are
+normalized to their nonzero pattern to avoid signed cancellation. The uniform
+random matrix and sampling factories are seeded; JSON is rounded to six decimals.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from functools import cache
 from io import BytesIO
 
 import pytest
@@ -23,129 +23,58 @@ import scipy.sparse as sps
 from matplotlib.figure import Figure
 
 import finch as ft
-from finch.algebra import ffuncs
-from finch.autoschedule.tensor_stats import (
-    BlockedUniformStatsFactory,
-    DCStatsFactory,
-    DenseStatsFactory,
-    LPStatsFactory,
-    SamplingStatsFactory,
-    UniformStatsFactory,
-)
 from finch.compile_jl.julia import julia_available
-from finch.finch_logic import Field
-
-pytestmark = pytest.mark.skipif(
-    not julia_available(), reason="accuracy regression requires the Julia backend"
+from finch.tests.stats_cases import (
+    BLOCK_COUNT,
+    DATASETS,
+    KERNELS,
+    RANDOM_DENSITY,
+    RANDOM_MATRIX_SIZE,
+    SEED,
+    N,
+    make_kernel_estimator,
+    make_models,
 )
 
-i, j, k, ell = (Field(name) for name in "ijkl")
-N = 100
-BLOCK_COUNT = 5
-SEED = 42
-KERNELS = ("Hadamard", "SpGEMM", "SpGEMM2", "Triangle Counting")
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        not julia_available(), reason="accuracy regression requires the Julia backend"
+    ),
+]
 
 
-def make_models():
-    sampling = SamplingStatsFactory(sample_prob=0.5)
-    sampling._rng = np.random.default_rng(SEED)
-    return {
-        "Dense": DenseStatsFactory(),
-        "Uniform": UniformStatsFactory(),
-        "DC": DCStatsFactory(),
-        "LP": LPStatsFactory(),
-        "Sampling_0.5": sampling,
-        "Blocked-Uniform": BlockedUniformStatsFactory(block_count=BLOCK_COUNT),
-    }
-
-
-def make_diagonal(n):
-    return np.eye(n, dtype=np.float64)
-
-
-def make_tridiagonal(n):
-    A = np.eye(n, k=0) + np.eye(n, k=1) + np.eye(n, k=-1)
-    return (A > 0).astype(np.float64)
-
-
-def make_banded(n, bw=5):
-    r, c = np.indices((n, n))
-    return (np.abs(r - c) <= bw).astype(np.float64)
-
-
-def make_triangular(n):
-    return np.triu(np.ones((n, n), dtype=np.float64))
-
-
-def make_striped(n):
-    A = np.zeros((n, n), dtype=np.float64)
-    A[:, ::5] = 1
-    return A
-
-
-# Keep the reference self-contained: the original SNAP .mat files are not bundled.
-DATASETS = {
-    "Diagonal": make_diagonal,
-    "Tridiagonal": make_tridiagonal,
-    "Banded": make_banded,
-    "Triangular": make_triangular,
-    "Striped": make_striped,
-}
-
-
-def estimate_kernels(factory, tensor):
-    @cache
-    def stats(fields):
-        return factory(tensor, fields)
-
-    # These datasets use the same matrix for every operand. Reuse its statistics
-    # for each field order, preserving distinct sampling masks for distinct fields.
-    hadamard = factory.mapjoin(ffuncs.mul, stats((i, j)), stats((i, j)))
-    spgemm = factory.aggregate(
-        ffuncs.add,
-        0.0,
-        (k,),
-        factory.mapjoin(ffuncs.mul, stats((i, k)), stats((k, j))),
-    )
-    first_product = factory.aggregate(
-        ffuncs.add,
-        0.0,
-        (ell,),
-        factory.mapjoin(ffuncs.mul, stats((i, ell)), stats((ell, k))),
-    )
-    spgemm2 = factory.aggregate(
-        ffuncs.add,
-        0.0,
-        (k,),
-        factory.mapjoin(ffuncs.mul, first_product, stats((k, j))),
-    )
-    triangle = factory.mapjoin(ffuncs.mul, spgemm, stats((i, j)))
-    return {
-        "Hadamard": hadamard.estimate_non_fill_values(),
-        "SpGEMM": spgemm.estimate_non_fill_values(),
-        "SpGEMM2": spgemm2.estimate_non_fill_values(),
-        "Triangle Counting": triangle.estimate_non_fill_values(),
-    }
+def actual_nonzeros(matrix, batch_rows=128):
+    # Boolean products count reachability without large path counts. Row batches
+    # bound intermediate storage even when powers of a sparse graph become dense.
+    pattern = matrix.astype(bool)
+    actual = dict.fromkeys(KERNELS, 0)
+    actual["Hadamard"] = int(pattern.count_nonzero())
+    for start in range(0, pattern.shape[0], batch_rows):
+        rows = pattern[start : start + batch_rows]
+        squared = rows @ pattern
+        actual["SpGEMM"] += int(squared.count_nonzero())
+        actual["SpGEMM2"] += int((squared @ pattern).count_nonzero())
+        actual["Triangle Counting"] += int(squared.multiply(rows).count_nonzero())
+    return actual
 
 
 @pytest.fixture(scope="module")
 def accuracy_results():
     results = {kernel: {} for kernel in KERNELS}
     q_errors = {model: [] for model in make_models()}
+    datasets = {}
     for dataset, make_matrix in DATASETS.items():
-        a = sps.csr_array(make_matrix(N))
+        a = sps.csr_array(make_matrix())
+        datasets[dataset] = {"shape": list(a.shape), "nnz": int(a.nnz)}
         tensor = ft.asarray(a)
-        aa = a @ a
-        actual = {
-            "Hadamard": int(a.multiply(a).count_nonzero()),
-            "SpGEMM": int(aa.count_nonzero()),
-            "SpGEMM2": int((aa @ a).count_nonzero()),
-            "Triangle Counting": int(aa.multiply(a).count_nonzero()),
-        }
+        logging.getLogger(__name__).info("Computing reference counts for %s", dataset)
+        actual = actual_nonzeros(a)
         # Fresh factories isolate sampling masks between datasets.
         for model, factory in make_models().items():
             logging.getLogger(__name__).info("Estimating %s with %s", dataset, model)
-            estimates = estimate_kernels(factory, tensor)
+            estimate_kernel = make_kernel_estimator(factory, tensor)
+            estimates = {kernel: estimate_kernel(kernel) for kernel in KERNELS}
             for kernel, estimate in estimates.items():
                 estimate = float(estimate)
                 assert np.isfinite(estimate) and estimate >= 0, (
@@ -166,6 +95,9 @@ def accuracy_results():
                 }
     return {
         "matrix_size": N,
+        "random_matrix_size": RANDOM_MATRIX_SIZE,
+        "random_density": RANDOM_DENSITY,
+        "datasets": datasets,
         "block_count": BLOCK_COUNT,
         "seed": SEED,
         "results": results,
@@ -211,7 +143,7 @@ def plot_accuracy(results):
                     )
         ax.axhline(0, color="black", linestyle="--", linewidth=1)
         ax.set(title=kernel, ylabel="log2(estimated / actual nnz)", ylim=(-10, 10))
-        ax.set_xticks(x, list(DATASETS))
+        ax.set_xticks(x, list(DATASETS), rotation=20, ha="right")
         ax.grid(axis="y", linestyle=":", alpha=0.5)
     axes[0].legend(loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=8)
     fig.suptitle("Sparsity estimator accuracy")
