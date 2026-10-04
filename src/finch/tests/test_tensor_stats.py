@@ -49,7 +49,7 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
-def test_sampling_reuses_random_masks():
+def test_sampling_reuses_random_seeds():
     i, j, k = Field("i"), Field("j"), Field("k")
     factory = SamplingStatsFactory(sample_prob=0.5)
     factory._rng = np.random.default_rng(42)
@@ -59,12 +59,23 @@ def test_sampling_reuses_random_masks():
     assert mask_i.element_type == ftype(np.intp)
 
     second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
-    assert factory._get_mask(i, 5) is mask_i
-    assert first.masks_ref is second.masks_ref is factory._masks
-    assert len(factory._masks) == 3
+    repeated_mask = factory._get_mask(i, 5)
+    assert repeated_mask is not mask_i
+    assert [repeated_mask[idx].item() for idx in range(5)] == [
+        mask_i[idx].item() for idx in range(5)
+    ]
+    expected_rng = np.random.default_rng(42)
+    assert list(factory._seeds.values()) == [
+        int(expected_rng.integers(0, 1 << 64, dtype=np.uint64)) for _ in range(3)
+    ]
+    assert first.seeds_ref is second.seeds_ref is factory._seeds
+    assert len(factory._seeds) == 3
     assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
     assert factory._get_mask(j, 7).ftype != mask_i.ftype
-    assert factory._get_mask(i, 6) is not mask_i
+    factory._get_mask(i, 6)
+    assert (i, 6) in factory._seeds
+    factory._get_mask(j, 5)
+    assert factory._seeds[i, 5] != factory._seeds[j, 5]
 
 
 @pytest.mark.parametrize("shape", [(12, 9), (0, 5)])

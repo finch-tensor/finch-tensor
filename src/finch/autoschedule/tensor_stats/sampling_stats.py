@@ -299,23 +299,25 @@ class SamplingStatsFactory(
         super().__init__(SamplingStats)
         self.sample_prob = sample_prob
         self.estimator = estimator
-        self._masks: dict[tuple[Field, int], RandomMaskTensor] = {}
+        self._seeds: dict[tuple[Field, int], int] = {}
         self._rng = np.random.default_rng()
 
     def _get_mask(self, field: Field, size: int) -> RandomMaskTensor:
-        mask_key = (field, size)
-        if mask_key not in self._masks:
-            self._masks[mask_key] = RandomMaskTensor(
-                size, self.sample_prob, rng=self._rng, dtype=np.intp
+        seed_key = (field, size)
+        if seed_key not in self._seeds:
+            self._seeds[seed_key] = int(
+                self._rng.integers(0, 1 << 64, dtype=np.uint64)
             )
-        return self._masks[mask_key]
+        return RandomMaskTensor(
+            size, self.sample_prob, seed=self._seeds[seed_key], dtype=np.intp
+        )
 
     def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> SamplingStats:
         base = super().__call__(tensor, fields)
         fill = base.fill_value.value
 
-        # Reuse each field's Bernoulli mask across tensors so joins sample the
-        # same coordinates. An entry survives only if every dimension is kept.
+        # Reuse each field's seed across tensors so joins sample the same
+        # coordinates. An entry survives only if every dimension is kept.
         masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
         non_fill = MapJoin(
             Literal(ffuncs.ne), (Table(Literal(tensor), fields), Literal(fill))
@@ -333,7 +335,7 @@ class SamplingStatsFactory(
             sketch=sketch,
             sample_prob=self.sample_prob,
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
     def _mapjoin_join(
@@ -364,7 +366,7 @@ class SamplingStatsFactory(
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: SamplingStats):
@@ -413,7 +415,7 @@ class SamplingStatsFactory(
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
     def aggregate(
@@ -477,7 +479,7 @@ class SamplingStatsFactory(
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
     def relabel(
@@ -491,7 +493,7 @@ class SamplingStatsFactory(
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
     def reorder(
@@ -505,7 +507,7 @@ class SamplingStatsFactory(
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
             estimator=self.estimator,
-            masks_ref=self._masks,
+            seeds_ref=self._seeds,
         )
 
 
@@ -528,7 +530,7 @@ class SamplingStats(NumericStats):
         estimator: str = "uj1",
         remainder_dims: set | None = None,
         remainder_dim_sizes: dict | None = None,
-        masks_ref: dict | None = None,
+        seeds_ref: dict[tuple[Field, int], int] | None = None,
     ):
 
         super().__init__(base)
@@ -539,7 +541,7 @@ class SamplingStats(NumericStats):
         self.remainder_dim_sizes = (
             dict(remainder_dim_sizes) if remainder_dim_sizes else {}
         )
-        self.masks_ref = masks_ref if masks_ref is not None else {}
+        self.seeds_ref = seeds_ref if seeds_ref is not None else {}
         self.scan_cache: tuple[float, float, float, dict | None] | None = None
 
     def scan(self, needs_freq: bool) -> tuple[float, float, float, dict | None]:
@@ -641,9 +643,10 @@ class SamplingStats(NumericStats):
         coverage = 1.0
         for field in self.index_order:
             size = int(self.dim_sizes[field])
-            mask = self.masks_ref.get((field, size))
-            if mask is None or size == 0:
+            seed = self.seeds_ref.get((field, size))
+            if seed is None or size == 0:
                 continue
+            mask = RandomMaskTensor(size, self.sample_prob, seed=seed, dtype=np.intp)
             out = Alias("sampled_count")
             query = Query(
                 Table(out, ()),
