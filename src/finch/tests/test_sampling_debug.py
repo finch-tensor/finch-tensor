@@ -63,7 +63,9 @@ def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
 
     # manually calculating
     mask_i, mask_k, mask_j = (
-        np.array([factory._get_mask(field, n)[idx].item() for idx in range(n)])
+        np.array(
+            [factory._get_mask(field, n, sample_prob)[idx].item() for idx in range(n)]
+        )
         for field in (i, k, j)
     )
     pat_a = (A != 0).astype(float)

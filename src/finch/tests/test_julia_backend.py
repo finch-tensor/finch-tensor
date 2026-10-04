@@ -437,7 +437,9 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     factory._rng = np.random.default_rng(42)
     stats = factory(_csr_tensor(data), (i, j))
     rows, cols = (
-        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        np.array(
+            [factory._get_mask(field, size, 0.5)[idx].item() for idx in range(size)]
+        )
         for field, size in zip((i, j), data.shape, strict=True)
     )
     expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])

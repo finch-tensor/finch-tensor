@@ -97,7 +97,7 @@ def _dsj1(d_n: float, q: float, N: float) -> float:
     D * (1-(1-q)^(N/D)) = d_n
 
     d_n = positions observed in the sample
-    q = sample_prob**2
+    q = product of per-dimension sampling probabilities
     N = total population = prod(dim_size)
     """
     if d_n == 0:
@@ -163,7 +163,7 @@ def _duj2(
     d_n : positions observed
     f_1 : positions seen once
     frequencies :  {i:f_i} -> historgam of sketch counts
-    q : sample_prob**ndims
+    q : product of per-dimension sampling probabilities
     n : np.sum(sketch) -> total sample size
     N : total population size
 
@@ -297,28 +297,37 @@ class SamplingStatsFactory(
 ):
     def __init__(self, sample_prob: float = 0.5, estimator: str = "uj1"):
         super().__init__(SamplingStats)
-        self.sample_prob = sample_prob
+        self.initial_sample_prob = sample_prob
         self.estimator = estimator
         self._seeds: dict[tuple[Field, int], int] = {}
         self._rng = np.random.default_rng()
 
-    def _get_mask(self, field: Field, size: int) -> RandomMaskTensor:
+    def _get_mask(self, field: Field, size: int, prob: float) -> RandomMaskTensor:
         seed_key = (field, size)
         if seed_key not in self._seeds:
-            self._seeds[seed_key] = int(
-                self._rng.integers(0, 1 << 64, dtype=np.uint64)
-            )
-        return RandomMaskTensor(
-            size, self.sample_prob, seed=self._seeds[seed_key], dtype=np.intp
-        )
+            self._seeds[seed_key] = int(self._rng.integers(0, 1 << 64, dtype=np.uint64))
+        return RandomMaskTensor(size, prob, seed=self._seeds[seed_key], dtype=np.intp)
 
-    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> SamplingStats:
+    def __call__(
+        self,
+        tensor: Any,
+        fields: tuple[Field, ...],
+        sample_probs: list[float] | None = None,
+    ) -> SamplingStats:
         base = super().__call__(tensor, fields)
         fill = base.fill_value.value
+        sample_probs = (
+            [self.initial_sample_prob] * len(fields)
+            if sample_probs is None
+            else list(sample_probs)
+        )
 
         # Reuse each field's seed across tensors so joins sample the same
         # coordinates. An entry survives only if every dimension is kept.
-        masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
+        masks = [
+            self._get_mask(field, int(base.dim_sizes[field]), prob)
+            for field, prob in zip(fields, sample_probs, strict=True)
+        ]
         non_fill = MapJoin(
             Literal(ffuncs.ne), (Table(Literal(tensor), fields), Literal(fill))
         )
@@ -326,17 +335,29 @@ class SamplingStatsFactory(
             mask_table(field, mask) for field, mask in zip(fields, masks, strict=True)
         ]
 
-        sketch = compute_sketch(
-            MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables))
-        )
+        sketch = compute_sketch(MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables)))
 
         return SamplingStats(
             base,
             sketch=sketch,
-            sample_prob=self.sample_prob,
+            sample_probs=sample_probs,
             estimator=self.estimator,
             seeds_ref=self._seeds,
         )
+
+    def _mapjoin_probs(self, *args: SamplingStats) -> dict[Field, float]:
+        probs: dict[Field, float] = {}
+        for arg in args:
+            arg_probs = dict(arg.remainder_sample_probs)
+            arg_probs.update(zip(arg.index_order, arg.sample_probs, strict=True))
+            for field, prob in arg_probs.items():
+                if field in probs and probs[field] != prob:
+                    raise ValueError(
+                        f"Conflicting sampling probabilities for field {field}: "
+                        f"{probs[field]} and {prob}"
+                    )
+                probs[field] = prob
+        return probs
 
     def _mapjoin_join(
         self, op: FinchOperator, *join_args: SamplingStats
@@ -349,6 +370,7 @@ class SamplingStatsFactory(
             return self.copy(join_args[0])
 
         base_stats = super()._mapjoin_defs(op, *join_args)
+        probs = self._mapjoin_probs(*join_args)
         result_sketch = compute_sketch(
             MapJoin(Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args))
         )
@@ -363,7 +385,8 @@ class SamplingStatsFactory(
             base_stats,
             sketch=result_sketch,
             remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
+            sample_probs=[probs[f] for f in base_stats.index_order],
+            remainder_sample_probs={f: probs[f] for f in new_remainder},
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
             seeds_ref=self._seeds,
@@ -375,6 +398,7 @@ class SamplingStatsFactory(
         N(B)_k *prod_{l in j\\k}n(A)_l ] - N(A)_j*N(B)_k
         """
         base_stats = super()._mapjoin_defs(op, *union_args)
+        probs = self._mapjoin_probs(*union_args)
         output_indices = set(base_stats.index_order)
         new_remainder: set[Field] = set()
         new_remainder_sizes: dict = {}
@@ -412,7 +436,8 @@ class SamplingStatsFactory(
             base_stats,
             sketch=compute_sketch(result),
             remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
+            sample_probs=[probs[f] for f in base_stats.index_order],
+            remainder_sample_probs={f: probs[f] for f in new_remainder},
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
             seeds_ref=self._seeds,
@@ -467,6 +492,9 @@ class SamplingStatsFactory(
                 )
             new_sketch = MapJoin(Literal(ffuncs.mul), (exists, Literal(prod_n)))
 
+        probs = dict(zip(stats.index_order, stats.sample_probs, strict=True))
+        remainder_probs = dict(stats.remainder_sample_probs)
+        remainder_probs.update((f, probs[f]) for f in reduce_set)
         new_remainder = stats.remainder_dims | reduce_set
         new_remainder_sizes = dict(stats.remainder_dim_sizes)
         for f in reduce_set:
@@ -476,7 +504,8 @@ class SamplingStatsFactory(
             base_stats,
             sketch=compute_sketch(new_sketch),
             remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
+            sample_probs=[probs[f] for f in base_stats.index_order],
+            remainder_sample_probs=remainder_probs,
             remainder_dim_sizes=new_remainder_sizes,
             estimator=self.estimator,
             seeds_ref=self._seeds,
@@ -490,7 +519,8 @@ class SamplingStatsFactory(
             base_stats,
             sketch=compute_sketch(Relabel(stats.sketch, relabel_indices)),
             remainder_dims=set(stats.remainder_dims),
-            sample_prob=self.sample_prob,
+            sample_probs=stats.sample_probs,
+            remainder_sample_probs=stats.remainder_sample_probs,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
             estimator=self.estimator,
             seeds_ref=self._seeds,
@@ -500,11 +530,13 @@ class SamplingStatsFactory(
         self, stats: SamplingStats, reorder_indices: tuple[Field, ...]
     ) -> SamplingStats:
         base_stats = self.reorder_def(stats, reorder_indices)
+        probs = dict(zip(stats.index_order, stats.sample_probs, strict=True))
         return SamplingStats(
             base_stats,
             sketch=compute_sketch(Reorder(stats.sketch, reorder_indices)),
             remainder_dims=set(stats.remainder_dims),
-            sample_prob=self.sample_prob,
+            sample_probs=[probs.get(f, 1.0) for f in base_stats.index_order],
+            remainder_sample_probs=stats.remainder_sample_probs,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
             estimator=self.estimator,
             seeds_ref=self._seeds,
@@ -515,30 +547,33 @@ class SamplingStats(NumericStats):
     """
     sketch : materialized table over bound dimensions
     remainder_dims : 'free' dimension -> absent in the output
-    sample_prob : Bernoulli sample prob
     sample_probs : per-dimension probabilities in index_order
     """
 
     sketch: LogicExpression
     remainder_dims: set
-    sample_prob: float
     sample_probs: list[float]
 
     def __init__(
         self,
         base: BaseTensorStats,
         sketch: LogicExpression,
-        sample_prob: float = 0.5,
+        sample_probs: list[float],
         estimator: str = "uj1",
         remainder_dims: set | None = None,
         remainder_dim_sizes: dict | None = None,
         seeds_ref: dict[tuple[Field, int], int] | None = None,
+        remainder_sample_probs: dict[Field, float] | None = None,
     ):
 
         super().__init__(base)
         self.sketch = sketch
-        self.sample_prob = sample_prob
-        self.sample_probs = [sample_prob] * len(self.index_order)
+        if len(sample_probs) != len(self.index_order):
+            raise ValueError("Expected one sampling probability per dimension")
+        self.sample_probs = list(sample_probs)
+        self.remainder_sample_probs = (
+            dict(remainder_sample_probs) if remainder_sample_probs is not None else {}
+        )
         self.remainder_dims = set(remainder_dims) if remainder_dims else set()
         self.estimator = estimator
         self.remainder_dim_sizes = (
@@ -644,12 +679,12 @@ class SamplingStats(NumericStats):
 
         _, d_n_raw, _, _ = self.scan(needs_freq=False)
         coverage = 1.0
-        for field in self.index_order:
+        for field, prob in zip(self.index_order, self.sample_probs, strict=True):
             size = int(self.dim_sizes[field])
             seed = self.seeds_ref.get((field, size))
             if seed is None or size == 0:
                 continue
-            mask = RandomMaskTensor(size, self.sample_prob, seed=seed, dtype=np.intp)
+            mask = RandomMaskTensor(size, prob, seed=seed, dtype=np.intp)
             out = Alias("sampled_count")
             query = Query(
                 Table(out, ()),
@@ -696,9 +731,9 @@ class SamplingStats(NumericStats):
             else 1
         )
         N = bound_size * remainder_size
-        all_dims = list(self.index_order) + list(self.remainder_dims)
-        ndims = len(all_dims)
-        q = self.sample_prob**ndims
+        q = math.prod(self.sample_probs) * math.prod(
+            self.remainder_sample_probs[f] for f in self.remainder_dims
+        )
 
         if self.estimator == "uj1":
             formula_est = _duj1(d_n, f_1, q, n)
@@ -721,7 +756,7 @@ class SamplingStats(NumericStats):
             formula_est = _dsh3(d_n, f_1, frequencies, q, n)
 
         elif self.estimator == "silly":
-            q_output = self.sample_prob ** len(self.index_order)
+            q_output = math.prod(self.sample_probs)
             formula_est = _dsilly(d_n, q_output)
 
         else:

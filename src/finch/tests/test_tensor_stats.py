@@ -54,12 +54,12 @@ def test_sampling_reuses_random_seeds():
     factory = SamplingStatsFactory(sample_prob=0.5)
     factory._rng = np.random.default_rng(42)
     first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
-    mask_i = factory._get_mask(i, 5)
+    mask_i = factory._get_mask(i, 5, 0.5)
     assert isinstance(mask_i, ft.RandomMaskTensor)
     assert mask_i.element_type == ftype(np.intp)
 
     second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
-    repeated_mask = factory._get_mask(i, 5)
+    repeated_mask = factory._get_mask(i, 5, 0.5)
     assert repeated_mask is not mask_i
     assert [repeated_mask[idx].item() for idx in range(5)] == [
         mask_i[idx].item() for idx in range(5)
@@ -70,11 +70,11 @@ def test_sampling_reuses_random_seeds():
     ]
     assert first.seeds_ref is second.seeds_ref is factory._seeds
     assert len(factory._seeds) == 3
-    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
-    assert factory._get_mask(j, 7).ftype != mask_i.ftype
-    factory._get_mask(i, 6)
+    assert factory._get_mask(k, 1 << 40, 0.5).shape == (1 << 40,)
+    assert factory._get_mask(j, 7, 0.5).ftype != mask_i.ftype
+    factory._get_mask(i, 6, 0.5)
     assert (i, 6) in factory._seeds
-    factory._get_mask(j, 5)
+    factory._get_mask(j, 5, 0.5)
     assert factory._seeds[i, 5] != factory._seeds[j, 5]
 
 
@@ -87,7 +87,10 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     stats = factory(ft.asarray(np.ones(shape)), (i, j))
     assert stats.sample_probs == [sample_prob, sample_prob]
     expected_count = math.prod(
-        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        sum(
+            factory._get_mask(field, size, sample_prob)[idx].item()
+            for idx in range(size)
+        )
         for field, size in zip((i, j), shape, strict=True)
     )
     assert stats.scan(needs_freq=True) == (
@@ -128,7 +131,7 @@ def test_sampling_materializes_each_step(operation):
             stats = factory.reorder(stats, fields)
             expected = expected.T
 
-    assert stats.sample_probs == [factory.sample_prob] * len(fields)
+    assert stats.sample_probs == [1.0] * len(fields)
 
     # Read the stored tensor directly, without evaluating another logic plan.
     match stats.sketch:
@@ -137,6 +140,76 @@ def test_sampling_materializes_each_step(operation):
             np.testing.assert_array_equal(np.asarray(tensor), expected)
         case _:
             pytest.fail("Sampling step left a deferred sketch")
+
+
+@pytest.mark.parametrize("sample_probs", [[0.25, 0.75], [0.0, 1.0], [1.0, 0.0]])
+def test_sampling_per_dimension_masks(sample_probs):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(estimator="silly")
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones((12, 9))), (i, j), sample_probs)
+    rows, cols = (
+        np.array(
+            [
+                ft.RandomMaskTensor(
+                    size, prob, seed=factory._seeds[field, size], dtype=np.intp
+                )[idx].item()
+                for idx in range(size)
+            ]
+        )
+        for field, size, prob in zip((i, j), (12, 9), sample_probs, strict=True)
+    )
+    expected = rows[:, None] * cols[None, :]
+    match stats.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(np.asarray(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+    count = expected.sum()
+    assert stats.coverage_correction() == pytest.approx(108 if count else 0)
+    prob = math.prod(sample_probs)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        count / prob if prob else 0
+    )
+    assert not hasattr(stats, "sample_prob")
+
+
+def test_sampling_propagates_per_dimension_probs():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory()
+    stats = factory(ft.asarray(np.ones((3, 4))), (i, j), [0.25, 0.75])
+    other = factory(ft.asarray(np.ones((4, 5))), (j, k), [0.75, 0.5])
+    for op in (ffuncs.mul, ffuncs.add):
+        joined = factory.mapjoin(op, stats, other)
+        assert dict(zip(joined.index_order, joined.sample_probs, strict=True)) == {
+            i: 0.25,
+            j: 0.75,
+            k: 0.5,
+        }
+    assert factory.reorder(stats, (j, i)).sample_probs == [0.75, 0.25]
+    relabeled = factory.relabel(stats, (j, k))
+    assert relabeled.sample_probs == [0.25, 0.75]
+    assert relabeled.sample_probs is not stats.sample_probs
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    assert reduced.sample_probs == [0.25]
+    assert reduced.remainder_sample_probs == {j: 0.75}
+    reduced.scan_cache = (8.0, 4.0, 2.0, None)
+    assert reduced.estimate_non_fill_values() == pytest.approx(
+        _duj1(4.0, 2.0, 0.25 * 0.75, 8.0)
+    )
+    scalar = factory.aggregate(ffuncs.add, 0, (i,), reduced)
+    assert scalar.sample_probs == []
+    assert scalar.remainder_sample_probs == {i: 0.25, j: 0.75}
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_conflicting_shared_dimension_probs(op):
+    i = Field("i")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones(4)), (i,), [0.25])
+    second = factory(ft.asarray(np.ones(4)), (i,), [0.75])
+    with pytest.raises(ValueError, match="Conflicting sampling probabilities"):
+        factory.mapjoin(op, first, second)
 
 
 def test_sampling_from_tensor():
