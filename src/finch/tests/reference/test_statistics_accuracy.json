@@ -1,14 +1,81 @@
 {
   "block_count": 5,
+  "datasets": {
+    "Banded": {
+      "nnz": 1070,
+      "shape": [
+        100,
+        100
+      ]
+    },
+    "Diagonal": {
+      "nnz": 100,
+      "shape": [
+        100,
+        100
+      ]
+    },
+    "Striped": {
+      "nnz": 2000,
+      "shape": [
+        100,
+        100
+      ]
+    },
+    "Triangular": {
+      "nnz": 5050,
+      "shape": [
+        100,
+        100
+      ]
+    },
+    "Tridiagonal": {
+      "nnz": 298,
+      "shape": [
+        100,
+        100
+      ]
+    },
+    "Uniform Random": {
+      "nnz": 100000,
+      "shape": [
+        10000,
+        10000
+      ]
+    },
+    "ct20stif": {
+      "nnz": 2600295,
+      "shape": [
+        52329,
+        52329
+      ]
+    },
+    "roadNet-PA": {
+      "nnz": 3083796,
+      "shape": [
+        1090920,
+        1090920
+      ]
+    },
+    "soc-sign-epinions": {
+      "nnz": 841372,
+      "shape": [
+        131828,
+        131828
+      ]
+    }
+  },
   "geomean_q_error": {
-    "Blocked-Uniform": 2.448244,
-    "DC": 1.362492,
-    "Dense": 10.825526,
-    "LP": 1.361677,
-    "Sampling_0.5": 2.309909,
-    "Uniform": 4.242992
+    "Blocked-Uniform": 8.248684,
+    "DC": 2.615121,
+    "Dense": 138.46853,
+    "LP": 2.034558,
+    "Sampling_0.5": 2.280211,
+    "Uniform": 15.901213
   },
   "matrix_size": 100,
+  "random_density": 0.001,
+  "random_matrix_size": 10000,
   "results": {
     "Hadamard": {
       "Banded": {
@@ -199,6 +266,158 @@
           "estimated_nnz": 8.8804,
           "q_error": 33.557047,
           "ratio": 0.0298
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100.025123,
+          "q_error": 999.748833,
+          "ratio": 0.001
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000000.0,
+          "q_error": 1000.0,
+          "ratio": 1000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 97244.0,
+          "q_error": 1.028341,
+          "ratio": 0.97244
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100.0,
+          "q_error": 1000.0,
+          "ratio": 0.001
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 10106.162612,
+          "q_error": 257.297958,
+          "ratio": 0.003887
+        },
+        "DC": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 1053.082147,
+          "ratio": 1053.082147
+        },
+        "LP": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2603496.0,
+          "q_error": 1.001231,
+          "ratio": 1.001231
+        },
+        "Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2469.223325,
+          "q_error": 1053.082147,
+          "ratio": 0.00095
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 39.494583,
+          "q_error": 78081.491911,
+          "ratio": 1.3e-05
+        },
+        "DC": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3083796.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 385922.559858,
+          "ratio": 385922.559858
+        },
+        "LP": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3083796.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3083752.0,
+          "q_error": 1.000014,
+          "ratio": 0.999986
+        },
+        "Uniform": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 7.990712,
+          "q_error": 385922.559858,
+          "ratio": 3e-06
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 201.725727,
+          "q_error": 4170.871078,
+          "ratio": 0.00024
+        },
+        "DC": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 20655.098558,
+          "ratio": 20655.098558
+        },
+        "LP": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 850196.0,
+          "q_error": 1.010488,
+          "ratio": 1.010488
+        },
+        "Uniform": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 40.734349,
+          "q_error": 20655.098558,
+          "ratio": 4.8e-05
         }
       }
     },
@@ -392,6 +611,158 @@
           "q_error": 1.720874,
           "ratio": 1.720874
         }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 995032.663475,
+          "q_error": 1.000853,
+          "ratio": 1.000853
+        },
+        "DC": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 2400000.0,
+          "q_error": 2.414038,
+          "ratio": 2.414038
+        },
+        "Dense": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 100000000.0,
+          "q_error": 100.584901,
+          "ratio": 100.584901
+        },
+        "LP": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 1101997.72537,
+          "q_error": 1.108443,
+          "ratio": 1.108443
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 931129.508906,
+          "q_error": 1.067719,
+          "ratio": 0.936576
+        },
+        "Uniform": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 995017.120137,
+          "q_error": 1.000837,
+          "ratio": 1.000837
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 119769237.53718,
+          "q_error": 12.144475,
+          "ratio": 12.144475
+        },
+        "DC": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 538261065.0,
+          "q_error": 54.579107,
+          "ratio": 54.579107
+        },
+        "Dense": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 277.663205,
+          "ratio": 277.663205
+        },
+        "LP": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 143540623.0,
+          "q_error": 14.554869,
+          "ratio": 14.554869
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 2410749.999724,
+          "q_error": 4.090858,
+          "ratio": 0.244448
+        },
+        "Uniform": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 126210900.542169,
+          "q_error": 12.797653,
+          "ratio": 12.797653
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 8719352.171233,
+          "q_error": 1.20451,
+          "ratio": 1.20451
+        },
+        "DC": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 27754164.0,
+          "q_error": 3.83402,
+          "ratio": 3.83402
+        },
+        "Dense": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 164403.867759,
+          "ratio": 164403.867759
+        },
+        "LP": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 9865130.0,
+          "q_error": 1.36279,
+          "ratio": 1.36279
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 2691446.548748,
+          "q_error": 2.689602,
+          "ratio": 0.371802
+        },
+        "Uniform": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 8717211.643587,
+          "q_error": 1.204214,
+          "ratio": 1.204214
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 11242411.164701,
+          "q_error": 4.196586,
+          "ratio": 0.238289
+        },
+        "DC": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 1741640040.0,
+          "q_error": 36.914994,
+          "ratio": 36.914994
+        },
+        "Dense": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 368.349198,
+          "ratio": 368.349198
+        },
+        "LP": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 156287911.846863,
+          "q_error": 3.312606,
+          "ratio": 3.312606
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 11332917.874017,
+          "q_error": 4.163071,
+          "ratio": 0.240207
+        },
+        "Uniform": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 5369098.156243,
+          "q_error": 8.787276,
+          "ratio": 0.113801
+        }
       }
     },
     "SpGEMM2": {
@@ -584,6 +955,158 @@
           "q_error": 3.256401,
           "ratio": 3.256401
         }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 9471459.32934,
+          "q_error": 1.006202,
+          "ratio": 1.006202
+        },
+        "DC": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 57600000.0,
+          "q_error": 6.119142,
+          "ratio": 6.119142
+        },
+        "Dense": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 100000000.0,
+          "q_error": 10.623511,
+          "ratio": 10.623511
+        },
+        "LP": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 13164410.021189,
+          "q_error": 1.398523,
+          "ratio": 1.398523
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 6226080.759686,
+          "q_error": 1.51188,
+          "ratio": 0.661428
+        },
+        "Uniform": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 9471204.81468,
+          "q_error": 1.006174,
+          "ratio": 1.006174
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 1483989202.140437,
+          "q_error": 63.103297,
+          "ratio": 63.103297
+        },
+        "DC": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "Dense": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "LP": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324240.999998,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 5674958.054068,
+          "q_error": 4.143965,
+          "ratio": 0.241315
+        },
+        "Uniform": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2461120623.142261,
+          "q_error": 104.65361,
+          "ratio": 104.65361
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 24659178.289327,
+          "q_error": 1.73365,
+          "ratio": 1.73365
+        },
+        "DC": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 249787476.0,
+          "q_error": 17.561176,
+          "ratio": 17.561176
+        },
+        "Dense": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 83669.800891,
+          "ratio": 83669.800891
+        },
+        "LP": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 33675222.0,
+          "q_error": 2.367519,
+          "ratio": 2.367519
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 2250774.65241,
+          "q_error": 6.319534,
+          "ratio": 0.15824
+        },
+        "Uniform": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 24641449.58079,
+          "q_error": 1.732404,
+          "ratio": 1.732404
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 154013164.946144,
+          "q_error": 4.854472,
+          "ratio": 0.205996
+        },
+        "DC": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 8063998118.0,
+          "q_error": 10.785756,
+          "ratio": 10.785756
+        },
+        "Dense": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 23.244247,
+          "ratio": 23.244247
+        },
+        "LP": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 8063998118.000001,
+          "q_error": 10.785756,
+          "ratio": 10.785756
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 87886630.885287,
+          "q_error": 8.507012,
+          "ratio": 0.11755
+        },
+        "Uniform": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 34233683.689452,
+          "q_error": 21.839677,
+          "ratio": 0.045788
+        }
       }
     },
     "Triangle Counting": {
@@ -775,6 +1298,158 @@
           "estimated_nnz": 25.333338,
           "q_error": 11.763156,
           "ratio": 0.085011
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 995.101626,
+          "q_error": 1.274242,
+          "ratio": 0.78478
+        },
+        "DC": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000.0,
+          "q_error": 78.864353,
+          "ratio": 78.864353
+        },
+        "Dense": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000000.0,
+          "q_error": 78864.353312,
+          "ratio": 78864.353312
+        },
+        "LP": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000.0,
+          "q_error": 78.864353,
+          "ratio": 78.864353
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1120.0,
+          "q_error": 1.132143,
+          "ratio": 0.883281
+        },
+        "Uniform": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 995.01712,
+          "q_error": 1.27435,
+          "ratio": 0.784714
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 418818.929866,
+          "q_error": 6.208638,
+          "ratio": 0.161066
+        },
+        "DC": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 1053.082147,
+          "ratio": 1053.082147
+        },
+        "LP": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 650875.761825,
+          "q_error": 3.995071,
+          "ratio": 0.250308
+        },
+        "Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 119849.055386,
+          "q_error": 21.696416,
+          "ratio": 0.046091
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 111.043002,
+          "q_error": 3522.851429,
+          "ratio": 0.000284
+        },
+        "DC": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 3083796.0,
+          "q_error": 7.883156,
+          "ratio": 7.883156
+        },
+        "Dense": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 3042287.714347,
+          "ratio": 3042287.714347
+        },
+        "LP": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 3083796.0,
+          "q_error": 7.883156,
+          "ratio": 7.883156
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 329947.92923,
+          "q_error": 1.185605,
+          "ratio": 0.843451
+        },
+        "Uniform": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 22.587982,
+          "q_error": 17318.413332,
+          "ratio": 5.8e-05
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 2806.447235,
+          "q_error": 212.918665,
+          "ratio": 0.004697
+        },
+        "DC": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.408048,
+          "ratio": 1.408048
+        },
+        "Dense": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 29083.368757,
+          "ratio": 29083.368757
+        },
+        "LP": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.408048,
+          "ratio": 1.408048
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 133201.554002,
+          "q_error": 4.486021,
+          "ratio": 0.222915
+        },
+        "Uniform": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 259.940573,
+          "q_error": 2298.77542,
+          "ratio": 0.000435
         }
       }
     }
