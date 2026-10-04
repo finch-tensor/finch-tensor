@@ -58,7 +58,7 @@ def test_sampling_reuses_random_masks():
     assert isinstance(mask_i, ft.RandomMaskTensor)
     assert mask_i.element_type == ftype(np.intp)
 
-    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
+    second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
     assert factory._get_mask(i, 5) is mask_i
     assert first.masks_ref is second.masks_ref is factory._masks
     assert len(factory._masks) == 3
@@ -86,6 +86,43 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     )
     expected_coverage = math.prod(shape) if expected_count else 0
     assert stats.coverage_correction() == pytest.approx(expected_coverage)
+
+
+@pytest.mark.parametrize(
+    "operation", ["tensor", "join", "union", "aggregate", "relabel", "reorder"]
+)
+def test_sampling_materializes_each_step(operation):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_prob=1.0)
+    data = np.array([[1, 0, 1], [0, 1, 0]], dtype=np.intp)
+    stats = factory(ft.asarray(data), (i, j))
+    expected = data.copy()
+    fields = (i, j)
+
+    match operation:
+        case "join":
+            stats = factory.mapjoin(ffuncs.mul, stats, stats)
+        case "union":
+            stats = factory.mapjoin(ffuncs.add, stats, stats)
+        case "aggregate":
+            stats = factory.aggregate(ffuncs.add, 0, (j,), stats)
+            expected = expected.sum(axis=1)
+            fields = (i,)
+        case "relabel":
+            fields = (Field("row"), Field("col"))
+            stats = factory.relabel(stats, fields)
+        case "reorder":
+            fields = (j, i)
+            stats = factory.reorder(stats, fields)
+            expected = expected.T
+
+    # Read the stored tensor directly, without evaluating another logic plan.
+    match stats.sketch:
+        case Table(Literal(tensor), indices):
+            assert indices == fields
+            np.testing.assert_array_equal(np.asarray(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
 
 
 def test_sampling_from_tensor():

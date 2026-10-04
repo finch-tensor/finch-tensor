@@ -31,6 +31,16 @@ def mask_table(field: Field, mask: RandomMaskTensor) -> Table:
     return Table(Literal(mask), (field,))
 
 
+def compute_sketch(sketch: LogicExpression) -> Table:
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
+    fields = sketch.fields()
+    out = Alias("sketch_out")
+    prgm = Plan((Query(Table(out, fields), sketch), Produces((out,))))
+    (result,) = NON_RECURSIVE_SCHEDULER(prgm)
+    return Table(Literal(result), fields)
+
+
 def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
 
     if d_n == 0:
@@ -314,7 +324,9 @@ class SamplingStatsFactory(
             mask_table(field, mask) for field, mask in zip(fields, masks, strict=True)
         ]
 
-        sketch = MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables))
+        sketch = compute_sketch(
+            MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables))
+        )
 
         return SamplingStats(
             base,
@@ -335,8 +347,8 @@ class SamplingStatsFactory(
             return self.copy(join_args[0])
 
         base_stats = super()._mapjoin_defs(op, *join_args)
-        result_sketch = MapJoin(
-            Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args)
+        result_sketch = compute_sketch(
+            MapJoin(Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args))
         )
 
         new_remainder: set[Field] = set()
@@ -396,7 +408,7 @@ class SamplingStatsFactory(
 
         return SamplingStats(
             base_stats,
-            sketch=result,
+            sketch=compute_sketch(result),
             remainder_dims=new_remainder,
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
@@ -460,7 +472,7 @@ class SamplingStatsFactory(
 
         return SamplingStats(
             base_stats,
-            sketch=new_sketch,
+            sketch=compute_sketch(new_sketch),
             remainder_dims=new_remainder,
             sample_prob=self.sample_prob,
             remainder_dim_sizes=new_remainder_sizes,
@@ -474,7 +486,7 @@ class SamplingStatsFactory(
         base_stats = self.relabel_def(stats, relabel_indices)
         return SamplingStats(
             base_stats,
-            sketch=Relabel(stats.sketch, relabel_indices),
+            sketch=compute_sketch(Relabel(stats.sketch, relabel_indices)),
             remainder_dims=set(stats.remainder_dims),
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
@@ -488,7 +500,7 @@ class SamplingStatsFactory(
         base_stats = self.reorder_def(stats, reorder_indices)
         return SamplingStats(
             base_stats,
-            sketch=Reorder(stats.sketch, reorder_indices),
+            sketch=compute_sketch(Reorder(stats.sketch, reorder_indices)),
             remainder_dims=set(stats.remainder_dims),
             sample_prob=self.sample_prob,
             remainder_dim_sizes=dict(stats.remainder_dim_sizes),
@@ -499,7 +511,7 @@ class SamplingStatsFactory(
 
 class SamplingStats(NumericStats):
     """
-    sketch : deferred expression over bound dimensions
+    sketch : materialized table over bound dimensions
     remainder_dims : 'free' dimension -> absent in the output
     sample_prob : Bernoulli sample prob
     """
