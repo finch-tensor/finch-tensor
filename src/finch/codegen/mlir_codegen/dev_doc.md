@@ -7,8 +7,8 @@ lifetime, including for the duration of any kernel call that touches it.
 MLIR is handed a pointer and a length into that memory.
 
 The resize path is: MLIR calls out to a function pointer supplied by
-`numpy_buffer_resize_callback`, and MLIR receives back the current, possibly
-changed, data pointer to use for the rest of the call. MLIR never decides
+`numpy_buffer_resize_callback`, and MLIR receives back the current
+data pointer to use for the rest of the call. MLIR never decides
 where the new memory comes from or frees the old memory itself.
 
 This makes `deserialize_from_mlir` a no-op: by the time the kernel call
@@ -52,14 +52,15 @@ and `memref.dim` in the same way as a plain memref argument.
 ## MemrefBuffer ownership and resizing
 
 A `MemrefBuffer` holds an MLIR-owned allocation. It crosses the function
-boundary directly as a `memref<?xT>` descriptor.
+boundary as a pointer to its mutable `memref<?xT>` descriptor.
 
-- `mlir_unpack` converts the memref to its LLVM descriptor and stores
-that descriptor in a mutable box. Buffer operations load the current descriptor
-from the box and convert it back to a memref.
+- `mlir_unpack` uses the incoming descriptor pointer as its mutable box. Buffer
+operations load the current descriptor from the box and convert it to a memref.
 
 - `Resize` loads the current descriptor, converts it to a memref, and calls
 `memref.realloc`. It then converts the resized memref back to its descriptor
 representation and stores it in the same mutable box.
 
-- `mlir_repack` and `deserialize_from_mlir` are no-ops because `MemrefBuffer` already holds the MLIR descriptor. When a kernel returns a memref, `construct_from_mlir` wraps its descriptor in a `MemrefBuffer` without copying the element data.
+- `mlir_repack` and `deserialize_from_mlir` are no-ops because resize updates
+the `MemrefBuffer` descriptor in place. `construct_from_mlir` wraps a returned
+descriptor pointer in a `MemrefBuffer` without copying the element data.

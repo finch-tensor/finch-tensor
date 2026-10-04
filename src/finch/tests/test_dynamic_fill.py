@@ -36,6 +36,7 @@ from finch.autoschedule import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
     INTERPRET_NOTATION,
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLogicFormatter,
     DefaultLoopOrderer,
@@ -154,7 +155,9 @@ def _cached_scheduler():
     executor = LogicExecutor(
         DefaultLogicFactorizer(
             DefaultLoopOrderer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                )
             )
         ),
         cache=True,
@@ -365,7 +368,9 @@ def _cached_galley_scheduler():
     executor = LogicExecutor(
         GalleyLogicFactorizer(
             DefaultLoopOrderer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                )
             )
         ),
         cache=True,
@@ -464,7 +469,9 @@ def test_sparse_dynamic_fill_channel(backend):
     # actual fill value.
     executor = LogicExecutor(
         DefaultLogicFactorizer(
-            DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(backend())))
+            DefaultLoopOrderer(
+                DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler(backend())))
+            )
         ),
         cache=True,
     )
@@ -497,7 +504,9 @@ def test_backend_refusal_propagates():
     loader = _DynamicRejectingLoader(
         DefaultLogicFactorizer(
             DefaultLoopOrderer(
-                DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                DefaultLogicFormatter(
+                    CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                )
             )
         )
     )

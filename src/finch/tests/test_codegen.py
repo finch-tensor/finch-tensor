@@ -33,6 +33,7 @@ from finch.codegen import (
     NumpyBufferFType,
 )
 from finch.codegen.buffers import MallocBuffer
+from finch.codegen.buffers.memref_buffer import MemrefBufferFType
 from finch.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
@@ -1551,7 +1552,7 @@ def test_init_write_returns_rhs(compiler):
     assert module.write(np.int64(0), np.int64(3)) == 3
 
 
-# Test resizing the buffer works as intended
+# Test resizing the buffer with NumpyBuffer
 @mlir_backend
 def test_resize_mlir_regression(file_regression):
     idx_buf = NumpyBuffer(np.empty(0, dtype=np.intp))
@@ -1597,6 +1598,47 @@ def test_resize_mlir_regression(file_regression):
     MLIRCompiler()(prgm).sparse_output(idx_buf, val_buf)
     np.testing.assert_array_equal(idx_buf.arr, np.array([2], dtype=np.intp))
     np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
+
+
+# Test for resize with MemrefBuffer
+@pytest.mark.mlir_backend
+@pytest.mark.parametrize("compiler", [asm.AssemblyInterpreter(), MLIRCompiler()])
+@pytest.mark.parametrize("new_size", [1, 5, 10])
+def test_memref_resize(compiler, new_size):
+    values = [1.0, 4.0, 3.0, 4.0]
+    ab = MemrefBufferFType(ftypes.float64)(len(values))
+    for i, value in enumerate(values):
+        ab.store(i, value)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    size = asm.Variable("size", finch.intp)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(min(len(values), new_size)):
+        assert ab.load(i) == values[i]
 
 
 # Test for zero copy construction of MLIR Numpy buffer

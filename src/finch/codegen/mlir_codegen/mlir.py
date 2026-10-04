@@ -41,6 +41,7 @@ mlir_globals: dict[str, str] = {
 }
 MLIR_PIPELINE = (
     "builtin.module("
+    "expand-realloc,"
     "expand-strided-metadata,"
     "convert-scf-to-cf,"
     "convert-cf-to-llvm,"

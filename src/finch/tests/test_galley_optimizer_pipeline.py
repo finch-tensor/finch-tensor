@@ -7,7 +7,19 @@ import pytest
 import numpy as np
 
 import finch.interface as fl_interface
+from finch.algebra import ffuncs
 from finch.autoschedule import INTERPRET_NOTATION_GALLEY
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
+from finch.tensor import BufferizedNDArray
 
 
 # --- TEST 1: out = a * b via frontend ---
@@ -487,3 +499,30 @@ def test_repeat_operator_nested_reduction_swapped_ops():
         ctx=INTERPRET_NOTATION_GALLEY,
     )
     assert np.allclose(np.array(out), (arr + 2.0).sum(axis=1).prod())
+
+
+@pytest.mark.parametrize(
+    "op, init, expected",
+    [
+        (ffuncs.add, 1.0, lambda x: 1.0 + x),
+        (ffuncs.mul, 2.0, lambda x: 2.0 * x),
+        (ffuncs.add, 0.0, lambda x: x),
+    ],
+)
+def test_aggregate_over_no_indices_keeps_init(op, init, expected):
+    # Galley starts each reduction from the init of the indices it reduces, so
+    # an aggregate which reduces no indices must still apply its init.
+    i, j = Field("i"), Field("j")
+    A, B = Alias("A"), Alias("B")
+    data = np.array([[1.0, 2.0], [3.0, 4.0]])
+    plan = Plan(
+        (
+            Query(
+                Table(B, (i, j)),
+                Aggregate(Literal(op), Literal(init), Table(A, (i, j)), ()),
+            ),
+            Produces((B,)),
+        )
+    )
+    (result,) = INTERPRET_NOTATION_GALLEY(plan, {A: BufferizedNDArray.from_numpy(data)})
+    assert np.allclose(result.to_numpy(), expected(data))
