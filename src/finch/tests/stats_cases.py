@@ -28,14 +28,14 @@ KERNELS = ("Hadamard", "SpGEMM", "SpGEMM2", "Triangle Counting")
 
 
 def make_models():
-    sampling = SamplingStatsFactory(sample_prob=0.5)
+    sampling = SamplingStatsFactory(sample_nnz=1000)
     sampling._rng = np.random.default_rng(SEED)
     return {
         "Dense": DenseStatsFactory(),
         "Uniform": UniformStatsFactory(),
         "DC": DCStatsFactory(),
         "LP": LPStatsFactory(),
-        "Sampling_0.5": sampling,
+        "Sampling_1000": sampling,
         "Blocked-Uniform": BlockedUniformStatsFactory(block_count=BLOCK_COUNT),
     }
 
