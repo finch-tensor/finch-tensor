@@ -85,6 +85,7 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     factory = SamplingStatsFactory(sample_prob=sample_prob)
     factory._rng = np.random.default_rng(42)
     stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    assert stats.sample_probs == [sample_prob, sample_prob]
     expected_count = math.prod(
         sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
         for field, size in zip((i, j), shape, strict=True)
@@ -126,6 +127,8 @@ def test_sampling_materializes_each_step(operation):
             fields = (j, i)
             stats = factory.reorder(stats, fields)
             expected = expected.T
+
+    assert stats.sample_probs == [factory.sample_prob] * len(fields)
 
     # Read the stored tensor directly, without evaluating another logic plan.
     match stats.sketch:

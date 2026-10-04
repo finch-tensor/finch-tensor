@@ -516,11 +516,13 @@ class SamplingStats(NumericStats):
     sketch : materialized table over bound dimensions
     remainder_dims : 'free' dimension -> absent in the output
     sample_prob : Bernoulli sample prob
+    sample_probs : per-dimension probabilities in index_order
     """
 
     sketch: LogicExpression
     remainder_dims: set
     sample_prob: float
+    sample_probs: list[float]
 
     def __init__(
         self,
@@ -536,6 +538,7 @@ class SamplingStats(NumericStats):
         super().__init__(base)
         self.sketch = sketch
         self.sample_prob = sample_prob
+        self.sample_probs = [sample_prob] * len(self.index_order)
         self.remainder_dims = set(remainder_dims) if remainder_dims else set()
         self.estimator = estimator
         self.remainder_dim_sizes = (
