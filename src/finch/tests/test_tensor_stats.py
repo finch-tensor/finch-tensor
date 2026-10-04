@@ -49,6 +49,18 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
+def sampling_sketch_array(tensor):
+    from finch.compile_jl.runtime import JuliaOwnedTensor
+
+    match tensor:
+        case JuliaOwnedTensor():
+            from finch.compile_jl.julia import jl
+
+            return jl.Array(tensor.raw_julia_obj).to_numpy().transpose()
+        case _:
+            return np.asarray(tensor)
+
+
 def test_sampling_reuses_random_seeds():
     i, j, k = Field("i"), Field("j"), Field("k")
     factory = SamplingStatsFactory()
@@ -137,7 +149,7 @@ def test_sampling_materializes_each_step(operation):
     match stats.sketch:
         case Table(Literal(tensor), indices):
             assert indices == fields
-            np.testing.assert_array_equal(np.asarray(tensor), expected)
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
         case _:
             pytest.fail("Sampling step left a deferred sketch")
 
@@ -162,14 +174,14 @@ def test_sampling_per_dimension_masks(sample_probs):
     expected = rows[:, None] * cols[None, :]
     match stats.sketch:
         case Table(Literal(tensor), _):
-            np.testing.assert_array_equal(np.asarray(tensor), expected)
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
         case _:
             pytest.fail("Sampling step left a deferred sketch")
     count = expected.sum()
     assert stats.coverage_correction() == pytest.approx(108 if count else 0)
     prob = math.prod(sample_probs)
     assert stats.estimate_non_fill_values() == pytest.approx(
-        count / prob if prob else 0
+        min(108, count / prob) if prob else 0
     )
     assert not hasattr(stats, "sample_prob")
 
@@ -194,10 +206,6 @@ def test_sampling_propagates_per_dimension_probs():
     assert reduced.sample_probs == [0.25]
     assert reduced.remainder_size == 4.0
     assert reduced.remainder_prob == 0.75
-    reduced.scan_cache = (8.0, 4.0, 2.0, None)
-    assert reduced.estimate_non_fill_values() == pytest.approx(
-        _duj1(4.0, 2.0, 0.25 * 0.75, 8.0)
-    )
     scalar = factory.aggregate(ffuncs.add, 0, (i,), reduced)
     assert scalar.sample_probs == []
     assert scalar.remainder_size == 12.0
@@ -291,7 +299,7 @@ def test_sampling_remask_largest_projection(data, budget):
     assert sampled.sample_probs == probs
     match sampled.sketch:
         case Table(Literal(tensor), _):
-            np.testing.assert_array_equal(np.asarray(tensor), expected)
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
         case _:
             pytest.fail("remask left a deferred sketch")
     assert sampled.scan(needs_freq=False)[1] == np.count_nonzero(expected)

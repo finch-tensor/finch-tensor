@@ -20,6 +20,7 @@ import pytest
 import numpy as np
 import scipy.sparse as sps
 
+from matplotlib import colormaps
 from matplotlib.figure import Figure
 
 import finch as ft
@@ -30,6 +31,7 @@ from finch.tests.stats_cases import (
     KERNELS,
     RANDOM_DENSITY,
     RANDOM_MATRIX_SIZE,
+    SAMPLE_NNZ,
     SEED,
     N,
     make_kernel_estimator,
@@ -100,6 +102,7 @@ def accuracy_results():
         "datasets": datasets,
         "block_count": BLOCK_COUNT,
         "seed": SEED,
+        "sample_nnz": SAMPLE_NNZ,
         "results": results,
         "geomean_q_error": {
             model: round(float(np.exp(np.mean(np.log(errors)))), 6)
@@ -109,7 +112,7 @@ def accuracy_results():
 
 
 def plot_accuracy(results):
-    fig = Figure(figsize=(14, 14), layout="constrained")
+    fig = Figure(figsize=(18, 16), layout="constrained")
     axes = fig.subplots(len(KERNELS), 1)
     models = list(make_models())
     x = np.arange(len(DATASETS))
@@ -120,7 +123,7 @@ def plot_accuracy(results):
                 [results[kernel][dataset][model]["ratio"] for dataset in DATASETS]
             )
             positions = x + (index - (len(models) - 1) / 2) * width
-            color = f"C{index}"
+            color = colormaps["tab20"](index / 19)
             ax.bar(
                 positions,
                 np.clip(values, -10, 10),
@@ -146,19 +149,23 @@ def plot_accuracy(results):
         ax.set_xticks(x, list(DATASETS), rotation=20, ha="right")
         ax.grid(axis="y", linestyle=":", alpha=0.5)
     axes[0].legend(loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=8)
-    fig.suptitle("Sparsity estimator accuracy")
+    fig.suptitle(f"Sparsity estimator accuracy — sampling budget {SAMPLE_NNZ:,} nnz")
     return fig
 
 
 def plot_geomean(geomeans):
-    fig = Figure(figsize=(12, 5), layout="constrained")
+    fig = Figure(figsize=(14, 6), layout="constrained")
     ax = fig.subplots()
-    models = list(geomeans)
+    models = list(make_models())
     x = np.arange(len(models))
-    ax.bar(x, list(geomeans.values()), color=[f"C{i}" for i in x])
+    ax.bar(
+        x,
+        [geomeans[model] for model in models],
+        color=[colormaps["tab20"](i / 19) for i in x],
+    )
     ax.axhline(1, color="black", linestyle="--", label="Perfect estimate")
     ax.set_yscale("log", base=2)
-    ax.set_xticks(x, models, rotation=30, ha="right", fontsize=9)
+    ax.set_xticks(x, models, rotation=35, ha="right", fontsize=9)
     ax.set(ylabel="Geometric mean q-error", title="Overall estimator accuracy")
     ax.legend()
     return fig

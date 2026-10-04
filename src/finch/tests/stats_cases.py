@@ -16,6 +16,7 @@ from finch.autoschedule.tensor_stats import (
     SamplingStatsFactory,
     UniformStatsFactory,
 )
+from finch.autoschedule.tensor_stats.sampling_stats import SAMPLING_ESTIMATORS
 from finch.finch_logic import Field
 
 i, j, k, ell = (Field(name) for name in "ijkl")
@@ -24,20 +25,23 @@ RANDOM_MATRIX_SIZE = 10_000
 RANDOM_DENSITY = 0.001
 BLOCK_COUNT = 5
 SEED = 42
+SAMPLE_NNZ = 10_000
 KERNELS = ("Hadamard", "SpGEMM", "SpGEMM2", "Triangle Counting")
 
 
 def make_models():
-    sampling = SamplingStatsFactory(sample_nnz=1000)
-    sampling._rng = np.random.default_rng(SEED)
-    return {
+    models = {
         "Dense": DenseStatsFactory(),
         "Uniform": UniformStatsFactory(),
         "DC": DCStatsFactory(),
         "LP": LPStatsFactory(),
-        "Sampling_1000": sampling,
         "Blocked-Uniform": BlockedUniformStatsFactory(block_count=BLOCK_COUNT),
     }
+    for estimator in SAMPLING_ESTIMATORS:
+        sampling = SamplingStatsFactory(sample_nnz=SAMPLE_NNZ, estimator=estimator)
+        sampling._rng = np.random.default_rng(SEED)
+        models[f"Sampling_{estimator}"] = sampling
+    return models
 
 
 def make_diagonal(n):
