@@ -112,12 +112,12 @@ class TableValueFType(FType):
 
 
 @dataclass(frozen=True)
-class TableValue(FTyped):
+class TableValue(FTyped[TableValueFType]):
     tns: Any
     idxs: tuple[Field, ...]
 
     @property
-    def ftype(self):
+    def ftype(self) -> TableValueFType:
         return TableValueFType(ftype(self.tns), self.idxs)
 
     def __post_init__(self) -> None:
@@ -541,6 +541,10 @@ class Aggregate(LogicTree, LogicExpression):
     """
     Represents a logical AST statement that reduces `arg` using `op`, starting
     with `init`. `idxs` are the dimensions to reduce. May happen in any order.
+    `init` may be a literal or a tensor expression. The fields of the result
+    are those of `arg` which are not reduced, followed by the fields of `init`
+    which are not in `arg`. `init` and `arg` are broadcast over the fields of
+    the result which they lack, as in a `MapJoin`.
 
     Attributes:
         op: The reduction operation.
@@ -550,7 +554,7 @@ class Aggregate(LogicTree, LogicExpression):
     """
 
     op: Literal
-    init: Literal
+    init: LogicExpression
     arg: LogicExpression
     idxs: tuple[Field, ...]
 
@@ -561,7 +565,8 @@ class Aggregate(LogicTree, LogicExpression):
 
     def fields(self) -> tuple[Field, ...]:
         """Returns fields of the node."""
-        return tuple(field for field in self.arg.fields() if field not in self.idxs)
+        arg_fields = [field for field in self.arg.fields() if field not in self.idxs]
+        return tuple(dict.fromkeys([*arg_fields, *self.init.fields()]))
 
     def dimmap(
         self,
@@ -570,9 +575,17 @@ class Aggregate(LogicTree, LogicExpression):
     ) -> tuple[T | None, ...]:
         idxs = self.arg.fields()
         dims = self.arg.dimmap(op, dim_bindings)
-        return tuple(
-            val for idx, val in zip(idxs, dims, strict=True) if idx not in self.idxs
-        )
+        idx_dims = {
+            idx: val
+            for idx, val in zip(idxs, dims, strict=True)
+            if idx not in self.idxs
+        }
+        init_dims = self.init.dimmap(op, dim_bindings)
+        for idx, dim in zip(self.init.fields(), init_dims, strict=True):
+            if idx in self.idxs:
+                raise ValueError(f"The init of an aggregate can't have reduced {idx}")
+            idx_dims[idx] = op(idx_dims[idx], dim) if idx in idx_dims else dim
+        return tuple(idx_dims.values())
 
     def valmap(
         self,
@@ -580,7 +593,11 @@ class Aggregate(LogicTree, LogicExpression):
         g: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return g(self.op.val, self.init.val, self.arg.valmap(f, g, bindings))
+        return g(
+            self.op.val,
+            self.init.valmap(f, g, bindings),
+            self.arg.valmap(f, g, bindings),
+        )
 
     @classmethod
     def from_children(cls, op, init, arg, *idxs):
@@ -683,7 +700,9 @@ class Query(LogicTree, LogicStatement):
     Represents a logical AST statement that evaluates `rhs`, storing the result
     in the table `lhs`. The alias `lhs.tns` is bound to a tensor whose
     dimensions are ordered as `lhs.idxs`, so a query behaves as though its
-    right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`.
+    right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`. A query is not
+    in place: the previous value of `lhs.tns` is replaced, and is only read if
+    `rhs` refers to it. See `QueryInto` for in-place updates.
 
     Attributes:
         lhs: The table to write, a `Table` wrapping an `Alias`.
@@ -734,6 +753,57 @@ class Query(LogicTree, LogicStatement):
         else:
             bindings[var] = self.rhs.valmap(f, g, bindings)
         return bindings
+
+
+@dataclass(eq=True, frozen=True)
+class QueryInto(LogicTree, LogicStatement):
+    """
+    Represents a logical AST statement that updates the table `lhs` in place,
+    using the reduction operator `op` to fold each element of `rhs` into the
+    matching element of `lhs`. The alias `lhs.tns` must already be bound. The
+    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, and `rhs`
+    is broadcast over the fields of `lhs` which it lacks, so a `QueryInto` is
+    equivalent to the aggregate which starts from `lhs`,
+    `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
+
+    Attributes:
+        lhs: The table to update, a `Table` wrapping an `Alias`.
+        op: The reduction operator used to combine old and new values.
+        rhs: The right-hand side to evaluate.
+    """
+
+    lhs: Table
+    op: Literal
+    rhs: LogicExpression
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.lhs, self.op, self.rhs]
+
+    def as_query(self) -> Query:
+        """The equivalent aggregate query, which is not in place."""
+        idxs = tuple(idx for idx in self.rhs.fields() if idx not in self.lhs.idxs)
+        return Query(self.lhs, Aggregate(self.op, self.lhs, self.rhs, idxs))
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        """Infers dimmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.as_query().infer_dimmap(op, dim_bindings)
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        """Infers valmaps for all aliases defined in the statement. The results
+        will be stored in the dictionary passed to the method."""
+        return self.as_query().infer_valmap(f, g, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -877,6 +947,10 @@ class LogicPrinterContext(Context):
             case Query(Table(Alias() as tns, idxs), rhs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 self.exec(f"{feed}{self(tns)}[{idxs_e}] = {self(rhs)}")
+                return None
+            case QueryInto(Table(tns, idxs), op, rhs):
+                idxs_e = ", ".join([self(idx) for idx in idxs])
+                self.exec(f"{feed}{self(tns)}[{idxs_e}] <<{self(op)}>>= {self(rhs)}")
                 return None
             case Plan(bodies):
                 ctx_2 = self.block()

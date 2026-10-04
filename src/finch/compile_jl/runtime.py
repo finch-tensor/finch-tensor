@@ -10,7 +10,8 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import Tensor, TensorFType
-from finch.tensor import BufferizedNDArray
+from finch.algebra.fill import DynamicFill
+from finch.tensor import BufferizedNDArray, FiberTensorFType
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
 from finch.tensor.scalar import Scalar
@@ -50,7 +51,12 @@ class _StoragePool:
         )
         if self._free[key]:
             return self._free[key].popitem()[1]
-        tensor = ftype.construct(shape)
+        match ftype:
+            case FiberTensorFType(fill_value=DynamicFill() as fill):
+                # A dynamic-fill ftype can't construct storage without its fill.
+                tensor = ftype.construct(shape, fill_value=fill)
+            case _:
+                tensor = ftype.construct(shape)
         return _StorageLease(
             tensor_to_jl(tensor, pin_fill=pin_fill),
             key,
@@ -218,7 +224,11 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
                 julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
             julia_buf_args.append(julia_buf)
 
-        getattr(jl, func_name)(*(arg.raw_julia_obj for arg in julia_buf_args))
+        raw_args = [arg.raw_julia_obj for arg in julia_buf_args]
+        raw_args += [
+            int(args[pos].shape[axis]) for pos, axis in getattr(kernel, "extents", ())
+        ]
+        getattr(jl, func_name)(*raw_args)
 
         # Associate returned tensors with their Python ownership handles.
         return tuple(

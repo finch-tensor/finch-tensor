@@ -589,22 +589,31 @@ class RollTensor(PatternTensor):
 
 
 class RepeatTensor(PatternTensor):
+    """Map each of ``n`` indices to ``k`` repeated indices.
+
+    ``shape`` is ``(n, n * k)``, and row ``i`` holds the repeats ``j`` of ``i``,
+    so that the efficient row-major traversal visits each index and then its
+    repeats. For ``k <= 0``, all entries are false.
+    """
+
     def __init__(self, shape, *, k: int = 0, dtype=None):
         self._k = k
         super().__init__(shape, dtype=dtype, k=self._k)
 
     @classmethod
     def _level_format_properties(cls, ndim: int) -> list[FormatProperty]:
-        return [Blocked((1,), (0,)), Repeated((1,), (0,))]
+        return [Blocked((0,), (1,)), Repeated((0,), (1,))]
 
     def contains(self, i, j) -> bool:
-        return self._k > 0 and j == i // self._k
+        return self._k > 0 and i == j // self._k
 
 
 class ChunkMaskTensor(PatternTensor):
     """Map ``n`` indices to chunks of size ``b``.
 
-    ``shape`` is ``(n, ceil(n / b))``; the last chunk may be shorter.
+    ``shape`` is ``(ceil(n / b), n)``, and row ``j`` holds the indices of chunk
+    ``j``, so that the efficient row-major traversal visits each chunk and then
+    its indices. The last chunk may be shorter.
     """
 
     def __init__(self, shape, *, b: int, dtype=None):
@@ -619,20 +628,22 @@ class ChunkMaskTensor(PatternTensor):
             pattern_value=True,
             b=self._b,
         )
-        n, chunks = map(operator.index, self.shape)
+        chunks, n = map(operator.index, self.shape)
         if n < 0:
             raise ValueError("n must be nonnegative")
         if chunks != (n + self._b - 1) // self._b:
-            raise ValueError("shape[1] must equal ceil(shape[0] / b)")
+            raise ValueError("shape[0] must equal ceil(shape[1] / b)")
 
-    def contains(self, i, j) -> bool:
+    def contains(self, j, i) -> bool:
         return j == i // self._b
 
 
 class SplitMaskTensor(PatternTensor):
     """Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.
 
-    ``shape`` is ``(n, p)``. Region ``j`` covers ``n*j//p <= i < n*(j+1)//p``.
+    ``shape`` is ``(p, n)``, and row ``j`` covers ``n*j//p <= i < n*(j+1)//p``,
+    so that the efficient row-major traversal visits each region and then its
+    indices.
     """
 
     def __init__(self, shape, *, dtype=None):
@@ -643,14 +654,14 @@ class SplitMaskTensor(PatternTensor):
             fill_value=False,
             pattern_value=True,
         )
-        n, p = map(operator.index, self.shape)
+        p, n = map(operator.index, self.shape)
         if n < 0:
             raise ValueError("n must be nonnegative")
         if p <= 0:
-            raise ValueError("shape[1] must be positive")
+            raise ValueError("shape[0] must be positive")
 
-    def contains(self, i, j) -> bool:
-        n, p = self.shape
+    def contains(self, j, i) -> bool:
+        p, n = self.shape
         return n * j // p <= i < n * (j + 1) // p
 
 
@@ -676,7 +687,8 @@ class RandomMaskTensor(PatternTensor):
     coordinates give the same value even if the shape changes.
 
     Like Finch.jl, indexed masks mix the seed, then each one-based coordinate
-    from the last axis to the first. Scalar masks use the seed directly.
+    from the first axis to the last, which is Finch.jl's order once the axes
+    are reversed like other tensors. Scalar masks use the seed directly.
     The high 53 bits give a value in ``[0, 1)`` that is compared with ``p``.
     """
 
@@ -722,7 +734,7 @@ class RandomMaskTensor(PatternTensor):
         if not idxs:
             return _randommask_uniform(self._seed) < self._p
         state = _randommask_mix(self._seed)
-        for idx in reversed(idxs):
+        for idx in idxs:
             state = _randommask_mix(state ^ (operator.index(idx) + 1))
         return _randommask_uniform(state) < self._p
 

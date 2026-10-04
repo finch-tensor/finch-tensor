@@ -41,8 +41,10 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    Reorder,
     Table,
 )
+from finch.symbolic import PostOrderDFS
 from finch.tensor.traits import Dense as DenseProperty
 
 
@@ -1559,7 +1561,29 @@ def test_uniform_aggregate():
         ((), ()),
     ],
 )
-def test_blocked_uniform_grid(shape, counts, fill_value):
+def test_blocked_uniform_grid(shape, counts, fill_value, monkeypatch):
+    from finch.autoschedule import default_schedulers
+
+    scheduler = default_schedulers.NON_RECURSIVE_STANDARD_SCHEDULER
+
+    def check_loop_order(plan):
+        for query in plan.bodies[:-1]:
+            match query:
+                case Query(_, Aggregate(_, _, Reorder(_, loop_order), _)):
+                    for node in PostOrderDFS(query):
+                        match node:
+                            case Table(_, idxs):
+                                assert (
+                                    tuple(idx for idx in loop_order if idx in idxs)
+                                    == idxs
+                                )
+                case _:
+                    pytest.fail("Expected a loop-ordered statistics query")
+        return scheduler(plan)
+
+    monkeypatch.setattr(
+        default_schedulers, "NON_RECURSIVE_STANDARD_SCHEDULER", check_loop_order
+    )
     fields = tuple(Field(f"x{axis}") for axis in range(len(shape)))
     data = np.full(shape, fill_value)
     data.flat[::3] = fill_value + 1

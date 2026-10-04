@@ -165,7 +165,9 @@ class SmartFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _):
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
                     # Evaluating the query gives the stats of the stored result,
                     # in the order of its left-hand table.
                     rhs_stats = stats_interpreter(node, stats_bindings)

@@ -54,7 +54,9 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     new_bodies = tuple(formatter(body) for body in bodies)
                     return lgc.Plan(new_bodies)
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _):
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)

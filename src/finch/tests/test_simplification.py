@@ -9,6 +9,7 @@ from finch import finch_logic as lgc
 from finch import finch_notation as ntn
 from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
 from finch.autoschedule import (
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLogicFormatter,
     DefaultLoopOrderer,
@@ -325,7 +326,11 @@ def test_annihilator_folds():
 def _capturing_scheduler():
     """A scheduler that records the program `LogicSimplify` hands downstream."""
     capture = LogicCapture(
-        DefaultLoopOrderer(DefaultLogicFormatter(LogicCompiler(NotationInterpreter())))
+        DefaultLoopOrderer(
+            DefaultLogicFormatter(
+                CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+            )
+        )
     )
     executor = LogicExecutor(DefaultLogicFactorizer(LogicSimplify(capture)))
     return capture, LogicNormalizer(executor)
@@ -416,13 +421,15 @@ def _assembly_for(build):
                 LogicSimplify(
                     DefaultLoopOrderer(
                         DefaultLogicFormatter(
-                            LogicCompiler(
-                                NotationCompiler(
-                                    capture,
-                                    ctx_transforms=(
-                                        LowerPackedStructSlots(),
-                                        AssemblySimplify(),
-                                    ),
+                            CompilerFormLowerer(
+                                LogicCompiler(
+                                    NotationCompiler(
+                                        capture,
+                                        ctx_transforms=(
+                                            LowerPackedStructSlots(),
+                                            AssemblySimplify(),
+                                        ),
+                                    )
                                 )
                             )
                         )
