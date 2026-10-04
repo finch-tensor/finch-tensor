@@ -277,7 +277,7 @@ def _dsh3(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float):
 class SamplingStatsFactory(
     BaseTensorStatsFactory["SamplingStats"], StatsFactory["SamplingStats"]
 ):
-    def __init__(self, sample_nnz: int = 10_000, estimator: str = "uj1"):
+    def __init__(self, sample_nnz: int = 10_000, estimator: str = "sh3"):
         super().__init__(SamplingStats)
         if sample_nnz < 1:
             raise ValueError("sample_nnz must be positive")
