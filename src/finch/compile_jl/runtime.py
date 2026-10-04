@@ -180,6 +180,9 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         self._kernel_metadata: dict[int, _KernalMetadata] = {}
         self._translated_tensors: dict[_TranslationCacheKey, JuliaOwnedTensor] = {}
         self.free_pool = _StoragePool()
+        # Shape last leased for each (kernel, reset position), used when the
+        # caller passes None for that argument.
+        self._reset_shapes: dict[tuple[int, int], tuple[int, ...]] = {}
 
     def get_cached_kernel(self, key):
         return self._kernels.get(key)
@@ -192,6 +195,12 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         )
 
     def kernel_call(self, func_name, kernel, args):
+        """Call ``kernel`` on ``args``.
+
+        A reset position may be passed ``None``: the kernel overwrites that
+        argument before reading it, so the runtime leases storage using the
+        kernel's declared ftype and the shape last leased for that position.
+        """
         metadata = self._kernel_metadata[id(kernel)]
 
         # Lease Julia storage only for resettable compiler-created outputs.
@@ -201,18 +210,36 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             if position in metadata.reset_positions and not isinstance(
                 tensor, JuliaOwnedTensor
             ):
+                if tensor is None:
+                    ftype = kernel.finch_program.args[position].type_
+                    try:
+                        shape = self._reset_shapes[(id(kernel), position)]
+                    except KeyError as error:
+                        raise ValueError(
+                            f"Argument {position} of {func_name} is None, but no "
+                            "tensor has been passed for it to take a shape from"
+                        ) from error
+                else:
+                    ftype = tensor.ftype
+                    shape = tuple(int(dimension) for dimension in tensor.shape)
+                    self._reset_shapes[(id(kernel), position)] = shape
                 lease = self.free_pool.acquire(
-                    tensor.ftype,
-                    tensor.shape,
+                    ftype,
+                    shape,
                     pin_fill,
                 )
                 julia_buf = JuliaOwnedTensor(
-                    tensor.ftype,
+                    ftype,
                     lease.key.shape,
                     self.release,
                     lease.raw,
                     lease.key.pin_fill,
                     lease,
+                )
+            elif tensor is None:
+                raise ValueError(
+                    f"Argument {position} of {func_name} is None, but only "
+                    "arguments the kernel resets before reading may be None"
                 )
             else:
                 julia_buf = self._to_julia_owned_tensor(tensor, pin_fill)
