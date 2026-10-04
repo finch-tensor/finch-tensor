@@ -1,0 +1,783 @@
+{
+  "block_count": 5,
+  "geomean_q_error": {
+    "Blocked-Uniform": 2.448244,
+    "DC": 1.362492,
+    "Dense": 10.825526,
+    "LP": 1.361677,
+    "Sampling_0.5": 2.309909,
+    "Uniform": 4.242992
+  },
+  "matrix_size": 100,
+  "results": {
+    "Hadamard": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 455.75,
+          "q_error": 2.347778,
+          "ratio": 0.425935
+        },
+        "DC": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1070.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 10000.0,
+          "q_error": 9.345794,
+          "ratio": 9.345794
+        },
+        "LP": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1070.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1096.0,
+          "q_error": 1.024299,
+          "ratio": 1.024299
+        },
+        "Uniform": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 114.49,
+          "q_error": 9.345794,
+          "ratio": 0.107
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 5.0,
+          "q_error": 20.0,
+          "ratio": 0.05
+        },
+        "DC": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100,
+          "estimated_nnz": 10000.0,
+          "q_error": 100.0,
+          "ratio": 100.0
+        },
+        "LP": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 1.0,
+          "q_error": 100.0,
+          "ratio": 0.01
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 400.0,
+          "q_error": 5.0,
+          "ratio": 0.2
+        },
+        "DC": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2400.0,
+          "q_error": 1.2,
+          "ratio": 1.2
+        },
+        "Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 400.0,
+          "q_error": 5.0,
+          "ratio": 0.2
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 4551.25,
+          "q_error": 1.109585,
+          "ratio": 0.901238
+        },
+        "DC": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5050.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "LP": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5050.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5124.0,
+          "q_error": 1.014653,
+          "ratio": 1.014653
+        },
+        "Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 2550.25,
+          "q_error": 1.980198,
+          "ratio": 0.505
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 298,
+          "estimated_nnz": 42.07,
+          "q_error": 7.083432,
+          "ratio": 0.141174
+        },
+        "DC": {
+          "actual_nnz": 298,
+          "estimated_nnz": 298.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 298,
+          "estimated_nnz": 10000.0,
+          "q_error": 33.557047,
+          "ratio": 33.557047
+        },
+        "LP": {
+          "actual_nnz": 298,
+          "estimated_nnz": 298.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 298,
+          "estimated_nnz": 312.0,
+          "q_error": 1.04698,
+          "ratio": 1.04698
+        },
+        "Uniform": {
+          "actual_nnz": 298,
+          "estimated_nnz": 8.8804,
+          "q_error": 33.557047,
+          "ratio": 0.0298
+        }
+      }
+    },
+    "SpGEMM": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 3695.822862,
+          "q_error": 1.857197,
+          "ratio": 1.857197
+        },
+        "DC": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.025126,
+          "ratio": 5.025126
+        },
+        "Dense": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.025126,
+          "ratio": 5.025126
+        },
+        "LP": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.025126,
+          "ratio": 5.025126
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 478.493752,
+          "q_error": 4.158884,
+          "ratio": 0.240449
+        },
+        "Uniform": {
+          "actual_nnz": 1990,
+          "estimated_nnz": 6838.392328,
+          "q_error": 3.436378,
+          "ratio": 3.436378
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 97.660249,
+          "q_error": 1.023958,
+          "ratio": 0.976602
+        },
+        "DC": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100,
+          "estimated_nnz": 10000.0,
+          "q_error": 100.0,
+          "ratio": 100.0
+        },
+        "LP": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 100,
+          "estimated_nnz": 96.0,
+          "q_error": 1.041667,
+          "ratio": 0.96
+        },
+        "Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 99.506613,
+          "q_error": 1.004958,
+          "ratio": 0.995066
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 9831.296806,
+          "q_error": 4.915648,
+          "ratio": 4.915648
+        },
+        "DC": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 600.0,
+          "q_error": 3.333333,
+          "ratio": 0.3
+        },
+        "Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 9831.296806,
+          "q_error": 4.915648,
+          "ratio": 4.915648
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5996.835544,
+          "q_error": 1.187492,
+          "ratio": 1.187492
+        },
+        "DC": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "Dense": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "LP": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 1263.529211,
+          "q_error": 3.996742,
+          "ratio": 0.250204
+        },
+        "Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 494,
+          "estimated_nnz": 739.073782,
+          "q_error": 1.496101,
+          "ratio": 1.496101
+        },
+        "DC": {
+          "actual_nnz": 494,
+          "estimated_nnz": 894.0,
+          "q_error": 1.809717,
+          "ratio": 1.809717
+        },
+        "Dense": {
+          "actual_nnz": 494,
+          "estimated_nnz": 10000.0,
+          "q_error": 20.242915,
+          "ratio": 20.242915
+        },
+        "LP": {
+          "actual_nnz": 494,
+          "estimated_nnz": 890.0,
+          "q_error": 1.801619,
+          "ratio": 1.801619
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 494,
+          "estimated_nnz": 175.310345,
+          "q_error": 2.81786,
+          "ratio": 0.354879
+        },
+        "Uniform": {
+          "actual_nnz": 494,
+          "estimated_nnz": 850.111999,
+          "q_error": 1.720874,
+          "ratio": 1.720874
+        }
+      }
+    },
+    "SpGEMM2": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 6379.128676,
+          "q_error": 2.230465,
+          "ratio": 2.230465
+        },
+        "DC": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 10000.0,
+          "q_error": 3.496503,
+          "ratio": 3.496503
+        },
+        "Dense": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 10000.0,
+          "q_error": 3.496503,
+          "ratio": 3.496503
+        },
+        "LP": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 10000.0,
+          "q_error": 3.496503,
+          "ratio": 3.496503
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 634.564183,
+          "q_error": 4.50703,
+          "ratio": 0.221876
+        },
+        "Uniform": {
+          "actual_nnz": 2860,
+          "estimated_nnz": 9994.988464,
+          "q_error": 3.494751,
+          "ratio": 3.494751
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 95.427928,
+          "q_error": 1.047911,
+          "ratio": 0.954279
+        },
+        "DC": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100,
+          "estimated_nnz": 10000.0,
+          "q_error": 100.0,
+          "ratio": 100.0
+        },
+        "LP": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 100,
+          "estimated_nnz": 64.0,
+          "q_error": 1.5625,
+          "ratio": 0.64
+        },
+        "Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 99.018075,
+          "q_error": 1.009917,
+          "ratio": 0.990181
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 9999.999997,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "DC": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 600.0,
+          "q_error": 3.333333,
+          "ratio": 0.3
+        },
+        "Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 9999.999997,
+          "q_error": 5.0,
+          "ratio": 5.0
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5999.999292,
+          "q_error": 1.188119,
+          "ratio": 1.188119
+        },
+        "DC": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "Dense": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "LP": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 1225.162255,
+          "q_error": 4.121903,
+          "ratio": 0.242606
+        },
+        "Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 688,
+          "estimated_nnz": 1473.505633,
+          "q_error": 2.141723,
+          "ratio": 2.141723
+        },
+        "DC": {
+          "actual_nnz": 688,
+          "estimated_nnz": 2682.0,
+          "q_error": 3.898256,
+          "ratio": 3.898256
+        },
+        "Dense": {
+          "actual_nnz": 688,
+          "estimated_nnz": 10000.0,
+          "q_error": 14.534884,
+          "ratio": 14.534884
+        },
+        "LP": {
+          "actual_nnz": 688,
+          "estimated_nnz": 2662.0,
+          "q_error": 3.869186,
+          "ratio": 3.869186
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 688,
+          "estimated_nnz": 124.444444,
+          "q_error": 5.528571,
+          "ratio": 0.180879
+        },
+        "Uniform": {
+          "actual_nnz": 688,
+          "estimated_nnz": 2240.403889,
+          "q_error": 3.256401,
+          "ratio": 3.256401
+        }
+      }
+    },
+    "Triangle Counting": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1006.066208,
+          "q_error": 1.063548,
+          "ratio": 0.940249
+        },
+        "DC": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1070.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 10000.0,
+          "q_error": 9.345794,
+          "ratio": 9.345794
+        },
+        "LP": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 1070.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 275.320028,
+          "q_error": 3.886386,
+          "ratio": 0.257308
+        },
+        "Uniform": {
+          "actual_nnz": 1070,
+          "estimated_nnz": 731.707979,
+          "q_error": 1.462332,
+          "ratio": 0.683839
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 4.883012,
+          "q_error": 20.479161,
+          "ratio": 0.04883
+        },
+        "DC": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100,
+          "estimated_nnz": 10000.0,
+          "q_error": 100.0,
+          "ratio": 100.0
+        },
+        "LP": {
+          "actual_nnz": 100,
+          "estimated_nnz": 100.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 100,
+          "estimated_nnz": 96.0,
+          "q_error": 1.041667,
+          "ratio": 0.96
+        },
+        "Uniform": {
+          "actual_nnz": 100,
+          "estimated_nnz": 0.995066,
+          "q_error": 100.0,
+          "ratio": 0.01
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 1966.259361,
+          "q_error": 1.01716,
+          "ratio": 0.98313
+        },
+        "DC": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 10000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 2000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 600.0,
+          "q_error": 3.333333,
+          "ratio": 0.3
+        },
+        "Uniform": {
+          "actual_nnz": 2000,
+          "estimated_nnz": 1966.259361,
+          "q_error": 1.01716,
+          "ratio": 0.98313
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5048.338661,
+          "q_error": 1.000329,
+          "ratio": 0.999671
+        },
+        "DC": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5050.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 10000.0,
+          "q_error": 1.980198,
+          "ratio": 1.980198
+        },
+        "LP": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5050.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 1263.529211,
+          "q_error": 3.996742,
+          "ratio": 0.250204
+        },
+        "Uniform": {
+          "actual_nnz": 5050,
+          "estimated_nnz": 5050.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 298,
+          "estimated_nnz": 100.556726,
+          "q_error": 2.963501,
+          "ratio": 0.337439
+        },
+        "DC": {
+          "actual_nnz": 298,
+          "estimated_nnz": 298.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 298,
+          "estimated_nnz": 10000.0,
+          "q_error": 33.557047,
+          "ratio": 33.557047
+        },
+        "LP": {
+          "actual_nnz": 298,
+          "estimated_nnz": 298.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_0.5": {
+          "actual_nnz": 298,
+          "estimated_nnz": 97.622718,
+          "q_error": 3.052568,
+          "ratio": 0.327593
+        },
+        "Uniform": {
+          "actual_nnz": 298,
+          "estimated_nnz": 25.333338,
+          "q_error": 11.763156,
+          "ratio": 0.085011
+        }
+      }
+    }
+  },
+  "seed": 42
+}
