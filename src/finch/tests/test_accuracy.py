@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+from functools import cache
 from io import BytesIO
 
 import pytest
@@ -92,38 +93,39 @@ DATASETS = {
 }
 
 
-def est_hadamard(factory, tns_a, tns_b):
-    s_a = factory(tns_a, (i, j))
-    s_b = factory(tns_b, (i, j))
-    return factory.mapjoin(ffuncs.mul, s_a, s_b).estimate_non_fill_values()
+def estimate_kernels(factory, tensor):
+    @cache
+    def stats(fields):
+        return factory(tensor, fields)
 
-
-def est_spgemm(factory, tns_a, tns_b):
-    s_a = factory(tns_a, (i, k))
-    s_b = factory(tns_b, (k, j))
-    mm = factory.mapjoin(ffuncs.mul, s_a, s_b)
-    return factory.aggregate(ffuncs.add, 0.0, (k,), mm).estimate_non_fill_values()
-
-
-def est_spgemm2(factory, tns_a, tns_b):
-    s_a = factory(tns_a, (i, ell))
-    s_b1 = factory(tns_b, (ell, k))
-    mm1 = factory.aggregate(
-        ffuncs.add, 0.0, (ell,), factory.mapjoin(ffuncs.mul, s_a, s_b1)
+    # These datasets use the same matrix for every operand. Reuse its statistics
+    # for each field order, preserving distinct sampling masks for distinct fields.
+    hadamard = factory.mapjoin(ffuncs.mul, stats((i, j)), stats((i, j)))
+    spgemm = factory.aggregate(
+        ffuncs.add,
+        0.0,
+        (k,),
+        factory.mapjoin(ffuncs.mul, stats((i, k)), stats((k, j))),
     )
-    s_b2 = factory(tns_b, (k, j))
-    mm2 = factory.mapjoin(ffuncs.mul, mm1, s_b2)
-    return factory.aggregate(ffuncs.add, 0.0, (k,), mm2).estimate_non_fill_values()
-
-
-def est_triangle(factory, tns_a):
-    s_a1 = factory(tns_a, (i, k))
-    s_a2 = factory(tns_a, (k, j))
-    mm = factory.aggregate(
-        ffuncs.add, 0.0, (k,), factory.mapjoin(ffuncs.mul, s_a1, s_a2)
+    first_product = factory.aggregate(
+        ffuncs.add,
+        0.0,
+        (ell,),
+        factory.mapjoin(ffuncs.mul, stats((i, ell)), stats((ell, k))),
     )
-    s_a3 = factory(tns_a, (i, j))
-    return factory.mapjoin(ffuncs.mul, mm, s_a3).estimate_non_fill_values()
+    spgemm2 = factory.aggregate(
+        ffuncs.add,
+        0.0,
+        (k,),
+        factory.mapjoin(ffuncs.mul, first_product, stats((k, j))),
+    )
+    triangle = factory.mapjoin(ffuncs.mul, spgemm, stats((i, j)))
+    return {
+        "Hadamard": hadamard.estimate_non_fill_values(),
+        "SpGEMM": spgemm.estimate_non_fill_values(),
+        "SpGEMM2": spgemm2.estimate_non_fill_values(),
+        "Triangle Counting": triangle.estimate_non_fill_values(),
+    }
 
 
 @pytest.fixture(scope="module")
@@ -132,24 +134,18 @@ def accuracy_results():
     q_errors = {model: [] for model in make_models()}
     for dataset, make_matrix in DATASETS.items():
         a = sps.csr_array(make_matrix(N))
-        b = a.copy()
-        tns_a, tns_b = ft.asarray(a), ft.asarray(b)
-        ab = a @ b
+        tensor = ft.asarray(a)
+        aa = a @ a
         actual = {
-            "Hadamard": int(a.multiply(b).count_nonzero()),
-            "SpGEMM": int(ab.count_nonzero()),
-            "SpGEMM2": int((ab @ b).count_nonzero()),
-            "Triangle Counting": int((a @ a).multiply(a).count_nonzero()),
+            "Hadamard": int(a.multiply(a).count_nonzero()),
+            "SpGEMM": int(aa.count_nonzero()),
+            "SpGEMM2": int((aa @ a).count_nonzero()),
+            "Triangle Counting": int(aa.multiply(a).count_nonzero()),
         }
         # Fresh factories isolate sampling masks between datasets.
         for model, factory in make_models().items():
             logging.getLogger(__name__).info("Estimating %s with %s", dataset, model)
-            estimates = {
-                "Hadamard": est_hadamard(factory, tns_a, tns_b),
-                "SpGEMM": est_spgemm(factory, tns_a, tns_b),
-                "SpGEMM2": est_spgemm2(factory, tns_a, tns_b),
-                "Triangle Counting": est_triangle(factory, tns_a),
-            }
+            estimates = estimate_kernels(factory, tensor)
             for kernel, estimate in estimates.items():
                 estimate = float(estimate)
                 assert np.isfinite(estimate) and estimate >= 0, (
@@ -178,13 +174,6 @@ def accuracy_results():
             for model, errors in q_errors.items()
         },
     }
-
-
-def test_statistics_accuracy(accuracy_results, file_regression):
-    file_regression.check(
-        json.dumps(accuracy_results, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        extension=".json",
-    )
 
 
 def plot_accuracy(results):
@@ -243,12 +232,17 @@ def plot_geomean(geomeans):
     return fig
 
 
-@pytest.mark.parametrize("view", ["accuracy", "geomean"])
-def test_statistics_accuracy_plot(accuracy_results, image_regression, view):
-    if view == "accuracy":
-        fig = plot_accuracy(accuracy_results["results"])
-    else:
-        fig = plot_geomean(accuracy_results["geomean_q_error"])
-    with BytesIO() as output:
-        fig.savefig(output, format="png", dpi=100)
-        image_regression.check(output.getvalue())
+def test_statistics_accuracy(accuracy_results, file_regression, image_regression):
+    file_regression.check(
+        json.dumps(accuracy_results, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        extension=".json",
+    )
+    for view, fig in (
+        ("accuracy", plot_accuracy(accuracy_results["results"])),
+        ("geomean", plot_geomean(accuracy_results["geomean_q_error"])),
+    ):
+        with BytesIO() as output:
+            fig.savefig(output, format="png", dpi=100)
+            image_regression.check(
+                output.getvalue(), basename=f"test_statistics_accuracy_plot_{view}_"
+            )
