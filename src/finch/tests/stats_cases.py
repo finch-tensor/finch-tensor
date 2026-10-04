@@ -20,7 +20,8 @@ from finch.autoschedule.tensor_stats.sampling_stats import SAMPLING_ESTIMATORS
 from finch.finch_logic import Field
 
 i, j, k, ell = (Field(name) for name in "ijkl")
-N = 100
+DENSE_MATRIX_SIZE = 1_000
+SPARSE_MATRIX_SIZE = 100_000
 RANDOM_MATRIX_SIZE = 10_000
 RANDOM_DENSITY = 0.001
 BLOCK_COUNT = 5
@@ -45,17 +46,24 @@ def make_models():
 
 
 def make_diagonal(n):
-    return np.eye(n, dtype=np.float64)
+    return sps.eye_array(n, dtype=np.float64, format="csr")
 
 
 def make_tridiagonal(n):
-    A = np.eye(n, k=0) + np.eye(n, k=1) + np.eye(n, k=-1)
-    return (A > 0).astype(np.float64)
+    return make_banded(n, bw=1)
 
 
 def make_banded(n, bw=5):
-    r, c = np.indices((n, n))
-    return (np.abs(r - c) <= bw).astype(np.float64)
+    if n == 0:
+        return sps.csr_array((0, 0), dtype=np.float64)
+    width = min(bw, n - 1)
+    offsets = range(-width, width + 1)
+    return sps.diags_array(
+        [np.ones(n - abs(offset)) for offset in offsets],
+        offsets=offsets,
+        shape=(n, n),
+        format="csr",
+    )
 
 
 def make_triangular(n):
@@ -92,11 +100,11 @@ def make_uniform_random():
 
 
 DATASETS = {
-    "Diagonal": partial(make_diagonal, N),
-    "Tridiagonal": partial(make_tridiagonal, N),
-    "Banded": partial(make_banded, N),
-    "Triangular": partial(make_triangular, N),
-    "Striped": partial(make_striped, N),
+    "Diagonal": partial(make_diagonal, SPARSE_MATRIX_SIZE),
+    "Tridiagonal": partial(make_tridiagonal, SPARSE_MATRIX_SIZE),
+    "Banded": partial(make_banded, SPARSE_MATRIX_SIZE),
+    "Triangular": partial(make_triangular, DENSE_MATRIX_SIZE),
+    "Striped": partial(make_striped, DENSE_MATRIX_SIZE),
     "Uniform Random": make_uniform_random,
     "ct20stif": partial(load_matrix_market, "ct20stif.mtx"),
     "roadNet-PA": partial(load_matrix_market, "roadNet-PA.mtx"),
@@ -104,7 +112,7 @@ DATASETS = {
 }
 
 
-def make_kernel_estimator(factory, tensor):
+def make_kernel_stats(factory, tensor):
     @cache
     def stats(fields):
         return factory(tensor, fields)
@@ -118,7 +126,7 @@ def make_kernel_estimator(factory, tensor):
             factory.mapjoin(ffuncs.mul, stats(left), stats(right)),
         )
 
-    def estimate(kernel):
+    def kernel_stats(kernel):
         match kernel:
             case "Hadamard":
                 result = factory.mapjoin(ffuncs.mul, stats((i, j)), stats((i, j)))
@@ -139,6 +147,15 @@ def make_kernel_estimator(factory, tensor):
                 )
             case _:
                 raise ValueError(f"Unknown statistics kernel: {kernel}")
-        return result.estimate_non_fill_values()
+        return result
+
+    return kernel_stats
+
+
+def make_kernel_estimator(factory, tensor):
+    kernel_stats = make_kernel_stats(factory, tensor)
+
+    def estimate(kernel):
+        return kernel_stats(kernel).estimate_non_fill_values()
 
     return estimate

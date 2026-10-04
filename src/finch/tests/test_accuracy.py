@@ -7,12 +7,14 @@ Regenerate with::
 Bundled Matrix Market inputs retain their full dimensions. Input values are
 normalized to their nonzero pattern to avoid signed cancellation. The uniform
 random matrix and sampling factories are seeded; JSON is rounded to six decimals.
+Synthetic inputs exceed the sampling budget. Sampling estimators share sketches.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 from io import BytesIO
 
 import pytest
@@ -24,19 +26,27 @@ from matplotlib import colormaps
 from matplotlib.figure import Figure
 
 import finch as ft
+from finch.autoschedule.tensor_stats.sampling_stats import (
+    SamplingStats,
+    SamplingStatsFactory,
+)
 from finch.compile_jl.julia import julia_available
 from finch.tests.stats_cases import (
     BLOCK_COUNT,
     DATASETS,
+    DENSE_MATRIX_SIZE,
     KERNELS,
     RANDOM_DENSITY,
     RANDOM_MATRIX_SIZE,
     SAMPLE_NNZ,
     SEED,
-    N,
+    SPARSE_MATRIX_SIZE,
     make_kernel_estimator,
+    make_kernel_stats,
     make_models,
 )
+
+GEOMEAN_DATASETS = ("ct20stif", "roadNet-PA", "soc-sign-epinions")
 
 pytestmark = [
     pytest.mark.slow,
@@ -72,11 +82,36 @@ def accuracy_results():
         tensor = ft.asarray(a)
         logging.getLogger(__name__).info("Computing reference counts for %s", dataset)
         actual = actual_nonzeros(a)
+        sampling_stats: dict[str, SamplingStats] = {}
         # Fresh factories isolate sampling masks between datasets.
         for model, factory in make_models().items():
             logging.getLogger(__name__).info("Estimating %s with %s", dataset, model)
-            estimate_kernel = make_kernel_estimator(factory, tensor)
-            estimates = {kernel: estimate_kernel(kernel) for kernel in KERNELS}
+            match factory:
+                case SamplingStatsFactory():
+                    # Sampling variants use identical budgets and seeds; only
+                    # the estimator applied to the materialized sketch differs.
+                    if not sampling_stats:
+                        kernel_stats = make_kernel_stats(factory, tensor)
+                        sampling_stats = {
+                            kernel: kernel_stats(kernel) for kernel in KERNELS
+                        }
+                        for kernel, stats in sampling_stats.items():
+                            _, nnz, _, _ = stats.scan(needs_freq=True)
+                            assert nnz <= SAMPLE_NNZ
+                            assert (
+                                math.prod(stats.sample_probs) * stats.remainder_prob < 1
+                            )
+                            logging.getLogger(__name__).info(
+                                "%s / %s: %s retained nonzeros", dataset, kernel, nnz
+                            )
+                    estimates = {}
+                    for kernel, cached_stats in sampling_stats.items():
+                        stats = factory.copy(cached_stats)
+                        stats.estimator = factory.estimator
+                        estimates[kernel] = stats.estimate_non_fill_values()
+                case _:
+                    estimate_kernel = make_kernel_estimator(factory, tensor)
+                    estimates = {kernel: estimate_kernel(kernel) for kernel in KERNELS}
             for kernel, estimate in estimates.items():
                 estimate = float(estimate)
                 assert np.isfinite(estimate) and estimate >= 0, (
@@ -88,7 +123,8 @@ def accuracy_results():
                 # Clamp only for ratios, retaining the raw counts in the reference.
                 ratio = max(estimate, 1) / max(actual[kernel], 1)
                 q_error = max(ratio, 1 / ratio)
-                q_errors[model].append(q_error)
+                if dataset in GEOMEAN_DATASETS:
+                    q_errors[model].append(q_error)
                 results[kernel].setdefault(dataset, {})[model] = {
                     "actual_nnz": actual[kernel],
                     "estimated_nnz": round(estimate, 6),
@@ -96,13 +132,15 @@ def accuracy_results():
                     "q_error": round(q_error, 6),
                 }
     return {
-        "matrix_size": N,
+        "dense_matrix_size": DENSE_MATRIX_SIZE,
+        "sparse_matrix_size": SPARSE_MATRIX_SIZE,
         "random_matrix_size": RANDOM_MATRIX_SIZE,
         "random_density": RANDOM_DENSITY,
         "datasets": datasets,
         "block_count": BLOCK_COUNT,
         "seed": SEED,
         "sample_nnz": SAMPLE_NNZ,
+        "geomean_datasets": list(GEOMEAN_DATASETS),
         "results": results,
         "geomean_q_error": {
             model: round(float(np.exp(np.mean(np.log(errors)))), 6)
@@ -166,7 +204,12 @@ def plot_geomean(geomeans):
     ax.axhline(1, color="black", linestyle="--", label="Perfect estimate")
     ax.set_yscale("log", base=2)
     ax.set_xticks(x, models, rotation=35, ha="right", fontsize=9)
-    ax.set(ylabel="Geometric mean q-error", title="Overall estimator accuracy")
+    ax.set(
+        ylabel="Geometric mean q-error",
+        title="Estimator accuracy — real matrices only\n"
+        + ", ".join(GEOMEAN_DATASETS)
+        + f" ({len(KERNELS)} kernels each)",
+    )
     ax.legend()
     return fig
 
