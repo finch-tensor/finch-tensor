@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from itertools import product
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import numpy as np
 
-import finch as ft
-from finch.algebra import as_fill, ftype
+from finch.algebra import ftype
 from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.tensor import (
     DenseLevel,
@@ -17,7 +17,6 @@ from finch.tensor import (
     OverrideTensor,
     SparseCOOLevel,
     SparseListLevel,
-    dense,
     element,
 )
 
@@ -67,6 +66,7 @@ class SwizzleTensor(OverrideTensor):
     def to_scipy(self):
         dense_arr = self.to_numpy()
         import scipy.sparse as sps
+
         return sps.coo_matrix(dense_arr)
 
     def to_numpy(self) -> np.ndarray:
@@ -261,7 +261,8 @@ def bspread_check_version(version_str: str) -> None:
     supp = [int(p) for p in BINSPARSE_VERSION.split(".")]
     if parts[0] != supp[0] or parts[1] != supp[1] or parts[2] > supp[2]:
         raise ValueError(
-            f"unsupported Binsparse version {version_str}; expected {supp[0]}.{supp[1]}.x <= {BINSPARSE_VERSION}"
+            f"unsupported Binsparse version {version_str};"  # noqa: G001
+            f"expected {supp[0]}.{supp[1]}.x <= {BINSPARSE_VERSION}"
         )
 
 
@@ -353,7 +354,9 @@ def bspwrite_vector(f: Any, key: str, val: np.ndarray) -> None:
     raise TypeError(f"Cannot write vector {key!r} to container {type(f)}")
 
 
-def bspread_data(f: Any, desc: dict[str, Any], key: str, dtype_str: str | None = None) -> np.ndarray:
+def bspread_data(
+    f: Any, desc: dict[str, Any], key: str, dtype_str: str | None = None
+) -> np.ndarray:
     if dtype_str is None:
         dtype_str = desc["data_types"][key]
 
@@ -470,7 +473,11 @@ def bspread(f: Any) -> Any:
 
 
 def bspread_level(
-    f: Any, desc: dict[str, Any], fmt_level: dict[str, Any], stored_shape: tuple[int, ...], depth: int = 0
+    f: Any,
+    desc: dict[str, Any],
+    fmt_level: dict[str, Any],
+    stored_shape: tuple[int, ...],
+    depth: int = 0,
 ) -> Any:
     level_desc = fmt_level["level_desc"]
     match level_desc:
@@ -490,7 +497,9 @@ def bspread_level(
         case "dense":
             rank = fmt_level["rank"]
             shape = stored_shape[depth : depth + rank]
-            child_lvl = bspread_level(f, desc, fmt_level["level"], stored_shape, depth + rank)
+            child_lvl = bspread_level(
+                f, desc, fmt_level["level"], stored_shape, depth + rank
+            )
             lvl = child_lvl
             for s in reversed(shape):
                 lvl = DenseLevel(lvl, np.intp(s))
@@ -498,7 +507,9 @@ def bspread_level(
         case "sparse":
             rank = fmt_level["rank"]
             shape = stored_shape[depth : depth + rank]
-            child_lvl = bspread_level(f, desc, fmt_level["level"], stored_shape, depth + rank)
+            child_lvl = bspread_level(
+                f, desc, fmt_level["level"], stored_shape, depth + rank
+            )
             if depth > 0:
                 ptr = bspread_data(f, desc, f"pointers_to_{depth}")
             else:
@@ -506,20 +517,33 @@ def bspread_level(
                 ptr = np.array([0, len(first_idx)], dtype=np.intp)
             ptr_arr = np.asarray(ptr, dtype=np.intp)
             if rank == 1:
-                idx_arr = np.asarray(bspread_data(f, desc, f"indices_{depth}"), dtype=np.intp)
+                idx_arr = np.asarray(
+                    bspread_data(f, desc, f"indices_{depth}"), dtype=np.intp
+                )
                 return SparseListLevel(
-                    child_lvl, np.intp(shape[0]), NumpyBuffer(ptr_arr), NumpyBuffer(idx_arr)
+                    child_lvl,
+                    np.intp(shape[0]),
+                    NumpyBuffer(ptr_arr),
+                    NumpyBuffer(idx_arr),
                 )
             tbl = tuple(
-                NumpyBuffer(np.asarray(bspread_data(f, desc, f"indices_{depth + r}"), dtype=np.intp))
+                NumpyBuffer(
+                    np.asarray(
+                        bspread_data(f, desc, f"indices_{depth + r}"), dtype=np.intp
+                    )
+                )
                 for r in range(rank)
             )
-            return SparseCOOLevel(child_lvl, tuple(np.intp(s) for s in shape), NumpyBuffer(ptr_arr), tbl)
+            return SparseCOOLevel(
+                child_lvl, tuple(np.intp(s) for s in shape), NumpyBuffer(ptr_arr), tbl
+            )
         case _:
             raise ValueError(f"Unknown level descriptor: {level_desc}")
 
 
-def bspwrite_level(f: Any, desc: dict[str, Any], fmt: dict[str, Any], lvl: Any, depth: int = 0) -> None:
+def bspwrite_level(
+    f: Any, desc: dict[str, Any], fmt: dict[str, Any], lvl: Any, depth: int = 0
+) -> None:
     match lvl:
         case ElementLevel():
             fmt["level_desc"] = "element"
@@ -529,7 +553,8 @@ def bspwrite_level(f: Any, desc: dict[str, Any], fmt: dict[str, Any], lvl: Any, 
                 fill_val = fill_val.value
             bspwrite_data(f, desc, "values", val_arr)
             fill_arr = np.array(
-                [fill_val], dtype=val_arr.dtype if val_arr.size > 0 else np.asarray(fill_val).dtype
+                [fill_val],
+                dtype=val_arr.dtype if val_arr.size > 0 else np.asarray(fill_val).dtype,
             )
             bspwrite_data(f, desc, "fill_value", fill_arr)
         case DenseLevel(child_lvl):
@@ -566,13 +591,17 @@ def bspwrite_level(f: Any, desc: dict[str, Any], fmt: dict[str, Any], lvl: Any, 
 def find_format_alias(custom: dict[str, Any]) -> str | None:
     for alias_name in bspwrite_format_order:
         target = bspread_tensor_lookup[alias_name]
-        if custom.get("transpose") == target.get("transpose"):
-            if custom["level"] == target["level"]:
-                return alias_name
+        if (
+            custom.get("transpose") == target.get("transpose")
+            and custom["level"] == target["level"]
+        ):
+            return alias_name
     return None
 
 
-def bspwrite_tensor(f: Any, arr: Any, attrs: dict[str, Any] | None = None, alias: bool | None = None) -> None:
+def bspwrite_tensor(
+    f: Any, arr: Any, attrs: dict[str, Any] | None = None, alias: bool | None = None
+) -> None:
     match arr:
         case SwizzleTensor(body, dims):
             transpose = [0] * len(dims)
@@ -619,7 +648,10 @@ def bspwrite_tensor(f: Any, arr: Any, attrs: dict[str, Any] | None = None, alias
 
 
 def bspwrite(
-    target: Any, arr: Any, attrs: dict[str, Any] | None = None, alias: bool | None = None
+    target: Any,
+    arr: Any,
+    attrs: dict[str, Any] | None = None,
+    alias: bool | None = None,
 ) -> None:
     if isinstance(target, (str, Path)):
         p = Path(target)
@@ -658,7 +690,9 @@ def fwrite(filename: str | Path, tns: Any) -> None:
     raise ValueError(f"Unknown file extension for {filename}")
 
 
-def finch_tensor(dense: np.ndarray, pat: np.ndarray, fill_value: Any, header: dict[str, Any]) -> Any:
+def finch_tensor(
+    dense: np.ndarray, pat: np.ndarray, fill_value: Any, header: dict[str, Any]
+) -> Any:
     fmt = binsparse_format(header)
     transpose = tuple(fmt.get("transpose", range(dense.ndim)))
 
@@ -719,9 +753,12 @@ def finch_level(
             shape = stored.shape[depth : depth + rank]
             children = []
             for p in parents:
-                for suffix in product(*(range(s) for s in shape)):
-                    children.append((*p, *suffix))
-            child_lvl = finch_level(fmt["level"], stored, coords, children, depth + rank, fill_value)
+                children.extend(
+                    (*p, *suffix) for suffix in product(*(range(s) for s in shape))
+                )
+            child_lvl = finch_level(
+                fmt["level"], stored, coords, children, depth + rank, fill_value
+            )
             lvl = child_lvl
             for s in reversed(shape):
                 lvl = DenseLevel(lvl, np.intp(s))
@@ -741,7 +778,9 @@ def finch_level(
                             seen.add(suffix)
                             children.append(c[: depth + rank])
                 ptr.append(len(children))
-            child_lvl = finch_level(fmt["level"], stored, coords, children, depth + rank, fill_value)
+            child_lvl = finch_level(
+                fmt["level"], stored, coords, children, depth + rank, fill_value
+            )
             ptr_arr = np.array(ptr, dtype=np.intp)
             if rank == 1:
                 idx_arr = np.array([c[-1] for c in children], dtype=np.intp)
@@ -765,7 +804,9 @@ def finch_level(
             raise ValueError(f"Unknown level descriptor: {level_desc}")
 
 
-def level_to_coo(lvl: Any, parents: list[tuple[int, ...]], shape: tuple[int, ...], depth: int = 0) -> list[tuple[tuple[int, ...], Any]]:
+def level_to_coo(
+    lvl: Any, parents: list[tuple[int, ...]], shape: tuple[int, ...], depth: int = 0
+) -> list[tuple[tuple[int, ...], Any]]:
     match lvl:
         case ElementLevel():
             val_arr = lvl.val.arr if hasattr(lvl.val, "arr") else np.asarray(lvl.val)
@@ -774,8 +815,7 @@ def level_to_coo(lvl: Any, parents: list[tuple[int, ...]], shape: tuple[int, ...
             dim = int(dimension)
             children = []
             for p in parents:
-                for i in range(dim):
-                    children.append((*p, i))
+                children.extend((*p, i) for i in range(dim))
             return level_to_coo(child_lvl, children, shape, depth + 1)
         case SparseListLevel(child_lvl, _, ptr, idx):
             ptr_arr = ptr.arr if hasattr(ptr, "arr") else np.asarray(ptr)
@@ -862,14 +902,13 @@ def get_levels(fmt: dict[str, Any]) -> list[tuple[str, int]]:
     if kind == "element":
         return [(kind, 0)]
     rank = fmt["rank"]
-    if kind == "dense":
-        here = [(kind, 1)] * rank
-    else:
-        here = [(kind, rank)]
+    here = [(kind, 1)] * rank if kind == "dense" else [(kind, rank)]
     return here + get_levels(fmt["level"])
 
 
-def match_header(path_or_file: Any, requested: dict[str, Any], rename_aliases: bool = True) -> None:
+def match_header(
+    path_or_file: Any, requested: dict[str, Any], rename_aliases: bool = True
+) -> None:
     if isinstance(path_or_file, (str, Path)):
         p = Path(path_or_file)
         if p.suffix.lower() in (".h5", ".hdf5"):
@@ -887,18 +926,20 @@ def match_header(path_or_file: Any, requested: dict[str, Any], rename_aliases: b
     _match_header_container(path_or_file, requested, rename_aliases)
 
 
-def _match_header_container(f: Any, requested: dict[str, Any], rename_aliases: bool) -> None:
+def _match_header_container(
+    f: Any, requested: dict[str, Any], rename_aliases: bool
+) -> None:
     desc_wrap = bspread_header(f)
     actual = desc_wrap["binsparse"]
     requested_custom = requested["format"] == "custom"
     actual_custom = actual["format"] == "custom"
 
-    if (actual_custom == requested_custom) and (requested_custom or rename_aliases):
-        if get_layout(actual) == get_layout(requested):
-            actual["format"] = requested["format"]
-            actual.pop("custom", None)
-            if "custom" in requested:
-                actual["custom"] = requested["custom"]
+    if (
+        (actual_custom == requested_custom)
+        and (requested_custom or rename_aliases)
+        and get_layout(actual) == get_layout(requested)
+    ):
+        actual["custom"] = requested["custom"]
 
     for key, dtype in requested.get("data_types", {}).items():
         actual_dtype = actual.get("data_types", {}).get(key)
@@ -908,7 +949,9 @@ def _match_header_container(f: Any, requested: dict[str, Any], rename_aliases: b
             value = data[: min(width, len(data))]
             repeated = np.tile(value, len(data) // width)
             if not np.array_equal(data, repeated):
-                raise ValueError(f"{key} must have identical stored values to be written as {dtype}")
+                raise ValueError(
+                    f"{key} must have identical stored values to be written as {dtype}"
+                )
             bspwrite_vector(f, key, value)
             actual["data_types"][key] = dtype
 

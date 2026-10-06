@@ -7,10 +7,11 @@ import errno
 import importlib
 import json
 import os
-from pathlib import Path
 import sys
 import tempfile
 import time
+from pathlib import Path
+
 
 def request(command, args):
     fifo = os.environ.get("FINCH_SERVER_FIFO")
@@ -45,11 +46,13 @@ def request(command, args):
     with tempfile.TemporaryDirectory(prefix="finch-response-") as directory:
         response = Path(directory) / "response.json"
         payload = (
-            json.dumps({
-                "cmd": command,
-                "args": args,
-                "response": str(response),
-            })
+            json.dumps(
+                {
+                    "cmd": command,
+                    "args": args,
+                    "response": str(response),
+                }
+            )
             + "\n"
         ).encode()
         while True:

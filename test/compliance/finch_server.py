@@ -5,9 +5,9 @@
 """Persistent Finch server for the Binsparse compliance test suite."""
 
 import json
-from pathlib import Path
 import sys
 import traceback
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -15,7 +15,6 @@ import numpy as np
 import finch as ft
 from finch.fileio.binsparse import (
     bspread_header,
-    bspwrite_header,
     dense_array,
     finch_tensor,
     match_header,
@@ -25,7 +24,10 @@ from finch.fileio.binsparse import (
 
 def cmd_binsparse_to_npy(args: list[str]) -> None:
     if len(args) != 4:
-        raise ValueError("binsparse_to_npy requires 4 args: tensor_in tensor_out pattern_out fill_value_out")
+        raise ValueError(
+            "binsparse_to_npy requires 4 args:"  # noqa: G001
+            "tensor_in tensor_out pattern_out fill_value_out"
+        )
     tensor_in, tensor_out, pattern_out, fill_value_out = args
     tns = ft.bspread(tensor_in)
     np.save(tensor_out, dense_array(tns))
@@ -38,7 +40,11 @@ def cmd_binsparse_to_npy(args: list[str]) -> None:
 
 def cmd_npy_to_binsparse(args: list[str]) -> None:
     if len(args) != 5:
-        raise ValueError("npy_to_binsparse requires 5 args: tensor_in pattern_in fill_value_in header_in tensor_out")
+        raise ValueError(
+            "npy_to_binsparse requires 5 args:"
+            "tensor_in pattern_in fill_value_in"  # noqa: G001
+            "header_in tensor_out"
+        )
     tensor_in, pattern_in, fill_value_in, header_in, tensor_out = args
     dense = np.load(tensor_in, allow_pickle=False)
     pat = np.load(pattern_in, allow_pickle=False)
@@ -103,7 +109,7 @@ def handle_request(line: str) -> bool:
     try:
         COMMANDS[cmd](args)
         write_response(response_path, 0)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         write_response(response_path, 1, str(e) or traceback.format_exc())
 
     return True

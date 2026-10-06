@@ -90,6 +90,15 @@ from .compile import (
     ExtentFType,
     dimension,
 )
+from .fileio import (
+    BINSPARSE_VERSION,
+    SwizzleTensor,
+    bspread,
+    bspwrite,
+    fread,
+    fwrite,
+    swizzle,
+)
 from .finch_fused.jit import jit
 from .interface import (
     LazyTensor,
@@ -288,15 +297,6 @@ from .tensor.level import (
     sparse_list,
 )
 from .tensor.masks import tril as fiber_tril
-from .fileio import (
-    BINSPARSE_VERSION,
-    SwizzleTensor,
-    bspread,
-    bspwrite,
-    fread,
-    fwrite,
-    swizzle,
-)
 
 e = math.e
 pi = math.pi
@@ -422,10 +422,10 @@ __all__ = [
     "bitwise_xor",
     "bool",
     "bool_",
-    "bspread",
-    "bspwrite",
     "broadcast_arrays",
     "broadcast_to",
+    "bspread",
+    "bspwrite",
     "can_cast",
     "ceil",
     "clip",

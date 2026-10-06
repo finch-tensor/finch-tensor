@@ -5,12 +5,11 @@
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
-
+from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 COMMANDS = ("binsparse_to_npy", "npy_to_binsparse", "binsparse_to_binsparse")
@@ -53,7 +52,7 @@ class ClientTests(unittest.TestCase):
         return server
 
     def test_commands_and_arguments(self):
-        self.start_server('''
+        self.start_server("""
 import json, pathlib, sys
 with open(sys.argv[1]) as fifo:
     for line in fifo:
@@ -63,14 +62,19 @@ with open(sys.argv[1]) as fifo:
         temporary = response.with_suffix(".tmp")
         temporary.write_text('{"exit_code": 0}')
         temporary.replace(response)
-''')
+""")
         # Keep the FIFO open across requests, as the real server does by reopening.
         fd = os.open(self.fifo, os.O_RDWR | os.O_NONBLOCK)
         self.addCleanup(os.close, fd)
         for command in COMMANDS:
             with self.subTest(command=command):
                 record = Path(self.directory.name) / "record.json"
-                args = [str(record), 'path with spaces and "quotes"', "line\nbreak", "x" * 8192]
+                args = [
+                    str(record),
+                    'path with spaces and "quotes"',
+                    "line\nbreak",
+                    "x" * 8192,
+                ]
                 result = self.call(command, *args)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 request = json.loads(record.read_text())
@@ -79,7 +83,7 @@ with open(sys.argv[1]) as fifo:
                 self.assertFalse(Path(request["response"]).parent.exists())
 
     def test_server_error(self):
-        self.start_server('''
+        self.start_server("""
 import json, pathlib, sys
 with open(sys.argv[1]) as fifo:
     request = json.loads(fifo.readline())
@@ -87,7 +91,7 @@ response = pathlib.Path(request["response"])
 temporary = response.with_suffix(".tmp")
 temporary.write_text('{"exit_code": 7, "error": "conversion failed"}')
 temporary.replace(response)
-''')
+""")
         result = self.call()
         self.assertEqual(result.returncode, 7)
         self.assertIn("conversion failed", result.stderr)
@@ -139,9 +143,12 @@ class RunnerTests(unittest.TestCase):
                 mock = mock_bin / command
                 mock.write_text(
                     f"#!{sys.executable}\n"
-                    + """
+                    """
 import os, pathlib, sys, time
-if pathlib.Path(sys.argv[0]).name != "python3" or not any("finch_server" in arg for arg in sys.argv):
+if (
+    pathlib.Path(sys.argv[0]).name != "python3"
+    or not any("finch_server" in arg for arg in sys.argv)
+):
     sys.exit(0)
 pathlib.Path(os.environ["PID_RECORD"]).write_text(str(os.getpid()))
 if os.environ["SERVER_MODE"] == "crash":
