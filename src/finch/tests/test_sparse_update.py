@@ -5,7 +5,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import DynamicFill, ffuncs, ftype, is_dynamic
-from finch.codegen import CCompiler, NumbaCompiler
+from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.compile.lower import AssemblyGenerator
 from finch.tensor import (
@@ -150,6 +150,15 @@ def tensors(format_, data, position_type=np.intp, fill=0):
 
 
 @pytest.mark.parametrize("position_type", [np.int32, np.int64])
+@pytest.mark.parametrize(
+    "loader",
+    [
+        asm.AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
 @pytest.mark.parametrize(
     "format_,data",
     [
