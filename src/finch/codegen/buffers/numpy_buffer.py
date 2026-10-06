@@ -1,4 +1,5 @@
 import ctypes
+from dataclasses import dataclass
 from typing import Any, NamedTuple, cast
 
 import numpy as np
@@ -11,7 +12,7 @@ from finch.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_
 from finch.codegen.mlir_codegen import (
     MLIRBufferFType,
     MLIRContext,
-    mlir_ctype,
+    mlir_cast_value,
     mlir_type,
 )
 from finch.codegen.numba_codegen import NumbaBufferFType
@@ -31,8 +32,10 @@ class CBufferFields(NamedTuple):
     obj: str
 
 
-class MLIRBufferFields(NamedTuple):
-    buffer: str
+@dataclass
+class MLIRBufferFields:
+    box: str
+    obj: str
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -46,6 +49,15 @@ def numpy_buffer_resize_callback(buf_ptr, new_length):
 
 
 class CNumpyBuffer(ctypes.Structure):
+    _fields_ = [
+        ("arr", ctypes.py_object),
+        ("data", ctypes.c_void_p),
+        ("length", ctypes.c_size_t),
+        ("resize", type(numpy_buffer_resize_callback)),
+    ]
+
+
+class MLIRNumpyBuffer(ctypes.Structure):
     _fields_ = [
         ("arr", ctypes.py_object),
         ("data", ctypes.c_void_p),
@@ -300,17 +312,66 @@ class NumpyBufferFType(
         return NumpyBuffer(numba_buffer[0])
 
     def mlir_type(self):
+        return "!llvm.ptr"
+
+    def mlir_buffer_type(self):
         return f"memref<?x{mlir_type(self.element_type)}>"
 
+    # this is the rank-1 memref descriptor type
+    def mlir_descriptor_type(self):
+        return "!llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>"
+
+    # this is the callback buffer type
+    def llvm_callback_type(self):
+        return "!llvm.struct<(ptr, ptr, i64, ptr)>"
+
+    # Create our own rank-1 memeref descriptor from a data pointer and length.
+    def mlir_memref_from_pointer(self, ctx, data, length):
+        memref_t = self.mlir_buffer_type()
+        desc_t = self.mlir_descriptor_type()
+
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.mlir.undef : {desc_t}")
+
+        for id, val in (
+            ("0", data),
+            ("1", data),
+            ("2", ctx.constant(0, "i64")),
+            ("3, 0", length),
+            ("4, 0", ctx.constant(1, "i64")),
+        ):
+            fresh = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{fresh} = llvm.insertvalue {val}, {desc}[{id}] : {desc_t}"
+            )
+            desc = fresh
+
+        buf = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{buf} = builtin.unrealized_conversion_cast "
+            f"{desc} : {desc_t} to {memref_t}"
+        )
+        return buf
+
+    # load the length of the NumPy buffer
     def mlir_length(self, ctx: "MLIRContext", buf: MLIRBufferFields):
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
+        buffer = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
+            f"{desc} : {desc_t} to {self.mlir_buffer_type()}"
+        )
         c0 = ctx.constant(0, "index")
         res = ctx.new_ssa()
         ctx.exec(
-            f"{ctx.feed}{res} = memref.dim {buf.buffer}, {c0} : {self.mlir_type()}"
+            f"{ctx.feed}{res} = memref.dim {buffer}, {c0} : {self.mlir_buffer_type()}"
         )
         return res
 
-    def _mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
+    # Convert index values to mlir index types
+    def mlir_index(self, ctx: "MLIRContext", idx: "AssemblyExpression"):
         i = ctx(idx)
         t = mlir_type(idx.result_type)
         if t == "index":
@@ -319,14 +380,26 @@ class NumpyBufferFType(
         ctx.exec(f"{ctx.feed}{cast_} = arith.index_cast {i} : {t} to index")
         return cast_
 
+    # Load buffer values of NumPy buffer
     def mlir_load(
         self, ctx: "MLIRContext", buf: MLIRBufferFields, idx: "AssemblyExpression"
     ):
-        i = self._mlir_index(ctx, idx)
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
+        buffer = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
+            f"{desc} : {desc_t} to {self.mlir_buffer_type()}"
+        )
+        i = self.mlir_index(ctx, idx)
         c0 = ctx.new_ssa()
-        ctx.exec(f"{ctx.feed}{c0} = memref.load {buf.buffer}[{i}] : {self.mlir_type()}")
+        ctx.exec(
+            f"{ctx.feed}{c0} = memref.load {buffer}[{i}] : {self.mlir_buffer_type()}"
+        )
         return c0
 
+    # Store values in the buffer
     def mlir_store(
         self,
         ctx: "MLIRContext",
@@ -334,38 +407,144 @@ class NumpyBufferFType(
         idx: Any,
         value: Any = None,
     ):
-        new = ctx(value)
-        i = self._mlir_index(ctx, idx)
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
+        buffer = ctx.new_ssa()
         ctx.exec(
-            f"{ctx.feed}memref.store {new}, {buf.buffer}[{i}] : {self.mlir_type()}"
+            f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
+            f"{desc} : {desc_t} to {self.mlir_buffer_type()}"
         )
-        return
+        new = ctx(value)
+        i = self.mlir_index(ctx, idx)
+        ctx.exec(
+            f"{ctx.feed}memref.store {new}, {buffer}[{i}] : {self.mlir_buffer_type()}"
+        )
 
-    def mlir_unpack(self, ctx: "MLIRContext", var_n, val):
-        return MLIRBufferFields(ctx(val))
+    # Resize the NumPy buffer and update its memref descriptor.
+    def mlir_resize(self, ctx, buf: MLIRBufferFields, new_len):
+        len_idx = mlir_cast_value(ctx, ctx(new_len), new_len.result_type, ftypes.intp)
+        len = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{len} = arith.index_cast {len_idx} : index to i64")
+        arr_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{arr_ptr} = llvm.getelementptr {buf.obj}[0, 0] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
 
-    def mlir_repack(self, ctx: "MLIRContext", lhs, obj):
-        pass
+        cb_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{cb_ptr} = llvm.getelementptr {buf.obj}[0, 3] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
+        cb = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{cb} = llvm.load {cb_ptr} : !llvm.ptr -> !llvm.ptr")
 
+        data = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{data} = llvm.call {cb}({arr_ptr}, {len}) "
+            f": !llvm.ptr, (!llvm.ptr, i64) -> !llvm.ptr"
+        )
+
+        buffer = self.mlir_memref_from_pointer(ctx, data, len)
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{desc} = builtin.unrealized_conversion_cast "
+            f"{buffer} : {self.mlir_buffer_type()} to {desc_t}"
+        )
+        ctx.exec(f"{ctx.feed}llvm.store {desc}, {buf.box} : {desc_t}, !llvm.ptr")
+
+    # Unpack the NumPy buffer and create its memeref descriptor
+    def mlir_unpack(self, ctx: MLIRContext, _var_n, val):
+        obj = ctx(val)
+
+        data_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{data_ptr} = llvm.getelementptr {obj}[0, 1] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
+        data = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{data} = llvm.load {data_ptr} : !llvm.ptr -> !llvm.ptr")
+
+        length_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{length_ptr} = llvm.getelementptr {obj}[0, 2] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
+        length = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{length} = llvm.load {length_ptr} : !llvm.ptr -> i64")
+
+        buffer = self.mlir_memref_from_pointer(ctx, data, length)
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{desc} = builtin.unrealized_conversion_cast "
+            f"{buffer} : {self.mlir_buffer_type()} to {desc_t}"
+        )
+        box = ctx.new_ssa()
+        count = ctx.constant(1, "i64")
+        ctx.exec(
+            f"{ctx.feed}{box} = llvm.alloca {count} x {desc_t} : (i64) -> !llvm.ptr"
+        )
+        ctx.exec(f"{ctx.feed}llvm.store {desc}, {box} : {desc_t}, !llvm.ptr")
+
+        return MLIRBufferFields(box, obj)
+
+    # Update the buffer wrapper with the resized pointer and length.
+    def mlir_repack(self, ctx: MLIRContext, _lhs, obj):
+        memref_t = self.mlir_buffer_type()
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {obj.box} : !llvm.ptr -> {desc_t}")
+        buffer = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{buffer} = builtin.unrealized_conversion_cast "
+            f"{desc} : {desc_t} to {memref_t}"
+        )
+
+        len_ssa = self.mlir_length(ctx, obj)
+        len_i64 = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{len_i64} = arith.index_cast {len_ssa} : index to i64")
+        len_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{len_ptr} = llvm.getelementptr {obj.obj}[0, 2] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
+        ctx.exec(f"{ctx.feed}llvm.store {len_i64}, {len_ptr} : i64, !llvm.ptr")
+
+        data_ssa = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{data_ssa} = "
+            f"memref.extract_aligned_pointer_as_index {buffer} "
+            f": {memref_t} -> index"
+        )
+        data_i64 = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{data_i64} = arith.index_cast {data_ssa} : index to i64")
+        data_llvm = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{data_llvm} = llvm.inttoptr {data_i64} : i64 to !llvm.ptr")
+        data_ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{data_ptr} = llvm.getelementptr {obj.obj}[0, 1] "
+            f": (!llvm.ptr) -> !llvm.ptr, {self.llvm_callback_type()}"
+        )
+        ctx.exec(f"{ctx.feed}llvm.store {data_llvm}, {data_ptr} : !llvm.ptr, !llvm.ptr")
+
+    # Package the NumPy array, data pointer, length, and resize callback for MLIR
     def serialize_to_mlir(self, obj):
-        from mlir.runtime import get_ranked_memref_descriptor
-
-        src = get_ranked_memref_descriptor(obj.arr)
-        desc = mlir_ctype(self.mlir_type())()
-        ctypes.memmove(ctypes.byref(desc), ctypes.byref(src), ctypes.sizeof(desc))
-        return desc
+        result = MLIRNumpyBuffer(
+            ctypes.py_object(obj),
+            ctypes.c_void_p(obj.arr.ctypes.data),
+            obj.arr.size,
+            numpy_buffer_resize_callback,
+        )
+        return ctypes.cast(ctypes.pointer(result), ctypes.c_void_p)
 
     def deserialize_from_mlir(self, obj, mlir_buffer):
-        # NOTE: for now it's a no-op because
-        # MLIR never allocates or resizes buffers; it only reads and writes to them.
-        # Once we support MLIR reallocating buffers, this will need to be updated.
+        # The resize callback updates the owning NumPy buffer directly.
         pass
 
     def construct_from_mlir(self, mlir_buffer):
-        from mlir.runtime import ranked_memref_to_numpy
-
-        # TODO: avoid the copy when the descriptor aliases an unmodified
-        # argument buffer — MLIRKernel.__call__ would match the aligned
-        # pointer against argument buffers and return the owning NumpyBuffer
-        # directly.
-        return NumpyBuffer(ranked_memref_to_numpy(ctypes.pointer(mlir_buffer)).copy())
+        # zero copy
+        result = ctypes.cast(mlir_buffer, ctypes.POINTER(MLIRNumpyBuffer))
+        return result.contents.arr
