@@ -2129,6 +2129,34 @@
   
   
     <li class="md-nav__item">
+      <a href="codegen/buffers/memref_buffer/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    memref_buffer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="codegen/buffers/numpy_buffer/" class="md-nav__link">
         
   
@@ -15478,49 +15506,49 @@ of the Buffer class.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span>
-<span class="normal">98</span>
-<span class="normal">99</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumpyBuffer</span><span class="p">(</span><span class="n">Buffer</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumpyBuffer</span><span class="p">(</span><span class="n">Buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A buffer that uses NumPy arrays to store data. This is a concrete implementation</span>
 <span class="sd">    of the Buffer class.</span>
@@ -15638,19 +15666,7 @@ of the BufferFType class.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span>
-<span class="normal">110</span>
-<span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
 <span class="normal">115</span>
 <span class="normal">116</span>
 <span class="normal">117</span>
@@ -15907,7 +15923,186 @@ of the BufferFType class.</p>
 <span class="normal">368</span>
 <span class="normal">369</span>
 <span class="normal">370</span>
-<span class="normal">371</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumpyBufferFType</span><span class="p">(</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span>
+<span class="normal">423</span>
+<span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumpyBufferFType</span><span class="p">(</span>
     <span class="n">CBufferFType</span><span class="p">,</span> <span class="n">NumbaBufferFType</span><span class="p">,</span> <span class="n">MLIRBufferFType</span><span class="p">,</span> <span class="n">CUnpackableFType</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -16108,17 +16303,66 @@ of the BufferFType class.</p>
         <span class="k">return</span> <span class="n">NumpyBuffer</span><span class="p">(</span><span class="n">numba_buffer</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">mlir_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"!llvm.ptr"</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_buffer_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"memref&lt;?x</span><span class="si">{</span><span class="n">mlir_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span><span class="si">}</span><span class="s2">&gt;"</span>
 
+    <span class="c1"># this is the rank-1 memref descriptor type</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_descriptor_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"!llvm.struct&lt;(ptr, ptr, i64, array&lt;1 x i64&gt;, array&lt;1 x i64&gt;)&gt;"</span>
+
+    <span class="c1"># this is the callback buffer type</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">llvm_callback_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">"!llvm.struct&lt;(ptr, ptr, i64, ptr)&gt;"</span>
+
+    <span class="c1"># Create our own rank-1 memeref descriptor from a data pointer and length.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_memref_from_pointer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">length</span><span class="p">):</span>
+        <span class="n">memref_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = llvm.mlir.undef : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="nb">id</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="p">(</span><span class="s2">"0"</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"1"</span><span class="p">,</span> <span class="n">data</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"2"</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"i64"</span><span class="p">)),</span>
+            <span class="p">(</span><span class="s2">"3, 0"</span><span class="p">,</span> <span class="n">length</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"4, 0"</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"i64"</span><span class="p">)),</span>
+        <span class="p">):</span>
+            <span class="n">fresh</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">fresh</span><span class="si">}</span><span class="s2"> = llvm.insertvalue </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="nb">id</span><span class="si">}</span><span class="s2">] : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">desc</span> <span class="o">=</span> <span class="n">fresh</span>
+
+        <span class="n">buf</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">buf</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">memref_t</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">buf</span>
+
+    <span class="c1"># load the length of the NumPy buffer</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mlir_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">buf</span><span class="p">:</span> <span class="n">MLIRBufferFields</span><span class="p">):</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">box</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">buffer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
         <span class="n">c0</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"index"</span><span class="p">)</span>
         <span class="n">res</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">res</span><span class="si">}</span><span class="s2"> = memref.dim </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">buffer</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">c0</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">res</span><span class="si">}</span><span class="s2"> = memref.dim </span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">c0</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">res</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_mlir_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="s2">"AssemblyExpression"</span><span class="p">):</span>
+    <span class="c1"># Convert index values to mlir index types</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="s2">"AssemblyExpression"</span><span class="p">):</span>
         <span class="n">i</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
         <span class="n">t</span> <span class="o">=</span> <span class="n">mlir_type</span><span class="p">(</span><span class="n">idx</span><span class="o">.</span><span class="n">result_type</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"index"</span><span class="p">:</span>
@@ -16127,14 +16371,26 @@ of the BufferFType class.</p>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">cast_</span><span class="si">}</span><span class="s2"> = arith.index_cast </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2"> to index"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">cast_</span>
 
+    <span class="c1"># Load buffer values of NumPy buffer</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mlir_load</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">buf</span><span class="p">:</span> <span class="n">MLIRBufferFields</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="s2">"AssemblyExpression"</span>
     <span class="p">):</span>
-        <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mlir_index</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">box</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">buffer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_index</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
         <span class="n">c0</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
-        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">c0</span><span class="si">}</span><span class="s2"> = memref.load </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">buffer</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">] : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">c0</span><span class="si">}</span><span class="s2"> = memref.load </span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">] : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="n">c0</span>
 
+    <span class="c1"># Store values in the buffer</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mlir_store</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span>
@@ -16142,41 +16398,147 @@ of the BufferFType class.</p>
         <span class="n">idx</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="n">new</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-        <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_mlir_index</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">box</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">buffer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">memref.store </span><span class="si">{</span><span class="n">new</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">buffer</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">] : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
-        <span class="k">return</span>
+        <span class="n">new</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_index</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">memref.store </span><span class="si">{</span><span class="n">new</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2">[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">] : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">MLIRBufferFields</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+    <span class="c1"># Resize the NumPy buffer and update its memref descriptor.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">buf</span><span class="p">:</span> <span class="n">MLIRBufferFields</span><span class="p">,</span> <span class="n">new_len</span><span class="p">):</span>
+        <span class="n">len_idx</span> <span class="o">=</span> <span class="n">mlir_cast_value</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ctx</span><span class="p">(</span><span class="n">new_len</span><span class="p">),</span> <span class="n">new_len</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span><span class="p">)</span>
+        <span class="nb">len</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="nb">len</span><span class="si">}</span><span class="s2"> = arith.index_cast </span><span class="si">{</span><span class="n">len_idx</span><span class="si">}</span><span class="s2"> : index to i64"</span><span class="p">)</span>
+        <span class="n">arr_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">arr_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 0] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="s2">"MLIRContext"</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
-        <span class="k">pass</span>
+        <span class="n">cb_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">cb_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 3] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">cb</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">cb</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">cb_ptr</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; !llvm.ptr"</span><span class="p">)</span>
 
+        <span class="n">data</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data</span><span class="si">}</span><span class="s2"> = llvm.call </span><span class="si">{</span><span class="n">cb</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">arr_ptr</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="nb">len</span><span class="si">}</span><span class="s2">) "</span>
+            <span class="sa">f</span><span class="s2">": !llvm.ptr, (!llvm.ptr, i64) -&gt; !llvm.ptr"</span>
+        <span class="p">)</span>
+
+        <span class="n">buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_memref_from_pointer</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="nb">len</span><span class="p">)</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">llvm.store </span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">buf</span><span class="o">.</span><span class="n">box</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">, !llvm.ptr"</span><span class="p">)</span>
+
+    <span class="c1"># Unpack the NumPy buffer and create its memeref descriptor</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">_var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+        <span class="n">data_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 1] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">data_ptr</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; !llvm.ptr"</span><span class="p">)</span>
+
+        <span class="n">length_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">length_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 2] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">length</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">length</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">length_ptr</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; i64"</span><span class="p">)</span>
+
+        <span class="n">buffer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_memref_from_pointer</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">length</span><span class="p">)</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">box</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">count</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">constant</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"i64"</span><span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">box</span><span class="si">}</span><span class="s2"> = llvm.alloca </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> x </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> : (i64) -&gt; !llvm.ptr"</span>
+        <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">llvm.store </span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">box</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">, !llvm.ptr"</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">MLIRBufferFields</span><span class="p">(</span><span class="n">box</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+
+    <span class="c1"># Update the buffer wrapper with the resized pointer and length.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mlir_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">_lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="n">memref_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_buffer_type</span><span class="p">()</span>
+        <span class="n">desc_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_descriptor_type</span><span class="p">()</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> = llvm.load </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">box</span><span class="si">}</span><span class="s2"> : !llvm.ptr -&gt; </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">buffer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> = builtin.unrealized_conversion_cast "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">desc_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">memref_t</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+
+        <span class="n">len_ssa</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mlir_length</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+        <span class="n">len_i64</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">len_i64</span><span class="si">}</span><span class="s2"> = arith.index_cast </span><span class="si">{</span><span class="n">len_ssa</span><span class="si">}</span><span class="s2"> : index to i64"</span><span class="p">)</span>
+        <span class="n">len_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">len_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 2] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">llvm.store </span><span class="si">{</span><span class="n">len_i64</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">len_ptr</span><span class="si">}</span><span class="s2"> : i64, !llvm.ptr"</span><span class="p">)</span>
+
+        <span class="n">data_ssa</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data_ssa</span><span class="si">}</span><span class="s2"> = "</span>
+            <span class="sa">f</span><span class="s2">"memref.extract_aligned_pointer_as_index </span><span class="si">{</span><span class="n">buffer</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="sa">f</span><span class="s2">": </span><span class="si">{</span><span class="n">memref_t</span><span class="si">}</span><span class="s2"> -&gt; index"</span>
+        <span class="p">)</span>
+        <span class="n">data_i64</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data_i64</span><span class="si">}</span><span class="s2"> = arith.index_cast </span><span class="si">{</span><span class="n">data_ssa</span><span class="si">}</span><span class="s2"> : index to i64"</span><span class="p">)</span>
+        <span class="n">data_llvm</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data_llvm</span><span class="si">}</span><span class="s2"> = llvm.inttoptr </span><span class="si">{</span><span class="n">data_i64</span><span class="si">}</span><span class="s2"> : i64 to !llvm.ptr"</span><span class="p">)</span>
+        <span class="n">data_ptr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}{</span><span class="n">data_ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">obj</span><span class="si">}</span><span class="s2">[0, 1] "</span>
+            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">llvm_callback_type</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">ctx</span><span class="o">.</span><span class="n">feed</span><span class="si">}</span><span class="s2">llvm.store </span><span class="si">{</span><span class="n">data_llvm</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">data_ptr</span><span class="si">}</span><span class="s2"> : !llvm.ptr, !llvm.ptr"</span><span class="p">)</span>
+
+    <span class="c1"># Package the NumPy array, data pointer, length, and resize callback for MLIR</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">serialize_to_mlir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">mlir.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_ranked_memref_descriptor</span>
-
-        <span class="n">src</span> <span class="o">=</span> <span class="n">get_ranked_memref_descriptor</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">arr</span><span class="p">)</span>
-        <span class="n">desc</span> <span class="o">=</span> <span class="n">mlir_ctype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mlir_type</span><span class="p">())()</span>
-        <span class="n">ctypes</span><span class="o">.</span><span class="n">memmove</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">byref</span><span class="p">(</span><span class="n">desc</span><span class="p">),</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">byref</span><span class="p">(</span><span class="n">src</span><span class="p">),</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">sizeof</span><span class="p">(</span><span class="n">desc</span><span class="p">))</span>
-        <span class="k">return</span> <span class="n">desc</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">MLIRNumpyBuffer</span><span class="p">(</span>
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">py_object</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span>
+            <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data</span><span class="p">),</span>
+            <span class="n">obj</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+            <span class="n">numpy_buffer_resize_callback</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span><span class="n">result</span><span class="p">),</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_void_p</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from_mlir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">mlir_buffer</span><span class="p">):</span>
-        <span class="c1"># NOTE: for now it's a no-op because</span>
-        <span class="c1"># MLIR never allocates or resizes buffers; it only reads and writes to them.</span>
-        <span class="c1"># Once we support MLIR reallocating buffers, this will need to be updated.</span>
+        <span class="c1"># The resize callback updates the owning NumPy buffer directly.</span>
         <span class="k">pass</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct_from_mlir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mlir_buffer</span><span class="p">):</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">mlir.runtime</span><span class="w"> </span><span class="kn">import</span> <span class="n">ranked_memref_to_numpy</span>
-
-        <span class="c1"># TODO: avoid the copy when the descriptor aliases an unmodified</span>
-        <span class="c1"># argument buffer — MLIRKernel.__call__ would match the aligned</span>
-        <span class="c1"># pointer against argument buffers and return the owning NumpyBuffer</span>
-        <span class="c1"># directly.</span>
-        <span class="k">return</span> <span class="n">NumpyBuffer</span><span class="p">(</span><span class="n">ranked_memref_to_numpy</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">pointer</span><span class="p">(</span><span class="n">mlir_buffer</span><span class="p">))</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+        <span class="c1"># zero copy</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="n">mlir_buffer</span><span class="p">,</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">MLIRNumpyBuffer</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">contents</span><span class="o">.</span><span class="n">arr</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -16254,15 +16616,15 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Repack the buffer from C context.</span>
 <span class="sd">    """</span>
@@ -16293,20 +16655,20 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">c_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unpack the buffer into C context.</span>
 <span class="sd">    """</span>
@@ -16342,11 +16704,11 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct_from_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c_buffer</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct_from_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">c_buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct a NumpyBuffer from a C-compatible structure.</span>
 <span class="sd">    """</span>
@@ -16373,11 +16735,11 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct_from_numba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">numba_buffer</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct_from_numba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">numba_buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Construct a NumpyBuffer from a Numba-compatible object.</span>
 <span class="sd">    """</span>
@@ -16404,10 +16766,10 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">c_buffer</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">deserialize_from_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">c_buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Update this buffer based on how the C call modified the CNumpyBuffer structure.</span>
 <span class="sd">    """</span>
@@ -16433,12 +16795,12 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span>
-<span class="normal">283</span>
-<span class="normal">284</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Repack the buffer from Numba context.</span>
 <span class="sd">    """</span>
@@ -16466,14 +16828,14 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numba_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">var_n</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Unpack the buffer into Numba context.</span>
 <span class="sd">    """</span>
@@ -16503,16 +16865,16 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">serialize_to_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">serialize_to_c</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Serialize the NumPy buffer to a C-compatible structure.</span>
 <span class="sd">    """</span>
@@ -16544,11 +16906,11 @@ This is typically the same as the dtype used to create the buffer.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/buffers/numpy_buffer.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">serialize_to_numba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">serialize_to_numba</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Serialize the NumPy buffer to a Numba-compatible object.</span>
 <span class="sd">    """</span>
