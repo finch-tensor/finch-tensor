@@ -288,6 +288,15 @@ from .tensor.level import (
     sparse_list,
 )
 from .tensor.masks import tril as fiber_tril
+from .fileio import (
+    BINSPARSE_VERSION,
+    SwizzleTensor,
+    bspread,
+    bspwrite,
+    fread,
+    fwrite,
+    swizzle,
+)
 
 e = math.e
 pi = math.pi
@@ -297,6 +306,7 @@ newaxis = None
 __array_api_version__ = "2024.12"
 
 __all__ = [
+    "BINSPARSE_VERSION",
     "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "CPU",
@@ -378,6 +388,7 @@ __all__ = [
     "SparseListLevel",
     "SparseListLevelFType",
     "SplitMaskTensor",
+    "SwizzleTensor",
     "TaskFType",
     "Tensor",
     "TensorFType",
@@ -411,6 +422,8 @@ __all__ = [
     "bitwise_xor",
     "bool",
     "bool_",
+    "bspread",
+    "bspwrite",
     "broadcast_arrays",
     "broadcast_to",
     "can_cast",
@@ -466,12 +479,14 @@ __all__ = [
     "float_",
     "floor",
     "floor_divide",
+    "fread",
     "ftype",
     "ftype",
     "full",
     "full_like",
     "fuse",
     "fused",
+    "fwrite",
     "get_default_scheduler",
     "greater",
     "greater_equal",
@@ -564,6 +579,7 @@ __all__ = [
     "str_",
     "subtract",
     "sum",
+    "swizzle",
     "take",
     "take_along_axis",
     "tan",
