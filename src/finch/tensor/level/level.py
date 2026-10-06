@@ -12,6 +12,7 @@ from finch.algebra import (
     StructFType,
     ftypes,
 )
+from finch.tensor.traits import FormatProperty
 
 
 @dataclass
@@ -178,7 +179,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_format_properties(self, n):
+    def level_format_properties(self, n: int) -> list[FormatProperty]:
         """
         Return the format properties contributed by this level type and children.
 
