@@ -316,7 +316,7 @@ class MemrefBufferFType(MLIRBufferFType, MLIRUnpackableFType):
             f"{self.mlir_buffer_type()}"
         )
 
-    # Resize the memeref buffer using memref.realloc
+    # Resize the memref buffer using memref.realloc
     def mlir_resize(
         self,
         ctx: MLIRContext,
