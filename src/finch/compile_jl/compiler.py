@@ -17,6 +17,7 @@ from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
 from finch.tensor.patterns import FillTensorFType, PatternTensorFType
 
+from .copy_propagation import propagate_copies
 from .guard_lifting import lift_guards
 from .julia import jl
 from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
@@ -416,7 +417,9 @@ class FinchJLCompiler(NotationCompiler):
 
         kernel_dict = {}
         for orig_func in prgm.children:
-            func, dynamic_args = handle_fills(lift_guards(orig_func))
+            func, dynamic_args = handle_fills(
+                propagate_copies(lift_guards(orig_func))
+            )
             generated_prgm = generator(func)
             extents = tuple((pos, axis) for _, pos, axis in generator.extents)
             arg_type_strs = tuple(
