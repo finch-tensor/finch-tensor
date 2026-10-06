@@ -616,6 +616,7 @@ def bspwrite_tensor(
         case _:
             raise TypeError(f"Unsupported tensor type for bspwrite: {type(arr)}")
 
+    custom: dict[str, Any] = {"level": {}}
     desc: dict[str, Any] = {
         "version": BINSPARSE_VERSION,
         "format": "custom",
@@ -623,19 +624,17 @@ def bspwrite_tensor(
         "number_of_stored_values": count_stored_values(root_lvl),
         "fill": True,
         "data_types": {},
-        "custom": {
-            "level": {},
-        },
+        "custom": custom,
     }
     if attrs:
         desc["attrs"] = attrs
     if transpose != list(range(len(logical_shape))):
-        desc["custom"]["transpose"] = transpose
+        custom["transpose"] = transpose
 
-    bspwrite_level(f, desc, desc["custom"]["level"], root_lvl, 0)
+    bspwrite_level(f, desc, custom["level"], root_lvl, 0)
 
     if alias is not False:
-        matched = find_format_alias(desc["custom"])
+        matched = find_format_alias(custom)
         if matched is not None:
             desc["format"] = matched
             del desc["custom"]

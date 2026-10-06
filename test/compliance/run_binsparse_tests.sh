@@ -1,1 +1,0 @@
-run-binsparse-tests.sh
