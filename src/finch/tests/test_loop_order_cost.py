@@ -8,7 +8,7 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule import DefaultLogicFactorizer
-from finch.autoschedule.compiler import LogicCompiler
+from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_order_cost import (
@@ -85,7 +85,9 @@ def greedy_scheduler():
         LogicExecutor(
             DefaultLogicFactorizer(
                 GreedyLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
                 )
             )
         )

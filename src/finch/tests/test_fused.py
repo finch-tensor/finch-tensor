@@ -8,6 +8,7 @@ import numpy as np
 
 import finch
 from finch.autoschedule import (
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLogicFormatter,
     DefaultLoopOrderer,
@@ -464,7 +465,9 @@ def test_a_constant_operand_is_not_bound_as_a_tensor(operand, bound):
     then replaces the constants with their values and drops those bindings. A
     value the optimizer cannot act on stays a binding, which is the point.
     """
-    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    capture = _CollectBindings(
+        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+    )
     executor = LogicExecutor(
         DefaultLogicFactorizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
     )
@@ -509,7 +512,9 @@ def test_jit_inlines_literal_operands():
     def opt_fn(A):
         return add(A, 1.0)
 
-    capture = _CollectBindings(LogicCompiler(NotationInterpreter()))
+    capture = _CollectBindings(
+        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+    )
     executor = LogicExecutor(
         DefaultLogicFactorizer(DefaultLoopOrderer(DefaultLogicFormatter(capture)))
     )
@@ -552,7 +557,9 @@ def test_jit_constant_folded_in_a_loop_does_not_grow_the_kernel_cache(trip_count
         executor = LogicExecutor(
             DefaultLogicFactorizer(
                 DefaultLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
                 )
             ),
             cache=True,

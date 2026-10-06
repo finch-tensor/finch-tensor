@@ -20,6 +20,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     StatsFactory,
@@ -94,6 +95,9 @@ class StatsMachine(Generic[TS]):
                 self.bindings[var] = rhs_stats
                 return rhs_stats
 
+            case QueryInto():
+                return self(node.as_query())
+
             case Alias():
                 stats = self.bindings.get(node)
                 if stats is None:
@@ -125,10 +129,18 @@ class StatsMachine(Generic[TS]):
                 if not isinstance(node.op, Literal):
                     raise TypeError("Aggregate.op must be Literal(...).")
                 op = node.op.val
-                init = node.init.val if isinstance(node.init, Literal) else None
                 arg2 = self(node.arg)
                 reduce_indices = node.idxs
-                return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
+                if isinstance(node.init, Literal):
+                    return self.stats_factory.aggregate(
+                        op, node.init.val, reduce_indices, arg2
+                    )
+                # A tensor init is folded into the reduction of the argument.
+                reduced = self.stats_factory.aggregate(op, None, reduce_indices, arg2)
+                return self.stats_factory.reorder(
+                    self.stats_factory.mapjoin(op, self(node.init), reduced),
+                    node.fields(),
+                )
 
             case Literal(val):
                 return self.stats_factory(Scalar(val), ())
