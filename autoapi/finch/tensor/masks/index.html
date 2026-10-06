@@ -5556,11 +5556,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
@@ -5580,7 +5576,14 @@
 <span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
-<span class="normal">192</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LoTriMask</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower triangular mask level.</span>
@@ -5605,6 +5608,9 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">body</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5664,8 +5670,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
-<span class="normal"> 22</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
 <span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
@@ -5808,7 +5813,11 @@
 <span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span>
-<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LoTriMaskFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
     <span class="n">body</span><span class="p">:</span> <span class="n">SingleDimensionLevelFType</span> <span class="o">|</span> <span class="n">MultiDimensionLevelFType</span>
 
@@ -5953,6 +5962,9 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">struct_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[(</span><span class="s2">"body"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="p">)]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">level_format_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">FormatProperty</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6018,8 +6030,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/masks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">62</span>
-<span class="normal">63</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">63</span>
 <span class="normal">64</span>
 <span class="normal">65</span>
 <span class="normal">66</span>
@@ -6029,7 +6040,8 @@
 <span class="normal">70</span>
 <span class="normal">71</span>
 <span class="normal">72</span>
-<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"LoTriMask"</span><span class="p">:</span>
+<span class="normal">73</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"LoTriMask"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this lower triangular mask level type.</span>
 
