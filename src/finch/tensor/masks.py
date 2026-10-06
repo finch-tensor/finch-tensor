@@ -1,11 +1,12 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs, is_dynamic
+from finch.algebra import AbstractFill, ImmutableStructFType, ffuncs, is_dynamic
 from finch.compile import looplets as lplt
+from finch.tensor.traits import FormatProperty
 
 from .fiber_tensor import FiberTensor
 from .level.level import (
@@ -164,6 +165,9 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def struct_fields(self):
         return [("body", self.body)]
 
+    def level_format_properties(self, n: int) -> list[FormatProperty]:
+        raise NotImplementedError
+
 
 @dataclass
 class LoTriMask(Level):
@@ -190,6 +194,9 @@ class LoTriMask(Level):
     @property
     def body(self):
         return self.lvl
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        return type(self)(self.lvl.with_fill(fill_value))
 
 
 def tril(x, /, *, k: int = 0):
