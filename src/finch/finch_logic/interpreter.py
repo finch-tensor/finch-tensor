@@ -231,7 +231,11 @@ class LogicMachine:
                 rhs = self(Reorder(rhs, idxs))
                 key = var.unfused
                 # Defining a view of the alias invalidates its other views.
-                if key not in self.bindings or self.view(var) != var:
+                if (
+                    key not in self.bindings
+                    or self.view(var) != var
+                    or self.bindings[key].shape != rhs.tns.shape
+                ):
                     match var:
                         case FusedAlias(_, n):
                             self.bindings[key] = MockFusedTensor(
@@ -252,7 +256,13 @@ class LogicMachine:
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case QueryInto() as stmt:
-                return self(stmt.as_query())
+                tns = self(stmt.lhs.tns)
+                rhs = self(Reorder(stmt.as_query().rhs, stmt.lhs.idxs))
+                if tns.shape != rhs.tns.shape:
+                    raise ValueError("QueryInto cannot change the tensor shape.")
+                for crds in product(*[range(dim) for dim in tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (TableValue(tns, stmt.lhs.idxs),)
             case Fuse(_, body):
                 return self(body)
             case Plan(bodies):

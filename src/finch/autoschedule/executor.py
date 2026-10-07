@@ -104,7 +104,11 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         for var, tns in bindings.items():
             for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
                 if idx is not None:
-                    binding_shapes[idx] = dim
+                    previous = binding_shapes.setdefault(idx, dim)
+                    if previous != dim:
+                        raise ValueError(f"Dimension mismatch: {previous} vs {dim}")
+                elif dim != 1:
+                    raise ValueError("A dropped dimension must have size 1.")
 
         # Dynamic output fills resolve at bind time against the actual
         # argument fills, mirroring the shape resolution above.
@@ -120,7 +124,15 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
 
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
-                shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
+                shape = []
+                for idx in binding_idxs[var]:
+                    if idx is None:
+                        shape.append(1)
+                    elif idx in binding_shapes:
+                        shape.append(binding_shapes[idx])
+                    else:
+                        raise ValueError(f"Cannot infer dimension {idx} of {var}.")
+                shape = tuple(shape)
                 if is_dynamic(tns_ftype.fill_value):
                     assert fill_map is not None
                     # We preserve the dynamic fill value in the ftype so that

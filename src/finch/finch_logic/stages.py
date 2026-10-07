@@ -47,6 +47,11 @@ def compute_shape_vars(
     prgm: lgc.LogicStatement,
     bindings: dict[lgc.Alias, TensorFType],
 ) -> dict[lgc.Alias, tuple[lgc.Field | None, ...]]:
+    """Infer allocation dimensions for loaders which reuse one buffer per alias.
+
+    Logical shapes are inferred in statement order. Each definition must also
+    fit the alias's allocation, since these loaders allocate before execution.
+    """
     groups: dict[lgc.Field | None, set[lgc.Field | None]] = {}
     dim_bindings: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {}
     for var, tns in bindings.items():
@@ -54,8 +59,11 @@ def compute_shape_vars(
         for idx in idxs:
             groups[idx] = {idx}
         dim_bindings[var] = tuple(idxs)
+    allocation_dims = dim_bindings.copy()
 
     def merge_dim_groups(dim1, dim2):
+        if dim1 is None and dim2 is None:
+            raise ValueError("Cannot merge two None dimensions.")
         if dim1 is None:
             groups[dim2].add(None)
             return dim2
@@ -71,7 +79,32 @@ def compute_shape_vars(
             groups[idx] = groups[dim1]
         return dim1
 
-    prgm.infer_dimmap(merge_dim_groups, dim_bindings)
+    def infer(node):
+        match node:
+            case lgc.Plan(bodies):
+                for body in bodies:
+                    infer(body)
+            case lgc.Fuse(_, body):
+                infer(body)
+            case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                lgc.Table(lgc.Alias() as lhs, _), _, _
+            ):
+                node.infer_dimmap(merge_dim_groups, dim_bindings)
+                var = lhs.unfused
+                dims = dim_bindings[var]
+                allocated = allocation_dims.setdefault(var, dims)
+                if len(allocated) != len(dims):
+                    raise ValueError(
+                        f"Cannot change the rank of allocated tensor {var.name}: "
+                        f"{len(allocated)} vs {len(dims)}."
+                    )
+                for old, new in zip(allocated, dims, strict=True):
+                    if old != new:
+                        merge_dim_groups(old, new)
+            case lgc.Produces():
+                pass
+
+    infer(prgm)
 
     group_names: dict[int, lgc.Field | None] = {}
 
@@ -85,5 +118,5 @@ def compute_shape_vars(
         var: tuple(
             group_names[id(groups[idx])] if idx is not None else None for idx in idxs
         )
-        for var, idxs in dim_bindings.items()
+        for var, idxs in allocation_dims.items()
     }

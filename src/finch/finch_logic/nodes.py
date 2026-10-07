@@ -39,11 +39,11 @@ def merge_dim_type(d1, d2):
 
 
 def merge_dim(d1, d2):
-    d3 = d1 or 1
-    d4 = d2 or 1
+    d3 = 1 if d1 is None else d1
+    d4 = 1 if d2 is None else d2
     if d3 != d4:
         raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
-    if d1 and d2:
+    if d1 is not None and d2 is not None:
         return ffuncs.max(d1, d2)
     return d1 or d2
 
@@ -742,7 +742,9 @@ class Query(LogicTree, LogicStatement):
     dimensions are ordered as `lhs.idxs`, so a query behaves as though its
     right-hand side were wrapped in `Reorder(rhs, lhs.idxs)`. A query is not
     in place: the previous value of `lhs.tns` is replaced, and is only read if
-    `rhs` refers to it. See `QueryInto` for in-place updates.
+    `rhs` refers to it. Its shape is inferred from this definition and may
+    differ from the previous shape. See `QueryInto` for updates which preserve
+    shape.
 
     Attributes:
         lhs: The table to write, a `Table` wrapping an `Alias`.
@@ -766,13 +768,9 @@ class Query(LogicTree, LogicStatement):
         will be stored in the dictionary passed to the method."""
         var = self.lhs.tns
         assert isinstance(var, Alias)
-        var = var.unfused
-        dims = Reorder(self.rhs, self.lhs.idxs).dimmap(op, dim_bindings)
-        if var in dim_bindings:
-            for dim1, dim2 in zip(dims, dim_bindings[var], strict=True):
-                op(dim1, dim2)
-        else:
-            dim_bindings[var] = dims
+        dim_bindings[var.unfused] = Reorder(self.rhs, self.lhs.idxs).dimmap(
+            op, dim_bindings
+        )
         return dim_bindings
 
     def infer_valmap(
@@ -802,8 +800,9 @@ class QueryInto(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that updates the table `lhs` in place,
     using the reduction operator `op` to fold each element of `rhs` into the
-    matching element of `lhs`. The alias `lhs.tns` must already be bound. The
-    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, and `rhs`
+    matching element of `lhs`. The alias `lhs.tns` must already be bound, and
+    its shape is preserved. The fields of `rhs` which are not in `lhs.idxs`
+    are reduced with `op`, and `rhs`
     is broadcast over the fields of `lhs` which it lacks, so a `QueryInto` is
     equivalent to the aggregate which starts from `lhs`,
     `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
@@ -835,7 +834,13 @@ class QueryInto(LogicTree, LogicStatement):
     ) -> dict[Alias, tuple[T | None, ...]]:
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.as_query().infer_dimmap(op, dim_bindings)
+        var = self.lhs.tns
+        assert isinstance(var, Alias)
+        previous = dim_bindings[var.unfused]
+        dims = Reorder(self.as_query().rhs, self.lhs.idxs).dimmap(op, dim_bindings)
+        for old, new in zip(previous, dims, strict=True):
+            op(old, new)
+        return dim_bindings
 
     def infer_valmap(
         self,

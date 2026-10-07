@@ -387,6 +387,8 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
         dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
+        shape_vars = compute_shape_vars(prgm, bindings)
+
         def rule(stmt):
             match stmt:
                 case lgc.Query(lgc.Table(_, idxs) as lhs, lgc.Table() as arg):
@@ -407,7 +409,7 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
         root = Rewrite(PostWalk(rule))(prgm)
         assert isinstance(root, lgc.Plan)
         root = flatten_plans(root)
-        lib, bindings, shape_vars, _ = self.ctx(root, bindings, stats, stats_factory)
+        lib, bindings, _, _ = self.ctx(root, bindings, stats, stats_factory)
         # Bind-time inference starts from the inputs alone, but CompilerForm
         # initializes an intermediate before any query defines it, so the
         # program this pass received is returned instead.
