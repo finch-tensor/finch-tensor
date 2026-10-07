@@ -17,7 +17,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, development setup, and be
 
 ## Sponsors
 
-<img width="20px" height="20px" alt="NSF POSE" src="https://github.com/user-attachments/assets/4127d71a-d2e0-4420-a719-7d4413e13ce3" /> This material is based upon work supported by the National Science Foundation under Award No. 2612044
+<img width="30px" height="30px" alt="NSF POSE" src="https://github.com/user-attachments/assets/4127d71a-d2e0-4420-a719-7d4413e13ce3" /> The National Science Foundation
+
+- This material is based upon work supported by the National Science Foundation under Award No. 2612044.
 
 <a href="https://codspeed.io/?utm_source=oss-sponsorship&utm_medium=finch-tensor">
   <picture>
@@ -25,4 +27,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, development setup, and be
     <source media="(prefers-color-scheme: light)" srcset="https://codspeed.io/codspeed-logo-light.svg">
     <img alt="CodSpeed" src="https://codspeed.io/codspeed-logo-light.svg" height="20px">
   </picture>
-</a> We are grateful to Codspeed for their benchmarking support.
+</a>
+
+- We are grateful to Codspeed for their benchmarking support.
