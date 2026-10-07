@@ -97,6 +97,7 @@ pre-commit = { features = ["pre-commit"], no-default-feature = true }
 
 [tool.pixi.dependencies]
 finch-tensor.path = "."
+h5py = ">=3.16.0,<4"
 
 [tool.pixi.target.macos-arm64.dependencies]
 libblas = { version = "*", build = "*newaccelerate" }
