@@ -159,3 +159,16 @@ def test_default_runtime_reuses_translated_buffer_across_kernels():
     )[0]
 
     assert first is second
+
+
+def test_julia_owned_tensor_to_numpy_copies():
+    _requires_julia_backend()
+    source = ft.asarray(np.arange(4, dtype=np.float64))
+    raw = tensor_to_jl(source)
+    tensor = JuliaOwnedTensor(source.ftype, source.shape, lambda _: None, raw, False)
+
+    array = tensor.to_numpy()
+    # A later kernel reusing the storage must not change the returned array.
+    raw.lvl.lvl.val.to_numpy(copy=False)[:] = -1.0
+
+    assert (array == np.arange(4)).all()

@@ -126,18 +126,16 @@ class JuliaOwnedTensor(OverrideTensor):
         return Scalar(result, fill_value=self.fill_value, device=self.device)
 
     def to_numpy(self):
-        return self._as_tensor().to_numpy()
+        # The storage returns to the runtime's pool once this handle dies, so a
+        # view could be overwritten by a later kernel.
+        return np.array(self._as_tensor().to_numpy(), copy=True)
 
     def __array__(self, dtype=None, copy=None):
-        out = np.asarray(self.to_numpy())
+        if copy is False:
+            raise ValueError("Unable to avoid copy while creating an array as requested.")
+        out = self.to_numpy()
         if dtype is not None and out.dtype != dtype:
-            if copy is False:
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
             out = out.astype(dtype)
-        if copy is True:
-            return out.copy()
         return out
 
     def to_scipy(self):
