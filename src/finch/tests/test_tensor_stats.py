@@ -49,33 +49,60 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
-def test_sampling_reuses_random_masks():
+def sampling_sketch_array(tensor):
+    from finch.compile_jl.runtime import JuliaOwnedTensor
+
+    match tensor:
+        case JuliaOwnedTensor():
+            from finch.compile_jl.julia import jl
+
+            return jl.Array(tensor.raw_julia_obj).to_numpy().transpose()
+        case _:
+            return np.asarray(tensor)
+
+
+def test_sampling_reuses_random_seeds():
     i, j, k = Field("i"), Field("j"), Field("k")
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
     first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
-    mask_i = factory._get_mask(i, 5)
+    mask_i = factory._get_mask(i, 5, 0.5)
     assert isinstance(mask_i, ft.RandomMaskTensor)
     assert mask_i.element_type == ftype(np.intp)
 
-    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
-    assert factory._get_mask(i, 5) is mask_i
-    assert first.masks_ref is second.masks_ref is factory._masks
-    assert len(factory._masks) == 3
-    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
-    assert factory._get_mask(j, 7).ftype != mask_i.ftype
-    assert factory._get_mask(i, 6) is not mask_i
+    second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
+    repeated_mask = factory._get_mask(i, 5, 0.5)
+    assert repeated_mask is not mask_i
+    assert [repeated_mask[idx].item() for idx in range(5)] == [
+        mask_i[idx].item() for idx in range(5)
+    ]
+    expected_rng = np.random.default_rng(42)
+    assert list(factory._seeds.values()) == [
+        int(expected_rng.integers(0, 1 << 64, dtype=np.uint64)) for _ in range(3)
+    ]
+    assert first.seeds_ref is second.seeds_ref is factory._seeds
+    assert len(factory._seeds) == 3
+    assert factory._get_mask(k, 1 << 40, 0.5).shape == (1 << 40,)
+    assert factory._get_mask(j, 7, 0.5).ftype != mask_i.ftype
+    factory._get_mask(i, 6, 0.5)
+    assert (i, 6) in factory._seeds
+    factory._get_mask(j, 5, 0.5)
+    assert factory._seeds[i, 5] != factory._seeds[j, 5]
 
 
 @pytest.mark.parametrize("shape", [(12, 9), (0, 5)])
 @pytest.mark.parametrize("sample_prob", [0.0, 0.5, 1.0])
 def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     i, j = Field("i"), Field("j")
-    factory = SamplingStatsFactory(sample_prob=sample_prob)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    stats = factory(ft.asarray(np.ones(shape)), (i, j), [sample_prob] * 2)
+    assert stats.sample_probs == [sample_prob, sample_prob]
     expected_count = math.prod(
-        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        sum(
+            factory._get_mask(field, size, sample_prob)[idx].item()
+            for idx in range(size)
+        )
         for field, size in zip((i, j), shape, strict=True)
     )
     assert stats.scan(needs_freq=True) == (
@@ -88,20 +115,258 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     assert stats.coverage_correction() == pytest.approx(expected_coverage)
 
 
+@pytest.mark.parametrize(
+    "operation", ["tensor", "join", "union", "aggregate", "relabel", "reorder"]
+)
+def test_sampling_materializes_each_step(operation):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    data = np.array([[1, 0, 1], [0, 1, 0]], dtype=np.intp)
+    stats = factory(ft.asarray(data), (i, j))
+    expected = data.copy()
+    fields = (i, j)
+
+    match operation:
+        case "join":
+            stats = factory.mapjoin(ffuncs.mul, stats, stats)
+        case "union":
+            stats = factory.mapjoin(ffuncs.add, stats, stats)
+        case "aggregate":
+            stats = factory.aggregate(ffuncs.add, 0, (j,), stats)
+            expected = expected.sum(axis=1)
+            fields = (i,)
+        case "relabel":
+            fields = (Field("row"), Field("col"))
+            stats = factory.relabel(stats, fields)
+        case "reorder":
+            fields = (j, i)
+            stats = factory.reorder(stats, fields)
+            expected = expected.T
+
+    assert stats.sample_probs == [1.0] * len(fields)
+
+    # Read the stored tensor directly, without evaluating another logic plan.
+    match stats.sketch:
+        case Table(Literal(tensor), indices):
+            assert indices == fields
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+
+
+@pytest.mark.parametrize("sample_probs", [[0.25, 0.75], [0.0, 1.0], [1.0, 0.0]])
+def test_sampling_per_dimension_masks(sample_probs):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(estimator="silly")
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones((12, 9))), (i, j), sample_probs)
+    rows, cols = (
+        np.array(
+            [
+                ft.RandomMaskTensor(
+                    size, prob, seed=factory._seeds[field, size], dtype=np.intp
+                )[idx].item()
+                for idx in range(size)
+            ]
+        )
+        for field, size, prob in zip((i, j), (12, 9), sample_probs, strict=True)
+    )
+    expected = rows[:, None] * cols[None, :]
+    match stats.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+    count = expected.sum()
+    assert stats.coverage_correction() == pytest.approx(108 if count else 0)
+    prob = math.prod(sample_probs)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        min(108, count / prob) if prob else 0
+    )
+    assert not hasattr(stats, "sample_prob")
+
+
+def test_sampling_propagates_per_dimension_probs():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory()
+    stats = factory(ft.asarray(np.ones((3, 4))), (i, j), [0.25, 0.75])
+    other = factory(ft.asarray(np.ones((4, 5))), (j, k), [0.75, 0.5])
+    for op in (ffuncs.mul, ffuncs.add):
+        joined = factory.mapjoin(op, stats, other)
+        assert dict(zip(joined.index_order, joined.sample_probs, strict=True)) == {
+            i: 0.25,
+            j: 0.75,
+            k: 0.5,
+        }
+    assert factory.reorder(stats, (j, i)).sample_probs == [0.75, 0.25]
+    relabeled = factory.relabel(stats, (j, k))
+    assert relabeled.sample_probs == [0.25, 0.75]
+    assert relabeled.sample_probs is not stats.sample_probs
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    assert reduced.sample_probs == [0.25]
+    assert reduced.remainder_size == 4.0
+    assert reduced.remainder_prob == 0.75
+    scalar = factory.aggregate(ffuncs.add, 0, (i,), reduced)
+    assert scalar.sample_probs == []
+    assert scalar.remainder_size == 12.0
+    assert scalar.remainder_prob == 0.25 * 0.75
+    for transformed in (
+        factory.copy(reduced),
+        factory.relabel(reduced, (k,)),
+        factory.reorder(reduced, (i,)),
+        factory.aggregate(ffuncs.add, 0, (), reduced),
+    ):
+        assert transformed.remainder_size == reduced.remainder_size
+        assert transformed.remainder_prob == reduced.remainder_prob
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_combines_reduced_sizes_and_probs(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones((3, 4))), (i, j), [1.0, 0.75])
+    second_factory = SamplingStatsFactory()
+    second = second_factory(ft.asarray(np.ones((3, 5))), (i, j), [1.0, 0.25])
+    left = factory.aggregate(ffuncs.add, 0, (j,), first)
+    right = second_factory.aggregate(ffuncs.add, 0, (j,), second)
+    combined = factory.mapjoin(op, left, right)
+    assert combined.remainder_size == 4.0 * 5.0
+    assert combined.remainder_prob == 0.75 * 0.25
+
+    # Reusing the old name for a live axis must not resample the reduced axis.
+    live = factory(ft.asarray(np.ones(6)), (j,), [0.125])
+    result = factory.mapjoin(op, left, live)
+    assert result.sample_probs == [1.0, 0.125]
+    assert result.remainder_prob == 0.75
+    assert result.remainder_size == 4.0
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_aligns_shared_dimension_probs(op):
+    i = Field("i")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones(4)), (i,), [0.25])
+    second = factory(ft.asarray(np.ones(4)), (i,), [0.75])
+    combined = factory.mapjoin(op, first, second)
+    assert combined.sample_probs == [0.25]
+    assert combined.scan(needs_freq=False) == first.scan(needs_freq=False)
+    assert second.sample_probs == [0.75]
+
+
+@pytest.mark.parametrize(
+    "data,budget",
+    [
+        (np.ones((4, 40)), 20),
+        (np.eye(16), 4),
+        (np.pad(np.ones((2, 4)), ((0, 38), (0, 0))), 3),
+        (np.ones((3, 4, 5)), 3),
+        (np.ones((1, 12)), 1),
+    ],
+)
+def test_sampling_remask_largest_projection(data, budget):
+    fields = tuple(Field(f"i_{dim}") for dim in range(data.ndim))
+    factory = SamplingStatsFactory(sample_nnz=data.size)
+    factory._rng = np.random.default_rng(42)
+    original = factory(ft.asarray(data), fields)
+    assert original.sample_probs == [1.0] * data.ndim
+    original_count = original.scan(needs_freq=False)[1]
+    factory.sample_nnz = budget
+    sampled = factory.remask(original)
+
+    expected = (data != 0).astype(np.intp)
+    probs = [1.0] * data.ndim
+    while np.count_nonzero(expected) > budget:
+        sizes = [
+            np.count_nonzero(
+                np.any(
+                    expected,
+                    axis=tuple(axis for axis in range(data.ndim) if axis != dim),
+                )
+            )
+            for dim in range(data.ndim)
+        ]
+        dim = int(np.argmax(sizes))
+        probs[dim] *= 0.5
+        size = data.shape[dim]
+        mask = ft.RandomMaskTensor(
+            size, probs[dim], seed=factory._seeds[fields[dim], size], dtype=np.intp
+        )
+        values = np.array([mask[idx].item() for idx in range(size)])
+        shape = [1] * data.ndim
+        shape[dim] = size
+        expected *= values.reshape(shape)
+
+    assert sampled.sample_probs == probs
+    match sampled.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("remask left a deferred sketch")
+    assert sampled.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+    assert original.sample_probs == [1.0] * data.ndim
+    assert original.scan(needs_freq=False)[1] == original_count
+    assert factory.remask(sampled) is sampled
+    automatic_factory = SamplingStatsFactory(sample_nnz=budget)
+    automatic_factory._rng = np.random.default_rng(42)
+    automatic = automatic_factory(ft.asarray(data), fields)
+    assert automatic.sample_probs == probs
+    assert automatic.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+
+
+@pytest.mark.parametrize("shape", [(), (0,), (0, 5), (2, 3)])
+def test_sampling_remask_under_budget(shape):
+    fields = tuple(Field(f"i_{dim}") for dim in range(len(shape)))
+    factory = SamplingStatsFactory(sample_nnz=6)
+    stats = factory(ft.asarray(np.ones(shape)), fields)
+    assert stats.sample_probs == [1.0] * len(shape)
+    assert stats.scan(needs_freq=False)[1] == math.prod(shape)
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_bounds_each_sketch(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=12)
+    factory._rng = np.random.default_rng(42)
+    first = factory(ft.asarray(np.ones(10)), (i,))
+    second = factory(ft.asarray(np.ones(10)), (j,))
+    combined = factory.mapjoin(op, first, second)
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), combined)
+    for stats in (first, second, combined, reduced):
+        assert stats.scan(needs_freq=False)[1] <= 12
+    assert min(combined.sample_probs) < 1.0
+
+
+def test_sampling_budget_counts_positions_not_multiplicities():
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=100)
+    stats = factory(ft.asarray(np.ones((2, 20))), (i, j))
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    factory.sample_nnz = 2
+    sampled = factory.remask(reduced)
+    assert sampled.sample_probs == [1.0]
+    assert sampled.scan(needs_freq=False)[:2] == (40.0, 2.0)
+
+
+@pytest.mark.parametrize("budget", [0, -1])
+def test_sampling_requires_positive_budget(budget):
+    with pytest.raises(ValueError, match="sample_nnz must be positive"):
+        SamplingStatsFactory(sample_nnz=budget)
+
+
 def test_sampling_from_tensor():
     i, j = Field("i"), Field("j")
     data = np.eye(20)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    assert stats.remainder_dims == set()
-    assert stats.remainder_dim_sizes == {}
+    assert stats.remainder_size == 1.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -115,14 +380,14 @@ def test_sampling_mapjoin_join():
 
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -130,7 +395,7 @@ def test_sampling_mapjoin_join():
     )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -149,14 +414,14 @@ def test_sampling_mapjoin_elementwise():
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -164,7 +429,7 @@ def test_sampling_mapjoin_elementwise():
     )
     node_mapjoin_elem = MapJoin(Literal(ffuncs.add), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node_mapjoin_elem,
         bindings=OrderedDict(),
         replace=False,
@@ -191,14 +456,14 @@ def test_sampling_mapjoin_broadcast():
 
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -206,7 +471,7 @@ def test_sampling_mapjoin_broadcast():
     )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -231,7 +496,7 @@ def test_sampling_aggregate():
         idxs=(k,),
     )
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -239,8 +504,8 @@ def test_sampling_aggregate():
     )
 
     assert stats.index_order == (i, j)
-    assert k in stats.remainder_dims
-    assert stats.remainder_dim_sizes[k] == 20.0
+    assert stats.remainder_size == 20.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -249,15 +514,13 @@ def test_sampling_relabel():
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    relabled = SamplingStatsFactory(sample_prob=1.0).relabel(
-        stats, (Field("row"), Field("col"))
-    )
+    relabled = SamplingStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
     assert relabled.index_order == (Field("row"), Field("col"))
     assert relabled.estimate_non_fill_values() == pytest.approx(
@@ -270,13 +533,13 @@ def test_sampling_reorder():
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    reordered = SamplingStatsFactory(sample_prob=1.0).reorder(stats, (j, i))
+    reordered = SamplingStatsFactory().reorder(stats, (j, i))
     assert reordered.index_order == (j, i)
     assert reordered.estimate_non_fill_values() == pytest.approx(
         stats.estimate_non_fill_values(), abs=1.0

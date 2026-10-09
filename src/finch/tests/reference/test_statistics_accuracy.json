@@ -1,0 +1,2984 @@
+{
+  "block_count": 10,
+  "datasets": {
+    "Banded": {
+      "nnz": 1099970,
+      "shape": [
+        100000,
+        100000
+      ]
+    },
+    "Diagonal": {
+      "nnz": 100000,
+      "shape": [
+        100000,
+        100000
+      ]
+    },
+    "Striped": {
+      "nnz": 200000,
+      "shape": [
+        1000,
+        1000
+      ]
+    },
+    "Triangular": {
+      "nnz": 500500,
+      "shape": [
+        1000,
+        1000
+      ]
+    },
+    "Tridiagonal": {
+      "nnz": 299998,
+      "shape": [
+        100000,
+        100000
+      ]
+    },
+    "Uniform Random": {
+      "nnz": 100000,
+      "shape": [
+        10000,
+        10000
+      ]
+    },
+    "ct20stif": {
+      "nnz": 2600295,
+      "shape": [
+        52329,
+        52329
+      ]
+    },
+    "roadNet-PA": {
+      "nnz": 3083796,
+      "shape": [
+        1090920,
+        1090920
+      ]
+    },
+    "soc-sign-epinions": {
+      "nnz": 841372,
+      "shape": [
+        131828,
+        131828
+      ]
+    }
+  },
+  "dense_matrix_size": 1000,
+  "geomean_datasets": [
+    "ct20stif",
+    "roadNet-PA",
+    "soc-sign-epinions"
+  ],
+  "geomean_q_error": {
+    "Blocked-Uniform": 49.014669,
+    "DC": 5.930063,
+    "Dense": 6158.828616,
+    "LP": 3.372986,
+    "Sampling_good1": 4.442737,
+    "Sampling_schlosser": 1.90394,
+    "Sampling_sh2": 2.430695,
+    "Sampling_sh3": 1.596695,
+    "Sampling_silly": 5.518563,
+    "Sampling_sj1": 2.539278,
+    "Sampling_uj1": 2.421008,
+    "Sampling_uj2": 1.975996,
+    "Uniform": 199.133057
+  },
+  "random_density": 0.001,
+  "random_matrix_size": 10000,
+  "results": {
+    "Hadamard": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1209.34013,
+          "q_error": 909.562142,
+          "ratio": 0.001099
+        },
+        "DC": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1099970.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 9091.157032,
+          "ratio": 9091.157032
+        },
+        "LP": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1099970.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_silly": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1098368.0,
+          "q_error": 1.001459,
+          "ratio": 0.998544
+        },
+        "Uniform": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 120.9934,
+          "q_error": 9091.157032,
+          "ratio": 0.00011
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 10.0,
+          "q_error": 10000.0,
+          "ratio": 0.0001
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 100000.0,
+          "ratio": 100000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_silly": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100192.0,
+          "q_error": 1.00192,
+          "ratio": 1.00192
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 1.0,
+          "q_error": 100000.0,
+          "ratio": 1e-05
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 40000.0,
+          "q_error": 5.0,
+          "ratio": 0.2
+        },
+        "DC": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_silly": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 186240.0,
+          "q_error": 1.073883,
+          "ratio": 0.9312
+        },
+        "Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 40000.0,
+          "q_error": 5.0,
+          "ratio": 0.2
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 475502.5,
+          "q_error": 1.052571,
+          "ratio": 0.950055
+        },
+        "DC": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "LP": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_silly": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 493952.0,
+          "q_error": 1.013256,
+          "ratio": 0.986917
+        },
+        "Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 250500.25,
+          "q_error": 1.998002,
+          "ratio": 0.5005
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 89.988001,
+          "q_error": 3333.75559,
+          "ratio": 0.0003
+        },
+        "DC": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 299998.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 33333.555557,
+          "ratio": 33333.555557
+        },
+        "LP": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 299998.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_silly": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 296096.0,
+          "q_error": 1.013178,
+          "ratio": 0.986993
+        },
+        "Uniform": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 8.99988,
+          "q_error": 33333.555557,
+          "ratio": 3e-05
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100.119886,
+          "q_error": 998.802576,
+          "ratio": 0.001001
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000000.0,
+          "q_error": 1000.0,
+          "ratio": 1000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_silly": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 95776.0,
+          "q_error": 1.044103,
+          "ratio": 0.95776
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100.0,
+          "q_error": 1000.0,
+          "ratio": 0.001
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 17435.953362,
+          "q_error": 149.134088,
+          "ratio": 0.006705
+        },
+        "DC": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 1053.082147,
+          "ratio": 1053.082147
+        },
+        "LP": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_silly": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2693120.0,
+          "q_error": 1.035698,
+          "ratio": 1.035698
+        },
+        "Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2469.223325,
+          "q_error": 1053.082147,
+          "ratio": 0.00095
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 78.270442,
+          "q_error": 39399.241151,
+          "ratio": 2.5e-05
+        },
+        "DC": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3083796.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 385922.559858,
+          "ratio": 385922.559858
+        },
+        "LP": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3083796.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_silly": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 3132416.0,
+          "q_error": 1.015766,
+          "ratio": 1.015766
+        },
+        "Uniform": {
+          "actual_nnz": 3083796,
+          "estimated_nnz": 7.990712,
+          "q_error": 385922.559858,
+          "ratio": 3e-06
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 316.899573,
+          "q_error": 2655.011464,
+          "ratio": 0.000377
+        },
+        "DC": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 20655.098558,
+          "ratio": 20655.098558
+        },
+        "LP": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_silly": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 742144.0,
+          "q_error": 1.133705,
+          "ratio": 0.882064
+        },
+        "Uniform": {
+          "actual_nnz": 841372,
+          "estimated_nnz": 40.734349,
+          "q_error": 20655.098558,
+          "ratio": 4.8e-05
+        }
+      }
+    },
+    "SpGEMM": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 12026515.973215,
+          "q_error": 5.727212,
+          "ratio": 5.727212
+        },
+        "DC": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 12099670.0,
+          "q_error": 5.762049,
+          "ratio": 5.762049
+        },
+        "Dense": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 4762.154208,
+          "ratio": 4762.154208
+        },
+        "LP": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 12099450.0,
+          "q_error": 5.761945,
+          "ratio": 5.761945
+        },
+        "Sampling_good1": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 617728.0,
+          "q_error": 3.399376,
+          "ratio": 0.294172
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 6967685.66539,
+          "q_error": 3.318119,
+          "ratio": 3.318119
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 1687327.511971,
+          "q_error": 1.244506,
+          "ratio": 0.803531
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 5989321.753497,
+          "q_error": 2.852207,
+          "ratio": 2.852207
+        },
+        "Sampling_silly": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 617728.0,
+          "q_error": 3.399376,
+          "ratio": 0.294172
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 1658130.681855,
+          "q_error": 1.26642,
+          "ratio": 0.789627
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 1689905.250636,
+          "q_error": 1.242608,
+          "ratio": 0.804759
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 1789337.187599,
+          "q_error": 1.173557,
+          "ratio": 0.85211
+        },
+        "Uniform": {
+          "actual_nnz": 2099890,
+          "estimated_nnz": 12092023.297313,
+          "q_error": 5.758408,
+          "ratio": 5.758408
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 99995.001169,
+          "q_error": 1.00005,
+          "ratio": 0.99995
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 100000.0,
+          "ratio": 100000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_silly": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 6448.0,
+          "q_error": 15.508685,
+          "ratio": 0.06448
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 99999.508281,
+          "q_error": 1.000005,
+          "ratio": 0.999995
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "DC": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_silly": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214018.497201,
+          "q_error": 1.070092,
+          "ratio": 1.070092
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 550000.0,
+          "q_error": 1.098901,
+          "ratio": 1.098901
+        },
+        "DC": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "Dense": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "LP": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "Sampling_good1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483840.0,
+          "q_error": 1.034433,
+          "ratio": 0.966713
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 647284.021314,
+          "q_error": 1.293275,
+          "ratio": 1.293275
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 488793.051977,
+          "q_error": 1.023951,
+          "ratio": 0.976609
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 506864.797822,
+          "q_error": 1.012717,
+          "ratio": 1.012717
+        },
+        "Sampling_silly": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483840.0,
+          "q_error": 1.034433,
+          "ratio": 0.966713
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483853.095039,
+          "q_error": 1.034405,
+          "ratio": 0.966739
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 488190.82671,
+          "q_error": 1.025214,
+          "ratio": 0.975406
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 507734.516949,
+          "q_error": 1.014455,
+          "ratio": 1.014455
+        },
+        "Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 899583.271096,
+          "q_error": 1.799188,
+          "ratio": 1.799188
+        },
+        "DC": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 899994.0,
+          "q_error": 1.80001,
+          "ratio": 1.80001
+        },
+        "Dense": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 20000.240003,
+          "ratio": 20000.240003
+        },
+        "LP": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 899990.0,
+          "q_error": 1.800002,
+          "ratio": 1.800002
+        },
+        "Sampling_good1": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 482006.946105,
+          "q_error": 1.037317,
+          "ratio": 0.964025
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 717217.692337,
+          "q_error": 1.434453,
+          "ratio": 1.434453
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 411296.945079,
+          "q_error": 1.215652,
+          "ratio": 0.822604
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 683547.695054,
+          "q_error": 1.367112,
+          "ratio": 1.367112
+        },
+        "Sampling_silly": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 101248.0,
+          "q_error": 4.93831,
+          "ratio": 0.202498
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 408997.053447,
+          "q_error": 1.222488,
+          "ratio": 0.818004
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 411399.336119,
+          "q_error": 1.21535,
+          "ratio": 0.822809
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 417971.337003,
+          "q_error": 1.19624,
+          "ratio": 0.835953
+        },
+        "Uniform": {
+          "actual_nnz": 499994,
+          "estimated_nnz": 899947.475738,
+          "q_error": 1.799917,
+          "ratio": 1.799917
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 995031.646752,
+          "q_error": 1.000852,
+          "ratio": 1.000852
+        },
+        "DC": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 2400000.0,
+          "q_error": 2.414038,
+          "ratio": 2.414038
+        },
+        "Dense": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 100000000.0,
+          "q_error": 100.584901,
+          "ratio": 100.584901
+        },
+        "LP": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 1101997.72537,
+          "q_error": 1.108443,
+          "ratio": 1.108443
+        },
+        "Sampling_good1": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 932351.319427,
+          "q_error": 1.06632,
+          "ratio": 0.937805
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 935162.490211,
+          "q_error": 1.063115,
+          "ratio": 0.940632
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 927484.964544,
+          "q_error": 1.071915,
+          "ratio": 0.93291
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 934462.901798,
+          "q_error": 1.063911,
+          "ratio": 0.939929
+        },
+        "Sampling_silly": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 234336.0,
+          "q_error": 4.242562,
+          "ratio": 0.235707
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 926998.765127,
+          "q_error": 1.072477,
+          "ratio": 0.932421
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 927482.544376,
+          "q_error": 1.071918,
+          "ratio": 0.932907
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 928863.748945,
+          "q_error": 1.070324,
+          "ratio": 0.934297
+        },
+        "Uniform": {
+          "actual_nnz": 994185,
+          "estimated_nnz": 995017.120137,
+          "q_error": 1.000837,
+          "ratio": 1.000837
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 114833937.052821,
+          "q_error": 11.644041,
+          "ratio": 11.644041
+        },
+        "DC": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 538261065.0,
+          "q_error": 54.579107,
+          "ratio": 54.579107
+        },
+        "Dense": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 277.663205,
+          "ratio": 277.663205
+        },
+        "LP": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 143540623.0,
+          "q_error": 14.554869,
+          "ratio": 14.554869
+        },
+        "Sampling_good1": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 5114880.0,
+          "q_error": 1.928107,
+          "ratio": 0.518643
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 30367235.406259,
+          "q_error": 3.079206,
+          "ratio": 3.079206
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 7240638.958664,
+          "q_error": 1.362039,
+          "ratio": 0.734193
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 20756347.459792,
+          "q_error": 2.104672,
+          "ratio": 2.104672
+        },
+        "Sampling_silly": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 5114880.0,
+          "q_error": 1.928107,
+          "ratio": 0.518643
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 6935162.090494,
+          "q_error": 1.422034,
+          "ratio": 0.703218
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 7262226.271102,
+          "q_error": 1.357991,
+          "ratio": 0.736382
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 8125610.646325,
+          "q_error": 1.213698,
+          "ratio": 0.823928
+        },
+        "Uniform": {
+          "actual_nnz": 9862035,
+          "estimated_nnz": 126210900.542169,
+          "q_error": 12.797653,
+          "ratio": 12.797653
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 8722365.67975,
+          "q_error": 1.204926,
+          "ratio": 1.204926
+        },
+        "DC": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 27754164.0,
+          "q_error": 3.83402,
+          "ratio": 3.83402
+        },
+        "Dense": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 164403.867759,
+          "ratio": 164403.867759
+        },
+        "LP": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 9865130.0,
+          "q_error": 1.36279,
+          "ratio": 1.36279
+        },
+        "Sampling_good1": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 596992.0,
+          "q_error": 12.125657,
+          "ratio": 0.08247
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 9207696.372262,
+          "q_error": 1.271971,
+          "ratio": 1.271971
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 5949527.774111,
+          "q_error": 1.216722,
+          "ratio": 0.821881
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 9049042.718529,
+          "q_error": 1.250054,
+          "ratio": 1.250054
+        },
+        "Sampling_silly": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 596992.0,
+          "q_error": 12.125657,
+          "ratio": 0.08247
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 5766203.951759,
+          "q_error": 1.255405,
+          "ratio": 0.796556
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 5954932.753138,
+          "q_error": 1.215617,
+          "ratio": 0.822627
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 6711237.846701,
+          "q_error": 1.078627,
+          "ratio": 0.927105
+        },
+        "Uniform": {
+          "actual_nnz": 7238920,
+          "estimated_nnz": 8717211.643587,
+          "q_error": 1.204214,
+          "ratio": 1.204214
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 13720716.484087,
+          "q_error": 3.438577,
+          "ratio": 0.290818
+        },
+        "DC": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 1741640040.0,
+          "q_error": 36.914994,
+          "ratio": 36.914994
+        },
+        "Dense": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 368.349198,
+          "ratio": 368.349198
+        },
+        "LP": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 156287911.846863,
+          "q_error": 3.312606,
+          "ratio": 3.312606
+        },
+        "Sampling_good1": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 5112832.0,
+          "q_error": 9.227713,
+          "ratio": 0.108369
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 62697137.921037,
+          "q_error": 1.328899,
+          "ratio": 1.328899
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 15924372.499582,
+          "q_error": 2.962738,
+          "ratio": 0.337526
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 54910185.968295,
+          "q_error": 1.163851,
+          "ratio": 1.163851
+        },
+        "Sampling_silly": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 5112832.0,
+          "q_error": 9.227713,
+          "ratio": 0.108369
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 13429345.187481,
+          "q_error": 3.513183,
+          "ratio": 0.284642
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 16083057.527846,
+          "q_error": 2.933506,
+          "ratio": 0.340889
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 32173261.398873,
+          "q_error": 1.466427,
+          "ratio": 0.68193
+        },
+        "Uniform": {
+          "actual_nnz": 47179746,
+          "estimated_nnz": 5369098.156243,
+          "q_error": 8.787276,
+          "ratio": 0.113801
+        }
+      }
+    },
+    "SpGEMM2": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 123924288.553799,
+          "q_error": 39.978672,
+          "ratio": 39.978672
+        },
+        "DC": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 133096370.0,
+          "q_error": 42.937637,
+          "ratio": 42.937637
+        },
+        "Dense": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 3226.056211,
+          "ratio": 3226.056211
+        },
+        "LP": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 133092290.0,
+          "q_error": 42.936321,
+          "ratio": 42.936321
+        },
+        "Sampling_good1": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 348160.0,
+          "q_error": 8.903263,
+          "ratio": 0.112318
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 41684684.256731,
+          "q_error": 13.447713,
+          "ratio": 13.447713
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 644361.910793,
+          "q_error": 4.810589,
+          "ratio": 0.207875
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 28761625.23206,
+          "q_error": 9.278662,
+          "ratio": 9.278662
+        },
+        "Sampling_silly": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 348160.0,
+          "q_error": 8.903263,
+          "ratio": 0.112318
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 623663.193844,
+          "q_error": 4.970247,
+          "ratio": 0.201197
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 648126.9755,
+          "q_error": 4.782643,
+          "ratio": 0.209089
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 767288.982066,
+          "q_error": 4.039886,
+          "ratio": 0.247532
+        },
+        "Uniform": {
+          "actual_nnz": 3099760,
+          "estimated_nnz": 132127981.448972,
+          "q_error": 42.62523,
+          "ratio": 42.62523
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 99990.002335,
+          "q_error": 1.0001,
+          "ratio": 0.9999
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 100000.0,
+          "ratio": 100000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_silly": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 480.0,
+          "q_error": 208.333333,
+          "ratio": 0.0048
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 122880.0,
+          "q_error": 1.2288,
+          "ratio": 1.2288
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 99998.953175,
+          "q_error": 1.00001,
+          "ratio": 0.99999
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "DC": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_silly": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 191488.0,
+          "q_error": 1.044452,
+          "ratio": 0.95744
+        },
+        "Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 550000.0,
+          "q_error": 1.098901,
+          "ratio": 1.098901
+        },
+        "DC": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "Dense": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "LP": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "Sampling_good1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 454656.0,
+          "q_error": 1.100832,
+          "ratio": 0.908404
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 701206.958966,
+          "q_error": 1.401013,
+          "ratio": 1.401013
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 454896.537521,
+          "q_error": 1.10025,
+          "ratio": 0.908884
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 457553.715929,
+          "q_error": 1.093861,
+          "ratio": 0.914193
+        },
+        "Sampling_silly": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 454656.0,
+          "q_error": 1.100832,
+          "ratio": 0.908404
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 454656.0,
+          "q_error": 1.100832,
+          "ratio": 0.908404
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 454866.198899,
+          "q_error": 1.100324,
+          "ratio": 0.908824
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 484168.173283,
+          "q_error": 1.033732,
+          "ratio": 0.967369
+        },
+        "Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 2695095.19043,
+          "q_error": 3.850202,
+          "ratio": 3.850202
+        },
+        "DC": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 2699982.0,
+          "q_error": 3.857183,
+          "ratio": 3.857183
+        },
+        "Dense": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 14285.959188,
+          "ratio": 14285.959188
+        },
+        "LP": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 2699962.0,
+          "q_error": 3.857155,
+          "ratio": 3.857155
+        },
+        "Sampling_good1": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 66976.0,
+          "q_error": 10.451326,
+          "ratio": 0.095682
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 1388269.03754,
+          "q_error": 1.983275,
+          "ratio": 1.983275
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 172625.392727,
+          "q_error": 4.054954,
+          "ratio": 0.246612
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 1140447.025443,
+          "q_error": 1.629238,
+          "ratio": 1.629238
+        },
+        "Sampling_silly": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 66976.0,
+          "q_error": 10.451326,
+          "ratio": 0.095682
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 171521.995276,
+          "q_error": 4.081039,
+          "ratio": 0.245036
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 172765.545906,
+          "q_error": 4.051664,
+          "ratio": 0.246812
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 176155.581257,
+          "q_error": 3.973692,
+          "ratio": 0.251655
+        },
+        "Uniform": {
+          "actual_nnz": 699988,
+          "estimated_nnz": 2699460.058925,
+          "q_error": 3.856438,
+          "ratio": 3.856438
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 9471401.433571,
+          "q_error": 1.006195,
+          "ratio": 1.006195
+        },
+        "DC": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 57600000.0,
+          "q_error": 6.119142,
+          "ratio": 6.119142
+        },
+        "Dense": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 100000000.0,
+          "q_error": 10.623511,
+          "ratio": 10.623511
+        },
+        "LP": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 13164410.021189,
+          "q_error": 1.398523,
+          "ratio": 1.398523
+        },
+        "Sampling_good1": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 8482798.859448,
+          "q_error": 1.109667,
+          "ratio": 0.901171
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 9008233.463921,
+          "q_error": 1.044942,
+          "ratio": 0.956991
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 7661871.065207,
+          "q_error": 1.228562,
+          "ratio": 0.81396
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 8961132.889038,
+          "q_error": 1.050435,
+          "ratio": 0.951987
+        },
+        "Sampling_silly": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 569536.0,
+          "q_error": 16.527637,
+          "ratio": 0.060505
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 7640995.69968,
+          "q_error": 1.231919,
+          "ratio": 0.811742
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 7662400.775138,
+          "q_error": 1.228477,
+          "ratio": 0.814016
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 7726200.028759,
+          "q_error": 1.218333,
+          "ratio": 0.820794
+        },
+        "Uniform": {
+          "actual_nnz": 9413084,
+          "estimated_nnz": 9471204.81468,
+          "q_error": 1.006174,
+          "ratio": 1.006174
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 1317158378.061146,
+          "q_error": 56.009192,
+          "ratio": 56.009192
+        },
+        "DC": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "Dense": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "LP": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2738324240.999998,
+          "q_error": 116.441069,
+          "ratio": 116.441069
+        },
+        "Sampling_good1": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 5820416.0,
+          "q_error": 4.040403,
+          "ratio": 0.2475
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 431866774.802014,
+          "q_error": 18.364162,
+          "ratio": 18.364162
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 6736971.1905,
+          "q_error": 3.490712,
+          "ratio": 0.286475
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 161530281.608359,
+          "q_error": 6.868711,
+          "ratio": 6.868711
+        },
+        "Sampling_silly": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 5820416.0,
+          "q_error": 4.040403,
+          "ratio": 0.2475
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 6314975.060183,
+          "q_error": 3.723977,
+          "ratio": 0.26853
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 6785902.587092,
+          "q_error": 3.465541,
+          "ratio": 0.288555
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 8898000.043081,
+          "q_error": 2.642934,
+          "ratio": 0.378367
+        },
+        "Uniform": {
+          "actual_nnz": 23516825,
+          "estimated_nnz": 2461120623.142261,
+          "q_error": 104.65361,
+          "ratio": 104.65361
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 24684524.235374,
+          "q_error": 1.735432,
+          "ratio": 1.735432
+        },
+        "DC": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 249787476.0,
+          "q_error": 17.561176,
+          "ratio": 17.561176
+        },
+        "Dense": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 83669.800891,
+          "ratio": 83669.800891
+        },
+        "LP": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 33675222.0,
+          "q_error": 2.367519,
+          "ratio": 2.367519
+        },
+        "Sampling_good1": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 56832.0,
+          "q_error": 250.278839,
+          "ratio": 0.003996
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 27079499.697241,
+          "q_error": 1.90381,
+          "ratio": 1.90381
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 796459.115939,
+          "q_error": 17.858854,
+          "ratio": 0.055995
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 26143057.826905,
+          "q_error": 1.837974,
+          "ratio": 1.837974
+        },
+        "Sampling_silly": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 56832.0,
+          "q_error": 250.278839,
+          "ratio": 0.003996
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 805101.67084,
+          "q_error": 17.667144,
+          "ratio": 0.056602
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 796161.827266,
+          "q_error": 17.865522,
+          "ratio": 0.055974
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 796161.827266,
+          "q_error": 17.865522,
+          "ratio": 0.055974
+        },
+        "Uniform": {
+          "actual_nnz": 14223847,
+          "estimated_nnz": 24641449.58079,
+          "q_error": 1.732404,
+          "ratio": 1.732404
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 226005276.2488,
+          "q_error": 3.30812,
+          "ratio": 0.302286
+        },
+        "DC": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 8063998118.0,
+          "q_error": 10.785756,
+          "ratio": 10.785756
+        },
+        "Dense": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 23.244247,
+          "ratio": 23.244247
+        },
+        "LP": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 8063998118.000001,
+          "q_error": 10.785756,
+          "ratio": 10.785756
+        },
+        "Sampling_good1": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 13326336.0,
+          "q_error": 56.103387,
+          "ratio": 0.017824
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 2447588772.701759,
+          "q_error": 3.273698,
+          "ratio": 3.273698
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 20040614.59879,
+          "q_error": 37.306869,
+          "ratio": 0.026805
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 1308597274.333167,
+          "q_error": 1.750275,
+          "ratio": 1.750275
+        },
+        "Sampling_silly": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 13326336.0,
+          "q_error": 56.103387,
+          "ratio": 0.017824
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 17346031.192646,
+          "q_error": 43.102228,
+          "ratio": 0.023201
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 20636066.975917,
+          "q_error": 36.230382,
+          "ratio": 0.027601
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 59236515.121153,
+          "q_error": 12.621482,
+          "ratio": 0.07923
+        },
+        "Uniform": {
+          "actual_nnz": 747652587,
+          "estimated_nnz": 34233683.689452,
+          "q_error": 21.839677,
+          "ratio": 0.045788
+        }
+      }
+    },
+    "Triangle Counting": {
+      "Banded": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 13219.029682,
+          "q_error": 83.2111,
+          "ratio": 0.012018
+        },
+        "DC": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1099970.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 9091.157032,
+          "ratio": 9091.157032
+        },
+        "LP": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1099970.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 439936.0,
+          "q_error": 2.500295,
+          "ratio": 0.399953
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 4591124.376832,
+          "q_error": 4.173863,
+          "ratio": 4.173863
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1049700.241505,
+          "q_error": 1.04789,
+          "ratio": 0.954299
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 3832216.183674,
+          "q_error": 3.483928,
+          "ratio": 3.483928
+        },
+        "Sampling_silly": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 439936.0,
+          "q_error": 2.500295,
+          "ratio": 0.399953
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1038649.795148,
+          "q_error": 1.059038,
+          "ratio": 0.944253
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1050604.299545,
+          "q_error": 1.046988,
+          "ratio": 0.955121
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1091426.524191,
+          "q_error": 1.007828,
+          "ratio": 0.992233
+        },
+        "Uniform": {
+          "actual_nnz": 1099970,
+          "estimated_nnz": 1330.086287,
+          "q_error": 826.99146,
+          "ratio": 0.001209
+        }
+      },
+      "Diagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 9.9995,
+          "q_error": 10000.499908,
+          "ratio": 0.0001
+        },
+        "DC": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 100000.0,
+          "ratio": 100000.0
+        },
+        "LP": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 100000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_silly": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 6448.0,
+          "q_error": 15.508685,
+          "ratio": 0.06448
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 103168.0,
+          "q_error": 1.03168,
+          "ratio": 1.03168
+        },
+        "Uniform": {
+          "actual_nnz": 100000,
+          "estimated_nnz": 0.999995,
+          "q_error": 100000.0,
+          "ratio": 1e-05
+        }
+      },
+      "Striped": {
+        "Blocked-Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "DC": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 1000000.0,
+          "q_error": 5.0,
+          "ratio": 5.0
+        },
+        "LP": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_silly": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214018.497201,
+          "q_error": 1.070092,
+          "ratio": 1.070092
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 214016.0,
+          "q_error": 1.07008,
+          "ratio": 1.07008
+        },
+        "Uniform": {
+          "actual_nnz": 200000,
+          "estimated_nnz": 200000.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        }
+      },
+      "Triangular": {
+        "Blocked-Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "DC": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 1000000.0,
+          "q_error": 1.998002,
+          "ratio": 1.998002
+        },
+        "LP": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483840.0,
+          "q_error": 1.034433,
+          "ratio": 0.966713
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 647284.021314,
+          "q_error": 1.293275,
+          "ratio": 1.293275
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 488793.051977,
+          "q_error": 1.023951,
+          "ratio": 0.976609
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 506864.797822,
+          "q_error": 1.012717,
+          "ratio": 1.012717
+        },
+        "Sampling_silly": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483840.0,
+          "q_error": 1.034433,
+          "ratio": 0.966713
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 483853.095039,
+          "q_error": 1.034405,
+          "ratio": 0.966739
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 488190.82671,
+          "q_error": 1.025214,
+          "ratio": 0.975406
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 507734.516949,
+          "q_error": 1.014455,
+          "ratio": 1.014455
+        },
+        "Uniform": {
+          "actual_nnz": 500500,
+          "estimated_nnz": 500500.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        }
+      },
+      "Tridiagonal": {
+        "Blocked-Uniform": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 269.824594,
+          "q_error": 1111.826002,
+          "ratio": 0.000899
+        },
+        "DC": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 299998.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 10000000000.0,
+          "q_error": 33333.555557,
+          "ratio": 33333.555557
+        },
+        "LP": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 299998.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 294091.663082,
+          "q_error": 1.020083,
+          "ratio": 0.980312
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 530918.773644,
+          "q_error": 1.769741,
+          "ratio": 1.769741
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 278266.952473,
+          "q_error": 1.078094,
+          "ratio": 0.927563
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 499086.208871,
+          "q_error": 1.663632,
+          "ratio": 1.663632
+        },
+        "Sampling_silly": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 77760.0,
+          "q_error": 3.857999,
+          "ratio": 0.259202
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 277599.72776,
+          "q_error": 1.080685,
+          "ratio": 0.925339
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 278298.947368,
+          "q_error": 1.07797,
+          "ratio": 0.927669
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 280174.073587,
+          "q_error": 1.070756,
+          "ratio": 0.93392
+        },
+        "Uniform": {
+          "actual_nnz": 299998,
+          "estimated_nnz": 26.998244,
+          "q_error": 11111.759597,
+          "ratio": 9e-05
+        }
+      },
+      "Uniform Random": {
+        "Blocked-Uniform": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 995.203969,
+          "q_error": 1.274111,
+          "ratio": 0.784861
+        },
+        "DC": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000.0,
+          "q_error": 78.864353,
+          "ratio": 78.864353
+        },
+        "Dense": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000000.0,
+          "q_error": 78864.353312,
+          "ratio": 78864.353312
+        },
+        "LP": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 100000.0,
+          "q_error": 78.864353,
+          "ratio": 78.864353
+        },
+        "Sampling_good1": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_silly": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 352.0,
+          "q_error": 3.602273,
+          "ratio": 0.277603
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 1408.0,
+          "q_error": 1.11041,
+          "ratio": 1.11041
+        },
+        "Uniform": {
+          "actual_nnz": 1268,
+          "estimated_nnz": 995.01712,
+          "q_error": 1.27435,
+          "ratio": 0.784714
+        }
+      },
+      "ct20stif": {
+        "Blocked-Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 641047.131831,
+          "q_error": 4.056324,
+          "ratio": 0.246529
+        },
+        "DC": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Dense": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2738324241.0,
+          "q_error": 1053.082147,
+          "ratio": 1053.082147
+        },
+        "LP": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2600295.0,
+          "q_error": 1.0,
+          "ratio": 1.0
+        },
+        "Sampling_good1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2169856.0,
+          "q_error": 1.198372,
+          "ratio": 0.834465
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 7148477.233377,
+          "q_error": 2.749102,
+          "ratio": 2.749102
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2513414.267769,
+          "q_error": 1.034567,
+          "ratio": 0.966588
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 4599657.803102,
+          "q_error": 1.768898,
+          "ratio": 1.768898
+        },
+        "Sampling_silly": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2169856.0,
+          "q_error": 1.198372,
+          "ratio": 0.834465
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2487638.327805,
+          "q_error": 1.045287,
+          "ratio": 0.956675
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2512946.372453,
+          "q_error": 1.034759,
+          "ratio": 0.966408
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 2578964.044668,
+          "q_error": 1.008271,
+          "ratio": 0.991797
+        },
+        "Uniform": {
+          "actual_nnz": 2600295,
+          "estimated_nnz": 119849.055386,
+          "q_error": 21.696416,
+          "ratio": 0.046091
+        }
+      },
+      "roadNet-PA": {
+        "Blocked-Uniform": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 219.187249,
+          "q_error": 1784.720607,
+          "ratio": 0.00056
+        },
+        "DC": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 3083796.0,
+          "q_error": 7.883156,
+          "ratio": 7.883156
+        },
+        "Dense": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 1190106446400.0,
+          "q_error": 3042287.714347,
+          "ratio": 3042287.714347
+        },
+        "LP": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 3083796.0,
+          "q_error": 7.883156,
+          "ratio": 7.883156
+        },
+        "Sampling_good1": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_silly": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 26624.0,
+          "q_error": 14.693059,
+          "ratio": 0.068059
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 425984.0,
+          "q_error": 1.08895,
+          "ratio": 1.08895
+        },
+        "Uniform": {
+          "actual_nnz": 391188,
+          "estimated_nnz": 22.587982,
+          "q_error": 17318.413332,
+          "ratio": 5.8e-05
+        }
+      },
+      "soc-sign-epinions": {
+        "Blocked-Uniform": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 5444.814806,
+          "q_error": 109.745698,
+          "ratio": 0.009112
+        },
+        "DC": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.408048,
+          "ratio": 1.408048
+        },
+        "Dense": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 17378621584.0,
+          "q_error": 29083.368757,
+          "ratio": 29083.368757
+        },
+        "LP": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 841372.0,
+          "q_error": 1.408048,
+          "ratio": 1.408048
+        },
+        "Sampling_good1": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 192512.0,
+          "q_error": 3.103936,
+          "ratio": 0.322172
+        },
+        "Sampling_schlosser": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 560141.273243,
+          "q_error": 1.066776,
+          "ratio": 0.937404
+        },
+        "Sampling_sh2": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 215540.770162,
+          "q_error": 2.772306,
+          "ratio": 0.360711
+        },
+        "Sampling_sh3": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 338280.272327,
+          "q_error": 1.76642,
+          "ratio": 0.566117
+        },
+        "Sampling_silly": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 192512.0,
+          "q_error": 3.103936,
+          "ratio": 0.322172
+        },
+        "Sampling_sj1": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 200763.476868,
+          "q_error": 2.976363,
+          "ratio": 0.335981
+        },
+        "Sampling_uj1": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 215144.807746,
+          "q_error": 2.777408,
+          "ratio": 0.360048
+        },
+        "Sampling_uj2": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 252641.171412,
+          "q_error": 2.365192,
+          "ratio": 0.422799
+        },
+        "Uniform": {
+          "actual_nnz": 597545,
+          "estimated_nnz": 259.940573,
+          "q_error": 2298.77542,
+          "ratio": 0.000435
+        }
+      }
+    }
+  },
+  "sample_nnz": 10000,
+  "seed": 42,
+  "sparse_matrix_size": 100000
+}
