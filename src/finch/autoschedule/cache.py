@@ -16,14 +16,16 @@ from finch.symbolic.stage import UnvalidatedForm
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
+LOG_FLOOR = -64.0
+LOG_CEIL = 64.0
 
 
-class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
+class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
         max_depth: int = 10,
-        threshold: int = 1,
+        threshold: float = 1.0,
         norm_order: float = np.inf,
     ):
         self.ctx = ctx
@@ -39,59 +41,55 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ):
-        def apply_norm(cached_matrix, current_vec, norm_order):
-            dist = np.abs(cached_matrix - current_vec)
-            return vector_norm(dist, ord=norm_order, axis=1)
-
         prgm_key = (prgm, tuple(bindings.items()), stats_factory)
-        if prgm_key not in self.cache:
-            self.cache[prgm_key] = {
-                "cached_embeddings": None,
-                "kernels": [],
-            }  # embeddings : result (kernel)
+        entry = self.cache.setdefault(prgm_key, {"cached_emb_matrix":None, "kernels":[]})
 
-        entry = self.cache[prgm_key]  # fetching the cached vectors and kernels
+        current_vec = None
+        parts = [
+            s.get_embedding() for s in stats.values() if isinstance(s, NumericStats)
+        ]
+        if parts:
+            embedding = np.concatenate(parts).astype(float)
 
-        if stats:
-            current_embedding = np.concatenate(
-                [
-                    s.get_embedding()
-                    for s in stats.values()
-                    if isinstance(s, NumericStats)
-                ]
+            embedding = np.nan_to_num(
+                embedding, nan=LOG_FLOOR, neginf=LOG_FLOOR, posinf=LOG_CEIL
             )
+            factor = vector_norm(np.ones(len(embedding)), ord=self.norm_order)
+            current_vec = embedding / factor
 
-            factor = vector_norm(np.ones(len(current_embedding)), ord=self.norm_order)
-            current_vec = current_embedding / factor
-
-            if entry["cached_embeddings"] is not None:
-                distances = apply_norm(
-                    entry["cached_embeddings"], current_vec, self.norm_order
-                )
-                chosen_idx = np.argmin(distances)  # threshold = 1
-                if distances[chosen_idx] < self.threshold:
-                    logger.debug("CacheLRU_Embeddings_Norms HIT, reusing kernel")
-                    return entry["kernels"][chosen_idx]
+        kernels = entry["kernels"]
+        idx = None
+        if kernels and current_vec is None:
+            idx = len(kernels) - 1
+        elif kernels:
+            distances = vector_norm(np.abs(entry["cached_emb_matrix"] - current_vec), 
+                            ord=self.norm_order,
+                            axis=1)
+            
+            chosen_idx = int(np.argmin(distances))
+            if distances[chosen_idx] < self.threshold:
+                idx = chosen_idx
+        if idx is not None:
+            logger.debug("CacheLRU_Embeddings_Norms HIT, reusing kernel")
+            kernels.append(kernels.pop(idx))
+            if entry["cached_emb_matrix"] is not None:
+                m = entry["cached_emb_matrix"]
+                entry["cached_emb_matrix"] = np.concatenate((m[:idx],m[idx+1:],m[idx:idx+1]))
+            return kernels[-1]
 
         logger.debug(
             "CacheLRU_Embeddings_Norms MISS, compiling new kernel and embeddings"
         )
         result = self.ctx(prgm, bindings, stats, stats_factory)
-
-        if stats:
-            if entry["cached_embeddings"] is None:
-                entry["cached_embeddings"] = np.array([current_vec])
-            else:
-                entry["cached_embeddings"] = np.vstack(
-                    [entry["cached_embeddings"], current_vec]
-                )
-
-            entry["kernels"].append(result)
-
-            if len(entry["kernels"]) > self.max_depth:
-                entry["cached_embeddings"] = np.delete(
-                    entry["cached_embeddings"], 0, axis=0
-                )
-                entry["kernels"].pop(0)
-
+        kernels.append(result)
+        if current_vec is not None:
+            row = current_vec[None, :]
+            entry["cached_emb_matrix"] = (
+                row if entry["cached_emb_matrix"] is None else np.vstack((entry["cached_emb_matrix"], row))
+            )
+        if len(kernels) > self.max_depth:
+            kernels.pop(0)  # evict the least recently used
+            if entry["cached_emb_matrix"] is not None:
+                entry["cached_emb_matrix"] = entry["cached_emb_matrix"][1:]
         return result
+
