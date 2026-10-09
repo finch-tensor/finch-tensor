@@ -1,3 +1,5 @@
+exclude: ^src/finch/tests/data/
+
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
@@ -30,6 +32,7 @@ repos:
             ^src/finch/tests/reference/|
             ^src/finch/tests/scripts/|
             ^src/finch/tests/utils.py|
+            ^src/finch/tests/stats_cases.py|
             ^src/finch/codegen/src/
         )
 

@@ -7,6 +7,7 @@ Regenerate with::
 Bundled Matrix Market inputs retain their full dimensions. Input values are
 normalized to their nonzero pattern to avoid signed cancellation. The uniform
 random matrix and sampling factories are seeded; JSON is rounded to six decimals.
+Floating-point comparisons allow rounding noise across platforms.
 Synthetic inputs exceed the sampling budget. Sampling estimators share sketches.
 """
 
@@ -16,6 +17,7 @@ import json
 import logging
 import math
 from io import BytesIO
+from pathlib import Path
 
 import pytest
 
@@ -47,13 +49,6 @@ from finch.tests.stats_cases import (
 )
 
 GEOMEAN_DATASETS = ("ct20stif", "roadNet-PA", "soc-sign-epinions")
-
-pytestmark = [
-    pytest.mark.slow,
-    pytest.mark.skipif(
-        not julia_available(), reason="accuracy regression requires the Julia backend"
-    ),
-]
 
 
 def actual_nonzeros(matrix, batch_rows=128):
@@ -214,10 +209,50 @@ def plot_geomean(geomeans):
     return fig
 
 
+def check_accuracy_results(obtained_filename: Path, expected_filename: Path):
+    obtained = json.loads(obtained_filename.read_text())
+    # Large estimates can differ beyond six decimal places through roundoff.
+    # Keep integer counts and metadata exact while comparing floats numerically.
+    expected = json.loads(
+        expected_filename.read_text(),
+        parse_float=lambda value: pytest.approx(float(value), rel=1e-12, abs=1e-6),
+    )
+    assert obtained == expected
+
+
+@pytest.mark.parametrize(
+    "result,matches",
+    [
+        ({"estimated_nnz": 133092290.0, "actual_nnz": 3099760}, True),
+        ({"estimated_nnz": 133092289.999999, "actual_nnz": 3099760}, True),
+        ({"estimated_nnz": 133092390.0, "actual_nnz": 3099760}, False),
+        ({"estimated_nnz": 133092290.0, "actual_nnz": 3099761}, False),
+        ({"estimated_nnz": 133092290.0}, False),
+    ],
+)
+def test_accuracy_results_comparison(tmp_path, result, matches):
+    expected = tmp_path / "expected.json"
+    obtained = tmp_path / "obtained.json"
+    expected.write_text(
+        json.dumps({"LP": {"estimated_nnz": 133092290.0, "actual_nnz": 3099760}})
+    )
+    obtained.write_text(json.dumps({"LP": result}))
+    if matches:
+        check_accuracy_results(obtained, expected)
+    else:
+        with pytest.raises(AssertionError):
+            check_accuracy_results(obtained, expected)
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not julia_available(), reason="accuracy regression requires the Julia backend"
+)
 def test_statistics_accuracy(accuracy_results, file_regression, image_regression):
     file_regression.check(
         json.dumps(accuracy_results, indent=2, sort_keys=True, allow_nan=False) + "\n",
         extension=".json",
+        check_fn=check_accuracy_results,
     )
     for view, fig in (
         ("accuracy", plot_accuracy(accuracy_results["results"])),
