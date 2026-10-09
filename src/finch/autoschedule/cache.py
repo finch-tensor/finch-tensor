@@ -20,7 +20,7 @@ LOG_FLOOR = -64.0
 LOG_CEIL = 64.0
 
 
-class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
+class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
@@ -30,7 +30,7 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
     ):
         self.ctx = ctx
         self.max_depth = max_depth
-        self.cache: dict[tuple, list[tuple]] = {}
+        self.cache: dict[tuple, dict] = {}
         self.threshold = threshold
         self.norm_order = norm_order
 
@@ -42,7 +42,7 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
         stats_factory: StatsFactory,
     ):
         prgm_key = (prgm, tuple(bindings.items()), stats_factory)
-        entries = self.cache.setdefault(prgm_key, [])
+        entry = self.cache.setdefault(prgm_key, {"cached_emb_matrix":None, "kernels":[]})
 
         current_vec = None
         parts = [
@@ -57,28 +57,39 @@ class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
             factor = vector_norm(np.ones(len(embedding)), ord=self.norm_order)
             current_vec = embedding / factor
 
+        kernels = entry["kernels"]
         idx = None
-        if entries and current_vec is None:
-            idx = len(entries) - 1
-        elif entries:
-            distances = [
-                vector_norm(np.abs(emb - current_vec), ord=self.norm_order)
-                for emb, _ in entries
-            ]
+        if kernels and current_vec is None:
+            idx = len(kernels) - 1
+        elif kernels:
+            distances = vector_norm(np.abs(entry["cached_emb_matrix"] - current_vec), 
+                            ord=self.norm_order,
+                            axis=1)
+            
             chosen_idx = int(np.argmin(distances))
             if distances[chosen_idx] < self.threshold:
                 idx = chosen_idx
         if idx is not None:
             logger.debug("CacheLRU_Embeddings_Norms HIT, reusing kernel")
-            entries.append(entries.pop(idx))
-            return entries[-1][1]
+            kernels.append(kernels.pop(idx))
+            if entry["cached_emb_matrix"] is not None:
+                m = entry["cached_emb_matrix"]
+                entry["cached_emb_matrix"] = np.concatenate((m[:idx],m[idx+1:],m[idx:idx+1]))
+            return kernels[-1]
 
         logger.debug(
             "CacheLRU_Embeddings_Norms MISS, compiling new kernel and embeddings"
         )
         result = self.ctx(prgm, bindings, stats, stats_factory)
-
-        entries.append((current_vec, result))
-        if len(entries) > self.max_depth:
-            entries.pop(0)
+        kernels.append(result)
+        if current_vec is not None:
+            row = current_vec[None, :]
+            entry["cached_emb_matrix"] = (
+                row if entry["cached_emb_matrix"] is None else np.vstack((entry["cached_emb_matrix"], row))
+            )
+        if len(kernels) > self.max_depth:
+            kernels.pop(0)  # evict the least recently used
+            if entry["cached_emb_matrix"] is not None:
+                entry["cached_emb_matrix"] = entry["cached_emb_matrix"][1:]
         return result
+
