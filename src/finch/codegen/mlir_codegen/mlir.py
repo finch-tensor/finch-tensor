@@ -764,8 +764,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             )
         case ffuncs._ScansearchFType():
             arr, _, _, hi = args
-            idx_type = mlir_type(arr.result_type.element_type)
-            name, code = gen_ss(idx_type)
+            name, code = gen_ss(mlir_type(arr.result_type.element_type))
             mlir_globals.setdefault(name, code)
             return mlir_call_function_call(name, hi.result_type, ctx, *args)
         case _:
