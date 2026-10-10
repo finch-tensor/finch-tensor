@@ -222,7 +222,7 @@ class FillTensor(OverrideTensor):
     def ftype(self):
         return FillTensorFType(
             self._fill,
-            self._fill.ftype,
+            self._fill.element_type,
             tuple(ftype(dim) for dim in self.shape),
         )
 

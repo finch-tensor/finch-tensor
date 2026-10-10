@@ -16,7 +16,15 @@ from enum import Enum
 from typing import TypeVar
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, FType, TensorFType, ffuncs, ftype, ftypes
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    TensorFType,
+    as_fill,
+    ffuncs,
+    ftype,
+    ftypes,
+)
 from finch.autoschedule.stages import LogicFormatter
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
@@ -190,7 +198,7 @@ class GalleyFormatter(LogicFormatter):
         formats = select_output_format(stats, stats_factory, loop_order, output_indices)
         logger.debug("Galley formats for %s: %s", output_indices, formats)
 
-        lvl = element(fill_value, ftype(fill_value))
+        lvl = element(fill_value, as_fill(fill_value).element_type)
         for level in reversed(range(len(output_indices))):
             lvl = formats[level].build(lvl, shape_type[level])
         return fiber_tensor(lvl)

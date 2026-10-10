@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, as_fill, is_dynamic
+from finch.algebra import AbstractFill, DynamicFill, as_fill, is_dynamic
 from finch.algebra.tensor import Tensor, TensorFType
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
@@ -114,8 +114,15 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
             for var, tns_ftype in binding_ftypes.items()
             if var not in bindings
         ):
+            # The ftype says whether a fill is dynamic, but a dynamic fill's
+            # value belongs to the tensor.
             fill_map = final_prgm.infer_fill_value(
-                {var: tns.ftype.fill_value for var, tns in input_bindings.items()}
+                {
+                    var: DynamicFill(tns.fill_value, fill.element_type)
+                    if is_dynamic(fill := tns.ftype.fill_value)
+                    else fill
+                    for var, tns in input_bindings.items()
+                }
             )
 
         for var, tns_ftype in binding_ftypes.items():

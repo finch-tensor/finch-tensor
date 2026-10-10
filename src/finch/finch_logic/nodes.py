@@ -7,6 +7,7 @@ from typing import Any, Self, TypeVar
 
 from finch.algebra import (
     AbstractFill,
+    DynamicFillFType,
     FinchOperator,
     FType,
     FTyped,
@@ -57,6 +58,12 @@ def merge_element_type(op: FinchOperator, *args: FType) -> FType:
 
 
 def reduce_element_type(op: FinchOperator, z: Any, t: FType) -> FType:
+    match z:
+        case FType():
+            # An init table holds values of its element type.
+            z = DynamicFillFType(z)
+        case _:
+            z = as_fill(z).ftype
     return fixpoint_type(op.ftype, z, t)
 
 

@@ -7,9 +7,12 @@ import numpy as np
 import finch
 from finch.algebra import (
     DynamicFill,
+    DynamicFillFType,
+    StaticFillFType,
     TupleFType,
     cansplitpush,
     ffuncs,
+    fixpoint_type,
     ftype,
     init_value,
     is_annihilator,
@@ -384,3 +387,11 @@ def test_function_ftypes_do_not_specialize_runtime_data(factory, first, second):
     )
     field_values = [getattr(right, name) for name in ftype(right).struct_fieldnames]
     assert ftype(left).from_fields(*field_values) == right
+
+
+@pytest.mark.parametrize(
+    "init", [StaticFillFType(np.int8(0)), DynamicFillFType(np.int8)]
+)
+def test_fixpoint_type_starts_from_the_fill_of_the_init(init):
+    # Folding uint8 values into an int8 init promotes the result to int16.
+    assert fixpoint_type(ffuncs.add.ftype, init, ftype(np.uint8)) == ftype(np.int16)

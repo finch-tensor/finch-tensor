@@ -10,6 +10,7 @@ from finch.algebra import (
     AbstractFill,
     FType,
     TensorFType,
+    as_fill,
     ffuncs,
     ftype,
     ftypes,
@@ -50,7 +51,7 @@ def optimize_format(
     over=(),
 ):
     n = len(fields)
-    fill_ftype = ftype(fill_value)
+    fill_ftype = as_fill(fill_value).element_type
     leaf = element(fill_value, fill_ftype)
     val_size = np_dtype(fill_ftype).itemsize
     assert leaf.position_type is not None
@@ -112,7 +113,7 @@ def total_tree_cost(
     leaf_cost_fn,
     over=(),
 ):
-    val_size = np_dtype(ftype(lvl.fill_value)).itemsize
+    val_size = np_dtype(as_fill(lvl.fill_value).element_type).itemsize
     pos_size = np_dtype(ftype(lvl.position_type)).itemsize
 
     if level == len(fields):
@@ -240,7 +241,7 @@ class FDFormatter(SmartFormatter):
 
         # Slices are formatted by the support of every slice, so the fields of
         # `over` are dropped from the dense dimensions.
-        fill_ftype = ftype(fill_value)
+        fill_ftype = as_fill(fill_value).element_type
         lvl = element(fill_value, fill_ftype)
         for dim in reversed(range(len(fields))):
             field = fields[dim]

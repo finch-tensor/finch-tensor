@@ -886,7 +886,7 @@ def reduce(
         data = Reorder(data, keeps)
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
-        dtype = fixpoint_type(op_type, init, x.element_type)
+        dtype = fixpoint_type(op_type, as_fill(init).ftype, x.element_type)
     expr, ctx = x.ctx.eval(data)
     return LazyTensor(expr, ctx, shape, init, dtype, x.device)
 
@@ -2142,7 +2142,7 @@ def cumulative(
     init = init_value(op_type, dtype)
     if explicit_dtype:
         init = dtype(init)
-    dtype = fixpoint_type(op_type, init, x.element_type)
+    dtype = fixpoint_type(op_type, as_fill(init).ftype, x.element_type)
 
     def cumulative_axis(
         arg: LazyTensor,

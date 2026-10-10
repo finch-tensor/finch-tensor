@@ -12,6 +12,7 @@ from finch.algebra import (
     DynamicFill,
     FType,
     ImmutableStructFType,
+    MutableStructFType,
     StaticFill,
     Tensor,
     TupleFType,
@@ -263,7 +264,7 @@ class BufferizedNDArray(OverrideTensor):
     __repr__ = __str__
 
 
-class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
+class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     """
     A ftype for bufferized NumPy arrays that provides metadata about the array.
     This includes the fill value, element type, and shape type.
@@ -285,6 +286,15 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
             fields.append(("fill", self.element_type))
         return fields
 
+    def struct_setattr(self, obj, attr, value):
+        match attr:
+            case "shape":
+                obj._shape = value
+            case "fill":
+                obj._fill_value = DynamicFill(value, self.element_type)
+            case _:
+                setattr(obj, attr, value)
+
     @property
     def lvl_t(self):
         return BufferizedNDArrayLevelFType(self)
@@ -299,6 +309,9 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return obj
 
     def from_fields(self, buf, shape, strides, fill=None):
+        if fill is not None and is_dynamic(self.fill_value):
+            # The fill field holds the value of a fill which stays dynamic.
+            fill = DynamicFill(fill, self.element_type)
         return BufferizedNDArray(
             buf,
             shape,
@@ -550,7 +563,7 @@ class BufferizedNDArrayAccessor(Tensor):
     @property
     def fill_value(self) -> Any:
         """Default value to fill the tensor."""
-        return self.ftype.fill_value.value
+        return self.tns.fill_value
 
     @property
     def element_type(self) -> FType:

@@ -4,7 +4,7 @@ import math
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .fill import AbstractFill, is_dynamic
+from .fill import AbstractFill, AbstractFillFType, is_dynamic
 from .ftypes import (
     CallableFType,
     FDTypeOrdered,
@@ -133,24 +133,23 @@ def init_value(op: FinchOperatorFType, arg: FType) -> Any:
     return op.init_value(arg)
 
 
-def fixpoint_type(op: CallableFType, z: Any, t: FType) -> FType:
+def fixpoint_type(op: CallableFType, z: AbstractFillFType, t: FType) -> FType:
     """
     Determines the fixpoint type after repeated calling the given operation.
 
     Args:
         op: The operation to evaluate.
-        z: The initial value.
+        z: The fill format of the initial value.
         t: The type to evaluate against.
 
     Returns:
         The fixpoint type.
     """
     s = set()
-    z_type = ftype(z)
-    r = z_type
+    r = z.element_type
     while r not in s:
         s.add(r)
-        r = return_type(op, z_type, t)
+        r = return_type(op, r, t)
     return r
 
 

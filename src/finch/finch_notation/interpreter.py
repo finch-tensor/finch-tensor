@@ -136,7 +136,7 @@ class TensorView(Tensor[FT]):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return self.tns.ftype.fill_value.value
+        return self.tns.fill_value
 
     @property
     def shape_type(self):

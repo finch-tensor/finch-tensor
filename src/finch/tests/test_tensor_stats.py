@@ -7,7 +7,7 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.algebra import TensorFType, TupleFType, ftype
+from finch.algebra import TensorFType, TupleFType, as_fill, ftype
 from finch.algebra.fill import StaticFill
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
@@ -664,8 +664,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             self, fill_value, shape_type, stats, over=()
         ) -> TensorFType:
             self.output_stats.append(stats)
-            fill_ftype = ftype(
-                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+            fill_ftype = (
+                ftype(fill_value.dtype)
+                if isinstance(fill_value, np.ndarray)
+                else as_fill(fill_value).element_type
             )
             return ft.BufferizedNDArrayFType(
                 buffer_type=ft.NumpyBufferFType(fill_ftype),

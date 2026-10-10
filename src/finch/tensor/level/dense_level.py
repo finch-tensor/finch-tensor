@@ -7,7 +7,7 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs, ftype, ftypes
+from finch.algebra import MutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
@@ -17,7 +17,7 @@ from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevel
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
+class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
@@ -32,6 +32,11 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
         ]
+
+    def struct_setattr(self, obj, attr, value):
+        # The stride is derived from the dimensions of the inner levels.
+        if attr != "stride":
+            setattr(obj, attr, value)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         n = stats.get_dim_size(fields[lvl])

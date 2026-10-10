@@ -5,7 +5,14 @@ from abc import abstractmethod
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, FType, TensorFType, TupleFType, ftype
+from finch.algebra import (
+    AbstractFill,
+    FType,
+    TensorFType,
+    TupleFType,
+    as_fill,
+    ftype,
+)
 from finch.autoschedule.stages import LogicFormatter
 from finch.codegen import NumpyBufferFType
 from finch.finch_logic import (
@@ -88,8 +95,10 @@ class BufferizedNDArrayFormatter(MonoLogicFormatter):
         Return the FType of the output tensor produced within the
         autoscheduler.
         """
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        fill_ftype = (
+            ftype(fill_value.dtype)
+            if isinstance(fill_value, np.ndarray)
+            else as_fill(fill_value).element_type
         )
         return BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(fill_ftype),
@@ -101,8 +110,10 @@ class BufferizedNDArrayFormatter(MonoLogicFormatter):
 
 class RandomLogicFormatter(LogicFormatter):
     def get_output_tns_ftype(self, fill_value, shape_type):
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
+        fill_ftype = (
+            ftype(fill_value.dtype)
+            if isinstance(fill_value, np.ndarray)
+            else as_fill(fill_value).element_type
         )
         elem = ElementLevelFType(
             fill_value=fill_value,

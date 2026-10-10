@@ -1169,7 +1169,9 @@ def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
 
 def serialize_tuple_to_c(fmt: TupleFType, obj):
     x = namedtuple("CTuple", fmt.struct_fieldnames)(*obj)  # noqa: PYI024
-    return serialize_to_c(ftype(x), x)
+    # Values like the Python ints of a shape must take the declared field types,
+    # or the struct would not match the one which the kernel was compiled for.
+    return serialize_to_c(NamedTupleFType("CTuple", fmt.struct_fields), x)
 
 
 def deserialize_from_c(fmt: FType, obj: Any, c_obj: Any) -> None:

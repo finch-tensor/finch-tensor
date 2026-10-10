@@ -257,6 +257,10 @@ class MultiDimensionLevelFType(LevelFType):
 class SingleDimensionLevel(Level):
     lvl: Level
 
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
@@ -264,6 +268,10 @@ class SingleDimensionLevel(Level):
 
 class MultiDimensionLevel(Level):
     lvl: Level
+
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
 
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""

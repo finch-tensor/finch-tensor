@@ -5,6 +5,7 @@ import numpy as np
 
 import finch
 from finch.algebra import (
+    DynamicFillFType,
     TupleFType,
     fisinstance,
     fixpoint_type,
@@ -174,8 +175,11 @@ class LogicMachine:
             case Aggregate(Literal(op), init, arg, idxs):
                 init = self(init)
                 arg = self(arg)
+                # The init is a tensor, so its values aren't compile-time data.
                 dtype = fixpoint_type(
-                    op.ftype, init.tns.element_type, arg.tns.element_type
+                    op.ftype,
+                    DynamicFillFType(init.tns.element_type),
+                    arg.tns.element_type,
                 )
                 arg_dims = dict(zip(arg.idxs, map(int, arg.tns.shape), strict=True))
                 out_dims = {

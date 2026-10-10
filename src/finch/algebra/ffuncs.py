@@ -2252,7 +2252,7 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("value", self.fill.ftype)]
+        return [("value", self.fill.element_type)]
 
     def __call__(self, value):
         if isinstance(value, _InitWrite) and value.ftype == self:
@@ -2261,7 +2261,9 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     def from_fields(self, value):
         fill = (
-            DynamicFill(value, self.fill.ftype) if is_dynamic(self.fill) else self.fill
+            DynamicFill(value, self.fill.element_type)
+            if is_dynamic(self.fill)
+            else self.fill
         )
         return _InitWrite(fill)
 
@@ -2390,11 +2392,11 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("fill_value", self.fill.ftype)]
+        return [("fill_value", self.fill.element_type)]
 
     def from_fields(self, fill_value):
         fill = (
-            DynamicFill(fill_value, self.fill.ftype)
+            DynamicFill(fill_value, self.fill.element_type)
             if is_dynamic(self.fill)
             else self.fill
         )
@@ -2406,7 +2408,7 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     def return_type(self, *args: FType) -> FType:
         if not args:
-            return self.fill.ftype
+            return self.fill.element_type
         result_arg = args[0]
         assert isinstance(result_arg, FDType)
         result: FDType = result_arg

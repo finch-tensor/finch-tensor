@@ -23,7 +23,9 @@ from finch import (
 from finch.algebra import (
     DynamicFill,
     DynamicFillError,
+    DynamicFillFType,
     StaticFill,
+    StaticFillFType,
     apply_fill,
     as_fill,
     ffuncs,
@@ -62,7 +64,9 @@ from .conftest import finch_assert_allclose
 
 def test_dynamic_fill_identity():
     d = DynamicFill(np.float64(0.0))
-    assert ftype(d) == ftype(np.float64)
+    # A fill's ftype is the fill of its format, which records only its type.
+    assert ftype(d) == DynamicFillFType(np.float64)
+    assert d.element_type == ftype(np.float64)
     assert d == DynamicFill(np.float64(0.0))
     assert hash(d) == hash(DynamicFill(np.float64(0.0)))
     assert d != DynamicFill(np.int64(0))
@@ -108,13 +112,31 @@ def test_apply_fill_known_folds():
     assert np.isnan(apply_fill(ffuncs.add, float("nan"), 2.0).value)
 
 
+def test_fill_ftypes():
+    # A static fill's value is part of its format, but only the element type
+    # of a dynamic fill is.
+    assert StaticFill(np.float64(1.0)).ftype == StaticFillFType(np.float64(1.0))
+    assert StaticFillFType(np.nan) == StaticFillFType(np.nan)
+    assert StaticFillFType(np.float64(1.0)) != StaticFillFType(np.float64(2.0))
+    assert DynamicFillFType(np.float64) == DynamicFill(np.float64(3.0)).ftype
+    assert DynamicFillFType(np.float64) != DynamicFillFType(np.int64)
+    # Calling a fill format makes one of its fills.
+    fill = DynamicFillFType(np.float64)(7)
+    assert isinstance(fill, DynamicFill)
+    assert fill.value == 7.0
+    assert fill.element_type == ftype(np.float64)
+    assert StaticFillFType(np.float64(1.0))(1) == StaticFill(np.float64(1.0))
+    with pytest.raises(ValueError):
+        StaticFillFType(np.float64(1.0))(2)
+
+
 def test_apply_fill_dynamic_propagates():
     d = DynamicFill(np.float64(4.0))
     assert apply_fill(ffuncs.add, 2.0, d) == DynamicFill(np.float64(0.0))
     assert apply_fill(ffuncs.add, d, d) == DynamicFill(np.float64(0.0))
     r = apply_fill(ffuncs.add, np.int64(1), d)
     assert isinstance(r, DynamicFill)
-    assert ftype(r) == ftype(np.float64)
+    assert r.element_type == ftype(np.float64)
     # The value still folds; it is simply not something to compile against.
     assert r.value == 5.0
 
