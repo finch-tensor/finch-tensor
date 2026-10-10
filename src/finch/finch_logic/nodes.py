@@ -110,6 +110,9 @@ class TableValueFType(FType):
     def __hash__(self) -> int:
         return hash((self.tns, self.idxs))
 
+    def __call__(self, tns: Any, idxs: tuple[Field, ...]) -> TableValue:
+        return TableValue(tns=tns, idxs=idxs)
+
 
 @dataclass(frozen=True)
 class TableValue(FTyped[TableValueFType]):
