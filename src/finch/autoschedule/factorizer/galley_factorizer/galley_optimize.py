@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from finch.algebra.tensor import TensorFType
+from finch.autoschedule.cost_models import CostModel
 from finch.autoschedule.factorizer.optimize import with_unique_lhs
 from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.tensor_stats.logic_to_stats import (
@@ -51,10 +52,11 @@ def optimize_query(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "dfs",
+    cost_model: CostModel | None = None,
 ):
     """Rewrite a single logical Query using ``optimizer``:
     greedy, bfs, or dfs."""
-    annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
+    annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings, cost_model)
     new_queries, _ = pruned_query_to_plan(
         annotated_query,
         use_components=use_components,
@@ -70,6 +72,7 @@ def optimize_plan(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "greedy",
+    cost_model: CostModel | None = None,
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -86,6 +89,7 @@ def optimize_plan(
                 stats_bindings,
                 use_components=use_components,
                 optimizer=optimizer,
+                cost_model=cost_model,
             )
             for new_query in new_queries:
                 insert_statistics(
@@ -109,7 +113,8 @@ class GalleyLogicFactorizer(LogicFactorizer):
 
     Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
     DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
-    inside ``branch_and_bound_dfs``.
+    inside ``branch_and_bound_dfs``. ``cost_model`` estimates the cost of each
+    reduction, and defaults to ``FlopsCostModel``.
     """
 
     def __init__(
@@ -118,10 +123,12 @@ class GalleyLogicFactorizer(LogicFactorizer):
         use_components: bool = True,
         *,
         optimizer: GalleyOptimizer = "bfs",
+        cost_model: CostModel | None = None,
     ):
         self.ctx = ctx
         self.use_components = use_components
         self.optimizer = optimizer
+        self.cost_model = cost_model
 
     def lower(
         self,
@@ -141,6 +148,7 @@ class GalleyLogicFactorizer(LogicFactorizer):
                 stats,
                 use_components=self.use_components,
                 optimizer=self.optimizer,
+                cost_model=self.cost_model,
             )
             return prgm, bindings
 
