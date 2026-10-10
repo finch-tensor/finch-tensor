@@ -53,17 +53,19 @@ def test_verify_sketch_computation(n=20, density=0.4, sample_prob=0.5, seed=0):
     B = (rs.random((n, n)) < density).astype(float)
 
     # SamplingStats
-    factory = SamplingStatsFactory(sample_prob=sample_prob, estimator="uj1")
+    factory = SamplingStatsFactory(sample_nnz=10000, estimator="uj1")
     factory._rng = rs
 
-    s_a = factory(fl.asarray(A), (i, k))
-    s_b = factory(fl.asarray(B), (k, j))
+    s_a = factory(fl.asarray(A), (i, k), [sample_prob] * 2)
+    s_b = factory(fl.asarray(B), (k, j), [sample_prob] * 2)
     mm = factory.mapjoin(ffuncs.mul, s_a, s_b)
     factory_sketch = materialize(factory.aggregate(ffuncs.add, 0.0, (k,), mm).sketch)
 
     # manually calculating
     mask_i, mask_k, mask_j = (
-        np.array([factory._get_mask(field, n)[idx].item() for idx in range(n)])
+        np.array(
+            [factory._get_mask(field, n, sample_prob)[idx].item() for idx in range(n)]
+        )
         for field in (i, k, j)
     )
     pat_a = (A != 0).astype(float)
@@ -131,7 +133,7 @@ def test_mapjoin():
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
     cache = {}
-    stats_factory = SamplingStatsFactory(sample_prob=1)
+    stats_factory = SamplingStatsFactory()
     insert_statistics(
         stats_factory=stats_factory,
         node=ta,
@@ -172,7 +174,7 @@ def test_aggregate():
     tb = Table(Literal(fl.asarray(data_b)), (j, k))
 
     cache = {}
-    stats_factory = SamplingStatsFactory(sample_prob=0.25, estimator="schlosser")
+    stats_factory = SamplingStatsFactory(estimator="schlosser")
     node = Aggregate(
         op=Literal(ffuncs.add),
         init=Literal(0.0),

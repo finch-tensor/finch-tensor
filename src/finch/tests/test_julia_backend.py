@@ -433,11 +433,13 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
     i, j = Field("i"), Field("j")
     data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(_csr_tensor(data), (i, j))
+    stats = factory(_csr_tensor(data), (i, j), [0.5, 0.5])
     rows, cols = (
-        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        np.array(
+            [factory._get_mask(field, size, 0.5)[idx].item() for idx in range(size)]
+        )
         for field, size in zip((i, j), data.shape, strict=True)
     )
     expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])

@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from .julia import jl
@@ -7,7 +7,7 @@ from .julia import jl
 @contextmanager
 def profile_julia_calls(
     *, n: int = 10**7, delay: float = 0.0005, mincount: int = 5
-) -> Iterator[None]:
+) -> Generator[None, None, None]:
     """
     Profiles Julia-side execution during the wrapped block, including calls
     made into Julia from Python (e.g. `FinchJLKernel.__call__`). Prints a
