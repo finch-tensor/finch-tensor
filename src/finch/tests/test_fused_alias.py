@@ -171,7 +171,7 @@ def test_updating_an_invalidated_view_is_rejected():
         AliasedForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
-def test_compiler_form_initialization_defines_a_view():
+def test_compiler_form_definition_defines_a_view():
     i = lgc.Field("i")
     a = lgc.HardAlias("a")
     fused = lgc.FusedAlias(_SCRATCH, 1)
@@ -184,9 +184,7 @@ def test_compiler_form_initialization_defines_a_view():
         lgc.Literal(ffuncs.add),
         lgc.Reorder(lgc.Table(a, (i,)), (i,)),
     )
-    init = lgc.QueryInto(
-        lgc.Table(fused, (i,)), lgc.Literal(ffuncs.overwrite), lgc.Literal(0.0)
-    )
+    init = lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,)))
     CompilerForm.validate_inputs(
         lgc.Plan((init, fold, lgc.Produces((fused,)))), ftypes, {}, DenseStatsFactory()
     )
@@ -282,9 +280,11 @@ def test_fused_alias_compilation(compiler, n):
 @pytest.mark.parametrize(
     "op, error",
     [
-        # Overwriting defines the fused view, after reading the hard one.
-        (ffuncs.overwrite, "both read and write"),
-        # Updating requires the fused view to be current already.
+        # A definition defines the fused view, after reading the hard one.
+        (None, "both read and write"),
+        # Updating requires the fused view to be current already, even when
+        # every element is overwritten.
+        (ffuncs.overwrite, "invalidated"),
         (ffuncs.add, "invalidated"),
     ],
 )
@@ -292,16 +292,16 @@ def test_fused_alias_cannot_hide_inplace_read(op, error):
     i = lgc.Field("i")
     a = lgc.HardAlias("a")
     fused = lgc.FusedAlias(a, 1)
-    plan = lgc.Plan(
-        (
-            lgc.QueryInto(
-                lgc.Table(fused, (i,)),
-                lgc.Literal(op),
-                lgc.Reorder(lgc.Table(a, (i,)), (i,)),
-            ),
-            lgc.Produces((fused,)),
+    stmt = (
+        lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,)))
+        if op is None
+        else lgc.QueryInto(
+            lgc.Table(fused, (i,)),
+            lgc.Literal(op),
+            lgc.Reorder(lgc.Table(a, (i,)), (i,)),
         )
     )
+    plan = lgc.Plan((stmt, lgc.Produces((fused,))))
     with pytest.raises(ValueError, match=error):
         CompilerForm.validate_inputs(
             plan, {a: ftype(ft.asarray(np.ones(2)))}, {}, DenseStatsFactory()

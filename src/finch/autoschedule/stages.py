@@ -54,11 +54,6 @@ class AliasedForm(Form):
                     # The rhs is read before the lhs is defined.
                     validate(rhs)
                     views[lhs.unfused] = lhs
-                case QueryInto(
-                    Table(Alias() as lhs, _), Literal(ffuncs.overwrite), rhs
-                ) if issubclass(cls, CompilerForm):
-                    validate(rhs)
-                    views[lhs.unfused] = lhs
                 case QueryInto(Table(Alias() as lhs, _), _, rhs):
                     validate(rhs)
                     if lhs.unfused not in views:
@@ -275,24 +270,32 @@ class FormattedForm(LoopOrderedForm):
 class CompilerForm(FormattedForm):
     """
     CompilerForm is the input of the notation lowerer. It is a FormattedForm
-    where every statement but the final Produces is a QueryInto, and
-    initialization is explicit. There are two valid kinds of statement:
+    where every statement but the final Produces is a definition or an update.
+    There are two valid kinds of definition:
+    1) copies
+        Query(Table(lhs, lhs_idxs), Table(arg, idxs))
+    (lhs is reset to its fill value, and arg is written into it. A different
+    storage order represents a transpose; notation lowering inserts
+    equality-constrained loops to read arg in storage order. Fields absent from
+    lhs_idxs are reduced by overwriting.)
+    2) reductions
+        Query(Table(lhs, lhs_idxs),
+              Aggregate(op, Literal(init), Reorder(arg, loop_order), _))
+    (lhs is reset to init, and arg is folded into it with op.)
+    There are two valid kinds of update:
     1) initializations
         QueryInto(Table(lhs, _), overwrite, Literal(init))
     (Every element of lhs is set to init.)
     2) folds
         QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
-    (Here, arg is made of Tables, Literals, and MapJoins. The loop order
-    contains each field once and visits all fields of lhs_idxs in order.
-    Tables in a MapJoin must also follow loop order.
-    A single Table argument may have a different storage order, representing a
-    transpose; notation lowering inserts equality-constrained loops to read it
-    in storage order. Fields absent from lhs_idxs are reduced with op.)
-    A transpose or fold which overwrites lhs also initializes it, starting from
-    the init of a preceding initialization, or else the fill value of lhs.
-    Every alias must have a TensorFType in the bindings, and a statement can't
-    read the alias it writes. Since initialization is explicit, a statement
-    which overwrites its lhs defines the view of the lhs.
+    (arg is folded into lhs with op. A fold which overwrites lhs resets it to
+    its fill value first.)
+    In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
+    loop order contains each field once and visits all fields of lhs_idxs in
+    order. Tables in a MapJoin must also follow loop order, but a single Table
+    argument may have a different storage order, as in a copy. Fields absent
+    from lhs_idxs are reduced with op. Every alias must have a TensorFType in
+    the bindings, and a statement can't read the alias it writes.
     """
 
     @classmethod
@@ -314,29 +317,34 @@ class CompilerForm(FormattedForm):
                 raise ValueError("The last body of a plan must be a Produces node.")
         for body in bodies:
             match body:
-                case QueryInto(Table(lhs, _), Literal(op), rhs):
-                    assert isinstance(lhs, Alias)
-                    if any(
-                        node.unfused == lhs.unfused
-                        for node in PostOrderDFS(rhs)
-                        if isinstance(node, Alias)
-                    ):
-                        raise ValueError(f"QueryInto can't both read and write {lhs}.")
-                    match rhs:
-                        case Literal():
-                            if op != ffuncs.overwrite:
-                                raise ValueError(
-                                    f"Initializing {lhs} must overwrite it, not {op}."
-                                )
-                        case Reorder(arg, loop_order):
-                            if len(set(loop_order)) != len(loop_order):
-                                raise ValueError("Loop order must not repeat fields.")
-                            if not set(arg.fields()).issubset(loop_order):
-                                raise ValueError(
-                                    "Loop order must include every RHS field."
-                                )
+                case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
+                    Table(Alias() as lhs, _), _, rhs
+                ):
+                    pass
                 case _:
-                    raise ValueError(f"CompilerForm only allows QueryInto, not {body}")
+                    raise ValueError(f"CompilerForm only allows queries, not {body}")
+            if any(
+                node.unfused == lhs.unfused
+                for node in PostOrderDFS(rhs)
+                if isinstance(node, Alias)
+            ):
+                raise ValueError(
+                    f"{type(body).__name__} can't both read and write {lhs}."
+                )
+            match body:
+                case Query(_, Aggregate(_, Literal(), Reorder(arg, loop_order), _)) | (
+                    QueryInto(_, _, Reorder(arg, loop_order))
+                ):
+                    if len(set(loop_order)) != len(loop_order):
+                        raise ValueError("Loop order must not repeat fields.")
+                    if not set(arg.fields()).issubset(loop_order):
+                        raise ValueError("Loop order must include every RHS field.")
+                case Query(_, Aggregate()):
+                    raise ValueError(
+                        f"The init of an aggregate into {lhs} must be a literal."
+                    )
+                case QueryInto(_, Literal(op), Literal()) if op != ffuncs.overwrite:
+                    raise ValueError(f"Initializing {lhs} must overwrite it, not {op}.")
 
 
 class FusedForm(Form):
