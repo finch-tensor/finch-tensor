@@ -171,3 +171,29 @@ def test_bare_literal_is_zero_dimensional(node):
     assert isinstance(result, TableValue)
     assert result.idxs == ()
     assert float(np.asarray(result.tns)) == 6.0
+
+
+@pytest.mark.parametrize(
+    "a_shape,b_shape,expected",
+    [((0,), (0,), (0,)), ((0,), (1,), None), ((1,), (0,), None), ((1,), (1,), (1,))],
+)
+def test_infer_shape_zero_extent(a_shape, b_shape, expected):
+    # A zero extent is a real extent, not the unit extent of a broadcast.
+    i = Field("i")
+    a, b, c = HardAlias("a"), HardAlias("b"), HardAlias("c")
+    args = (Table(a, (i,)), Table(b, (i,)))
+    query = Query(Table(c, (i,)), MapJoin(Literal(ffuncs.add), args))
+    if expected is None:
+        with pytest.raises(ValueError, match="Dimension mismatch"):
+            query.infer_shape({a: a_shape, b: b_shape})
+    else:
+        assert query.infer_shape({a: a_shape, b: b_shape})[c] == expected
+
+
+def test_infer_shape_squeezes_only_unit_extents():
+    i, j = Field("i"), Field("j")
+    a = HardAlias("a")
+    squeeze = Reorder(Table(a, (i, j)), (i,))
+    assert squeeze.shape({a: (2, 1)}) == (2,)
+    with pytest.raises(ValueError, match="Dimension mismatch"):
+        squeeze.shape({a: (2, 0)})

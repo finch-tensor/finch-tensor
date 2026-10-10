@@ -116,7 +116,6 @@ def set_greedy_loop_order(
     stats: dict[Alias, NS],
 ) -> Plan:
     stats_bindings = dict(stats)
-    cache: dict[object, NS] = {}
 
     new_queries = []
     for query in plan.bodies[:-1]:
@@ -133,9 +132,7 @@ def set_greedy_loop_order(
             case _:
                 raise Exception(f"Invalid node: {query} in set_greedy_loop_order")
 
-        insert_statistics(
-            stats_factory, query, stats_bindings, replace=False, cache=cache
-        )
+        insert_statistics(stats_factory, query, stats_bindings, replace=False, cache={})
 
     return Plan(tuple(new_queries + [plan.bodies[-1]]))
 

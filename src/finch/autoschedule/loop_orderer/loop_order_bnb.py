@@ -203,7 +203,6 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         stats_factory: StatsFactory[NS],
     ) -> Plan:
         stats_bindings = dict(stats)
-        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
@@ -221,7 +220,7 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                     raise Exception(f"Invalid node: {query} in BFSLoopOrderer")
 
             insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache=cache
+                stats_factory, query, stats_bindings, replace=False, cache={}
             )
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
@@ -235,7 +234,6 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         stats_factory: StatsFactory[NS],
     ) -> Plan:
         stats_bindings = dict(stats)
-        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
@@ -253,7 +251,7 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                     raise Exception(f"Invalid node: {query} in DFSLoopOrderer")
 
             insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache=cache
+                stats_factory, query, stats_bindings, replace=False, cache={}
             )
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))
@@ -267,7 +265,6 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         stats_factory: StatsFactory[NS],
     ) -> Plan:
         stats_bindings = dict(stats)
-        cache: dict[object, NS] = {}
 
         new_queries = []
         for query in prgm.bodies[:-1]:
@@ -285,7 +282,7 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
                     raise Exception(f"Invalid node: {query} in BruteForceLoopOrderer")
 
             insert_statistics(
-                stats_factory, query, stats_bindings, replace=False, cache=cache
+                stats_factory, query, stats_bindings, replace=False, cache={}
             )
 
         return Plan(tuple(new_queries + [prgm.bodies[-1]]))

@@ -388,6 +388,7 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
         return (
             self.buf_t == other.buf_t
             and self.ndim == other.ndim
+            and self.shape_t == other.shape_t
             and bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
             and self.device == other.device
         )
@@ -410,7 +411,13 @@ class BufferizedNDArrayFType(FinchTensorFType, ImmutableStructFType):
 
     def __hash__(self):
         return hash(
-            (self.buf_t, self.ndim, ffuncs.samehash(self.fill_value), self.device)
+            (
+                self.buf_t,
+                self.ndim,
+                self.shape_t,
+                ffuncs.samehash(self.fill_value),
+                self.device,
+            )
         )
 
     def __str__(self):

@@ -7,15 +7,33 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
+from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
+    BFSLoopOrderer,
+    BruteForceLoopOrderer,
+    DFSLoopOrderer,
     loop_order_bfs,
     loop_order_brute_force,
     loop_order_dfs,
 )
 from finch.autoschedule.loop_orderer.loop_order_cost import loop_order_cost
-from finch.autoschedule.loop_orderer.loop_order_greedy import greedy_loop_order
+from finch.autoschedule.loop_orderer.loop_order_greedy import (
+    GreedyLoopOrderer,
+    greedy_loop_order,
+)
 from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory
-from finch.finch_logic import Alias, Field, HardAlias, Literal, MapJoin, Table
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    HardAlias,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 
 
 def test_bfs_and_dfs_are_no_worse_than_greedy():
@@ -97,3 +115,49 @@ def test_brute_force_is_no_worse_than_heuristics():
             for order in itertools.permutations(tuple(expr.fields()))
         )
     )
+
+
+@pytest.mark.parametrize(
+    "orderer,module,search",
+    [
+        (GreedyLoopOrderer, loop_order_greedy, "greedy_loop_order"),
+        (BFSLoopOrderer, loop_order_bnb, "loop_order_bfs"),
+        (DFSLoopOrderer, loop_order_bnb, "loop_order_dfs"),
+        (BruteForceLoopOrderer, loop_order_bnb, "loop_order_brute_force"),
+    ],
+)
+def test_loop_orderers_refresh_stats_of_redefined_aliases(
+    monkeypatch, orderer, module, search
+):
+    # The second copy is the same node as the first, but scratch has been
+    # redefined in between, so its statistics must not come from a cache.
+    i = Field("i")
+    a, b, scratch, out, result = map(
+        HardAlias, ("a", "b", "scratch", "out", "result")
+    )
+    copy = Query(Table(out, (i,)), Table(scratch, (i,)))
+    total = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(out, (i,)), (i,))
+    plan = Plan(
+        (
+            Query(Table(scratch, (i,)), Table(a, (i,))),
+            copy,
+            Query(Table(scratch, (i,)), Table(b, (i,))),
+            copy,
+            Query(Table(result, ()), total),
+            Produces((result,)),
+        )
+    )
+    seen = []
+
+    def choose(expr, stats_factory, stats, output_vars, **kwargs):
+        seen.append(stats[out].estimate_non_fill_values())
+        return expr.fields()
+
+    monkeypatch.setattr(module, search, choose)
+    factory = DCStatsFactory()
+    sparse = fl.asarray(np.array([0.0, 0.0, 1.0, 0.0, 0.0]))
+    dense = fl.asarray(np.ones(5))
+    orderer().set_loop_orders(
+        plan, {a: factory(sparse, (i,)), b: factory(dense, (i,))}, factory
+    )
+    assert seen == [5]

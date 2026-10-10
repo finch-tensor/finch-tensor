@@ -39,13 +39,17 @@ def merge_dim_type(d1, d2):
 
 
 def merge_dim(d1, d2):
-    d3 = d1 or 1
-    d4 = d2 or 1
+    # None is a unit dimension, so it only merges with an extent of 1. A zero
+    # extent is falsy, but it is a real extent.
+    d3 = 1 if d1 is None else d1
+    d4 = 1 if d2 is None else d2
     if d3 != d4:
         raise ValueError(f"Dimension mismatch: {d1} vs {d2}")
-    if d1 and d2:
-        return ffuncs.max(d1, d2)
-    return d1 or d2
+    if d1 is None:
+        return d2
+    if d2 is None:
+        return d1
+    return ffuncs.max(d1, d2)
 
 
 def merge_element_type(op: FinchOperator, *args: FType) -> FType:

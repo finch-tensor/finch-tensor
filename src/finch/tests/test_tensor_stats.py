@@ -3875,7 +3875,7 @@ _OVER_FIELDS = [(), (_OVER_I,), (_OVER_J,), (_OVER_I, _OVER_J), (Field("k"),)]
         UniformStatsFactory(),
         VPStatsFactory(),
         ExactStatsFactory(),
-        SamplingStatsFactory(sample_prob=1.0),
+        SamplingStatsFactory(sample_nnz=_OVER_DATA.size),
         BlockedUniformStatsFactory(blocks_per_dim={_OVER_I: 2, _OVER_J: 2}),
         BlockedStatsFactory(
             ExactStatsFactory(), blocks_per_dim={_OVER_I: 2, _OVER_J: 2}
@@ -3917,7 +3917,7 @@ def test_estimate_non_fill_values_over_uniform(fields):
     assert dense.estimate_non_fill_values(over=fields) == 24 / slices
     uniform = UniformStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
     assert uniform.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
-    sampling = SamplingStatsFactory(sample_prob=1.0)(
+    sampling = SamplingStatsFactory(sample_nnz=_OVER_DATA.size)(
         ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J)
     )
     assert sampling.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)

@@ -16,6 +16,7 @@ from finch import (
 )
 from finch.tensor import (
     BufferizedNDArray,
+    BufferizedNDArrayFType,
     ChunkMaskTensor,
     DenseLevel,
     ElementLevel,
@@ -136,6 +137,22 @@ def test_bufferized_ndarray_custom_fill_value():
     assert finch.same(x.fill_value, y.fill_value)
     assert x.ftype == y.ftype
     assert hash(x.ftype) == hash(y.ftype)
+
+
+def test_bufferized_ndarray_ftype_distinguishes_dimension_types():
+    def fmt(dimension_type):
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(finch.int64),
+            ndim=1,
+            dimension_type=(dimension_type,),
+        )
+
+    # The dimension type sets the layout of the shape field, so kernels
+    # compiled for one dimension type can't be reused for another.
+    assert fmt(int32) == fmt(int32)
+    assert hash(fmt(int32)) == hash(fmt(int32))
+    assert fmt(int32) != fmt(finch.int64)
+    assert len({fmt(int32), fmt(finch.int64)}) == 2
 
 
 def test_bufferized_ndarray_to_numpy_returns_view():
