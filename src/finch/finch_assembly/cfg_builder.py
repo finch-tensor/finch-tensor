@@ -12,6 +12,7 @@ from finch.symbolic import (
 )
 
 from .nodes import (
+    AssemblyExpression,
     AssemblyNode,
     AssemblyStatement,
     Assert,
@@ -88,6 +89,7 @@ def assembly_desugar(
     """
     Lower surface syntax to a core AST shape before CFG construction.
 
+    - single-statement bodies (e.g. a bare `Store`) -> `Block`
     - `If(cond, body)` -> `IfElse(cond, body, Block())`
     - `IfElse` branch bodies get leading `Assert(cond)`/`Assert(not cond)`
     - `ForLoop`/`BufferLoop` -> explicit `Assign`+`WhileLoop` with increment
@@ -107,13 +109,21 @@ def assembly_desugar(
         sid += 1
         return s
 
+    def _as_block(body: AssemblyStatement) -> Block:
+        """helper to view a bare statement body as a block."""
+        match body:
+            case Block():
+                return body
+            case _:
+                return Block((body,))
+
     def go(node: AssemblyNode):
         """Recursively desugar the AST."""
         match node:
             case Module(funcs):
                 return Module(tuple(go(f) for f in funcs))
             case Function(name, args, body):
-                body_2 = go(body)
+                body_2 = go(_as_block(body))
 
                 # Make argument definitions explicit so they get statement ids.
                 func_prologue = tuple(_number_stmt(Assign(arg, arg)) for arg in args)
@@ -129,8 +139,8 @@ def assembly_desugar(
             case If(cond, body):
                 return go(IfElse(cond, body, Block(())))
             case IfElse(cond, body, else_body):
-                then_block = go(body)
-                else_block = go(else_body)
+                then_block = go(_as_block(body))
+                else_block = go(_as_block(else_body))
 
                 then_block = Block((_number_stmt(Assert(cond)), *then_block.bodies))
                 else_block = Block(
@@ -139,7 +149,7 @@ def assembly_desugar(
 
                 return IfElse(cond, then_block, else_block)
             case WhileLoop(cond, body):
-                body_block = go(body)
+                body_block = go(_as_block(body))
                 body_block = Block((_number_stmt(Assert(cond)), *body_block.bodies))
 
                 # Insert loop-exit assertion immediately after each while.
@@ -156,7 +166,8 @@ def assembly_desugar(
                 init = Assign(fic_var, start)
                 cond = Call(Literal(ffuncs.lt), (fic_var, end))
 
-                body_block = go(body)
+                # desugared once, by the while loop case below
+                body_block = _as_block(body)
 
                 inc = Assign(
                     fic_var,
@@ -179,7 +190,7 @@ def assembly_desugar(
                 init = Assign(fic_var, Literal(np.int64(0)))
                 cond = Call(Literal(ffuncs.lt), (fic_var, Length(buf)))
 
-                body_block = go(body)
+                body_block = _as_block(body)
 
                 inc = Assign(
                     fic_var,
@@ -379,6 +390,9 @@ class AssemblyCFGBuilder:
                     func_exit_block.add_successor(self.cfg.exit_block)
             case Assign(_, _):
                 # unnumbered temporary variables for loops
+                self.emit(node)
+            case AssemblyExpression():
+                # bare expression statements, kept for their effects
                 self.emit(node)
             case node:
                 raise NotImplementedError(node, "AssemblyCFGBuilder")
