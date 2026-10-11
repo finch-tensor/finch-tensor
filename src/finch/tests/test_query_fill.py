@@ -38,7 +38,7 @@ def produces(executor, *tables):
 
 @pytest.mark.parametrize("ndim", [0, 1])
 def test_query_fills_flow_through_cached_kernel(executor, monkeypatch, ndim):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     idxs = tuple(lgc.Field(f"i_{i}") for i in range(ndim))
     one = lgc.Literal(np.float64(1))
     plan = lgc.Plan(
@@ -86,7 +86,7 @@ def test_query_fills_flow_through_cached_kernel(executor, monkeypatch, ndim):
     [(np.bool_, (True, False)), (np.complex128, (3.5 + 7j, 1.5 + 2j))],
 )
 def test_query_copies_dynamic_fills(executor, dtype, fills):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i = lgc.Field("i")
     plan = lgc.Plan(
         (

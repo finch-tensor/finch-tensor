@@ -39,7 +39,7 @@ def executor(request):
 
 
 def test_query_shapes_flow_through_cached_kernel(executor, monkeypatch):
-    a, b, c, d = (lgc.Alias(name) for name in "ABCD")
+    a, b, c, d = (lgc.HardAlias(name) for name in "ABCD")
     i, j, k = (lgc.Field(name) for name in "ijk")
     plan = lgc.Plan(
         (
@@ -87,7 +87,7 @@ def test_query_shapes_flow_through_cached_kernel(executor, monkeypatch):
 
 
 def test_logic_interpreter_sizes_query_outputs():
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
@@ -106,7 +106,7 @@ def test_logic_interpreter_sizes_query_outputs():
 
 @pytest.mark.parametrize("ndim", [0, 2])
 def test_query_expands_scalar_dimensions(executor, ndim):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     idxs = tuple(lgc.Field(f"i_{i}") for i in range(ndim))
     plan = lgc.Plan(
         (lgc.Query(lgc.Table(b, idxs), lgc.Table(a, ())), lgc.Produces((b,)))
@@ -120,7 +120,7 @@ def test_query_expands_scalar_dimensions(executor, ndim):
 
 
 def test_query_into_keeps_bound_shape(executor):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
@@ -147,7 +147,7 @@ def test_query_into_keeps_bound_shape(executor):
 
 
 def test_query_replaces_bound_shape(executor):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (lgc.Query(lgc.Table(b, (j, i)), lgc.Table(a, (i, j))), lgc.Produces((b,)))

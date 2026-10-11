@@ -6,8 +6,8 @@ from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter import GalleyFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import (
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -18,7 +18,7 @@ from finch.finch_logic import (
 from finch.tensor.level import ElementLevelFType
 
 i, j = Field("i"), Field("j")
-A, B = Alias("A"), Alias("B")
+A, B = HardAlias("A"), HardAlias("B")
 
 
 def level_ftypes(tensor_ftype):

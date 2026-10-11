@@ -64,6 +64,7 @@ class MonoLogicFormatter(LogicFormatter):
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
                     node.infer_shape_type(shape_types)
+                    lhs = lhs.unfused
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)

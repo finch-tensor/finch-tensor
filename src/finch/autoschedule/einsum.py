@@ -147,5 +147,7 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
                 case lgc.Query(lgc.Table(lgc.Alias(name), _), _):
                     defined.add(ein.Alias(name))
         mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
-        lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
+        lgc_bindings: dict[lgc.Alias, TensorFType] = {
+            lgc.HardAlias(var.name): val for var, val in ein_bindings.items()
+        }
         return mod, lgc_bindings

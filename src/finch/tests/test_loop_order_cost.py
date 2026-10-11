@@ -25,10 +25,11 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
     transpose_penalty,
 )
 from finch.autoschedule.normalize import LogicNormalizer
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory
 from finch.finch_logic import (
     Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Table,
@@ -39,9 +40,9 @@ from finch.finch_notation.interpreter import NotationInterpreter
 def test_empty_input_ordered_first_is_cheaper():
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
-    bindings = {
+    bindings: dict[Alias, DCStats] = {
         a: sf(fl.asarray(np.ones((4, 4))), (i, j)),
         b: sf(fl.asarray(np.zeros((4, 4))), (j, k)),
     }
@@ -56,7 +57,7 @@ def test_empty_relation():
     sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (Alias(name) for name in "ABCD")
+    a, b, c, d = (HardAlias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -66,7 +67,7 @@ def test_empty_relation():
             Table(d, (l_, m)),
         ),
     )
-    bindings = OrderedDict(
+    bindings: OrderedDict[Alias, DCStats] = OrderedDict(
         {
             a: sf(fl.asarray(np.ones((2, 2))), (i, j)),
             b: sf(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -160,14 +161,18 @@ def test_greedy_order_breaks_ties_by_field_order():
     """
     sf = DCStatsFactory()
     i, j, k, m = (Field(name) for name in "ijkm")
-    a, b, c = Alias("A"), Alias("B"), Alias("C")
+    a, b, c = HardAlias("A"), HardAlias("B"), HardAlias("C")
     ones = fl.asarray(np.ones((4, 4)))
 
     forward = MapJoin(
         Literal(ffuncs.mul),
         (Table(a, (i, j)), Table(b, (j, k)), Table(c, (k, m))),
     )
-    forward_bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k)), c: sf(ones, (k, m))}
+    forward_bindings: dict[Alias, DCStats] = {
+        a: sf(ones, (i, j)),
+        b: sf(ones, (j, k)),
+        c: sf(ones, (k, m)),
+    }
     conjuncts, disjuncts, _ = _dedup_stats(forward, sf, forward_bindings)
 
     # The chain's endpoints tie, so only the tie-break separates them.
@@ -185,7 +190,11 @@ def test_greedy_order_breaks_ties_by_field_order():
         Literal(ffuncs.mul),
         (Table(c, (m, k)), Table(b, (k, j)), Table(a, (j, i))),
     )
-    reverse_bindings = {c: sf(ones, (m, k)), b: sf(ones, (k, j)), a: sf(ones, (j, i))}
+    reverse_bindings: dict[Alias, DCStats] = {
+        c: sf(ones, (m, k)),
+        b: sf(ones, (k, j)),
+        a: sf(ones, (j, i)),
+    }
     reverse_order = greedy_loop_order(reverse, sf, reverse_bindings)
     assert reverse_order[0] == m
     assert set(reverse_order) == {i, j, k, m}
@@ -211,13 +220,13 @@ def test_greedy_avoids_transposing_a_sparse_input():
     """
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     n = 16
     diagonal = np.zeros((n, n))
     diagonal[np.arange(n), np.arange(n)] = 1.0
 
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (j, i)), Table(b, (i, j))))
-    bindings = {
+    bindings: dict[Alias, DCStats] = {
         a: sf(fl.asarray(np.ones((n, n))), (j, i)),
         b: sf(fl.asarray(diagonal), (i, j)),
     }
@@ -248,10 +257,10 @@ def test_transpose_penalty_totals_match_loop_order_cost():
     """
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     ones = fl.asarray(np.ones((3, 3)))
-    bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
+    bindings: dict[Alias, DCStats] = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
     conjuncts, disjuncts, input_stats = _dedup_stats(expr, sf, bindings)
 
     saw_reformat = False
