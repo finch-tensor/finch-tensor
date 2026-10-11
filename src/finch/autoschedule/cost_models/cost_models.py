@@ -142,3 +142,69 @@ class FlopsCostModel(CostModel, AliasedForm):
 
         visit_stmt(term)
         return features
+
+class PigeonCostModel(CostModel, LoopOrderedForm):
+    """
+    PigeonCostModel counts the non-fill values in the iteration space of each
+    query, and in the output it materializes. Writes are weighted 10x reads.
+    """
+
+    def __init__(self):
+        pass
+
+    @property
+    def coefficients(self) -> np.ndarray:
+        return np.array([1.0, 10.0])
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, NumericStats],
+        stats_factory: StatsFactory[NumericStats],
+    ) -> np.ndarray:
+        stats = dict(stats)
+        features = np.zeros(len(self.coefficients))
+
+        def visit_stmt(stmt: LogicStatement):
+            nonlocal features
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                    return
+                case QueryInto(Table(lhs), _, Literal()):
+                    return
+                case Query(Table(lhs), Table(rhs))|
+                 QueryInto(Table(lhs, lhs_idxs), _, Reorder(Table(rhs), idxs)):
+                    init = literal(lhs.fill_value)
+                case Query(
+                    Table(lhs, lhs_idxs), Aggregate(_, init, Reorder(arg, idxs), _) as out
+                ) | QueryInto(Table(_, lhs_idxs), init, Reorder(arg, idxs)):
+                    exec_space = stats_interpreter(rhs)
+                    args = {[] for idx in rhs.idxs}
+                    for node in PostOrderDFS(rhs):
+                        match node:
+                            case Table(arg, idxs):
+                                for idx in idxs:
+                                    args[idx].append((arg, idxs))
+                    out_space = stats_interpreter(out)
+                    out_cost += out_space.estimate_non_fill_values()
+                    op_cost = 0
+                    iter_cost = 0
+                    for n in range(len(rhs.idxs), 1, -1):
+                        idx = rhs.idxs[n]
+                        exec_space = stats_factory.aggregate(exec_space, [idx])
+                        out_space = stats_factory.aggregate(out_space, [idx])
+                        if idx in out_idxs:
+                            out_cost += out_space.estimate_non_fill_values()
+                        iter_space = stats_factory.mapjoin(ffuncs.and, exec_space, stats_factory.mapjoin(ffuncs.or, *args[idx]))
+                        iter_cost += iter_space.estimate_non_fill_values()
+                        op_cost += exec_space.estimate_non_fill_values() * len(args[idx])
+                    features += [iter_cost, op_cost, out_cost]
+                    return None
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+        visit_stmt(term)
+        return features
