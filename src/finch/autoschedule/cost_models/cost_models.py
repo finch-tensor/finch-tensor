@@ -180,6 +180,141 @@ class MultiLoopCostModel(LoopCostModel, MultiCostModel):
             ]
         )
 
+class LevelCostModel(CostModel):
+    """A cost model for a specific level of tensor formats."""
+
+    @property
+    @abstractmethod
+    def coefficients(self):
+        ...
+
+
+class LevelOption(ABC):
+    level_type: type
+
+    @abstractmethod
+    def build(self, lvl, dim_type): ...
+
+    @abstractmethod
+    def next_num_pos(self, num_pos, n_l, nnz_l): ...
+    @abstractmethod
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size): ...
+
+
+class DenseLevelOption(LevelOption):
+    level_type = DenseLevelFType
+
+    def build(self, lvl, dim_type):
+        return dense(lvl, dim_type)
+
+    def next_num_pos(self, num_pos, n_l, nnz_l):
+        return num_pos * n_l
+
+
+class SparseHashLevelOption(LevelOption):
+    level_type = SparseHashLevelFType
+
+    def build(self, lvl, dim_type):
+        return sparse_hash(lvl, dim_type, single_writer=True)
+
+    def next_num_pos(self, num_pos, n_l, nnz_l):
+        return nnz_l
+
+
+class IterCostDenseLevelOption(DenseLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return num_pos * n_l
+
+
+class StorageCostDenseLevelOption(DenseLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return 0.0
+
+
+class IterCostSparseHashLevelOption(SparseHashLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return num_pos + nnz_l
+
+
+class StorageCostSparseHashLevelOption(SparseHashLevelOption):
+    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        return (num_pos + 1) * pos_size + nnz_l * pos_size
+
+class FormatCostModel(CostModel):
+    """A cost model with features for tensor format prefixes."""
+
+    def __init__(self, formats:dict[str, LevelCostModel]):
+        self.formats = formats
+
+    @property
+    def coefficients(self) -> np.ndarray:
+        return np.concatenate([format.coefficients for format in self.formats.values()])
+
+    @abstractmethod
+    def get_format_features(
+        self,
+        alias: HardAlias,
+        prefix: tuple[str, ...],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
+    ) -> np.ndarray: ...
+
+    def predict_format_cost(
+        self,
+        alias: HardAlias,
+        prefix: tuple[str, ...],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
+    ) -> float:
+        features = self.get_format_features(alias, prefix, expr, machine, output_vars)
+        return float(np.dot(self.coefficients, features))
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, list[str]],
+        stats: Mapping[Alias, NumericStats],
+        stats_factory: StatsFactory[NumericStats],
+    ) -> np.ndarray:
+        stats = dict(stats)
+        features = {key: format.coefficients for key, format in self.formats.items()}
+        stats_interpreter = StatsMachine(stats_factory, stats)
+
+        def visit_stmt(stmt: LogicStatement):
+            nonlocal features
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                    return
+                case QueryInto(Table(), _, Literal()):
+                    stats_interpreter(stmt)
+                    return
+                case Produces():
+                    return
+                case Query(Table(_, lhs_idxs), Table() as out):
+                    idxs = lhs_idxs
+                case Query(
+                    Table(_, lhs_idxs),
+                    Aggregate(_, _, Reorder(_, idxs), _) as out,
+                ):
+                    pass
+                case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
+                    out = stmt.as_query().rhs
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+            for n in range(len(idxs) + 1):
+                features += self.get_format_features(
+                    idxs[:n], out, stats_interpreter, lhs_idxs
+                )
+            stats_interpreter(stmt)
+
+        visit_stmt(term)
+        return features
+
 
 class FlopsCostModel(CostModel, AliasedForm):
     """
