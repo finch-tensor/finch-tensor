@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from typing import TypeVar
 
 import numpy as np
 
@@ -28,6 +29,8 @@ from finch.finch_logic import (
 )
 from finch.symbolic import Form, PostOrderDFS
 from finch.tensor import Scalar
+
+NS = TypeVar("NS", bound=NumericStats)
 
 
 class CostModel(Form):
@@ -150,7 +153,7 @@ class FlopsCostModel(CostModel, AliasedForm):
 class PigeonCostModel(CostModel, LoopOrderedForm):
     """
     PigeonCostModel counts iteration, operation, and output costs across loop
-    levels. Writes are weighted 10x reads and operations.
+    prefixes. Writes are weighted 10x reads and operations.
     """
 
     def __init__(self):
@@ -159,6 +162,72 @@ class PigeonCostModel(CostModel, LoopOrderedForm):
     @property
     def coefficients(self) -> np.ndarray:
         return np.array([1.0, 1.0, 10.0])
+
+    def get_prefix_features(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> np.ndarray:
+        """Return the incremental features for an outermost-first loop prefix.
+
+        The statistics are unprojected: exec_space describes the query's RHS,
+        out_space describes its output in lhs order, and args groups input Table
+        occurrences by field. They can be reused across candidate prefixes.
+
+        A nonempty prefix charges its last index, projecting execution and
+        output onto prefix[:-1], as in the inside-out calculation. The empty
+        prefix charges the output's non-fill values once. Summing all prefixes,
+        including the empty one, gives the query's features.
+        """
+        if not prefix:
+            return np.array([0.0, 0.0, out_space.estimate_non_fill_values()])
+
+        def support(stat: NS) -> NS:
+            stat = stats_factory.copy(stat)
+            stat.fill_value = StaticFill(False)
+            return stat
+
+        def project(stat: NS) -> NS:
+            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
+            return stats_factory.aggregate(
+                ffuncs.or_, False, reduce_idxs, support(stat)
+            )
+
+        parent = set(prefix[:-1])
+        idx = prefix[-1]
+        exec_space = project(exec_space)
+        inputs = [support(stat) for stat in args.get(idx, ())]
+        iter_space = exec_space
+        if inputs:
+            iter_space = stats_factory.mapjoin(
+                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *inputs)
+            )
+        out_cost = 0.0
+        if idx in out_space.index_order:
+            out_cost = project(out_space).estimate_non_fill_values()
+        return np.array(
+            [
+                iter_space.estimate_non_fill_values(),
+                exec_space.estimate_non_fill_values() * len(inputs),
+                out_cost,
+            ]
+        )
+
+    def predict_prefix_cost(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> float:
+        features = self.get_prefix_features(
+            prefix, exec_space, out_space, args, stats_factory
+        )
+        return float(np.dot(self.coefficients, features))
 
     def get_features(
         self,
@@ -170,11 +239,6 @@ class PigeonCostModel(CostModel, LoopOrderedForm):
         stats = dict(stats)
         features = np.zeros(len(self.coefficients))
         stats_interpreter = StatsMachine(stats_factory, stats)
-
-        def support(stat: NumericStats) -> NumericStats:
-            stat = stats_factory.copy(stat)
-            stat.fill_value = StaticFill(False)
-            return stat
 
         def visit_stmt(stmt: LogicStatement):
             nonlocal features
@@ -203,39 +267,20 @@ class PigeonCostModel(CostModel, LoopOrderedForm):
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
-            exec_space = support(stats_interpreter(rhs))
+            exec_space = stats_interpreter(rhs)
             args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
             for node in PostOrderDFS(rhs):
                 match node:
                     case Table(_, arg_idxs):
-                        arg_stats = support(stats_interpreter(node))
+                        arg_stats = stats_interpreter(node)
                         for idx in arg_idxs:
                             args[idx].append(arg_stats)
-            out_space = stats_interpreter(out)
-            stats[lhs] = stats_factory.reorder(out_space, lhs_idxs)
-            out_space = support(out_space)
-            out_cost = out_space.estimate_non_fill_values()
-            op_cost = 0
-            iter_cost = 0
-            for idx in reversed(idxs):
-                exec_space = stats_factory.aggregate(
-                    ffuncs.or_, False, (idx,), exec_space
+            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
+            stats[lhs] = out_space
+            for n in range(len(idxs) + 1):
+                features += self.get_prefix_features(
+                    idxs[:n], exec_space, out_space, args, stats_factory
                 )
-                out_space = stats_factory.aggregate(
-                    ffuncs.or_, False, (idx,), out_space
-                )
-                if idx in lhs_idxs:
-                    out_cost += out_space.estimate_non_fill_values()
-                iter_space = exec_space
-                if args[idx]:
-                    iter_space = stats_factory.mapjoin(
-                        ffuncs.and_,
-                        exec_space,
-                        stats_factory.mapjoin(ffuncs.or_, *args[idx]),
-                    )
-                iter_cost += iter_space.estimate_non_fill_values()
-                op_cost += exec_space.estimate_non_fill_values() * len(args[idx])
-            features += [iter_cost, op_cost, out_cost]
 
         visit_stmt(term)
         return features

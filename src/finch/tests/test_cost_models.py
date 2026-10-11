@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 
 import numpy as np
@@ -113,3 +115,100 @@ def test_pigeon_cost_model_dependent_queries(factory):
         np.dot(model.coefficients, expected)
     )
     assert set(stats) == {a}
+
+
+@pytest.mark.parametrize(
+    "factory, expected",
+    [
+        (
+            DCStatsFactory,
+            [
+                [13, 8, 8],
+                [13, 13, 8],
+                [13, 8, 8],
+                [15, 10, 10],
+                [15, 15, 10],
+                [15, 14, 10],
+            ],
+        ),
+        (
+            UniformStatsFactory,
+            [
+                [25.030714922766236, 8.397118199352539, 6.9057883730956355],
+                [20.948107815782194, 10.936459669391933, 6.9057883730956355],
+                [25.546706922536774, 8.172993988088525, 6.9057883730956355],
+                [25.64527434095588, 9.008949572579267, 8.042275185340479],
+                [22.592642244606303, 12.072946481636775, 8.042275185340479],
+                [22.275728472420994, 11.506047408332968, 8.042275185340479],
+            ],
+        ),
+    ],
+)
+def test_pigeon_prefix_costs_match_full_cost(factory, expected):
+    sf = factory()
+    model = PigeonCostModel()
+    i, j, k = (Field(name) for name in "ijk")
+    a, b, out = (Alias(name) for name in ("a", "b", "out"))
+    stats = {
+        a: sf(fl.asarray([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]), (i, j)),
+        b: sf(
+            fl.asarray(
+                [[0.0, 1.0, 0.0, 1.0], [1.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0]]
+            ),
+            (j, k),
+        ),
+    }
+    arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
+    machine = StatsMachine(sf, dict(stats))
+    exec_space = machine(arg)
+    out_space = sf.aggregate(ffuncs.add, 0.0, (j,), exec_space)
+    args = {i: [stats[a]], j: [stats[a], stats[b]], k: [stats[b]]}
+    spaces = [exec_space, out_space, *stats.values()]
+    original_fills = [stat.fill_value for stat in spaces]
+    original_idxs = [stat.index_order for stat in spaces]
+
+    # These totals were captured before extracting the prefix calculation.
+    for order, original_features in zip(
+        itertools.permutations((i, j, k)), expected, strict=True
+    ):
+        output = sf.reorder(out_space, tuple(idx for idx in order if idx != j))
+        prefixes = [order[:n] for n in range(len(order) + 1)]
+        features = sum(
+            model.get_prefix_features(prefix, exec_space, output, args, sf)
+            for prefix in prefixes
+        )
+        cost = sum(
+            model.predict_prefix_cost(prefix, exec_space, output, args, sf)
+            for prefix in prefixes
+        )
+        query = Query(
+            Table(out, output.index_order),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
+        )
+
+        np.testing.assert_allclose(features, original_features)
+        np.testing.assert_allclose(model.get_features(query, {}, stats, sf), features)
+        assert model.predict_cost(query, {}, stats, sf) == pytest.approx(cost)
+
+    assert all(
+        stat.fill_value is fill
+        for stat, fill in zip(spaces, original_fills, strict=True)
+    )
+    assert [stat.index_order for stat in spaces] == original_idxs
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
+    sf = factory()
+    model = PigeonCostModel()
+    i = Field("i")
+    scalar = sf(fl.asarray(np.ones(())), ())
+    broadcast = sf.reorder(scalar, (i,))
+
+    np.testing.assert_array_equal(
+        model.get_prefix_features((), scalar, scalar, {}, sf), [0, 0, 1]
+    )
+    assert model.predict_prefix_cost((), scalar, scalar, {}, sf) == 10
+    np.testing.assert_array_equal(
+        model.get_prefix_features((i,), broadcast, broadcast, {}, sf), [1, 0, 1]
+    )
