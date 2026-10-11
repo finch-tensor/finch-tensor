@@ -298,3 +298,126 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
 
         visit_stmt(term)
         return features
+
+
+class TransposeCostModel(LoopCostModel, LoopOrderedForm):
+    """
+    PigeonCostModel counts iteration, operation, and output costs across loop
+    prefixes. Writes are weighted 10x reads and operations.
+    """
+
+    def __init__(self):
+        pass
+
+    @property
+    def coefficients(self) -> np.ndarray:
+        return np.array([1.0, 1.0, 10.0])
+
+    def get_prefix_features(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> np.ndarray:
+        """Return the incremental features for an outermost-first loop prefix.
+
+        The statistics are unprojected: exec_space describes the query's RHS,
+        out_space describes its output in lhs order, and args groups input Table
+        occurrences by field. They can be reused across candidate prefixes.
+
+        A nonempty prefix charges its last index, projecting execution and
+        output onto prefix[:-1], as in the inside-out calculation. The empty
+        prefix charges the output's non-fill values once. Summing all prefixes,
+        including the empty one, gives the query's features.
+        """
+        if not prefix:
+            return np.array([0.0, 0.0, out_space.estimate_non_fill_values()])
+
+        def support(stat: NS) -> NS:
+            stat = stats_factory.copy(stat)
+            stat.fill_value = StaticFill(False)
+            return stat
+
+        def project(stat: NS) -> NS:
+            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
+            return stats_factory.aggregate(
+                ffuncs.or_, False, reduce_idxs, support(stat)
+            )
+
+        parent = set(prefix[:-1])
+        idx = prefix[-1]
+        exec_space = project(exec_space)
+        inputs = [support(stat) for stat in args.get(idx, ())]
+        iter_space = exec_space
+        if inputs:
+            iter_space = stats_factory.mapjoin(
+                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *inputs)
+            )
+        out_cost = 0.0
+        if idx in out_space.index_order:
+            out_cost = project(out_space).estimate_non_fill_values()
+        return np.array(
+            [
+                iter_space.estimate_non_fill_values(),
+                exec_space.estimate_non_fill_values() * len(inputs),
+                out_cost,
+            ]
+        )
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, NumericStats],
+        stats_factory: StatsFactory[NumericStats],
+    ) -> np.ndarray:
+        stats = dict(stats)
+        features = np.zeros(len(self.coefficients))
+        stats_interpreter = StatsMachine(stats_factory, stats)
+
+        def visit_stmt(stmt: LogicStatement):
+            nonlocal features
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                    return
+                case QueryInto(Table(), _, Literal()):
+                    stats_interpreter(stmt)
+                    return
+                case Produces():
+                    return
+                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
+                    idxs = lhs_idxs
+                    out = rhs
+                case Query(
+                    Table(Alias() as lhs, lhs_idxs),
+                    Aggregate(_, _, Reorder(_, idxs) as rhs, _) as out,
+                ):
+                    pass
+                case QueryInto(
+                    Table(Alias() as lhs, lhs_idxs), _, Reorder(_, idxs) as rhs
+                ):
+                    out = stmt.as_query().rhs
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+            exec_space = stats_interpreter(rhs)
+            args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
+            for node in PostOrderDFS(rhs):
+                match node:
+                    case Table(_, arg_idxs):
+                        arg_stats = stats_interpreter(node)
+                        for idx in arg_idxs:
+                            args[idx].append(arg_stats)
+            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
+            stats[lhs] = out_space
+            for n in range(len(idxs) + 1):
+                features += self.get_prefix_features(
+                    idxs[:n], exec_space, out_space, args, stats_factory
+                )
+
+        visit_stmt(term)
+        return features
