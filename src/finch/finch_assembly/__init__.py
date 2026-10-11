@@ -9,7 +9,11 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
-from .global_value_numbering import AssemblyGlobalValueNumbering
+from .global_value_numbering import (
+    AssemblyGlobalValueNumbering,
+    AssemblyGlobalValueNumberingTransform,
+    assembly_global_value_numbering,
+)
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyExpression,
@@ -58,6 +62,7 @@ __all__ = [
     "AssemblyCopyPropagation",
     "AssemblyExpression",
     "AssemblyGlobalValueNumbering",
+    "AssemblyGlobalValueNumberingTransform",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyKernel",
@@ -102,6 +107,7 @@ __all__ = [
     "assembly_copy_propagation",
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
+    "assembly_global_value_numbering",
     "element_type",
     "get_vars_in_expr",
     "length_type",

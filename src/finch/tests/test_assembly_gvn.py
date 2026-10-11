@@ -4,12 +4,36 @@ import finch
 import finch.finch_assembly as asm
 from finch import ffuncs
 from finch.algebra import FinchOperator
+from finch.autoschedule import (
+    CompilerFormLowerer,
+    DefaultLogicFactorizer,
+    DefaultLogicFormatter,
+    DefaultLoopOrderer,
+    LogicCompiler,
+    LogicExecutor,
+    LogicNormalizer,
+)
+from finch.codegen import NumpyBuffer
+from finch.compile import NotationCompiler
 from finch.finch_assembly import (
     AssemblyGlobalValueNumbering,
+    AssemblyGlobalValueNumberingTransform,
+    AssemblyInterpreter,
+    AssemblyLoader,
+    AssemblySimplify,
+    LowerPackedStructSlots,
+    assembly_check_types,
     assembly_dataflow_analyze,
+    assembly_global_value_numbering,
 )
+from finch.finch_logic import LogicSimplify
+from finch.symbolic import UnvalidatedForm
 
-from .scripts.nodes import create_asm_gvn_node, create_asm_if_node
+from .scripts.nodes import (
+    create_asm_comprehensive_node,
+    create_asm_gvn_node,
+    create_asm_if_node,
+)
 
 
 def call(op, *args):
@@ -38,7 +62,9 @@ def variables(names, type_=finch.int64):
 
 def module(args, *body, ret=finch.int64):
     arg_types = tuple(arg.result_type for arg in args)
-    func = asm.Variable("f", asm.AssemblyKernelFType("f", arg_types, ret))
+    # fixed definition, so modules built from the same parts compare equal
+    func_t = asm.AssemblyKernelFType("f", arg_types, ret, definition="f")
+    func = asm.Variable("f", func_t)
     return asm.Module((asm.Function(func, tuple(args), asm.Block(body)),))
 
 
@@ -317,3 +343,223 @@ def test_asm_gvn_debug_if(file_regression):
 def test_asm_gvn_debug_redundant(file_regression):
     ctx, _ = analyze(create_asm_gvn_node())
     file_regression.check(str(ctx), extension=".txt")
+
+
+def check_rewrite(prgm, expected, *inputs):
+    """gvn turns `prgm` into `expected`, which type checks and computes the same"""
+    result = assembly_global_value_numbering(prgm)
+    assert result == expected
+    assembly_check_types(result)
+    assert assembly_global_value_numbering(result) == result
+    for args in inputs:
+        assert AssemblyInterpreter()(result).f(*args) == (
+            AssemblyInterpreter()(prgm).f(*args)
+        )
+
+
+def test_gvn_rewrite_reuses_values():
+    a, b, t, u, v = variables("a b t u v")
+
+    def make(redundant, expr):
+        return module(
+            (a, b),
+            asm.Assign(t, add(a, b)),
+            asm.Assign(u, redundant),
+            asm.Assign(v, mul(expr, a)),
+            asm.Assert(lt(expr, i64(100))),
+            asm.Return(add(expr, v)),
+        )
+
+    check_rewrite(
+        make(add(a, b), add(a, b)),
+        make(t, t),
+        (np.int64(1), np.int64(2)),
+        (np.int64(-4), np.int64(9)),
+    )
+
+
+def test_gvn_rewrite_store():
+    p, q, x = variables("p q x", finch.float64)
+    buf_t = NumpyBuffer(np.zeros(2)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+
+    def make(value):
+        return module(
+            (p, q, buf),
+            asm.Assign(x, mul(p, q)),
+            asm.Unpack(buf_slt, buf),
+            asm.Store(buf_slt, asm.Literal(np.intp(1)), value),
+            asm.Repack(buf_slt),
+            asm.Return(x),
+            ret=finch.float64,
+        )
+
+    prgm, expected = make(mul(p, q)), make(x)
+    result = assembly_global_value_numbering(prgm)
+    assert result == expected
+    for module_ in (prgm, result):
+        out = NumpyBuffer(np.zeros(2))
+        AssemblyInterpreter()(module_).f(np.float64(3.0), np.float64(4.0), out)
+        np.testing.assert_array_equal(out.arr, [0.0, 12.0])
+
+
+def test_gvn_rewrite_respects_scopes():
+    """
+    `t` (declared in both branches) and `w` (in a nested block) aren't visible
+    after them, `x` (declared before the if) is.
+    """
+    a, b, c, t, u, w, x = variables("a b c t u w x")
+
+    def make(branch_x, product, total):
+        return module(
+            (a, b, c),
+            asm.Assign(x, i64(0)),
+            asm.IfElse(
+                lt(c, i64(0)),
+                asm.Block((asm.Assign(t, add(a, b)), asm.Assign(x, branch_x))),
+                asm.Block((asm.Assign(t, add(a, b)), asm.Assign(x, branch_x))),
+            ),
+            asm.Block((asm.Assign(w, mul(a, b)),)),
+            asm.Assign(u, add(product, total)),
+            asm.Return(u),
+        )
+
+    check_rewrite(
+        make(add(a, b), mul(a, b), add(a, b)),
+        make(t, mul(a, b), x),
+        (np.int64(2), np.int64(3), np.int64(-1)),
+        (np.int64(2), np.int64(3), np.int64(1)),
+    )
+
+
+def test_gvn_rewrite_loop_invariant():
+    a, b, n, t, e, u, i, acc = variables("a b n t e u i acc")
+
+    def make(inner, after):
+        return module(
+            (a, b, n),
+            asm.Assign(t, add(a, b)),
+            asm.Assign(acc, i64(0)),
+            asm.ForLoop(
+                i,
+                i64(0),
+                n,
+                asm.Block((asm.Assign(e, inner), asm.Assign(acc, add(acc, mul(e, i))))),
+            ),
+            asm.Assign(u, after),
+            asm.Return(add(acc, u)),
+        )
+
+    check_rewrite(
+        make(add(a, b), add(a, b)),
+        make(t, t),
+        (np.int64(1), np.int64(2), np.int64(4)),
+        (np.int64(1), np.int64(2), np.int64(0)),
+    )
+
+
+def test_gvn_rewrite_loop_variables():
+    """
+    neither the loop index `i` (named like an outer `i`) nor the loop-local `e`
+    can stand in for `add(a, b)`.
+    """
+    a, b, n, e, u, i, acc = variables("a b n e u i acc")
+    prgm = module(
+        (a, b, n),
+        asm.Assign(i, add(a, b)),
+        asm.Assign(acc, i64(0)),
+        asm.ForLoop(
+            i,
+            i64(0),
+            n,
+            asm.Block((asm.Assign(e, add(a, b)), asm.Assign(acc, add(acc, e)))),
+        ),
+        asm.Assign(u, add(a, b)),
+        asm.Return(add(acc, u)),
+    )
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+def test_gvn_rewrite_leaves_dead_code():
+    a, b, t, u = variables("a b t u")
+    prgm = module(
+        (a, b),
+        asm.Assign(t, add(a, b)),
+        asm.Return(t),
+        asm.Assign(u, add(a, b)),
+    )
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+def test_asm_gvn_if(file_regression):
+    prgm = assembly_global_value_numbering(create_asm_if_node())
+    file_regression.check(str(prgm), extension=".txt")
+
+
+def test_asm_gvn_comprehensive(file_regression):
+    prgm = assembly_global_value_numbering(create_asm_comprehensive_node())
+    file_regression.check(str(prgm), extension=".txt")
+
+
+def test_asm_gvn_redundant(file_regression):
+    prgm = create_asm_gvn_node()
+    result = assembly_global_value_numbering(prgm)
+    assert assembly_global_value_numbering(result) == result
+    for args in [(1, 2, 3), (5, -2, 0)]:
+        args = tuple(np.int64(arg) for arg in args)
+        assert AssemblyInterpreter()(result).gvn(*args) == (
+            AssemblyInterpreter()(prgm).gvn(*args)
+        )
+    file_regression.check(str(result), extension=".txt")
+
+
+class _CaptureAssembly(UnvalidatedForm, AssemblyLoader):
+    """records the assembly a kernel is built from, after all transforms"""
+
+    def __init__(self, ctx):
+        self.ctx = ctx
+        self.last: asm.Module
+
+    def lower(self, term: asm.Module, *, mode=None):
+        self.last = term
+        return self.ctx(term, mode=mode)
+
+
+def test_gvn_pipeline_dense():
+    capture = _CaptureAssembly(AssemblyInterpreter())
+    ctx = LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicFactorizer(
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        DefaultLogicFormatter(
+                            CompilerFormLowerer(
+                                LogicCompiler(
+                                    NotationCompiler(
+                                        capture,
+                                        ctx_transforms=(
+                                            LowerPackedStructSlots(),
+                                            AssemblySimplify(),
+                                            AssemblyGlobalValueNumberingTransform(),
+                                        ),
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+    x = np.arange(6, dtype=np.float64).reshape(2, 3)
+    y = np.arange(12, dtype=np.float64).reshape(3, 4)
+    a, b = finch.defer(finch.asarray(x)), finch.defer(finch.asarray(y))
+
+    out = finch.compute(a @ b, ctx=ctx)
+    np.testing.assert_allclose(out.to_numpy(), x @ y)
+    assembly_check_types(capture.last)
+
+    out = finch.compute(a * 2 + a, ctx=ctx)
+    np.testing.assert_allclose(out.to_numpy(), x * 2 + x)
+    assembly_check_types(capture.last)

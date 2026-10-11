@@ -1,6 +1,10 @@
 """
 global value numbering (gvn) for finch assembly.
 
+`assembly_global_value_numbering` replaces a redundant pure expression with a
+variable in scope that already holds its value. assignments are kept, copy
+propagation and dce can clean up after it.
+
 the analysis maps each variable to a value number (vn), an int interned from a
 key that says how the value was computed:
 
@@ -24,26 +28,57 @@ analysis terminates. never key a phi on its incoming vns instead, or
 `j = add(j, 1)` diverges.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 
 from finch.algebra import FType, SingletonOperatorFType, StructFType, ffuncs
 from finch.algebra.ftypes import FDType
-from finch.symbolic import BasicBlock, ControlFlowGraph, PostOrderDFS
+from finch.symbolic import BasicBlock, ControlFlowGraph, PostOrderDFS, UnvalidatedForm
 from finch.util import qual_str
 
 from .cfg_builder import NumberedStatement
-from .dataflow import AbstractAssemblyDataflow
+from .dataflow import AbstractAssemblyDataflow, assembly_dataflow_run
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
+    AssemblyStatement,
     AssemblyTree,
+    Assert,
     Assign,
+    Block,
+    BufferLoop,
     Call,
+    ForLoop,
+    Function,
+    If,
+    IfElse,
     Literal,
+    Module,
+    Resize,
+    Return,
+    SetAttr,
+    Store,
     Variable,
+    WhileLoop,
 )
+from .stages import AssemblyTransform
+
+
+def assembly_global_value_numbering(node: AssemblyNode) -> AssemblyNode:
+    """apply global value numbering to a finch assembly node"""
+    return assembly_dataflow_run(
+        node,
+        AssemblyGlobalValueNumbering,
+        lambda pre_node, ctx: _GVNRewriter(ctx)(pre_node),
+    )
+
+
+class AssemblyGlobalValueNumberingTransform(UnvalidatedForm, AssemblyTransform):
+    def lower(self, term: Module) -> Module:
+        result = assembly_global_value_numbering(term)
+        assert isinstance(result, Module)
+        return result
 
 
 def _const_key(val) -> tuple | None:
@@ -245,3 +280,114 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                     if id(child) in vns
                 ]
         return []
+
+
+class _GVNRewriter:
+    """
+    walks the numbered program tracking the variables in scope, and rewrites
+    each statement with the analysis results.
+    """
+
+    def __init__(self, ctx: AssemblyGlobalValueNumbering):
+        self.ctx = ctx
+        self.states = {stmt.sid: state for stmt, state in ctx.statement_states()}
+        self.scopes: list[dict[str, Variable]] = []
+
+    def __call__(self, node: AssemblyNode) -> AssemblyNode:
+        match node:
+            case Module(funcs):
+                return Module(tuple(self.function(func) for func in funcs))
+            case Function():
+                return self.function(node)
+            case AssemblyStatement():
+                return self.statement(node)
+        return node
+
+    def function(self, func: Function) -> Function:
+        return Function(func.name, func.args, self.scoped(func.body, func.args))
+
+    def scoped(
+        self, body: AssemblyStatement, decls: Sequence[Variable] = ()
+    ) -> AssemblyStatement:
+        """rewrite `body` in a new scope declaring `decls`"""
+        # the type checker scopes every block, the interpreter every body
+        self.scopes.append({var.name: var for var in decls})
+        try:
+            match body:
+                case Block(bodies):
+                    return Block(tuple(self.statement(stmt) for stmt in bodies))
+            result = self.statement(body)
+            assert isinstance(result, AssemblyStatement)
+            return result
+        finally:
+            self.scopes.pop()
+
+    def statement(
+        self, node: AssemblyStatement | AssemblyExpression
+    ) -> AssemblyStatement | AssemblyExpression:
+        match node:
+            case Block():
+                return self.scoped(node)
+            case If(cond, body):
+                return If(cond, self.scoped(body))
+            case IfElse(cond, body, else_body):
+                return IfElse(cond, self.scoped(body), self.scoped(else_body))
+            case WhileLoop(cond, body):
+                return WhileLoop(cond, self.scoped(body))
+            case ForLoop(var, start, end, body):
+                return ForLoop(var, start, end, self.scoped(body, (var,)))
+            case BufferLoop(buf, var, body):
+                return BufferLoop(buf, var, self.scoped(body, (var,)))
+            case NumberedStatement(stmt, sid):
+                result = NumberedStatement(self.rewrite(stmt, sid), sid)
+                # an assignment declares its variable only after it runs
+                match stmt:
+                    case Assign(Variable(name, _) as var, _) if not any(
+                        name in scope for scope in self.scopes
+                    ):
+                        self.scopes[-1][name] = var
+                return result
+        return node
+
+    def rewrite(self, stmt: AssemblyStatement, sid: int) -> AssemblyStatement:
+        state = self.states.get(sid)
+        if state is None or _is_impure(stmt):
+            return stmt
+        vns: dict[int, int] = {}
+        self.ctx.step(NumberedStatement(stmt, sid), dict(state), vns)
+
+        # visible scalar variables by vn, outer and earlier ones first
+        candidates: dict[int, list[Variable]] = {}
+        for scope in self.scopes:
+            for name, var in scope.items():
+                vn = state.get(("var", name))
+                if vn is not None and _is_scalar(var.result_type):
+                    candidates.setdefault(vn, []).append(var)
+
+        def replace(node, exclude=None):
+            match node:
+                case Call(op, args):
+                    for var in candidates.get(vns.get(id(node), -1), ()):
+                        if var != exclude and var.type == self.ctx.result_type(node):
+                            return var
+                    new_args = tuple(replace(arg) for arg in args)
+                    if any(
+                        new is not old for new, old in zip(new_args, args, strict=True)
+                    ):
+                        return Call(op, new_args)
+            return node
+
+        match stmt:
+            case Assign(lhs, rhs):
+                return Assign(lhs, replace(rhs, exclude=lhs))
+            case Store(buf, idx, val):
+                return Store(buf, replace(idx), replace(val))
+            case Resize(buf, size):
+                return Resize(buf, replace(size))
+            case SetAttr(obj, attr, val):
+                return SetAttr(obj, attr, replace(val))
+            case Return(arg):
+                return Return(replace(arg))
+            case Assert(exp):
+                return Assert(replace(exp))
+        return stmt
