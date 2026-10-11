@@ -9,6 +9,7 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
+from .global_value_numbering import AssemblyGlobalValueNumbering
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .nodes import (
     AssemblyExpression,
@@ -56,6 +57,7 @@ __all__ = [
     "AssemblyCFGBuilder",
     "AssemblyCopyPropagation",
     "AssemblyExpression",
+    "AssemblyGlobalValueNumbering",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyKernel",

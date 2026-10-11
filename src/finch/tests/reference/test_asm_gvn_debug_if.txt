@@ -1,0 +1,46 @@
+ENTRY_0: #succs=[if_else_2]
+
+EXIT_1: #succs=[]
+
+if_else_2: #succs=[if_else_4, if_else_5]
+    [0] a: finch.int64 = 5 	# a = %0
+
+if_else_3: #succs=[EXIT_1]
+
+if_else_4: #succs=[if_else_6]
+    [5] assert(eq(a, 5)) 	# eq(a, 5) = %1
+    [1] a: finch.int64 = add(a, 10) 	# a = %3
+
+if_else_5: #succs=[if_else_6]
+    [6] assert(not_(eq(a, 5))) 	# not_(eq(a, 5)) = %4
+
+if_else_6: #succs=[if_else_7, if_else_8]
+
+if_else_7: #succs=[if_else_9]
+    [7] assert(lt(a, 15)) 	# lt(a, 15) = %7
+    [2] a: finch.int64 = sub(a, 3) 	# a = %9
+
+if_else_8: #succs=[if_else_9]
+    [8] assert(not_(lt(a, 15))) 	# not_(lt(a, 15)) = %10
+    [3] a: finch.int64 = mul(a, 2) 	# a = %12
+
+if_else_9: #succs=[if_else_3]
+    [4] return a 	# a = %13
+
+if_else_10: #succs=[if_else_3]
+
+value numbers:
+%0 = np.int64(5)
+%1 = eq(%0, %0)
+%2 = np.int64(10)
+%3 = add(%0, %2)
+%4 = not_(%1)
+%5 = a@if_else_6
+%6 = np.int64(15)
+%7 = lt(%5, %6)
+%8 = np.int64(3)
+%9 = sub(%5, %8)
+%10 = not_(%7)
+%11 = np.int64(2)
+%12 = mul(%5, %11)
+%13 = a@if_else_9
