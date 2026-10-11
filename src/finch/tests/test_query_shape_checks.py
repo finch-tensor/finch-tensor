@@ -48,7 +48,7 @@ def tensor(values):
 
 
 def pointwise_plan():
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i = lgc.Field("i")
     rhs = lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.Table(a, (i,)), lgc.Table(b, (i,))))
     return lgc.Plan(
@@ -68,7 +68,7 @@ def pointwise_plan():
 
 
 def test_shared_dimensions_checked_before_declare(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     plan = pointwise_plan()
     output = tensor([99, 99, 99, 99])
     for a_size, b_size in ((2, 3), (3, 2), (0, 1), (1, 0)):
@@ -89,7 +89,7 @@ def test_shared_dimensions_checked_before_declare(executor):
 
 
 def test_reduced_dimensions_checked_even_with_empty_output(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i, j, k = (lgc.Field(name) for name in "ijk")
     plan = lgc.Plan(
         (
@@ -127,7 +127,7 @@ def test_reduced_dimensions_checked_even_with_empty_output(executor):
 
 @pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
 def test_query_into_checks_shared_fields_and_allows_broadcast(executor, op):
-    a, c = lgc.Alias("A"), lgc.Alias("C")
+    a, c = lgc.HardAlias("A"), lgc.HardAlias("C")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
@@ -155,7 +155,7 @@ def test_query_into_checks_shared_fields_and_allows_broadcast(executor, op):
 
 
 def test_empty_overwrite_reduction_still_checks_output_shape(executor):
-    a, c = lgc.Alias("A"), lgc.Alias("C")
+    a, c = lgc.HardAlias("A"), lgc.HardAlias("C")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
@@ -176,7 +176,7 @@ def test_empty_overwrite_reduction_still_checks_output_shape(executor):
 
 
 def test_shape_checks_use_current_definition(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i = lgc.Field("i")
     plan = lgc.Plan(
         (
@@ -208,7 +208,7 @@ def test_shape_checks_follow_loader_mode(mode):
         assert mode.safe and mode.debug
     else:
         compiler = LogicCompiler(NotationCompiler(asm.AssemblyInterpreter(), mode=mode))
-    bindings = {lgc.Alias(name): tensor([1, 2]).ftype for name in "ABC"}
+    bindings = {lgc.HardAlias(name): tensor([1, 2]).ftype for name in "ABC"}
     program = compiler.ctx_lower(pointwise_plan(), bindings, {}, None)
     checks = [node for node in PostOrderDFS(program) if isinstance(node, ntn.Assert)]
     assert len(checks) == int(mode.safe or mode.debug)
