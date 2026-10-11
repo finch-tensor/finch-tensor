@@ -213,9 +213,10 @@ def check_accuracy_results(obtained_filename: Path, expected_filename: Path):
     obtained = json.loads(obtained_filename.read_text())
     # Large estimates can differ beyond six decimal places through roundoff.
     # Keep integer counts and metadata exact while comparing floats numerically.
+    # julia package updates move large estimates by ~1e-12 relative, so allow 1e-9
     expected = json.loads(
         expected_filename.read_text(),
-        parse_float=lambda value: pytest.approx(float(value), rel=1e-12, abs=1e-6),
+        parse_float=lambda value: pytest.approx(float(value), rel=1e-9, abs=1e-6),
     )
     assert obtained == expected
 
