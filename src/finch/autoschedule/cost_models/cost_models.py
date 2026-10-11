@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import TypeVar
 
 import numpy as np
@@ -63,11 +63,16 @@ class CostModel(Form):
         features = self.get_features(term, bindings, stats, stats_factory)
         return float(np.dot(self.coefficients, features))
 
-class MultiCostModel(CostModel):
-    """A cost model that sums the costs of its sub-statements."""
 
-    def __init__(self, *submodels):
+class MultiCostModel(CostModel):
+    """A cost model that sums the costs of its submodels."""
+
+    def __init__(self, *submodels: CostModel):
         self.submodels = submodels
+
+    def validate_inputs(self, *inputs):
+        for model in self.submodels:
+            model.validate_inputs(*inputs)
 
     def get_features(
         self,
@@ -76,10 +81,15 @@ class MultiCostModel(CostModel):
         stats: Mapping[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> np.ndarray:
-        return np.concatenate([model.get_features(term, bindings, stats, stats_factory) for model in self.submodels])
+        return np.concatenate(
+            [
+                model.get_features(term, bindings, stats, stats_factory)
+                for model in self.submodels
+            ]
+        )
 
     @property
-    def coefficients(self):
+    def coefficients(self) -> np.ndarray:
         return np.concatenate([model.coefficients for model in self.submodels])
 
 
@@ -90,23 +100,19 @@ class LoopCostModel(CostModel):
     def get_prefix_features(
         self,
         prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray: ...
 
     def predict_prefix_cost(
         self,
         prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
     ) -> float:
-        features = self.get_prefix_features(
-            prefix, exec_space, out_space, args, stats_factory
-        )
+        features = self.get_prefix_features(prefix, expr, machine, output_vars)
         return float(np.dot(self.coefficients, features))
 
     def get_features(
@@ -132,54 +138,47 @@ class LoopCostModel(CostModel):
                     return
                 case Produces():
                     return
-                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
+                case Query(Table(_, lhs_idxs), Table() as out):
                     idxs = lhs_idxs
-                    out = rhs
                 case Query(
-                    Table(Alias() as lhs, lhs_idxs),
-                    Aggregate(_, _, Reorder(_, idxs) as rhs, _) as out,
+                    Table(_, lhs_idxs),
+                    Aggregate(_, _, Reorder(_, idxs), _) as out,
                 ):
                     pass
-                case QueryInto(
-                    Table(Alias() as lhs, lhs_idxs), _, Reorder(_, idxs) as rhs
-                ):
+                case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
                     out = stmt.as_query().rhs
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
-            exec_space = stats_interpreter(rhs)
-            args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
-            for node in PostOrderDFS(rhs):
-                match node:
-                    case Table(_, arg_idxs):
-                        arg_stats = stats_interpreter(node)
-                        for idx in arg_idxs:
-                            args[idx].append(arg_stats)
-            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
-            stats[lhs] = out_space
             for n in range(len(idxs) + 1):
                 features += self.get_prefix_features(
-                    idxs[:n], exec_space, out_space, args, stats_factory
+                    idxs[:n], out, stats_interpreter, lhs_idxs
                 )
+            stats_interpreter(stmt)
 
         visit_stmt(term)
         return features
 
-class MultiLoopCostModel(MultiCostModel):
-    """A cost model that sums the costs of its sub-statements."""
 
-    def __init__(self, *submodels):
-        self.submodels = submodels
+class MultiLoopCostModel(LoopCostModel, MultiCostModel):
+    """A loop cost model that sums the costs of its submodels."""
+
+    def __init__(self, *submodels: LoopCostModel):
+        self.submodels: tuple[LoopCostModel, ...] = submodels
 
     def get_prefix_features(
         self,
         prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray:
-        return np.concatenate([model.get_prefix_features(prefix, exec_space, out_space, args, stats_factory) for model in self.submodels])
+        return np.concatenate(
+            [
+                model.get_prefix_features(prefix, expr, machine, output_vars)
+                for model in self.submodels
+            ]
+        )
 
 
 class FlopsCostModel(CostModel, AliasedForm):
@@ -284,22 +283,35 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
     def get_prefix_features(
         self,
         prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray:
         """Return the incremental features for an outermost-first loop prefix.
-
-        The statistics are unprojected: exec_space describes the query's RHS,
-        out_space describes its output in lhs order, and args groups input Table
-        occurrences by field. They can be reused across candidate prefixes.
 
         A nonempty prefix charges its last index, projecting execution and
         output onto prefix[:-1], as in the inside-out calculation. The empty
         prefix charges the output's non-fill values once. Summing all prefixes,
         including the empty one, gives the query's features.
         """
+        stats_factory = machine.stats_factory
+        match expr:
+            case Aggregate(arg=arg):
+                pass
+            case _:
+                arg = expr
+        out_space = machine(expr)
+        if output_vars is not None:
+            reduce_idxs = tuple(
+                idx for idx in out_space.index_order if idx not in output_vars
+            )
+            if reduce_idxs:
+                out_space = stats_factory.copy(out_space)
+                out_space.fill_value = StaticFill(False)
+                out_space = stats_factory.aggregate(
+                    ffuncs.or_, False, reduce_idxs, out_space
+                )
+            out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
             return np.array([0.0, 0.0, out_space.estimate_non_fill_values()])
 
@@ -316,8 +328,12 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
 
         parent = set(prefix[:-1])
         idx = prefix[-1]
-        exec_space = project(exec_space)
-        inputs = [support(stat) for stat in args.get(idx, ())]
+        exec_space = project(machine(arg))
+        inputs = []
+        for node in PostOrderDFS(arg):
+            match node:
+                case Table(_, idxs) if idx in idxs:
+                    inputs.append(support(machine(node)))
         iter_space = exec_space
         if inputs:
             iter_space = stats_factory.mapjoin(
@@ -335,7 +351,6 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         )
 
 
-
 class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     """
     Count dense and sparse transposed entries, charging each input once per query.
@@ -351,22 +366,31 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     def get_prefix_features(
         self,
         prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
+        expr: LogicExpression,
+        machine: StatsMachine[NS],
+        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray:
         """Charge only the input transpositions newly forced by this prefix.
 
-        Repeated occurrences of an input share the same statistics object in
-        args. Comparing with the parent prefix avoids charging it again at
-        deeper loop levels. Empty prefixes have no transposition cost.
+        Deduplicate input tables within this prefix. Comparing with the parent
+        prefix avoids charging them again at deeper loop levels. Empty prefixes
+        have no transposition cost.
         """
         features = np.zeros(len(self.coefficients))
         if not prefix:
             return features
 
-        for stat in set(args.get(prefix[-1], ())):
+        match expr:
+            case Aggregate(arg=arg):
+                pass
+            case _:
+                arg = expr
+        for node in set(PostOrderDFS(arg)):
+            match node:
+                case Table(_, idxs) if prefix[-1] in idxs:
+                    stat = machine(node)
+                case _:
+                    continue
             order = stat.index_order
             parent = tuple(idx for idx in prefix[:-1] if idx in order)
             if parent == order[: len(parent)] and prefix[-1] != order[len(parent)]:
@@ -375,4 +399,3 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
                 dense = 0 < space < float("inf") and nnz / space > 0.1
                 features[0 if dense else 1] += nnz
         return features
-

@@ -6,7 +6,12 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule.cost_models import PigeonCostModel, TransposeCostModel
+from finch.autoschedule.cost_models import (
+    MultiCostModel,
+    MultiLoopCostModel,
+    PigeonCostModel,
+    TransposeCostModel,
+)
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
@@ -159,11 +164,9 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
         ),
     }
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
+    expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
     machine = StatsMachine(sf, dict(stats))
-    exec_space = machine(arg)
-    out_space = sf.aggregate(ffuncs.add, 0.0, (j,), exec_space)
-    args = {i: [stats[a]], j: [stats[a], stats[b]], k: [stats[b]]}
-    spaces = [exec_space, out_space, *stats.values()]
+    spaces = list(stats.values())
     original_fills = [stat.fill_value for stat in spaces]
     original_idxs = [stat.index_order for stat in spaces]
 
@@ -171,18 +174,18 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     for order, original_features in zip(
         itertools.permutations((i, j, k)), expected, strict=True
     ):
-        output = sf.reorder(out_space, tuple(idx for idx in order if idx != j))
+        out_idxs = tuple(idx for idx in order if idx != j)
         prefixes = [order[:n] for n in range(len(order) + 1)]
         features = sum(
-            model.get_prefix_features(prefix, exec_space, output, args, sf)
+            model.get_prefix_features(prefix, expr, machine, out_idxs)
             for prefix in prefixes
         )
         cost = sum(
-            model.predict_prefix_cost(prefix, exec_space, output, args, sf)
+            model.predict_prefix_cost(prefix, expr, machine, out_idxs)
             for prefix in prefixes
         )
         query = Query(
-            Table(out, output.index_order),
+            Table(out, out_idxs),
             Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
         )
 
@@ -202,15 +205,18 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     sf = factory()
     model = PigeonCostModel()
     i = Field("i")
-    scalar = sf(fl.asarray(np.ones(())), ())
-    broadcast = sf.reorder(scalar, (i,))
+    a = Alias("a")
+    stats = {a: sf(fl.asarray(np.ones(())), ())}
+    scalar = Table(a, ())
+    broadcast = Reorder(scalar, (i,))
+    machine = StatsMachine(sf, dict(stats))
 
     np.testing.assert_array_equal(
-        model.get_prefix_features((), scalar, scalar, {}, sf), [0, 0, 1]
+        model.get_prefix_features((), scalar, machine), [0, 0, 1]
     )
-    assert model.predict_prefix_cost((), scalar, scalar, {}, sf) == 10
+    assert model.predict_prefix_cost((), scalar, machine) == 10
     np.testing.assert_array_equal(
-        model.get_prefix_features((i,), broadcast, broadcast, {}, sf), [1, 0, 1]
+        model.get_prefix_features((i,), broadcast, machine), [1, 0, 1]
     )
 
 
@@ -260,9 +266,8 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
     }
     a_table, b_table = Table(a, (i, j)), Table(b, (j, k))
     arg = MapJoin(Literal(ffuncs.mul), (a_table, a_table, b_table))
-    exec_space = StatsMachine(sf, dict(stats))(arg)
-    out_space = sf.aggregate(ffuncs.add, 0.0, (i, j, k), exec_space)
-    args = {i: [stats[a], stats[a]], j: [stats[a], stats[a], stats[b]], k: [stats[b]]}
+    expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (i, j, k))
+    machine = StatsMachine(sf, dict(stats))
     original_fills = [stat.fill_value for stat in stats.values()]
 
     for order in itertools.permutations((i, j, k)):
@@ -270,7 +275,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
             6 if order.index(k) < order.index(j) else 0
         )
         cost = sum(
-            model.predict_prefix_cost(order[:n], exec_space, out_space, args, sf)
+            model.predict_prefix_cost(order[:n], expr, machine)
             for n in range(len(order) + 1)
         )
         query = Query(
@@ -322,3 +327,27 @@ def test_transpose_cost_model_dependent_queries(factory):
     )
     assert model.predict_cost(plan, bindings, stats, sf) == 6
     assert set(stats) == {a}
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+@pytest.mark.parametrize("composite", [MultiCostModel, MultiLoopCostModel])
+def test_multi_cost_model_sums_submodels(factory, composite):
+    sf = factory()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    tensor = fl.asarray(np.ones((2, 3)))
+    stats = {a: sf(tensor, (i, j))}
+    bindings = {a: tensor.ftype}
+    plan = Plan((Query(Table(out, (j, i)), Table(a, (i, j))), Produces((out,))))
+    models = (PigeonCostModel(), TransposeCostModel())
+    model = composite(*models)
+    model.validate_inputs(plan, bindings, stats, sf)
+
+    np.testing.assert_array_equal(model.coefficients, [1, 1, 10, 0.5, 60])
+    np.testing.assert_allclose(
+        model.get_features(plan, bindings, stats, sf),
+        np.concatenate([sub.get_features(plan, bindings, stats, sf) for sub in models]),
+    )
+    assert model.predict_cost(plan, bindings, stats, sf) == pytest.approx(
+        sum(sub.predict_cost(plan, bindings, stats, sf) for sub in models)
+    )
