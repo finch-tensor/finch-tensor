@@ -287,7 +287,8 @@ class CompilerForm(FormattedForm):
     order. Tables in a MapJoin must also follow loop order, but a single Table
     argument may have a different storage order, as in a copy. Fields absent
     from lhs_idxs are reduced with op. Every alias must have a TensorFType in
-    the bindings, and a statement can't read the alias it writes.
+    the bindings, and a statement can't read the alias it writes. Definitions
+    may change dimension sizes but must preserve the allocated tensor's rank.
     """
 
     @classmethod
@@ -309,12 +310,14 @@ class CompilerForm(FormattedForm):
                 raise ValueError("The last body of a plan must be a Produces node.")
         for body in bodies:
             match body:
-                case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
-                    Table(Alias() as lhs, _), _, rhs
+                case Query(Table(Alias() as lhs, idxs), rhs) | QueryInto(
+                    Table(Alias() as lhs, idxs), _, rhs
                 ):
                     pass
                 case _:
                     raise ValueError(f"CompilerForm only allows queries, not {body}")
+            if len(idxs) != bindings[lhs].ndim:
+                raise ValueError(f"Cannot change the rank of allocated tensor {lhs}.")
             if lhs in PostOrderDFS(rhs):
                 raise ValueError(
                     f"{type(body).__name__} can't both read and write {lhs}."

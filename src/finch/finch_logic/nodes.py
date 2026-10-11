@@ -113,8 +113,8 @@ entities that index the dimensions of a tensor. This naming convention helps
 clarify the relationships between different tensors and their dimensions during
 operations such as mapping, aggregation, reordering, and relabeling.
 
-Fields may not be used to represent different dimension sizes within the same
-logic program.
+Fields represent matching dimension sizes within an expression. Redefining an
+alias may change those sizes for subsequent statements.
 
 Tables may be referenced using "aliases", which are symbolic names that refer to
 specific tables within the program. Evaluators for Finch logic may accept a list
@@ -860,12 +860,7 @@ class Query(LogicTree, LogicStatement):
         will be stored in the dictionary passed to the method."""
         var = self.lhs.tns
         assert isinstance(var, Alias)
-        dims = Reorder(self.rhs, self.lhs.idxs).dimmap(op, dim_bindings)
-        if var in dim_bindings:
-            for dim1, dim2 in zip(dims, dim_bindings[var], strict=True):
-                op(dim1, dim2)
-        else:
-            dim_bindings[var] = dims
+        dim_bindings[var] = Reorder(self.rhs, self.lhs.idxs).dimmap(op, dim_bindings)
         return dim_bindings
 
     def infer_valmap(
@@ -895,10 +890,11 @@ class QueryInto(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that updates the table `lhs` in place,
     using the reduction operator `op` to fold each element of `rhs` into the
-    matching element of `lhs`. The alias `lhs.tns` must already be bound. The
-    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, and `rhs`
-    is broadcast over the fields of `lhs` which it lacks, so a `QueryInto` is
-    equivalent to the aggregate which starts from `lhs`,
+    matching element of `lhs`. The alias `lhs.tns` must already be bound, and
+    its shape is preserved. The fields of `rhs` which are not in `lhs.idxs`
+    are reduced with `op`, and `rhs` is broadcast over the fields of `lhs`
+    which it lacks, so a `QueryInto` is equivalent to the aggregate which
+    starts from `lhs`,
     `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
 
     Attributes:
@@ -928,7 +924,13 @@ class QueryInto(LogicTree, LogicStatement):
     ) -> dict[Alias, tuple[T | None, ...]]:
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.as_query().infer_dimmap(op, dim_bindings)
+        var = self.lhs.tns
+        assert isinstance(var, Alias)
+        previous = dim_bindings[var]
+        dims = Reorder(self.as_query().rhs, self.lhs.idxs).dimmap(op, dim_bindings)
+        for old, new in zip(previous, dims, strict=True):
+            op(old, new)
+        return dim_bindings
 
     def infer_valmap(
         self,
