@@ -2270,7 +2270,7 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     def is_identity(self, val):
         return is_static(self.fill_type) and builtins.bool(
-            np.all(same(val, self.fill_type.value))
+            same(val, self.fill_type.value)
         )
 
     def return_type(self, *args: FType) -> FType:
@@ -2421,7 +2421,7 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     def is_identity(self, val: Any) -> builtins.bool:
         return is_static(self.fill_type) and builtins.bool(
-            np.all(same(val, self.fill_type.value))
+            same(val, self.fill_type.value)
         )
 
     def init_value(self, type_: FType) -> Any:
@@ -2443,7 +2443,6 @@ class _Choose(FinchOperator):
         return (
             isinstance(other, _Choose)
             and self.fill == other.fill
-            and builtins.bool(np.all(same(self.fill_value, other.fill_value)))
         )
 
     def __hash__(self):

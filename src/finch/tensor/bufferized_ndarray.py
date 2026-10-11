@@ -459,10 +459,6 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     def ndim(self) -> int:
         return int(self._ndim)
 
-    @ndim.setter
-    def ndim(self, val):
-        self._ndim = val
-
     @property
     def fill_type(self) -> AbstractFillFType:
         return self._fill_type

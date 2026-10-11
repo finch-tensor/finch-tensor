@@ -645,7 +645,8 @@ class AssemblyPrinterContext(Context):
             case GetAttr(obj, attr):
                 return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
-                return f"setattr({obj}, {attr})"
+                self.exec(f"{feed}setattr({self(obj)}, {self(attr)}, {self(val)})")
+                return None
             case Call(lit, args):
                 call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
                 if emit_calls:

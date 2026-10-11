@@ -147,7 +147,7 @@ class Scalar(OverrideTensor):
     def with_fill(self, fill_value: AbstractFill) -> Scalar:
         if is_dynamic(fill_value):
             return Scalar(self.val, fill_value=fill_value, device=self._device)
-        if not bool(np.all(ffuncs.same(fill_value.value, self.val))):
+        if not bool(ffuncs.same(fill_value.value, self.val)):
             raise NotImplementedError(
                 "a ConstantScalar's fill is its value, so a scalar of "
                 f"{self.val!r} cannot take the static fill {fill_value.value!r}"

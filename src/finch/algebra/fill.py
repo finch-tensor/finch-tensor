@@ -54,8 +54,8 @@ class AbstractFillFType(FType, ABC):
 class StaticFillFType(AbstractFillFType):
     """
     The fill of a format which kernels may specialize on, so its value is part
-    of the format. Equality and hashing are by value, so formats with different
-    static fills are distinct and get distinct kernels.
+    of the format. Equality and hashing are by element type and value, so
+    formats with different static fills are distinct and get distinct kernels.
     """
 
     def __init__(self, value: Any) -> None:
@@ -82,14 +82,16 @@ class StaticFillFType(AbstractFillFType):
         # depends on this module.
         from .ffuncs import same
 
-        if not isinstance(other, StaticFillFType):
-            return False
-        return bool(np.all(same(self._value, other._value)))
+        return (
+            isinstance(other, StaticFillFType)
+            and self.element_type == other.element_type
+            and bool(same(self._value, other._value))
+        )
 
     def __hash__(self):
         from .ffuncs import samehash
 
-        return hash((StaticFillFType, samehash(self._value)))
+        return hash((StaticFillFType, self.element_type, samehash(self._value)))
 
     def __repr__(self):
         return f"StaticFillFType({self._value!r})"

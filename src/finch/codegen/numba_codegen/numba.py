@@ -523,9 +523,15 @@ def _deserialize_asm_struct_from_numba(
 ) -> None:
     for i, (name, field) in enumerate(fmt.struct_fields):
         value = getattr(numba_struct, name) if fmt.is_mutable else numba_struct[i]
-        deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
-        if fmt.is_mutable:
-            fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+        match field:
+            case NumbaArgumentFType() | MutableStructFType():
+                # Buffers and mutable structs are updated in place.
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                # Immutable fields of a mutable struct are replaced.
+                fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+            case _:
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
 
 
 def struct_construct_from_numba(fmt: StructFType, numba_struct):

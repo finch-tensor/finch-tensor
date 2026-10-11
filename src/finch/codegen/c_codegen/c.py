@@ -1203,9 +1203,15 @@ def deserialize_struct_from_c(fmt: StructFType, obj, c_struct: Any) -> None:
         c_struct = c_struct.contents
     for name, field in fmt.struct_fields:
         value = getattr(c_struct, name) if c_type(field) is not None else None
-        deserialize_from_c(field, fmt.struct_getattr(obj, name), value)
-        if fmt.is_mutable:
-            fmt.struct_setattr(obj, name, construct_from_c(field, value))
+        match field:
+            case CArgumentFType() | MutableStructFType():
+                # Buffers and mutable structs are updated in place.
+                deserialize_from_c(field, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                # Immutable fields of a mutable struct are replaced.
+                fmt.struct_setattr(obj, name, construct_from_c(field, value))
+            case _:
+                deserialize_from_c(field, fmt.struct_getattr(obj, name), value)
 
 
 def construct_from_c(fmt: FType, c_obj: Any) -> Any:
