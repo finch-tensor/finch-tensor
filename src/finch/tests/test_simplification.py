@@ -7,7 +7,15 @@ from finch import ConstantScalar, Scalar
 from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
-from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
+from finch.algebra import (
+    FinchOperator,
+    bool_,
+    ffuncs,
+    float64,
+    ftype,
+    int64,
+    is_commutative,
+)
 from finch.autoschedule import (
     CompilerFormLowerer,
     DefaultLogicFactorizer,
@@ -478,3 +486,88 @@ def test_try_evaluate_declines_runtime_failures():
         (ffuncs.truediv, (np.float64(1.0), np.float64(0.0))),
     ]:
         assert try_evaluate(lit(op), tuple(lit(arg) for arg in args)) is None
+
+
+def _asm_module(args, *body, ret=int64):
+    func_t = asm.AssemblyKernelFType(
+        "f", tuple(arg.result_type for arg in args), ret, definition="f"
+    )
+    return asm.Module(
+        (asm.Function(asm.Variable("f", func_t), tuple(args), asm.Block(body)),)
+    )
+
+
+def test_assembly_simplify_keeps_failing_folds():
+    pow_call = asm.Call(
+        asm.Literal(ffuncs.pow), (asm.Literal(np.int64(2)), asm.Literal(np.int64(-1)))
+    )
+    prgm = _asm_module((), asm.Return(pow_call))
+    assert AssemblySimplify()(prgm) == prgm
+
+
+def test_assembly_simplify_folds_branches():
+    a = asm.Variable("a", int64)
+    x = asm.Variable("x", int64)
+    i = asm.Variable("i", int64)
+
+    def lit(val):
+        return asm.Literal(np.int64(val))
+
+    prgm = _asm_module(
+        (a,),
+        asm.Assign(x, lit(0)),
+        asm.If(asm.Literal(False), asm.Assign(x, lit(1))),
+        asm.WhileLoop(asm.Literal(np.False_), asm.Assign(x, lit(2))),
+        asm.ForLoop(i, lit(3), lit(1), asm.Assign(x, lit(3))),
+        asm.IfElse(
+            asm.Literal(True),
+            asm.Block((asm.Assign(x, a),)),
+            asm.Block((asm.Assign(x, lit(4)),)),
+        ),
+        asm.If(
+            asm.Call(asm.Literal(ffuncs.eq), (a, a)),
+            asm.Assign(x, asm.Call(asm.Literal(ffuncs.add), (x, lit(1)))),
+        ),
+        asm.Return(x),
+    )
+    expected = _asm_module(
+        (a,),
+        asm.Assign(x, lit(0)),
+        asm.Assign(x, a),
+        asm.Assign(x, asm.Call(asm.Literal(ffuncs.add), (lit(1), x))),
+        asm.Return(x),
+    )
+    result = AssemblySimplify()(prgm)
+    assert result == expected
+    for module in (prgm, result):
+        assert AssemblyInterpreter()(module).f(np.int64(6)) == 7
+
+
+def test_assembly_simplify_keeps_scopes_nan_and_effects():
+    """
+    an if(true) body that declares a later-used name stays, as does
+    if(x == x) on floats and an empty if whose condition may have effects.
+    """
+    t = asm.Variable("t", int64)
+    y = asm.Variable("y", float64)
+
+    class Bump(FinchOperator):
+        @property
+        def ftype(self):
+            return ffuncs.lt.ftype
+
+        def __call__(self, *args):
+            return ffuncs.lt(*args)
+
+    prgm = _asm_module(
+        (y,),
+        asm.If(asm.Literal(True), asm.Assign(t, asm.Literal(np.int64(1)))),
+        asm.If(
+            asm.Call(asm.Literal(ffuncs.eq), (y, y)),
+            asm.Assign(t, asm.Literal(np.int64(2))),
+        ),
+        asm.If(asm.Call(asm.Literal(Bump()), (y, y)), asm.Block(())),
+        asm.Assign(t, asm.Literal(np.int64(3))),
+        asm.Return(t),
+    )
+    assert AssemblySimplify()(prgm) == prgm

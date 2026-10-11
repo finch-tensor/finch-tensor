@@ -98,7 +98,8 @@ def canonicalize_associative(node: Term) -> Term | None:
                     LiteralTerm() as k1,
                     CallTerm(op=inner, args=(LiteralTerm() as k2, y)),
                 ) if inner == op and isinstance(op, LiteralTerm):
-                    return _call_like(node, [_evaluate(op, (k1, k2)), y])
+                    folded = try_evaluate(op, (k1, k2))
+                    return None if folded is None else _call_like(node, [folded, y])
                 case (
                     CallTerm(op=inner, args=(LiteralTerm() as k, x)),
                     y,
@@ -140,11 +141,13 @@ def fold_literals(node: Term) -> Term | None:
       call disappears, so this is sound for any operator.
     - `f(a..., x, y, b...)` => `f(a..., f(x, y), b...)` folds adjacent
       literal pairs of an associative n-ary `f`.
+
+    nothing is folded if evaluating would raise or warn, that's left to runtime.
     """
     match node:
         case CallTerm(op=LiteralTerm() as op, args=args) if args:
             if all(isinstance(arg, LiteralTerm) for arg in args):
-                return _evaluate(op, args)
+                return try_evaluate(op, args)
             op_type = op.result_type
             if not (
                 isinstance(op_type, FinchOperatorFType)
@@ -157,9 +160,13 @@ def fold_literals(node: Term) -> Term | None:
             on_run = False
             for x in args:
                 if isinstance(x, LiteralTerm):
-                    running_literal = (
-                        x if not on_run else _evaluate(op, (running_literal, x))
-                    )
+                    if on_run:
+                        folded = try_evaluate(op, (running_literal, x))
+                        if folded is None:
+                            return None
+                        running_literal = folded
+                    else:
+                        running_literal = x
                     on_run = True
                 else:
                     if on_run:
