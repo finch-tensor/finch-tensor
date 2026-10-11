@@ -20,6 +20,7 @@ from .global_value_numbering import (
     assembly_global_value_numbering,
 )
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
+from .liveness import AssemblyLiveVariables
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
@@ -76,6 +77,7 @@ __all__ = [
     "AssemblyKernel",
     "AssemblyKernelFType",
     "AssemblyLibrary",
+    "AssemblyLiveVariables",
     "AssemblyLoader",
     "AssemblyNode",
     "AssemblyReachingDefinitions",
