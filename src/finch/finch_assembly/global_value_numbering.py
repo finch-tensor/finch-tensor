@@ -39,15 +39,20 @@ analysis terminates. never key a phi on its incoming vns instead, or
 
 from collections.abc import Iterable, Sequence
 
-import numpy as np
-
-from finch.algebra import FType, SingletonOperatorFType, StructFType, ffuncs
-from finch.algebra.ftypes import FDType
-from finch.symbolic import BasicBlock, ControlFlowGraph, PostOrderDFS, UnvalidatedForm
+from finch.algebra import FType, StructFType
+from finch.symbolic import BasicBlock, ControlFlowGraph, UnvalidatedForm
 from finch.util import qual_str
 
 from .cfg_builder import NumberedStatement
-from .dataflow import AbstractAssemblyDataflow, assembly_dataflow_run
+from .dataflow import (
+    AbstractAssemblyDataflow,
+    assembly_dataflow_run,
+    has_effects,
+    is_scalar_type,
+    literal_key,
+    pure_op_key,
+    root_of,
+)
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
@@ -101,56 +106,14 @@ _STRUCT = ("mem", "struct")
 _MEMORY = (_HEAP, _STRUCT)
 
 
-def _const_key(val) -> tuple | None:
-    match val:
-        case bool() | int():
-            return ("const", type(val), val)
-        case float() | complex() | np.number() | np.bool_():
-            return ("const", type(val), np.asarray(val).tobytes())
-    return None
-
-
-def _op_key(op) -> object | None:
-    """key of a pure operator, or None if calling `op` may have effects"""
-    # user-defined finch operators can mutate their arguments, `ffuncs` ones don't
-    if type(op).__module__ != ffuncs.__name__:
-        return None
-    match op.ftype:
-        case SingletonOperatorFType() as op_type:
-            return op_type
-    # e.g. `choose(0.0) == choose(-0.0)`, so key by identity
-    return ("id", id(op))
-
-
-def _is_scalar(type_: FType | None) -> bool:
-    match type_:
-        case StructFType():
-            return False
-        case FDType():
-            return True
-    return False
-
-
 def _root_key(node: AssemblyExpression) -> tuple | None:
     """state key of the variable or slot under a getattr chain"""
-    match node:
-        case GetAttr(obj, _):
-            return _root_key(obj)
+    match root_of(node):
         case Variable(name, _):
             return ("var", name)
         case Slot(name, _):
             return ("slot", name)
     return None
-
-
-def _is_impure(stmt: AssemblyNode) -> bool:
-    for node in PostOrderDFS(stmt):
-        match node:
-            case Call(Literal(op), _) if _op_key(op) is not None:
-                pass
-            case Call():
-                return True
-    return False
 
 
 class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
@@ -209,7 +172,7 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                 pass
             case _:
                 sid = None
-        if _is_impure(stmt):
+        if has_effects(stmt):
             # nothing is numbered in a statement with unknown effects
             match stmt:
                 case Assign(Variable(name, _), _):
@@ -265,7 +228,7 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
         vn = None
         match node:
             case Literal(val):
-                key = _const_key(val)
+                key = literal_key(val)
                 if key is not None:
                     vn = self.number(key, repr(val))
             case Variable(name, _):
@@ -274,15 +237,15 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                 vn = self.read(state, ("slot", name), sid)
             case Call(Literal(op), args):
                 arg_vns = [self.eval(arg, state, sid, vns) for arg in args]
-                op_key = _op_key(op)
+                op_key = pure_op_key(op)
                 if (
                     op_key is not None
                     and None not in arg_vns
-                    and _is_scalar(self.result_type(node))
+                    and is_scalar_type(self.result_type(node))
                 ):
                     key: tuple = ("call", op_key, tuple(arg_vns))
                     label = f"{qual_str(op)}({', '.join(f'%{x}' for x in arg_vns)})"
-                    if not all(_is_scalar(self.result_type(arg)) for arg in args):
+                    if not all(is_scalar_type(self.result_type(arg)) for arg in args):
                         # e.g. `scansearch` reads its buffer argument
                         key += (self.read(state, _HEAP, sid),)
                         key += (self.read(state, _STRUCT, sid),)
@@ -440,7 +403,7 @@ class _GVNRewriter:
 
     def rewrite(self, stmt: AssemblyStatement, sid: int) -> AssemblyStatement:
         state = self.states.get(sid)
-        if state is None or _is_impure(stmt):
+        if state is None or has_effects(stmt):
             return stmt
         vns: dict[int, int] = {}
         self.ctx.step(NumberedStatement(stmt, sid), dict(state), vns)
@@ -450,7 +413,7 @@ class _GVNRewriter:
         for scope in self.scopes:
             for name, var in scope.items():
                 vn = state.get(("var", name))
-                if vn is not None and _is_scalar(var.result_type):
+                if vn is not None and is_scalar_type(var.result_type):
                     candidates.setdefault(vn, []).append(var)
 
         def replace(node, exclude=None):

@@ -10,6 +10,8 @@ FinchNotation (`Call`), and FinchAssembly (`Call`).
 import math
 from collections.abc import Sequence
 
+import numpy as np
+
 from finch.algebra import (
     CallableFType,
     FinchOperatorFType,
@@ -42,6 +44,15 @@ def _evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm:
     assert isinstance(op_type, CallableFType)
     result = return_type(op_type, *(ftype(val) for val in vals))
     return op.make_term(op.head(), result(op.val(*vals)))
+
+
+def try_evaluate(op: LiteralTerm, args: Sequence[Term]) -> LiteralTerm | None:
+    """`_evaluate`, or None if evaluating would raise or warn at runtime"""
+    try:
+        with np.errstate(all="raise"):
+            return _evaluate(op, args)
+    except (ArithmeticError, TypeError, ValueError):
+        return None
 
 
 def canonicalize_associative(node: Term) -> Term | None:
