@@ -1,3 +1,5 @@
+import pytest
+
 import numpy as np
 
 import finch as fl
@@ -8,6 +10,7 @@ from finch.autoschedule.formatter.smart_formatter import (
     StorageCostFormatter,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Alias,
     Field,
@@ -18,6 +21,16 @@ from finch.finch_logic import (
     Query,
     Table,
 )
+
+
+def _format_matrix(formatter, matrix, fill_value):
+    i, j = Field("i"), Field("j")
+    A = Alias("A")
+    query = Query(Table(A, (i, j)), Table(Literal(fl.asarray(matrix)), (i, j)))
+    machine = StatsMachine(DCStatsFactory(), {})
+    machine(query)
+    shape_type = tuple(fl.ftype(np.intp) for _ in matrix.shape)
+    return formatter.get_tensor_ftype(A, query, machine, fill_value, shape_type)
 
 
 def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
@@ -53,18 +66,10 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
 
 
 def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
-    i, j = Field("i"), Field("j")
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
-    stats_factory = DCStatsFactory()
-    stats = stats_factory(fl.asarray(matrix), (i, j))
-
-    formatter = StorageCostFormatter()
-    formatter._stats_factory = stats_factory
-    ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
-    )
+    ftype = _format_matrix(StorageCostFormatter(), matrix, np.float64(0.0))
 
     assert isinstance(ftype, fl.FiberTensorFType)
     assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
@@ -73,28 +78,17 @@ def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
 
 
 def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
-    i, j = Field("i"), Field("j")
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
-    stats_factory = DCStatsFactory()
-    stats = stats_factory(fl.asarray(matrix), (i, j))
-
-    formatter = IterCostFormatter()
-    formatter._stats_factory = stats_factory
-    ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
-    )
+    ftype = _format_matrix(IterCostFormatter(), matrix, np.float64(0.0))
 
     assert isinstance(ftype, fl.FiberTensorFType)
     assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
 
 
-def _cost_output_pattern(formatter_cls, stats, stats_factory):
-    formatter = formatter_cls()
-    formatter._stats_factory = stats_factory
-    shape_type = tuple(fl.ftype(np.intp) for _ in stats.index_order)
-    ftype = formatter.get_tensor_ftype(stats.fill_value, shape_type, stats)
+def _cost_output_pattern(formatter_cls, matrix):
+    ftype = _format_matrix(formatter_cls(), matrix, np.float64(0.0))
 
     lvl = ftype.lvl_t
     pattern = []
@@ -111,21 +105,43 @@ def _cost_output_pattern(formatter_cls, stats, stats_factory):
 
 
 def test_check_expected_pattern_using_storage_cost_formatter():
-    i, j = Field("i"), Field("j")
-    stats_factory = DCStatsFactory()
     dense_matrix = np.ones((4, 4))
     sparse_matrix = np.zeros((50, 50))
     sparse_matrix[0, 0] = 1
     sparse_matrix[49, 49] = 1
 
-    dense_stats = stats_factory(fl.asarray(dense_matrix), (i, j))
-    sparse_stats = stats_factory(fl.asarray(sparse_matrix), (i, j))
+    assert _cost_output_pattern(StorageCostFormatter, dense_matrix) == (
+        "dense",
+        "dense",
+    )
+    assert _cost_output_pattern(StorageCostFormatter, sparse_matrix) == (
+        "sparse_hash",
+        "sparse_hash",
+    )
 
-    assert _cost_output_pattern(StorageCostFormatter, dense_stats, stats_factory) == (
-        "dense",
-        "dense",
-    )
-    assert _cost_output_pattern(StorageCostFormatter, sparse_stats, stats_factory) == (
-        "sparse_hash",
-        "sparse_hash",
-    )
+
+@pytest.mark.parametrize(
+    "formatter_cls, expected",
+    [
+        (IterCostFormatter, [28, 9, 0]),
+        (StorageCostFormatter, [0, 10 * np.dtype(np.intp).itemsize, 40]),
+    ],
+)
+def test_format_cost_uses_depth_and_input_positions(formatter_cls, expected):
+    i, j = Field("i"), Field("j")
+    a = Alias("a")
+    tensor = fl.asarray(np.eye(3, 4, dtype=np.float64) * [1, 1, 0, 0])
+    query = Query(Table(a, (i, j)), Table(Literal(tensor), (i, j)))
+    machine = StatsMachine(DCStatsFactory())
+    machine(query)
+    model = formatter_cls().cost_model
+
+    costs = [
+        model.predict_format_cost(a, level, num_pos, key, query, machine)
+        for level, num_pos, key in (
+            (1, 7, "dense"),
+            (1, 7, "sparse_hash"),
+            (2, 5, None),
+        )
+    ]
+    np.testing.assert_allclose(costs, expected)

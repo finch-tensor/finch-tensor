@@ -1,96 +1,75 @@
 from __future__ import annotations
 
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from collections import OrderedDict
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
 from finch import finch_logic as lgc
 from finch.algebra import (
     AbstractFill,
     FType,
     TensorFType,
-    ffuncs,
     ftype,
     ftypes,
-    np_dtype,
+)
+from finch.autoschedule.cost_models import (
+    DenseLevelOption,
+    FormatCostModel,
+    SparseHashLevelOption,
 )
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
 from finch.finch_logic.tensor_stats import TensorStats
-from finch.tensor import dense, element, fiber_tensor, sparse_hash
-from finch.tensor.level import DenseLevelFType, SparseHashLevelFType
+from finch.tensor import FiberTensorFType, dense, element, fiber_tensor, sparse_hash
 from finch.util.logging import LOG_LOGIC_POST_OPT
 
 from .formatter import LogicFormatter
 
-if TYPE_CHECKING:
-    from finch.algebra import FiberTensorFType
-
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-def nnz_after(fields, stats, stats_factory, level):
-    reduce_fields = tuple(fields[level + 1 :])
-    if reduce_fields:
-        reduced = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
-    else:
-        reduced = stats
-    return reduced.estimate_non_fill_values()
+# Builders for the level options of a FormatCostModel.
+LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 
 
-def optimize_format(
-    fields,
-    shape_type,
-    stats,
-    stats_factory,
-    fill_value,
-    candidates,
-    leaf_cost_fn,
-):
+def optimize_format(alias, shape_type, machine, fill_value, cost_model, term):
+    stats = machine(alias)
+    fields = stats.index_order
     n = len(fields)
-    fill_ftype = ftype(fill_value)
-    leaf = element(fill_value, fill_ftype)
-    val_size = np_dtype(fill_ftype).itemsize
-    assert leaf.position_type is not None
-    pos_size = np_dtype(leaf.position_type).itemsize
-
-    # memoizing (l,nnz) : (best_cost,best_fmt)
+    leaf = element(fill_value, ftype(fill_value))
     memo = {}
 
     def rec(level, num_pos):
-        """
-        We are trying to keep this as :
-        def optimise_fmt(S,n,p):
-            d_cost = C(S,(D,optimise_fmt(S,n-1,p*n_l)))
-            s_cost = C(S,(D,optimise_fmt(S,n-1,q)))
-
-            if d_cost < s_cost :
-                return D, optimise_fmt(S,n-1,p*n_l)
-            else:
-                return D, optimise_fmt(S,n-1,q)
-        """
         if level == n:
-            return leaf_cost_fn(num_pos, val_size, pos_size), leaf
+            return (
+                cost_model.predict_format_cost(
+                    alias, level, num_pos, None, term, machine
+                ),
+                leaf,
+            )
 
         key = (level, num_pos)
         if key in memo:
             return memo[key]
 
         n_l = stats.get_dim_size(fields[level])
-        nnz_l = nnz_after(fields, stats, stats_factory, level)
+        nnz_l = cost_model.nnz_after(stats, machine.stats_factory, level)
 
         best_cost = None
         best_format = None
-        for option in candidates:
-            local = option.cost_fn(num_pos, n_l, nnz_l, val_size, pos_size)
+        for format_key, option in cost_model.formats.items():
+            local = cost_model.predict_format_cost(
+                alias, level, num_pos, format_key, term, machine
+            )
             child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
             if best_cost is None or total < best_cost:
                 best_cost, best_format = (
                     total,
-                    option.build(child_fmt, shape_type[level]),
+                    LEVEL_BUILDERS[format_key](child_fmt, shape_type[level]),
                 )
 
         memo[key] = (best_cost, best_format)
@@ -98,32 +77,6 @@ def optimize_format(
 
     _, fmt = rec(0, 1.0)
     return fmt
-
-
-def total_tree_cost(
-    lvl, fields, stats, stats_factory, num_pos, level, candidates, leaf_cost_fn
-):
-    val_size = np_dtype(ftype(lvl.fill_value)).itemsize
-    pos_size = np_dtype(ftype(lvl.position_type)).itemsize
-
-    if level == len(fields):
-        return leaf_cost_fn(num_pos, val_size, pos_size)
-
-    option = next(o for o in candidates if o.level_type is type(lvl))
-    n_l = stats.get_dim_size(fields[level])
-    nnz_l = nnz_after(fields, stats, stats_factory, level)
-    local_cost = option.cost_fn(num_pos, n_l, nnz_l, val_size, pos_size)
-    child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
-    return local_cost + total_tree_cost(
-        lvl.lvl_t,
-        fields,
-        stats,
-        stats_factory,
-        child_num_pos,
-        level + 1,
-        candidates,
-        leaf_cost_fn,
-    )
 
 
 TS = TypeVar("TS", bound=TensorStats)
@@ -235,104 +188,106 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
-class LevelOption(ABC):
-    level_type: type
-
-    @abstractmethod
-    def build(self, lvl, dim_type): ...
-
-    @abstractmethod
-    def next_num_pos(self, num_pos, n_l, nnz_l): ...
-    @abstractmethod
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size): ...
-
-
-class DenseLevelOption(LevelOption):
-    level_type = DenseLevelFType
-
-    def build(self, lvl, dim_type):
-        return dense(lvl, dim_type)
-
-    def next_num_pos(self, num_pos, n_l, nnz_l):
-        return num_pos * n_l
+# Level features are positions, slots, entries, position bytes, index bytes,
+# and value bytes.
+ITER_COST_MODEL = FormatCostModel(
+    {
+        "dense": DenseLevelOption((0, 1, 0, 0, 0, 0)),
+        "sparse_hash": SparseHashLevelOption((1, 0, 1, 0, 0, 0)),
+    },
+    (0, 0, 0, 0, 0, 0),
+)
+STORAGE_COST_MODEL = FormatCostModel(
+    {
+        "dense": DenseLevelOption((0, 0, 0, 0, 0, 0)),
+        "sparse_hash": SparseHashLevelOption((0, 0, 0, 1, 1, 0)),
+    },
+    (0, 0, 0, 0, 0, 1),
+)
 
 
-class SparseHashLevelOption(LevelOption):
-    level_type = SparseHashLevelFType
+class CostFormatter(LogicFormatter):
+    """
+    CostFormatter chooses the format of each alias with the lowest cost under
+    cost_model, memoizing the best format for each depth and input position count.
+    """
 
-    def build(self, lvl, dim_type):
-        return sparse_hash(lvl, dim_type, single_writer=True)
+    def __init__(
+        self,
+        loader: LogicLoader | None = None,
+        cost_model: FormatCostModel = STORAGE_COST_MODEL,
+    ):
+        super().__init__()
+        if loader is None:
+            loader = MockLogicLoader()
+        self.ctx = loader
+        self.cost_model = cost_model
 
-    def next_num_pos(self, num_pos, n_l, nnz_l):
-        return nnz_l
-
-
-class IterCostDenseLevelOption(DenseLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return num_pos * n_l
-
-
-class StorageCostDenseLevelOption(DenseLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return 0.0
-
-
-class IterCostSparseHashLevelOption(SparseHashLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return num_pos + nnz_l
-
-
-class StorageCostSparseHashLevelOption(SparseHashLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return (num_pos + 1) * pos_size + nnz_l * pos_size
-
-
-ITER_CANDIDATES = (IterCostDenseLevelOption(), IterCostSparseHashLevelOption())
-STORAGE_CANDIDATES = (StorageCostDenseLevelOption(), StorageCostSparseHashLevelOption())
-
-
-class CostFormatter(SmartFormatter):
-    candidates: tuple[LevelOption, ...]
-
-    def __init__(self, loader: LogicLoader | None = None):
-        super().__init__(loader)
-        self._stats_factory = None
-
-    @abstractmethod
-    def leaf_cost_fn(self, num_pos, val_size, pos_size): ...
-
-    def lower(self, prgm, bindings, stats, stats_factory):
-        """
-        get_tensor_ftype is called by lower which needs stats_factory which
-        isn't passed by smart formatter lower
-        """
-        self._stats_factory = stats_factory
-        return super().lower(prgm, bindings, stats, stats_factory)
-
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
-        if self._stats_factory is None:
-            raise ValueError("CostFormatter requires StatsFactory")
+    def get_tensor_ftype(
+        self,
+        alias: lgc.Alias,
+        term: lgc.LogicStatement,
+        machine: StatsMachine,
+        fill_value: AbstractFill,
+        shape_type: tuple[FType, ...],
+    ) -> FiberTensorFType:
         lvl = optimize_format(
-            stats.index_order,
-            shape_type,
-            stats,
-            self._stats_factory,
-            fill_value,
-            self.candidates,
-            self.leaf_cost_fn,
+            alias, shape_type, machine, fill_value, self.cost_model, term
         )
         return fiber_tensor(lvl)
 
+    def lower(
+        self,
+        prgm: lgc.LogicStatement,
+        bindings: dict[lgc.Alias, TensorFType],
+        stats: dict[lgc.Alias, TS],
+        stats_factory: StatsFactory,
+    ):
+        bindings = bindings.copy()
+        machine = StatsMachine(stats_factory, OrderedDict(stats))
+        shape_types = prgm.infer_shape_type(
+            {var: val.shape_type for var, val in bindings.items()}
+        )
+        fill_values = prgm.infer_fill_value(
+            {var: val.fill_value for var, val in bindings.items()}
+        )
+
+        def formatter(node: lgc.LogicStatement):
+            match node:
+                case lgc.Plan(bodies):
+                    for body in bodies:
+                        formatter(body)
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
+                    machine(node)
+                    if lhs not in bindings:
+                        shape_type = tuple(
+                            ftype(dim) if dim is not None else ftypes.intp
+                            for dim in shape_types[lhs]
+                        )
+                        bindings[lhs] = self.get_tensor_ftype(
+                            lhs, node, machine, fill_values[lhs], shape_type
+                        )
+                case lgc.Produces():
+                    return
+                case _:
+                    raise ValueError(
+                        f"Unsupported logic statement for formatting: {node}"
+                    )
+
+        formatter(prgm)
+
+        logger.debug(prgm)
+
+        return self.ctx(prgm, bindings, machine.bindings, stats_factory)
+
 
 class StorageCostFormatter(CostFormatter):
-    candidates = STORAGE_CANDIDATES
-
-    def leaf_cost_fn(self, num_pos, val_size, pos_size):
-        return num_pos * val_size
+    def __init__(self, loader: LogicLoader | None = None):
+        super().__init__(loader, STORAGE_COST_MODEL)
 
 
 class IterCostFormatter(CostFormatter):
-    candidates = ITER_CANDIDATES
-
-    def leaf_cost_fn(self, num_pos, val_size, pos_size):
-        return 0.0
+    def __init__(self, loader: LogicLoader | None = None):
+        super().__init__(loader, ITER_COST_MODEL)

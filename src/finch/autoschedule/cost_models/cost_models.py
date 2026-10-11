@@ -1,10 +1,10 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import TypeVar
 
 import numpy as np
 
-from finch.algebra import StaticFill, ffuncs
+from finch.algebra import StaticFill, ffuncs, ftype, np_dtype
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.stages import AliasedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
@@ -28,7 +28,7 @@ from finch.finch_logic import (
     TensorStats,
 )
 from finch.symbolic import Form, PostOrderDFS
-from finch.tensor import Scalar
+from finch.tensor import Scalar, element
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -180,95 +180,130 @@ class MultiLoopCostModel(LoopCostModel, MultiCostModel):
             ]
         )
 
-class LevelCostModel(CostModel):
-    """A cost model for a specific level of tensor formats."""
-
-    @property
-    @abstractmethod
-    def coefficients(self):
-        ...
-
 
 class LevelOption(ABC):
-    level_type: type
+    """
+    A level the formatter may choose for a dimension. Its coefficients weigh
+    the level features of a FormatCostModel.
+    """
 
-    @abstractmethod
-    def build(self, lvl, dim_type): ...
+    def __init__(self, coefficients):
+        self._coefficients = np.array(coefficients, dtype=float)
+
+    @property
+    def coefficients(self) -> np.ndarray:
+        return self._coefficients
 
     @abstractmethod
     def next_num_pos(self, num_pos, n_l, nnz_l): ...
-    @abstractmethod
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size): ...
 
 
 class DenseLevelOption(LevelOption):
-    level_type = DenseLevelFType
-
-    def build(self, lvl, dim_type):
-        return dense(lvl, dim_type)
-
     def next_num_pos(self, num_pos, n_l, nnz_l):
         return num_pos * n_l
 
 
 class SparseHashLevelOption(LevelOption):
-    level_type = SparseHashLevelFType
-
-    def build(self, lvl, dim_type):
-        return sparse_hash(lvl, dim_type, single_writer=True)
-
     def next_num_pos(self, num_pos, n_l, nnz_l):
         return nnz_l
 
 
-class IterCostDenseLevelOption(DenseLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return num_pos * n_l
+class FormatCostModel(CostModel, LoopOrderedForm):
+    """
+    A cost model with features for individual levels of tensor formats. Each
+    entry of formats names a level option, whose coefficients weigh the level
+    features of the levels which use it.
+    """
 
-
-class StorageCostDenseLevelOption(DenseLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return 0.0
-
-
-class IterCostSparseHashLevelOption(SparseHashLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return num_pos + nnz_l
-
-
-class StorageCostSparseHashLevelOption(SparseHashLevelOption):
-    def cost_fn(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        return (num_pos + 1) * pos_size + nnz_l * pos_size
-
-class FormatCostModel(CostModel):
-    """A cost model with features for tensor format prefixes."""
-
-    def __init__(self, formats:dict[str, LevelCostModel]):
+    def __init__(self, formats: dict[str, LevelOption], element_coefficients):
         self.formats = formats
+        self.element_coefficients = np.array(element_coefficients, dtype=float)
 
     @property
     def coefficients(self) -> np.ndarray:
-        return np.concatenate([format.coefficients for format in self.formats.values()])
+        return np.concatenate(
+            [
+                *(format.coefficients for format in self.formats.values()),
+                self.element_coefficients,
+            ]
+        )
 
-    @abstractmethod
+    def nnz_after(self, stats: NS, stats_factory: StatsFactory[NS], level: int):
+        """Return the non-fill entries of the first level + 1 levels of stats."""
+        reduce_fields = tuple(stats.index_order[level + 1 :])
+        if reduce_fields:
+            stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        return stats.estimate_non_fill_values()
+
+    def get_level_features(self, num_pos, n_l, nnz_l, val_size, pos_size):
+        """
+        Return the features of a level with num_pos positions entering it, a
+        dimension of n_l, and nnz_l non-fill entries: positions, slots, entries,
+        position bytes, index bytes, and value bytes.
+        """
+        return np.array(
+            [
+                num_pos,
+                num_pos * n_l,
+                nnz_l,
+                (num_pos + 1) * pos_size,
+                nnz_l * pos_size,
+                num_pos * val_size,
+            ]
+        )
+
     def get_format_features(
         self,
-        alias: HardAlias,
-        prefix: tuple[str, ...],
-        expr: LogicExpression,
+        alias: Alias,
+        level: int,
+        num_pos: float,
+        format_key: str | None,
+        term: LogicStatement,
         machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
-    ) -> np.ndarray: ...
+    ) -> np.ndarray:
+        """Return the features at a zero-based depth with num_pos input positions.
+
+        format_key selects a level option; None selects the element level at
+        the tensor's rank. term is the statement which writes alias.
+        """
+        stats = machine(alias)
+        fields = stats.index_order
+        fill_ftype = ftype(stats.fill_value)
+        leaf = element(stats.fill_value, fill_ftype)
+        assert leaf.position_type is not None
+        val_size = np_dtype(fill_ftype).itemsize
+        pos_size = np_dtype(leaf.position_type).itemsize
+
+        features = {
+            key: np.zeros(len(format.coefficients))
+            for key, format in self.formats.items()
+        }
+        element_features = np.zeros(len(self.element_coefficients))
+        if format_key is None:
+            # The element level stores one value for each position.
+            element_features += self.get_level_features(
+                num_pos, 1, num_pos, val_size, pos_size
+            )
+        else:
+            n_l = stats.get_dim_size(fields[level])
+            nnz_l = self.nnz_after(stats, machine.stats_factory, level)
+            features[format_key] += self.get_level_features(
+                num_pos, n_l, nnz_l, val_size, pos_size
+            )
+        return np.concatenate([*features.values(), element_features])
 
     def predict_format_cost(
         self,
-        alias: HardAlias,
-        prefix: tuple[str, ...],
-        expr: LogicExpression,
+        alias: Alias,
+        level: int,
+        num_pos: float,
+        format_key: str | None,
+        term: LogicStatement,
         machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
     ) -> float:
-        features = self.get_format_features(alias, prefix, expr, machine, output_vars)
+        features = self.get_format_features(
+            alias, level, num_pos, format_key, term, machine
+        )
         return float(np.dot(self.coefficients, features))
 
     def get_features(
@@ -278,9 +313,13 @@ class FormatCostModel(CostModel):
         stats: Mapping[Alias, NumericStats],
         stats_factory: StatsFactory[NumericStats],
     ) -> np.ndarray:
-        stats = dict(stats)
-        features = {key: format.coefficients for key, format in self.formats.items()}
-        stats_interpreter = StatsMachine(stats_factory, stats)
+        """
+        Return the features of the formats in bindings, which name the level
+        option of each level of an alias, outermost first.
+        """
+        features = np.zeros(len(self.coefficients))
+        stats_interpreter = StatsMachine(stats_factory, dict(stats))
+        visited: set[Alias] = set()
 
         def visit_stmt(stmt: LogicStatement):
             nonlocal features
@@ -288,29 +327,34 @@ class FormatCostModel(CostModel):
                 case Plan(bodies):
                     for body in bodies:
                         visit_stmt(body)
-                    return
-                case QueryInto(Table(), _, Literal()):
+                case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                    Table(Alias() as lhs, _), _, _
+                ):
                     stats_interpreter(stmt)
-                    return
+                    # Each alias is formatted once, when it is first written.
+                    match bindings.get(lhs):
+                        case list() as format_keys if lhs not in visited:
+                            lhs_stats = stats_interpreter(lhs)
+                            num_pos = 1.0
+                            for level, key in enumerate((*format_keys, None)):
+                                features += self.get_format_features(
+                                    lhs, level, num_pos, key, stmt, stats_interpreter
+                                )
+                                if key is not None:
+                                    n_l = lhs_stats.get_dim_size(
+                                        lhs_stats.index_order[level]
+                                    )
+                                    nnz_l = self.nnz_after(
+                                        lhs_stats, stats_factory, level
+                                    )
+                                    num_pos = self.formats[key].next_num_pos(
+                                        num_pos, n_l, nnz_l
+                                    )
+                    visited.add(lhs)
                 case Produces():
                     return
-                case Query(Table(_, lhs_idxs), Table() as out):
-                    idxs = lhs_idxs
-                case Query(
-                    Table(_, lhs_idxs),
-                    Aggregate(_, _, Reorder(_, idxs), _) as out,
-                ):
-                    pass
-                case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
-                    out = stmt.as_query().rhs
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
-
-            for n in range(len(idxs) + 1):
-                features += self.get_format_features(
-                    idxs[:n], out, stats_interpreter, lhs_idxs
-                )
-            stats_interpreter(stmt)
 
         visit_stmt(term)
         return features
