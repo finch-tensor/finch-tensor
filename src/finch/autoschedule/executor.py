@@ -37,7 +37,7 @@ def extract_tensors(
                     var = ids[id(tns)]
                     return lgc.Table(var, idxs)
                 # If we don't have an Alias for the tensor we just found we create one
-                var = lgc.HardAlias(spc.freshen("A"))
+                var = lgc.Alias(spc.freshen("A"))
                 # Updating the ids and bindings
                 ids[id(tns)] = var
                 bindings[var] = tns
@@ -71,7 +71,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         if bindings is None:
             bindings = {}
         if isinstance(prgm, lgc.LogicExpression):
-            var = lgc.HardAlias("result")
+            var = lgc.Alias("result")
             stmt: lgc.LogicStatement = lgc.Plan(
                 (lgc.Query(lgc.Table(var, prgm.fields()), prgm), lgc.Produces((var,)))
             )

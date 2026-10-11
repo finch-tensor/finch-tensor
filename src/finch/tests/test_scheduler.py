@@ -27,8 +27,8 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import flatten_plans, push_fields
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -47,20 +47,20 @@ def test_propagate_map_queries():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A10"), ()),
+                Table(Alias("A10"), ()),
                 MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))),
             ),
-            Query(Table(HardAlias("A11"), ()), Table(HardAlias("A10"), ())),
-            Produces((HardAlias("A11"),)),
+            Query(Table(Alias("A11"), ()), Table(Alias("A10"), ())),
+            Produces((Alias("A11"),)),
         )
     )
     expected = Plan(
         (
             Query(
-                Table(HardAlias("A11"), ()),
+                Table(Alias("A11"), ()),
                 Relabel(MapJoin(Literal("+"), (Literal(0), Literal("[1,2,3]"))), ()),
             ),
-            Produces((HardAlias("A11"),)),
+            Produces((Alias("A11"),)),
         )
     )
 
@@ -72,15 +72,15 @@ def test_propagate_map_queries_backward():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A0"), (Field("i0"), Field("i1"))),
-                Table(HardAlias("A1"), (Field("i0"), Field("i1"))),
+                Table(Alias("A0"), (Field("i0"), Field("i1"))),
+                Table(Alias("A1"), (Field("i0"), Field("i1"))),
             ),
             Query(
-                Table(HardAlias("table-1"), (Field("i0"), Field("i1"))),
-                Table(HardAlias("A0"), (Field("i0"), Field("i1"))),
+                Table(Alias("table-1"), (Field("i0"), Field("i1"))),
+                Table(Alias("A0"), (Field("i0"), Field("i1"))),
             ),
             Query(
-                Table(HardAlias("map-join-1"), (Field("i2"), Field("i4"))),
+                Table(Alias("map-join-1"), (Field("i2"), Field("i4"))),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
@@ -95,21 +95,21 @@ def test_propagate_map_queries_backward():
                 ),
             ),
             Query(
-                Table(HardAlias("aggregate-1"), ()),
+                Table(Alias("aggregate-1"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(10),
                     Aggregate(
                         Literal(ffuncs.add),
                         Literal(0),
-                        Table(HardAlias("A2"), ()),
+                        Table(Alias("A2"), ()),
                         (Field("i5"),),
                     ),
                     (Field("i6"),),
                 ),
             ),
             Query(
-                Table(HardAlias("aggregate-2"), (Field("i10"),)),
+                Table(Alias("aggregate-2"), (Field("i10"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -118,7 +118,7 @@ def test_propagate_map_queries_backward():
                             Literal(ffuncs.add),
                             Literal(0),
                             Table(
-                                HardAlias("A3"),
+                                Alias("A3"),
                                 (Field("i10"), Field("i7"), Field("i9"), Field("i8")),
                             ),
                             (Field("i7"), Field("i8")),
@@ -136,11 +136,11 @@ def test_propagate_map_queries_backward():
         (
             Plan(()),
             Query(
-                Table(HardAlias("table-1"), (Field("i0"), Field("i1"))),
-                Table(HardAlias("A1"), (Field("i0"), Field("i1"))),
+                Table(Alias("table-1"), (Field("i0"), Field("i1"))),
+                Table(Alias("A1"), (Field("i0"), Field("i1"))),
             ),
             Query(
-                Table(HardAlias("map-join-1"), (Field("i2"), Field("i4"))),
+                Table(Alias("map-join-1"), (Field("i2"), Field("i4"))),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -155,22 +155,22 @@ def test_propagate_map_queries_backward():
                 ),
             ),
             Query(
-                Table(HardAlias("aggregate-1"), ()),
+                Table(Alias("aggregate-1"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(10),
-                    Table(HardAlias("A2"), ()),
+                    Table(Alias("A2"), ()),
                     (Field("i5"), Field("i6")),
                 ),
             ),
             Query(
-                Table(HardAlias("aggregate-2"), (Field("i10"),)),
+                Table(Alias("aggregate-2"), (Field("i10"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
                     Reorder(
                         Table(
-                            HardAlias("A3"),
+                            Alias("A3"),
                             (Field("i10"), Field("i7"), Field("i9"), Field("i8")),
                         ),
                         (Field("i9"), Field("i7"), Field("i10"), Field("i8")),
@@ -190,7 +190,7 @@ def test_isolate_aggregates():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A0"), (Field("i3"),)),
+                Table(Alias("A0"), (Field("i3"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -211,9 +211,7 @@ def test_isolate_aggregates():
             Plan(
                 (
                     Query(
-                        Table(
-                            HardAlias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
-                        ),
+                        Table(Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))),
                         Aggregate(
                             Literal(ffuncs.mul),
                             Literal(1),
@@ -222,13 +220,12 @@ def test_isolate_aggregates():
                         ),
                     ),
                     Query(
-                        Table(HardAlias("A0"), (Field("i3"),)),
+                        Table(Alias("A0"), (Field("i3"),)),
                         Aggregate(
                             Literal(ffuncs.add),
                             Literal(0),
                             Table(
-                                HardAlias(f"#A#{_sg.counter}"),
-                                (Field("i1"), Field("i3")),
+                                Alias(f"#A#{_sg.counter}"), (Field("i1"), Field("i3"))
                             ),
                             (Field("i1"),),
                         ),
@@ -247,7 +244,7 @@ def test_push_fields():
         (
             (
                 Query(
-                    Table(HardAlias("relabel-1"), (Field("B1"), Field("B2"))),
+                    Table(Alias("relabel-1"), (Field("B1"), Field("B2"))),
                     Relabel(
                         MapJoin(
                             Literal("+"),
@@ -261,7 +258,7 @@ def test_push_fields():
                 )
             ),
             Query(
-                Table(HardAlias("relabel-2"), (Field("B1"), Field("B3"))),
+                Table(Alias("relabel-2"), (Field("B1"), Field("B3"))),
                 Relabel(
                     Aggregate(
                         Literal("+"),
@@ -273,7 +270,7 @@ def test_push_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("reorder-1"), (Field("A3"), Field("A1"))),
+                Table(Alias("reorder-1"), (Field("A3"), Field("A1"))),
                 Aggregate(
                     Literal("+"),
                     Literal(0),
@@ -287,7 +284,7 @@ def test_push_fields():
     expected = Plan(
         (
             Query(
-                Table(HardAlias("relabel-1"), (Field(name="B1"), Field(name="B2"))),
+                Table(Alias("relabel-1"), (Field(name="B1"), Field(name="B2"))),
                 MapJoin(
                     op=Literal(val="+"),
                     args=(
@@ -303,7 +300,7 @@ def test_push_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("relabel-2"), (Field(name="B1"), Field(name="B3"))),
+                Table(Alias("relabel-2"), (Field(name="B1"), Field(name="B3"))),
                 Aggregate(
                     op=Literal(val="+"),
                     init=Literal(val=0),
@@ -315,7 +312,7 @@ def test_push_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("reorder-1"), (Field("A3"), Field("A1"))),
+                Table(Alias("reorder-1"), (Field("A3"), Field("A1"))),
                 Aggregate(
                     Literal("+"),
                     Literal(0),
@@ -337,18 +334,15 @@ def test_propagate_copy_queries():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A0"), (Field("i0"),)),
-                Table(HardAlias("A0"), (Field("i0"),)),
+                Table(Alias("A0"), (Field("i0"),)), Table(Alias("A0"), (Field("i0"),))
             ),
             Query(
-                Table(HardAlias("A1"), (Field("i1"),)),
-                Table(HardAlias("A2"), (Field("i1"),)),
+                Table(Alias("A1"), (Field("i1"),)), Table(Alias("A2"), (Field("i1"),))
             ),
             Query(
-                Table(HardAlias("A1"), (Field("i1"),)),
-                Table(Literal(0), (Field("i1"),)),
+                Table(Alias("A1"), (Field("i1"),)), Table(Literal(0), (Field("i1"),))
             ),
-            Produces((HardAlias("A1"),)),
+            Produces((Alias("A1"),)),
         )
     )
 
@@ -357,10 +351,9 @@ def test_propagate_copy_queries():
             Plan(),
             Plan(),
             Query(
-                Table(HardAlias("A2"), (Field("i1"),)),
-                Table(Literal(0), (Field("i1"),)),
+                Table(Alias("A2"), (Field("i1"),)), Table(Literal(0), (Field("i1"),))
             ),
-            Produces((HardAlias("A2"),)),
+            Produces((Alias("A2"),)),
         )
     )
 
@@ -372,30 +365,30 @@ def test_propagate_transpose_queries():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A1"), (Field("j1"), Field("j2"))),
+                Table(Alias("A1"), (Field("j1"), Field("j2"))),
                 Relabel(
                     Table(
-                        HardAlias("XD"),
+                        Alias("XD"),
                         (Field("i1"), Field("i2")),
                     ),
                     (Field("j1"), Field("j2")),
                 ),
             ),
             Query(
-                Table(HardAlias("A2"), (Field("j2"), Field("j1"))),
-                Table(HardAlias("A1"), (Field("j1"), Field("j2"))),
+                Table(Alias("A2"), (Field("j2"), Field("j1"))),
+                Table(Alias("A1"), (Field("j1"), Field("j2"))),
             ),
-            Produces((HardAlias("A2"),)),
+            Produces((Alias("A2"),)),
         )
     )
 
     expected = Plan(
         (
             Query(
-                Table(HardAlias("A2"), (Field("j2"), Field("j1"))),
-                Table(HardAlias("XD"), (Field("j1"), Field("j2"))),
+                Table(Alias("A2"), (Field("j2"), Field("j1"))),
+                Table(Alias("XD"), (Field("j1"), Field("j2"))),
             ),
-            Produces((HardAlias("A2"),)),
+            Produces((Alias("A2"),)),
         )
     )
 
@@ -407,7 +400,7 @@ def test_lift_fields():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A_#"), (Field("i1"),)),
+                Table(Alias("A_#"), (Field("i1"),)),
                 Aggregate(
                     Literal("*"),
                     Literal(1),
@@ -416,7 +409,7 @@ def test_lift_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("A0"), (Field("i1"), Field("i2"))),
+                Table(Alias("A0"), (Field("i1"), Field("i2"))),
                 MapJoin(
                     Literal("*"),
                     (
@@ -426,7 +419,7 @@ def test_lift_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("A0"), (Field("i1"), Field("i2"))),
+                Table(Alias("A0"), (Field("i1"), Field("i2"))),
                 MapJoin(
                     Literal("*"),
                     (
@@ -441,7 +434,7 @@ def test_lift_fields():
     expected = Plan(
         (
             Query(
-                Table(HardAlias("A_#"), (Field("i1"),)),
+                Table(Alias("A_#"), (Field("i1"),)),
                 Aggregate(
                     Literal("*"),
                     Literal(1),
@@ -453,7 +446,7 @@ def test_lift_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("A0"), (Field("i1"), Field("i2"))),
+                Table(Alias("A0"), (Field("i1"), Field("i2"))),
                 Reorder(
                     MapJoin(
                         Literal("*"),
@@ -466,7 +459,7 @@ def test_lift_fields():
                 ),
             ),
             Query(
-                Table(HardAlias("A0"), (Field("i1"), Field("i2"))),
+                Table(Alias("A0"), (Field("i1"), Field("i2"))),
                 Reorder(
                     MapJoin(
                         Literal("*"),
@@ -489,56 +482,50 @@ def test_normalize_names():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("A0"), (Field("##foo#8"),)),
-                Table(HardAlias("A0"), (Field("##foo#8"),)),
+                Table(Alias("A0"), (Field("##foo#8"),)),
+                Table(Alias("A0"), (Field("##foo#8"),)),
             ),
             Query(
-                Table(HardAlias("A1"), (Field("##foo#1"),)),
-                Table(HardAlias("A1"), (Field("##foo#1"),)),
+                Table(Alias("A1"), (Field("##foo#1"),)),
+                Table(Alias("A1"), (Field("##foo#1"),)),
             ),
             Query(
-                Table(HardAlias("A2"), (Field("#2#foo"),)),
-                Table(HardAlias("A2"), (Field("#2#foo"),)),
+                Table(Alias("A2"), (Field("#2#foo"),)),
+                Table(Alias("A2"), (Field("#2#foo"),)),
             ),
-            Query(Table(HardAlias("##foo#9"), ()), Table(HardAlias("##foo#9"), ())),
+            Query(Table(Alias("##foo#9"), ()), Table(Alias("##foo#9"), ())),
             Query(
-                Table(HardAlias("A4"), (Field("#10#A"),)),
-                Table(HardAlias("A4"), (Field("#10#A"),)),
+                Table(Alias("A4"), (Field("#10#A"),)),
+                Table(Alias("A4"), (Field("#10#A"),)),
             ),
-            Query(Table(HardAlias("bar"), ()), Table(HardAlias("bar"), ())),
-            Query(
-                Table(HardAlias("A5"), (Field("j"),)),
-                Table(HardAlias("A5"), (Field("j"),)),
-            ),
-            Query(Table(HardAlias("##test#0"), ()), Table(HardAlias("##test#0"), ())),
+            Query(Table(Alias("bar"), ()), Table(Alias("bar"), ())),
+            Query(Table(Alias("A5"), (Field("j"),)), Table(Alias("A5"), (Field("j"),))),
+            Query(Table(Alias("##test#0"), ()), Table(Alias("##test#0"), ())),
         )
     )
 
     expected = Plan(
         (
+            Query(Table(Alias("A"), (Field("i"),)), Table(Alias("A"), (Field("i"),))),
             Query(
-                Table(HardAlias("A"), (Field("i"),)),
-                Table(HardAlias("A"), (Field("i"),)),
+                Table(Alias("A_2"), (Field("i_2"),)),
+                Table(Alias("A_2"), (Field("i_2"),)),
             ),
             Query(
-                Table(HardAlias("A_2"), (Field("i_2"),)),
-                Table(HardAlias("A_2"), (Field("i_2"),)),
+                Table(Alias("A_3"), (Field("i_3"),)),
+                Table(Alias("A_3"), (Field("i_3"),)),
             ),
+            Query(Table(Alias("A_4"), ()), Table(Alias("A_4"), ())),
             Query(
-                Table(HardAlias("A_3"), (Field("i_3"),)),
-                Table(HardAlias("A_3"), (Field("i_3"),)),
+                Table(Alias("A_5"), (Field("i_4"),)),
+                Table(Alias("A_5"), (Field("i_4"),)),
             ),
-            Query(Table(HardAlias("A_4"), ()), Table(HardAlias("A_4"), ())),
+            Query(Table(Alias("A_6"), ()), Table(Alias("A_6"), ())),
             Query(
-                Table(HardAlias("A_5"), (Field("i_4"),)),
-                Table(HardAlias("A_5"), (Field("i_4"),)),
+                Table(Alias("A_7"), (Field("i_5"),)),
+                Table(Alias("A_7"), (Field("i_5"),)),
             ),
-            Query(Table(HardAlias("A_6"), ()), Table(HardAlias("A_6"), ())),
-            Query(
-                Table(HardAlias("A_7"), (Field("i_5"),)),
-                Table(HardAlias("A_7"), (Field("i_5"),)),
-            ),
-            Query(Table(HardAlias("A_8"), ()), Table(HardAlias("A_8"), ())),
+            Query(Table(Alias("A_8"), ()), Table(Alias("A_8"), ())),
         )
     )
 
@@ -557,35 +544,35 @@ def test_concordize():
     i0, i1 = Field("i0"), Field("i1")
     plan = Plan(
         (
-            Query(Table(HardAlias("A0"), (i0, i1)), Table(Literal(0), (i0, i1))),
+            Query(Table(Alias("A0"), (i0, i1)), Table(Literal(0), (i0, i1))),
             Query(
-                Table(HardAlias("A1"), (i1, i0)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i1, i0)),
+                Table(Alias("A1"), (i1, i0)),
+                overwrite(Table(Alias("A0"), (i0, i1)), (i1, i0)),
             ),
             Query(
-                Table(HardAlias("A2"), (i0, i1)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i0, i1)),
+                Table(Alias("A2"), (i0, i1)),
+                overwrite(Table(Alias("A0"), (i0, i1)), (i0, i1)),
             ),
-            Produces((HardAlias("A1"), HardAlias("A2"))),
+            Produces((Alias("A1"), Alias("A2"))),
         )
     )
 
     expected = Plan(
         (
-            Query(Table(HardAlias("A0"), (i0, i1)), Table(Literal(0), (i0, i1))),
+            Query(Table(Alias("A0"), (i0, i1)), Table(Literal(0), (i0, i1))),
             Query(
-                Table(HardAlias("A0_4"), (Field("i_1"), Field("i_0"))),
-                Table(HardAlias("A0"), (Field("i_0"), Field("i_1"))),
+                Table(Alias("A0_4"), (Field("i_1"), Field("i_0"))),
+                Table(Alias("A0"), (Field("i_0"), Field("i_1"))),
             ),
             Query(
-                Table(HardAlias("A1"), (i1, i0)),
-                overwrite(Table(HardAlias("A0_4"), (i1, i0)), (i1, i0)),
+                Table(Alias("A1"), (i1, i0)),
+                overwrite(Table(Alias("A0_4"), (i1, i0)), (i1, i0)),
             ),
             Query(
-                Table(HardAlias("A2"), (i0, i1)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i0, i1)),
+                Table(Alias("A2"), (i0, i1)),
+                overwrite(Table(Alias("A0"), (i0, i1)), (i0, i1)),
             ),
-            Produces((HardAlias("A1"), HardAlias("A2"))),
+            Produces((Alias("A1"), Alias("A2"))),
         )
     )
 
@@ -597,7 +584,7 @@ def test_heuristic_loop_order():
     plan = Plan(
         (
             Query(
-                Table(HardAlias("C"), (Field("i0"), Field("i2"))),
+                Table(Alias("C"), (Field("i0"), Field("i2"))),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -606,11 +593,11 @@ def test_heuristic_loop_order():
                             Literal(ffuncs.mul),
                             (
                                 Reorder(
-                                    Table(HardAlias("A"), (Field("i0"), Field("i1"))),
+                                    Table(Alias("A"), (Field("i0"), Field("i1"))),
                                     (Field("i0"), Field("i1")),
                                 ),
                                 Reorder(
-                                    Table(HardAlias("B"), (Field("i1"), Field("i2"))),
+                                    Table(Alias("B"), (Field("i1"), Field("i2"))),
                                     (Field("i1"), Field("i2")),
                                 ),
                             ),
@@ -620,14 +607,14 @@ def test_heuristic_loop_order():
                     (Field("i1"),),
                 ),
             ),
-            Produces((HardAlias("C"),)),
+            Produces((Alias("C"),)),
         )
     )
 
     expected = Plan(
         (
             Query(
-                Table(HardAlias("C"), (Field("i0"), Field("i2"))),
+                Table(Alias("C"), (Field("i0"), Field("i2"))),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -638,14 +625,14 @@ def test_heuristic_loop_order():
                                 (
                                     Reorder(
                                         Table(
-                                            HardAlias("A"),
+                                            Alias("A"),
                                             (Field("i0"), Field("i1")),
                                         ),
                                         (Field("i0"), Field("i1")),
                                     ),
                                     Reorder(
                                         Table(
-                                            HardAlias("B"),
+                                            Alias("B"),
                                             (Field("i1"), Field("i2")),
                                         ),
                                         (Field("i1"), Field("i2")),
@@ -661,7 +648,7 @@ def test_heuristic_loop_order():
                     (Field("i1"),),
                 ),
             ),
-            Produces((HardAlias("C"),)),
+            Produces((Alias("C"),)),
         )
     )
 
@@ -675,36 +662,34 @@ def test_flatten_plans():
             Plan(
                 (
                     Query(
-                        Table(HardAlias("A0"), (Field("i0"),)),
-                        Table(HardAlias("A0"), (Field("i0"),)),
+                        Table(Alias("A0"), (Field("i0"),)),
+                        Table(Alias("A0"), (Field("i0"),)),
                     ),
                     Query(
-                        Table(HardAlias("A1"), (Field("i0"),)),
-                        Table(HardAlias("A1"), (Field("i0"),)),
+                        Table(Alias("A1"), (Field("i0"),)),
+                        Table(Alias("A1"), (Field("i0"),)),
                     ),
                 )
             ),
-            Query(Table(HardAlias("A2"), ()), Table(HardAlias("A2"), ())),
+            Query(Table(Alias("A2"), ()), Table(Alias("A2"), ())),
             Plan(
                 (
                     Plan(
                         (
                             Query(
-                                Table(HardAlias("A3"), (Field("i3"),)),
-                                Table(HardAlias("A3"), (Field("i3"),)),
+                                Table(Alias("A3"), (Field("i3"),)),
+                                Table(Alias("A3"), (Field("i3"),)),
                             ),
-                            Produces((HardAlias("A4"),)),
+                            Produces((Alias("A4"),)),
                         )
                     ),
                 )
             ),
             Query(
-                Table(HardAlias("A5"), (Field("i4"),)),
-                Table(HardAlias("A5"), (Field("i4"),)),
+                Table(Alias("A5"), (Field("i4"),)), Table(Alias("A5"), (Field("i4"),))
             ),
             Query(
-                Table(HardAlias("A6"), (Field("i0"),)),
-                Table(HardAlias("A6"), (Field("i0"),)),
+                Table(Alias("A6"), (Field("i0"),)), Table(Alias("A6"), (Field("i0"),))
             ),
         )
     )
@@ -712,19 +697,16 @@ def test_flatten_plans():
     expected = Plan(
         (
             Query(
-                Table(HardAlias("A0"), (Field("i0"),)),
-                Table(HardAlias("A0"), (Field("i0"),)),
+                Table(Alias("A0"), (Field("i0"),)), Table(Alias("A0"), (Field("i0"),))
             ),
             Query(
-                Table(HardAlias("A1"), (Field("i0"),)),
-                Table(HardAlias("A1"), (Field("i0"),)),
+                Table(Alias("A1"), (Field("i0"),)), Table(Alias("A1"), (Field("i0"),))
             ),
-            Query(Table(HardAlias("A2"), ()), Table(HardAlias("A2"), ())),
+            Query(Table(Alias("A2"), ()), Table(Alias("A2"), ())),
             Query(
-                Table(HardAlias("A3"), (Field("i3"),)),
-                Table(HardAlias("A3"), (Field("i3"),)),
+                Table(Alias("A3"), (Field("i3"),)), Table(Alias("A3"), (Field("i3"),))
             ),
-            Produces((HardAlias("A4"),)),
+            Produces((Alias("A4"),)),
         )
     )
 
@@ -740,30 +722,27 @@ def test_scheduler_e2e_matmul(file_regression):
     plan = Plan(
         (
             Query(
-                Table(HardAlias("AB"), (i, k, j)),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
+                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(HardAlias("C"), (i, j)),
+                Table(Alias("C"), (i, j)),
                 Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Table(HardAlias("AB"), (i, k, j)),
-                    (k,),
+                    Literal(ffuncs.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
-            Produces((HardAlias("C"),)),
+            Produces((Alias("C"),)),
         )
     )
 
     plan_opt, bindings = optimize(
         plan,
         {
-            HardAlias("A"): ftype(finch.asarray(a)),
-            HardAlias("B"): ftype(finch.asarray(b)),
+            Alias("A"): ftype(finch.asarray(a)),
+            Alias("B"): ftype(finch.asarray(b)),
         },
     )
 
@@ -781,37 +760,34 @@ def test_scheduler_e2e_sddmm(file_regression):
     plan = Plan(
         (
             Query(
-                Table(HardAlias("AB"), (i, j, k)),
+                Table(Alias("AB"), (i, j, k)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
-                        Reorder(Table(HardAlias("A"), (i, j)), (i, j)),
-                        Reorder(Table(HardAlias("B"), (k, j)), (j, k)),
+                        Reorder(Table(Alias("A"), (i, j)), (i, j)),
+                        Reorder(Table(Alias("B"), (k, j)), (j, k)),
                     ),
                 ),
             ),
             # matmul
             Query(
-                Table(HardAlias("C"), (i, j)),
+                Table(Alias("C"), (i, j)),
                 Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Table(HardAlias("AB"), (i, k, j)),
-                    (k,),
+                    Literal(ffuncs.add), Literal(0), Table(Alias("AB"), (i, k, j)), (k,)
                 ),
             ),
             # elemwise
             Query(
-                Table(HardAlias("RES"), (i, j)),
+                Table(Alias("RES"), (i, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
-                        Reorder(Table(HardAlias("C"), (i, j)), (i, j)),
-                        Reorder(Table(HardAlias("S"), (j, i)), (i, j)),
+                        Reorder(Table(Alias("C"), (i, j)), (i, j)),
+                        Reorder(Table(Alias("S"), (j, i)), (i, j)),
                     ),
                 ),
             ),
-            Produces((HardAlias("RES"),)),
+            Produces((Alias("RES"),)),
         )
     )
 
@@ -820,9 +796,9 @@ def test_scheduler_e2e_sddmm(file_regression):
         DefaultLoopOrderer(DefaultLogicFormatter(capture))
     )
     bindings = {
-        HardAlias("S"): finch.asarray(s),
-        HardAlias("A"): finch.asarray(a),
-        HardAlias("B"): finch.asarray(b),
+        Alias("S"): finch.asarray(s),
+        Alias("A"): finch.asarray(a),
+        Alias("B"): finch.asarray(b),
     }
     binding_ftypes = {var: val.ftype for var, val in bindings.items()}
     stats_factory = DenseStatsFactory()
@@ -841,7 +817,7 @@ def test_scheduler_inplace(file_regression):
     plan = Plan(
         bodies=(
             Query(
-                lhs=Table(HardAlias(name="A2"), (Field(name="i0"), Field(name="i2"))),
+                lhs=Table(Alias(name="A2"), (Field(name="i0"), Field(name="i2"))),
                 rhs=MapJoin(
                     op=Literal(ffuncs.add),
                     args=(
@@ -853,11 +829,11 @@ def test_scheduler_inplace(file_regression):
                                     op=Literal(val=ffuncs.mul),
                                     args=(
                                         Table(
-                                            HardAlias(name="A0"),
+                                            Alias(name="A0"),
                                             (Field(name="i0"), Field(name="i1")),
                                         ),
                                         Table(
-                                            HardAlias(name="A1"),
+                                            Alias(name="A1"),
                                             (Field(name="i1"), Field(name="i2")),
                                         ),
                                     ),
@@ -874,11 +850,11 @@ def test_scheduler_inplace(file_regression):
                             op=Literal(ffuncs.add),
                             args=(
                                 Table(
-                                    HardAlias("A2"),
+                                    Alias("A2"),
                                     (Field(name="i0"), Field(name="i2")),
                                 ),
                                 Table(
-                                    HardAlias("A1"),
+                                    Alias("A1"),
                                     (Field(name="i0"), Field(name="i2")),
                                 ),
                             ),
@@ -887,7 +863,7 @@ def test_scheduler_inplace(file_regression):
                 ),
             ),
             Plan(
-                bodies=(Produces(args=(HardAlias(name="A2"),)),),
+                bodies=(Produces(args=(Alias(name="A2"),)),),
             ),
         ),
     )
@@ -897,9 +873,9 @@ def test_scheduler_inplace(file_regression):
     )
 
     bindings = {
-        HardAlias(name="A0"): finch.asarray(np.array([[1, 2], [3, 4]])),
-        HardAlias(name="A1"): finch.asarray(np.array([[5, 6], [7, 8]])),
-        HardAlias(name="A2"): finch.asarray(np.array([[1, 1], [1, 1]])),
+        Alias(name="A0"): finch.asarray(np.array([[1, 2], [3, 4]])),
+        Alias(name="A1"): finch.asarray(np.array([[5, 6], [7, 8]])),
+        Alias(name="A2"): finch.asarray(np.array([[1, 1], [1, 1]])),
     }
 
     binding_ftypes = {var: val.ftype for var, val in bindings.items()}

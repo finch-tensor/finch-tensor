@@ -54,7 +54,7 @@ class PointwiseContext:
             case lgc.Table(lgc.Alias() as var, idxs):
                 return ntn.Unwrap(
                     ntn.Access(
-                        self.ctx.slots[var.unfused],
+                        self.ctx.slots[var],
                         ntn.Read(),
                         tuple(loops[idx] for idx in idxs),
                     )
@@ -62,7 +62,7 @@ class PointwiseContext:
             case lgc.Literal(val):
                 return ntn.Literal(val)
             case lgc.FillTable(lgc.Alias() as var):
-                return ntn.FillValue(self.ctx.slots[var.unfused])
+                return ntn.FillValue(self.ctx.slots[var])
             case lgc.Relabel(arg, idxs):
                 return self(
                     arg,
@@ -158,7 +158,7 @@ class NotationContext:
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""
         reads = dict.fromkeys(
-            node.unfused for node in PostOrderDFS(expr) if isinstance(node, lgc.Alias)
+            node for node in PostOrderDFS(expr) if isinstance(node, lgc.Alias)
         )
         return tuple(stmt for var in reads for stmt in self.freeze(var))
 
@@ -363,7 +363,7 @@ class NotationContext:
                 # arg which lhs lacks are reduced by overwriting.
                 loop_order = (*idxs, *(idx for idx in arg.idxs if idx not in idxs))
                 return self.fold(
-                    lhs.unfused,
+                    lhs,
                     idxs,
                     ffuncs.overwrite,
                     lgc.Reorder(arg, loop_order),
@@ -374,14 +374,13 @@ class NotationContext:
                 lgc.Aggregate(lgc.Literal(op), init, lgc.Reorder() as arg, _),
             ):
                 stmts = self.freeze_reads(init)
-                body = self.fold(lhs.unfused, idxs, op, arg, self.lower_init(init))
+                body = self.fold(lhs, idxs, op, arg, self.lower_init(init))
                 return ntn.Block((*stmts, body))
             case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs),
                 lgc.Literal(ffuncs.overwrite),
                 lgc.Literal(init),
             ):
-                lhs = lhs.unfused
                 op = ntn.Literal(ffuncs.overwrite)
                 fill = self.bindings[lhs].fill_type
                 if is_static(fill) and not bool(ffuncs.same(init, fill.value)):
@@ -400,13 +399,13 @@ class NotationContext:
                 lgc.Reorder() as rhs,
             ):
                 if op == ffuncs.overwrite:
-                    return self.overwrite(lhs.unfused, idxs, rhs)
-                return self.fold(lhs.unfused, idxs, op, rhs, None)
+                    return self.overwrite(lhs, idxs, rhs)
+                return self.fold(lhs, idxs, op, rhs, None)
             case lgc.Produces(args):
                 vars: list[lgc.Alias] = []
                 for var in args:
                     assert isinstance(var, lgc.Alias)
-                    vars.append(var.unfused)
+                    vars.append(var)
                 return ntn.Block(
                     (
                         *(stmt for var in self.bindings for stmt in self.freeze(var)),

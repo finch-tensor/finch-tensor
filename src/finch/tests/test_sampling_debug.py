@@ -20,8 +20,8 @@ from finch.autoschedule.tensor_stats.sampling_stats import (
 )
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -35,7 +35,7 @@ rng = np.random.default_rng(0)
 
 
 def materialize(sketch):
-    out = HardAlias("sketch_out")
+    out = Alias("sketch_out")
     prgm = Plan((Query(Table(out, sketch.fields()), sketch), Produces((out,))))
     result = NON_RECURSIVE_SCHEDULER(prgm)[0]
     if isinstance(result, fl.FiberTensor):

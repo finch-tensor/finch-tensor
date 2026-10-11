@@ -14,7 +14,6 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -80,7 +79,7 @@ def get_lp_norms(
     bodies: list[Query] = []
     outputs: list[Alias] = []
     for dim, field in enumerate(fields):
-        degrees = HardAlias(f"degrees_{dim}")
+        degrees = Alias(f"degrees_{dim}")
         bodies.append(
             Query(
                 Table(degrees, (field,)),
@@ -95,7 +94,7 @@ def get_lp_norms(
         degree_table = Table(degrees, (field,))
 
         for k, norm in enumerate(norms):
-            out = HardAlias(f"norm_{dim}_{k}")
+            out = Alias(f"norm_{dim}_{k}")
             rhs: Aggregate
             if norm == 0:
                 rhs = Aggregate(

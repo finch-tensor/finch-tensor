@@ -5,8 +5,6 @@ from finch.algebra.tensor import Tensor
 from finch.finch_logic import (
     Alias,
     Field,
-    FusedAlias,
-    HardAlias,
     Literal,
     LogicEvaluator,
     LogicNode,
@@ -53,16 +51,12 @@ def normalize_names(
 
     def rule_0(node: LogicNode) -> LogicNode | None:
         match node:
-            case FusedAlias(alias, n):
-                renamed = rule_0(alias)
-                assert isinstance(renamed, HardAlias)
-                return FusedAlias(renamed, n)
             case Alias(name):
                 if name in renames:
-                    return HardAlias(renames[name])
+                    return Alias(renames[name])
                 new_name = spc.freshen("A")
                 renames[name] = new_name
-                return HardAlias(new_name)
+                return Alias(new_name)
             case Field(name):
                 if name in renames:
                     return Field(renames[name])

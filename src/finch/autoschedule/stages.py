@@ -10,13 +10,9 @@ from finch.finch_logic import (
     Alias,
     Field,
     FillTable,
-    Fuse,
-    FusedAlias,
-    HardAlias,
     Literal,
     LogicExpression,
     LogicStatement,
-    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -27,17 +23,14 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finch.symbolic import Form, PostOrderDFS, Stage
+from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
 
 
 class AliasedForm(Form):
     """
     AliasedForm requires that all aliases in the input are defined
     in the bindings or in previous queries and that all Tables
-    are wrapping Aliases. Defining an alias selects its view, which is either
-    the HardAlias or a FusedAlias with some number of fused dimensions, and
-    invalidates every other view of that alias. Statements may only read or
-    update the current view of an alias. Bindings define the HardAlias view.
+    are wrapping Aliases.
     """
 
     @classmethod
@@ -48,40 +41,28 @@ class AliasedForm(Form):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> None:
-        views: dict[Alias, Alias] = {var.unfused: var for var in bindings}
+        defined_aliases = set(bindings.keys())
 
         def validate(node):
             match node:
-                case Query(Table(Alias() as lhs, _), rhs):
-                    # The rhs is read before the lhs is defined.
-                    validate(rhs)
-                    views[lhs.unfused] = lhs
-                case QueryInto(Table(Alias() as lhs, _), _, rhs):
-                    validate(rhs)
-                    if lhs.unfused not in views:
+                case Query(Table(Alias() as lhs, _), _):
+                    defined_aliases.add(lhs)
+                case QueryInto(Table(Alias() as lhs, _), _, _):
+                    if lhs not in defined_aliases:
                         raise ValueError(
                             f"QueryInto updates alias {lhs.name}, which is not defined."
                         )
-                    validate(lhs)
-                case Alias() as var:
-                    view = views.get(var.unfused)
-                    if view is None:
-                        raise ValueError(
-                            f"Alias {var.name} is not defined in bindings."
-                        )
-                    if view != var:
-                        raise ValueError(
-                            f"{var} was invalidated by the definition of {view}."
-                        )
-                case Table(Alias() as tns, _):
-                    validate(tns)
-                case Table():
-                    raise ValueError("Table nodes must wrap an Alias.")
-                case LogicTree():
-                    for child in node.children:
-                        validate(child)
+                case Query(lhs, _) | QueryInto(lhs, _, _):
+                    raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
+                case Alias(name):
+                    if node not in defined_aliases:
+                        raise ValueError(f"Alias {name} is not defined in bindings.")
+                case Table(tns, _):
+                    if not isinstance(tns, Alias):
+                        raise ValueError("Table nodes must wrap an Alias.")
+            return node
 
-        validate(term)
+        Rewrite(PreWalk(validate))(term)
 
 
 def _is_init(init: LogicExpression) -> bool:
@@ -263,8 +244,8 @@ class FormattedForm(LoopOrderedForm):
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg)
-                case Table(Alias() as tns, _):
-                    if tns.unfused not in bindings:
+                case Table(tns, _):
+                    if tns not in bindings:
                         raise ValueError(
                             f"Alias {tns.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
@@ -335,11 +316,7 @@ class CompilerForm(FormattedForm):
                     pass
                 case _:
                     raise ValueError(f"CompilerForm only allows queries, not {body}")
-            if any(
-                node.unfused == lhs.unfused
-                for node in PostOrderDFS(rhs)
-                if isinstance(node, Alias)
-            ):
+            if lhs in PostOrderDFS(rhs):
                 raise ValueError(
                     f"{type(body).__name__} can't both read and write {lhs}."
                 )
@@ -358,77 +335,6 @@ class CompilerForm(FormattedForm):
                         raise ValueError("Loop order must include every RHS field.")
                 case QueryInto(_, Literal(op), Literal()) if op != ffuncs.overwrite:
                     raise ValueError(f"Initializing {lhs} must overwrite it, not {op}.")
-
-
-class FusedForm(Form):
-    """
-    Each Fuse field occurs in a HardAlias table in its body. The leading n
-    indices of every FusedAlias table match the first n enclosing Fuse fields,
-    from outermost to innermost.
-
-    Within each Fuse body, a tensor accessed by that Fuse's field in a stored
-    dimension cannot occur on both a query lhs and a query rhs, even in separate
-    queries. Different alias views refer to the same tensor for this check.
-    These constraints apply independently of the query's lowering stage.
-    """
-
-    @classmethod
-    def validate_inputs(
-        cls,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: dict[Alias, TensorStats],
-        stats_factory: StatsFactory,
-    ) -> None:
-        def validate(node, fused_idxs):
-            match node:
-                case Fuse(idx, body):
-                    hard_idxs = set()
-                    stored = set()
-                    reads = set()
-                    writes = set()
-                    for child in PostOrderDFS(body):
-                        match child:
-                            case Table(HardAlias() as tns, idxs):
-                                hard_idxs.update(idxs)
-                                if idx in idxs:
-                                    stored.add(tns)
-                            case Table(FusedAlias(tns, n), idxs):
-                                if idx in idxs[n:]:
-                                    stored.add(tns)
-                            case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
-                                Table(Alias() as lhs, _), _, rhs
-                            ):
-                                writes.add(lhs.unfused)
-                                for arg in PostOrderDFS(rhs):
-                                    match arg:
-                                        case Alias() as tns:
-                                            reads.add(tns.unfused)
-                    if idx not in hard_idxs:
-                        raise ValueError(
-                            f"Fuse field {idx} must occur in a HardAlias table "
-                            "in its body."
-                        )
-                    conflicts = stored & reads & writes
-                    if conflicts:
-                        names = ", ".join(sorted(tns.name for tns in conflicts))
-                        raise ValueError(
-                            f"Fuse field {idx} accesses a non-fused dimension of "
-                            f"{names}, which cannot occur on both lhs and rhs "
-                            "in its body."
-                        )
-                    validate(body, (*fused_idxs, idx))
-                case Table(FusedAlias(tns, n), idxs):
-                    if n > len(fused_idxs) or idxs[:n] != fused_idxs[:n]:
-                        raise ValueError(
-                            f"Fused indices of {tns} must match the enclosing "
-                            "Fuse fields in order."
-                        )
-                case LogicTree():
-                    for child in node.children:
-                        validate(child, fused_idxs)
-
-        validate(term, ())
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):

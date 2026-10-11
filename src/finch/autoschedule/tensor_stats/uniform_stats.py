@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -131,10 +130,8 @@ class UniformStats(NumericStats):
         super().__init__(base)
         self.nnz = float(nnz)
 
-    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
-        # Non-fill values are spread evenly over the slices.
-        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
-        return self.nnz / slices
+    def estimate_non_fill_values(self) -> float:
+        return self.nnz
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

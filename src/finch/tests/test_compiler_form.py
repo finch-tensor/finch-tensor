@@ -19,8 +19,8 @@ from finch.compile import NotationCompiler
 from finch.compile_jl.analyze import reset_argument_positions
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -36,7 +36,7 @@ from finch.tensor import BufferizedNDArray
 from .conftest import finch_assert_equal
 
 i, j = Field("i"), Field("j")
-A, B, C, D = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("D")
+A, B, C, D = Alias("A"), Alias("B"), Alias("C"), Alias("D")
 OVERWRITE, ADD, MUL = (
     Literal(ffuncs.overwrite),
     Literal(ffuncs.add),

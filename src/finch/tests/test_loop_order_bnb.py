@@ -21,12 +21,11 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
     greedy_loop_order,
 )
-from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory
+from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -39,7 +38,7 @@ from finch.finch_logic import (
 def test_bfs_and_dfs_are_no_worse_than_greedy():
     stats_factory = DCStatsFactory()
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (HardAlias(name) for name in "ABCD")
+    a, b, c, d = (Alias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -49,7 +48,7 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
             Table(d, (l_, m)),
         ),
     )
-    stats: OrderedDict[Alias, DCStats] = OrderedDict(
+    stats = OrderedDict(
         {
             a: stats_factory(fl.asarray(np.ones((2, 2))), (i, j)),
             b: stats_factory(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -76,7 +75,7 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
 def test_brute_force_is_no_worse_than_heuristics():
     stats_factory = DCStatsFactory()
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (HardAlias(name) for name in "ABCD")
+    a, b, c, d = (Alias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -86,7 +85,7 @@ def test_brute_force_is_no_worse_than_heuristics():
             Table(d, (l_, m)),
         ),
     )
-    stats: OrderedDict[Alias, DCStats] = OrderedDict(
+    stats = OrderedDict(
         {
             a: stats_factory(fl.asarray(np.ones((2, 2))), (i, j)),
             b: stats_factory(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -132,9 +131,7 @@ def test_loop_orderers_refresh_stats_of_redefined_aliases(
     # The second copy is the same node as the first, but scratch has been
     # redefined in between, so its statistics must not come from a cache.
     i = Field("i")
-    a, b, scratch, out, result = map(
-        HardAlias, ("a", "b", "scratch", "out", "result")
-    )
+    a, b, scratch, out, result = map(Alias, ("a", "b", "scratch", "out", "result"))
     copy = Query(Table(out, (i,)), Table(scratch, (i,)))
     total = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(out, (i,)), (i,))
     plan = Plan(

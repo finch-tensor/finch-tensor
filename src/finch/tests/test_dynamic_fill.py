@@ -51,9 +51,9 @@ from finch.autoschedule import (
 from finch.autoschedule.normalize import inline_constant_scalars
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
     FillTable,
-    HardAlias,
     Literal,
     LogicLoader,
     MapJoin,
@@ -539,7 +539,7 @@ def test_declare_sets_a_dynamic_fill(loader):
     # A kernel computes the dynamic fill of its output from the fills of its
     # inputs, rather than keeping the fill the output was constructed with.
     i = Field("i")
-    A, C = HardAlias("A"), HardAlias("C")
+    A, C = Alias("A"), Alias("C")
     one = Literal(np.float64(1.0))
     arg = MapJoin(Literal(ffuncs.add), (Table(A, (i,)), one))
     init = MapJoin(Literal(ffuncs.add), (FillTable(A), one))

@@ -124,46 +124,46 @@ def create_log_simple_node():
     return log.Plan(
         (
             log.Query(
-                log.Table(log.HardAlias("S"), (i, j)), log.Table(log.Literal(s), (i, j))
+                log.Table(log.Alias("S"), (i, j)), log.Table(log.Literal(s), (i, j))
             ),
             log.Query(
-                log.Table(log.HardAlias("A"), (i, k)), log.Table(log.Literal(a), (i, k))
+                log.Table(log.Alias("A"), (i, k)), log.Table(log.Literal(a), (i, k))
             ),
             log.Query(
-                log.Table(log.HardAlias("B"), (k, j)), log.Table(log.Literal(b), (k, j))
+                log.Table(log.Alias("B"), (k, j)), log.Table(log.Literal(b), (k, j))
             ),
             log.Query(
-                log.Table(log.HardAlias("AB"), (i, j, k)),
+                log.Table(log.Alias("AB"), (i, j, k)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (
-                        log.Table(log.HardAlias("A"), (i, j)),
-                        log.Table(log.HardAlias("B"), (k, j)),
+                        log.Table(log.Alias("A"), (i, j)),
+                        log.Table(log.Alias("B"), (k, j)),
                     ),
                 ),
             ),
             # matmul
             log.Query(
-                log.Table(log.HardAlias("C"), (i, j)),
+                log.Table(log.Alias("C"), (i, j)),
                 log.Aggregate(
                     log.Literal(ffuncs.add),
                     log.Literal(0),
-                    log.Table(log.HardAlias("AB"), (i, j, k)),
+                    log.Table(log.Alias("AB"), (i, j, k)),
                     (k,),
                 ),
             ),
             # elemwise
             log.Query(
-                log.Table(log.HardAlias("RES"), (i, j)),
+                log.Table(log.Alias("RES"), (i, j)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (
-                        log.Table(log.HardAlias("C"), (i, j)),
-                        log.Table(log.HardAlias("S"), (i, j)),
+                        log.Table(log.Alias("C"), (i, j)),
+                        log.Table(log.Alias("S"), (i, j)),
                     ),
                 ),
             ),
-            log.Produces((log.HardAlias("RES"),)),
+            log.Produces((log.Alias("RES"),)),
         )
     )
 

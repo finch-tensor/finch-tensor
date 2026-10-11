@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from typing import Any, Generic, TypeVar
 
 import numpy as np
@@ -10,8 +10,8 @@ import finch as ft
 from finch.algebra import FinchOperator, ffuncs
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
-    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -78,7 +78,7 @@ def get_blocks_subtensor(
             starts[f], ends[f] = start, end
 
         expr = build_block_expr(arr, fields, starts, ends, coord)
-        out = HardAlias(f"block_{'_'.join(str(c) for c in coord)}")
+        out = Alias(f"block_{'_'.join(str(c) for c in coord)}")
         prgm = Plan((Query(Table(out, expr.fields()), expr), Produces((out,))))
         (result,) = NON_RECURSIVE_SCHEDULER(prgm)
         blocks[coord] = result
@@ -314,16 +314,8 @@ class BlockedStats(NumericStats, Generic[NS]):
 
         return blocks_grid
 
-    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
-        fields = tuple(over)
-        counts = np.array(
-            [b.estimate_non_fill_values(over=fields) for b in self.blocks.flat],
-            dtype=float,
-        ).reshape(self.blocks.shape)
-        rest = tuple(
-            axis for axis, idx in enumerate(self.index_order) if idx not in fields
-        )
-        return float(np.max(np.sum(counts, axis=rest), initial=0.0))
+    def estimate_non_fill_values(self):
+        return float(sum(b.estimate_non_fill_values() for b in self.blocks.flat))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
