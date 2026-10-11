@@ -11,8 +11,11 @@ key that says how the value was computed:
 - ("const", type, bits): a literal, by exact type and bits (`Literal` compares
   by value only, so `0.0 == -0.0`)
 - ("call", op, args): a pure `ffuncs` operator applied to vns
-- ("def", sid): the value statement `sid` assigns when its rhs has no vn, e.g.
-  the result of an impure call
+- ("load", buf, idx, heap), ("length", buf, heap), ("getattr", obj, attr,
+  struct): memory reads, keyed by the current version of the heap or the struct
+  fields
+- ("def", sid, key): a new value statement `sid` gives to `key`, e.g. a variable
+  assigned an impure call, the slot of an unpack, or memory after a write
 - ("phi", block, key): the value of `key` entering `block`, when it differs
   between the incoming paths
 - ("unknown", sid, key): the value of `key` when `sid` read it without a vn,
@@ -20,6 +23,12 @@ key that says how the value was computed:
 
 variables with the same vn hold the same value on every path. a variable that is
 undefined on some path is dropped at the join.
+
+writes start new memory versions: store and resize for the heap, setattr and
+unpacking a struct slot for structs, repack and impure calls for both. buffer
+writes never touch struct fields since buffers are handles. setattr also gives
+the root of its target a new value, since mlir rebinds it, and every unpack gives
+its slot a new value.
 
 the cfg comes from structured code, so loops are only entered through their
 header, and values named inside a loop are dropped there before they go stale.
@@ -51,14 +60,20 @@ from .nodes import (
     Call,
     ForLoop,
     Function,
+    GetAttr,
     If,
     IfElse,
+    Length,
     Literal,
+    Load,
     Module,
+    Repack,
     Resize,
     Return,
     SetAttr,
+    Slot,
     Store,
+    Unpack,
     Variable,
     WhileLoop,
 )
@@ -79,6 +94,11 @@ class AssemblyGlobalValueNumberingTransform(UnvalidatedForm, AssemblyTransform):
         result = assembly_global_value_numbering(term)
         assert isinstance(result, Module)
         return result
+
+
+_HEAP = ("mem", "heap")
+_STRUCT = ("mem", "struct")
+_MEMORY = (_HEAP, _STRUCT)
 
 
 def _const_key(val) -> tuple | None:
@@ -111,6 +131,18 @@ def _is_scalar(type_: FType | None) -> bool:
     return False
 
 
+def _root_key(node: AssemblyExpression) -> tuple | None:
+    """state key of the variable or slot under a getattr chain"""
+    match node:
+        case GetAttr(obj, _):
+            return _root_key(obj)
+        case Variable(name, _):
+            return ("var", name)
+        case Slot(name, _):
+            return ("slot", name)
+    return None
+
+
 def _is_impure(stmt: AssemblyNode) -> bool:
     for node in PostOrderDFS(stmt):
         match node:
@@ -123,8 +155,9 @@ def _is_impure(stmt: AssemblyNode) -> bool:
 
 class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
     """
-    gvn analysis, see the module docstring. a state maps ("var", name) to the vn
-    of the variable, `table` interns vn keys and `labels` prints them.
+    gvn analysis, see the module docstring. a state maps ("var", name),
+    ("slot", name) and the memory versions ("mem", "heap"), ("mem", "struct")
+    to vns, `table` interns vn keys and `labels` prints them.
     """
 
     def __init__(self, cfg: ControlFlowGraph):
@@ -140,6 +173,10 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
 
     def direction(self) -> str:
         return "forward"
+
+    def boundary_state(self) -> dict:
+        # the memory a function starts with
+        return {key: self.number(("entry", key), f"{key[1]}@entry") for key in _MEMORY}
 
     def join(self, state_1: dict, state_2: dict) -> dict:
         return {key: vn for key, vn in state_1.items() if state_2.get(key) == vn}
@@ -176,22 +213,46 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
             # nothing is numbered in a statement with unknown effects
             match stmt:
                 case Assign(Variable(name, _), _):
-                    self.define(state, name, sid)
+                    self.define(state, ("var", name), sid)
+            for key in _MEMORY:
+                self.define(state, key, sid)
             return
         match stmt:
             case Assign(Variable(name, _), rhs):
                 vn = self.eval(rhs, state, sid, vns)
                 if vn is None:
-                    self.define(state, name, sid)
+                    self.define(state, ("var", name), sid)
                 else:
                     state[("var", name)] = vn
+                return
             case AssemblyExpression():
                 self.eval(stmt, state, sid, vns)
+                return
+            case Unpack(_, rhs):
+                # the slot is defined, not read
+                self.eval(rhs, state, sid, vns)
             case AssemblyTree():
                 for child in stmt.children:
                     match child:
                         case AssemblyExpression():
                             self.eval(child, state, sid, vns)
+        # effects, after the operands are read
+        match stmt:
+            case Store() | Resize():
+                self.define(state, _HEAP, sid)
+            case SetAttr(obj, _, _):
+                self.define(state, _STRUCT, sid)
+                root = _root_key(obj)
+                if root is not None:
+                    self.define(state, root, sid)
+            case Unpack(Slot(name, type_), _):
+                self.define(state, ("slot", name), sid)
+                match type_:
+                    case StructFType():
+                        self.define(state, _STRUCT, sid)
+            case Repack():
+                for key in _MEMORY:
+                    self.define(state, key, sid)
 
     def eval(
         self,
@@ -209,16 +270,44 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                     vn = self.number(key, repr(val))
             case Variable(name, _):
                 vn = self.read(state, ("var", name), sid)
+            case Slot(name, _):
+                vn = self.read(state, ("slot", name), sid)
             case Call(Literal(op), args):
                 arg_vns = [self.eval(arg, state, sid, vns) for arg in args]
                 op_key = _op_key(op)
                 if (
                     op_key is not None
                     and None not in arg_vns
-                    and all(_is_scalar(self.result_type(e)) for e in (*args, node))
+                    and _is_scalar(self.result_type(node))
                 ):
+                    key: tuple = ("call", op_key, tuple(arg_vns))
                     label = f"{qual_str(op)}({', '.join(f'%{x}' for x in arg_vns)})"
-                    vn = self.number(("call", op_key, tuple(arg_vns)), label)
+                    if not all(_is_scalar(self.result_type(arg)) for arg in args):
+                        # e.g. `scansearch` reads its buffer argument
+                        key += (self.read(state, _HEAP, sid),)
+                        key += (self.read(state, _STRUCT, sid),)
+                        label += f" @%{key[-2]}, %{key[-1]}"
+                    if None not in key:
+                        vn = self.number(key, label)
+            case Load(buf, idx):
+                buf_vn = self.eval(buf, state, sid, vns)
+                idx_vn = self.eval(idx, state, sid, vns)
+                heap = self.read(state, _HEAP, sid)
+                if None not in (buf_vn, idx_vn, heap):
+                    label = f"load(%{buf_vn}, %{idx_vn}) @%{heap}"
+                    vn = self.number(("load", buf_vn, idx_vn, heap), label)
+            case Length(buf):
+                buf_vn = self.eval(buf, state, sid, vns)
+                heap = self.read(state, _HEAP, sid)
+                if None not in (buf_vn, heap):
+                    label = f"length(%{buf_vn}) @%{heap}"
+                    vn = self.number(("length", buf_vn, heap), label)
+            case GetAttr(obj, Literal(attr)):
+                obj_vn = self.eval(obj, state, sid, vns)
+                struct = self.read(state, _STRUCT, sid)
+                if None not in (obj_vn, struct):
+                    label = f"%{obj_vn}.{attr} @%{struct}"
+                    vn = self.number(("getattr", obj_vn, attr, struct), label)
             case AssemblyTree():
                 for child in node.children:
                     match child:
@@ -228,13 +317,13 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
             vns[id(node)] = vn
         return vn
 
-    def define(self, state: dict, name: str, sid: int | None) -> None:
-        """bind `name` to the value assigned by statement `sid`"""
+    def define(self, state: dict, key: tuple, sid: int | None) -> None:
+        """bind `key` to a new value defined by statement `sid`"""
         # unnumbered statements (loop counters) never create names
         if sid is None:
-            state.pop(("var", name), None)
+            state.pop(key, None)
         else:
-            state[("var", name)] = self.number(("def", sid), f"{name}@{sid}")
+            state[key] = self.number(("def", sid, key), f"{key[1]}@{sid}")
 
     def read(self, state: dict, key: tuple, sid: int | None) -> int | None:
         vn = state.get(key)
@@ -366,15 +455,22 @@ class _GVNRewriter:
 
         def replace(node, exclude=None):
             match node:
-                case Call(op, args):
+                case Call() | Load() | Length() | GetAttr():
                     for var in candidates.get(vns.get(id(node), -1), ()):
                         if var != exclude and var.type == self.ctx.result_type(node):
                             return var
+            # never rewrite buffer operands or getattr objects
+            match node:
+                case Call(op, args):
                     new_args = tuple(replace(arg) for arg in args)
                     if any(
                         new is not old for new, old in zip(new_args, args, strict=True)
                     ):
                         return Call(op, new_args)
+                case Load(buf, idx):
+                    new_idx = replace(idx)
+                    if new_idx is not idx:
+                        return Load(buf, new_idx)
             return node
 
         match stmt:
