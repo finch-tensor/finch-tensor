@@ -2,6 +2,7 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
+from finch.algebra import StaticFillFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter.smart_formatter import (
     IterCostFormatter,
@@ -63,7 +64,7 @@ def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     formatter = StorageCostFormatter()
     formatter._stats_factory = stats_factory
     ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
+        StaticFillFType(np.float64(0.0)), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
@@ -83,7 +84,7 @@ def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     formatter = IterCostFormatter()
     formatter._stats_factory = stats_factory
     ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
+        StaticFillFType(np.float64(0.0)), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
@@ -94,7 +95,7 @@ def _cost_output_pattern(formatter_cls, stats, stats_factory):
     formatter = formatter_cls()
     formatter._stats_factory = stats_factory
     shape_type = tuple(fl.ftype(np.intp) for _ in stats.index_order)
-    ftype = formatter.get_tensor_ftype(stats.fill_value, shape_type, stats)
+    ftype = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats)
 
     lvl = ftype.lvl_t
     pattern = []

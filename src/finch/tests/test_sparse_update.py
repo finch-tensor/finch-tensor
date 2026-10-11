@@ -64,8 +64,8 @@ def copy_program(
             ntn.Declare(
                 dst_slot,
                 ntn.Literal(
-                    target.ftype.fill_value
-                    if is_dynamic(target.ftype.fill_value)
+                    target.ftype.fill_type
+                    if is_dynamic(target.ftype.fill_type)
                     else target.fill_value
                 ),
                 op,
@@ -137,7 +137,8 @@ def tensors(format_, data, position_type=np.intp, fill=0):
         position_type=ftype(position_type),
     )
     dst_fmt = element(
-        fill if is_dynamic(fill) else np.int64(fill), position_type=ftype(position_type)
+        fill.ftype if isinstance(fill, DynamicFill) else np.int64(fill),
+        position_type=ftype(position_type),
     )
     for char in reversed(format_):
         src_fmt = dense(src_fmt)

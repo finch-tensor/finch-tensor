@@ -114,7 +114,7 @@ def test_bufferized_ndarray_fill_value_dtype():
         a = BufferizedNDArray.from_numpy(arr, fill_value=0)
 
         assert a.fill_value.dtype == arr.dtype
-        assert a.ftype.fill_value.value.dtype == arr.dtype
+        assert a.ftype.fill_type.value.dtype == arr.dtype
         assert finch.defer(a).fill_value.dtype == arr.dtype
         assert asarray(a, copy=True).fill_value.dtype == arr.dtype
         assert a[0:1].fill_value.dtype == arr.dtype
@@ -129,7 +129,7 @@ def test_bufferized_ndarray_custom_fill_value():
     a = BufferizedNDArray.from_numpy(arr, fill_value=2)
 
     assert a.fill_value == np.float32(2)
-    assert a.ftype.fill_value.value == np.float32(2)
+    assert a.ftype.fill_type.value == np.float32(2)
     assert np.all(a.ftype.construct((2, 3)).to_numpy() == np.float32(2))
 
     x = BufferizedNDArray.from_numpy(arr, fill_value=np.nan)
@@ -843,7 +843,7 @@ def test_fiber_tensor_to_csr():
             SparseListLevel(
                 ElementLevel(
                     element(
-                        fill_value=np.float64(0),
+                        fill_type=np.float64(0),
                         position_type=int32,
                     ),
                     NumpyBuffer(data),
@@ -876,7 +876,7 @@ def test_fiber_tensor_to_coo():
         SparseCOOLevel(
             ElementLevel(
                 element(
-                    fill_value=np.float64(0),
+                    fill_type=np.float64(0),
                     position_type=int32,
                 ),
                 NumpyBuffer(data),

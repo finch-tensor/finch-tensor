@@ -205,7 +205,7 @@ def test_kernels_write_tensor_fields_back(compiler):
     # A kernel which changes a dimension or a dynamic fill of a tensor it was
     # given updates the tensor, so that kernels can redefine shapes and fills.
     fill = DynamicFill(np.float64(0.0))
-    fiber = fiber_tensor(dense(element(fill))).from_numpy(np.zeros(3))
+    fiber = fiber_tensor(dense(element(fill.ftype))).from_numpy(np.zeros(3), fill)
     array = finch.BufferizedNDArray.from_numpy(np.zeros(3), fill_value=fill)
     formats = (fiber.ftype, array.ftype)
     t, a = asm.Variable("t", fiber.ftype), asm.Variable("a", array.ftype)

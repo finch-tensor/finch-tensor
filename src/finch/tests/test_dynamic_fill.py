@@ -102,14 +102,15 @@ def test_dynamic_fill_same():
 
 def test_apply_fill_known_folds():
     # A static result stays static only while the algebra can act on its value.
-    assert apply_fill(ffuncs.add, 1.0, 0.0) == StaticFill(1.0)
-    assert apply_fill(ffuncs.mul, 2.0, 0.0) == StaticFill(0.0)
+    one, two, zero = StaticFill(1.0), StaticFill(2.0), StaticFill(0.0)
+    assert apply_fill(ffuncs.add, one, zero) == one
+    assert apply_fill(ffuncs.mul, two, zero) == zero
     # The value still folds when it cannot be compiled against; it is only the
     # marking that goes, so a chain of such folds shares one kernel.
-    folded = apply_fill(ffuncs.add, 1.0, 2.0)
+    folded = apply_fill(ffuncs.add, one, two)
     assert folded.value == 3.0
     assert is_dynamic(folded)
-    assert np.isnan(apply_fill(ffuncs.add, float("nan"), 2.0).value)
+    assert np.isnan(apply_fill(ffuncs.add, StaticFill(float("nan")), two).value)
 
 
 def test_fill_ftypes():
@@ -132,9 +133,9 @@ def test_fill_ftypes():
 
 def test_apply_fill_dynamic_propagates():
     d = DynamicFill(np.float64(4.0))
-    assert apply_fill(ffuncs.add, 2.0, d) == DynamicFill(np.float64(0.0))
+    assert apply_fill(ffuncs.add, StaticFill(2.0), d) == DynamicFill(np.float64(0.0))
     assert apply_fill(ffuncs.add, d, d) == DynamicFill(np.float64(0.0))
-    r = apply_fill(ffuncs.add, np.int64(1), d)
+    r = apply_fill(ffuncs.add, StaticFill(np.int64(1)), d)
     assert isinstance(r, DynamicFill)
     assert r.element_type == ftype(np.float64)
     # The value still folds; it is simply not something to compile against.
@@ -144,12 +145,12 @@ def test_apply_fill_dynamic_propagates():
 def test_apply_fill_annihilator_refinement():
     # A Static annihilator determines the fill regardless of the Dynamic args,
     # so the result is Static again.
-    assert apply_fill(ffuncs.mul, 0.0, DynamicFill(np.float64(2.0))) == StaticFill(0.0)
+    two = DynamicFill(np.float64(2.0))
+    assert apply_fill(ffuncs.mul, StaticFill(0.0), two) == StaticFill(0.0)
+    inf = StaticFill(float("inf"))
+    assert apply_fill(ffuncs.add, inf, two) == inf
     assert apply_fill(
-        ffuncs.add, float("inf"), DynamicFill(np.float64(2.0))
-    ) == StaticFill(float("inf"))
-    assert apply_fill(
-        ffuncs.logical_and, False, DynamicFill(np.bool_(True))
+        ffuncs.logical_and, StaticFill(False), DynamicFill(np.bool_(True))
     ) == StaticFill(False)
 
 
@@ -439,7 +440,7 @@ class _DynamicFillFiber(FiberTensor):
     @property
     def ftype(self):
         base = super().ftype
-        return base.with_fill(base.fill_value.as_dynamic())
+        return base.with_fill(base.fill_type.as_dynamic())
 
 
 def _sparse_fiber(fill, cls=FiberTensor):
@@ -514,7 +515,7 @@ class _DynamicRejectingLoader(UnvalidatedForm, LogicLoader):
         self.ctx = ctx
 
     def lower(self, prgm, bindings, stats, stats_factory):
-        if builtins.any(is_dynamic(t.fill_value) for t in bindings.values()):
+        if builtins.any(is_dynamic(t.fill_type) for t in bindings.values()):
             raise DynamicFillError("dynamic fills unsupported here")
         return self.ctx(prgm, bindings, stats, stats_factory)
 
@@ -541,20 +542,20 @@ def test_backend_refusal_propagates():
 def test_ftype_reports_a_fill_and_tensor_reports_a_value():
     """The two layers of the contract: an ftype says *whether* a kernel may
     specialize on the fill, a tensor just gives the value."""
-    from finch.algebra import AbstractFill
+    from finch.algebra import AbstractFill, AbstractFillFType
 
     arr = finch.asarray(np.arange(3.0))
-    assert isinstance(arr.ftype.fill_value, AbstractFill)
+    assert isinstance(arr.ftype.fill_type, AbstractFillFType)
     assert not isinstance(arr.fill_value, AbstractFill)
-    assert arr.fill_value == arr.ftype.fill_value.value
+    # Only a static fill's value is part of the format.
+    assert arr.fill_value == arr.ftype.fill_type.value
 
     s = finch.Scalar(np.float64(2.0))
-    assert isinstance(s.ftype.fill_value, AbstractFill)
+    assert isinstance(s.ftype.fill_type, AbstractFillFType)
     assert s.fill_value == 2.0
-    # A Scalar declares its fill dynamic, keeping the value while staying out of
-    # the kernel cache key.
-    assert is_dynamic(s.ftype.fill_value)
-    assert s.ftype.fill_value.value == 2.0
+    # A Scalar declares its fill dynamic, which keeps the value out of the
+    # kernel cache key. The scalar holds the value itself.
+    assert is_dynamic(s.ftype.fill_type)
 
 
 def test_executor_output_keeps_a_dynamic_fill():
@@ -570,8 +571,7 @@ def test_executor_output_keeps_a_dynamic_fill():
     # The value resolved, and it is the right one ...
     assert out.fill_value == 5.0
     # ... but nothing downstream may compile against it.
-    assert is_dynamic(out.ftype.fill_value)
-    assert out.ftype.fill_value.value == 5.0
+    assert is_dynamic(out.ftype.fill_type)
 
 
 def test_dynamic_output_feeds_a_reusable_kernel():
@@ -583,7 +583,7 @@ def test_dynamic_output_feeds_a_reusable_kernel():
 
     for v in [2.0, 3.0, 4.0]:
         step1 = finch.compute(finch.defer(x) + v, ctx=ctx)
-        assert is_dynamic(step1.ftype.fill_value)
+        assert is_dynamic(step1.ftype.fill_type)
         step2 = finch.compute(finch.defer(step1) * 2.0, ctx=ctx)
         finch_assert_allclose(step2, (arr + v) * 2.0)
 

@@ -4,6 +4,7 @@ import numpy as np
 
 import finch as ft
 import finch.finch_logic as lgc
+from finch.algebra import StaticFillFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.formatter.galley_formatter import GalleyFormatter
 from finch.autoschedule.formatter.smart_formatter import (
@@ -120,7 +121,7 @@ def test_galley_uses_support_projected_over_fused_dimensions(
     projected = np.any(data, axis=tuple(range(nfused))).astype(data.dtype)
     projected_stats = factory(ft.asarray(projected), fields[nfused:])
     expected = GalleyFormatter().get_tensor_ftype(
-        stats.fill_value,
+        stats.fill_type,
         tensor.shape_type[nfused:],
         projected_stats,
         factory,
@@ -159,7 +160,7 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
     formatter._stats_factory = factory
     projected = factory(ft.asarray(np.ones(8)), (i,))
     projected_fmt = formatter.get_tensor_ftype(
-        stats.fill_value, tensor.shape_type[1:], projected
+        stats.fill_type, tensor.shape_type[1:], projected
     )
     assert isinstance(projected_fmt, ft.FiberTensorFType)
     assert isinstance(projected_fmt.lvl_t, ft.DenseLevelFType)
@@ -198,7 +199,7 @@ def test_galley_removes_fused_fields_from_loop_order(monkeypatch, transpose):
 def test_fd_formatter_projects_temporal_fields_before_choosing_levels(monkeypatch):
     t, i, j = fields = tuple(map(lgc.Field, "tij"))
     stats = FDStats(
-        BaseTensorStats(fields, {t: 10, i: 3, j: 4}, 0.0),
+        BaseTensorStats(fields, {t: 10, i: 3, j: 4}, StaticFillFType(0.0)),
         {frozenset({i}), frozenset({i, j})},
     )
     a, scratch = lgc.HardAlias("a"), lgc.HardAlias("scratch")

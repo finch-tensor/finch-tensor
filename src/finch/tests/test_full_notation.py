@@ -27,7 +27,7 @@ def test_full_interpreter(shape):
     for r, dim in enumerate(shape):
         assert interpreter(ntn.Dimension(full, ntn.Literal(r))) == dim
     assert full.result_type.shape_type == tuple(ftype(dim) for dim in shape)
-    assert is_dynamic(full.result_type.fill_value)
+    assert is_dynamic(full.result_type.fill_type)
     access = ntn.Access(full, ntn.Read(), tuple(ntn.Literal(0) for _ in shape))
     assert interpreter(ntn.Unwrap(access)) == 7
     view = tensor.access((0,) * len(shape))

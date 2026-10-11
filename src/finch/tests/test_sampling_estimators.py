@@ -6,6 +6,7 @@ import numpy as np
 import scipy.sparse as sps
 
 import finch as ft
+from finch.algebra import StaticFillFType
 from finch.autoschedule.tensor_stats import BaseTensorStats
 from finch.autoschedule.tensor_stats.sampling_stats import (
     SAMPLING_ESTIMATORS,
@@ -169,7 +170,9 @@ def test_sampling_scan_keeps_large_sketch_sparse():
     tensor = ft.asarray(data)
     fields = (Field("i"), Field("j"))
     stats = SamplingStats(
-        BaseTensorStats(fields, dict(zip(fields, tensor.shape, strict=True)), 0),
+        BaseTensorStats(
+            fields, dict(zip(fields, tensor.shape, strict=True)), StaticFillFType(0)
+        ),
         sketch=Table(Literal(tensor), fields),
         sample_probs=[1.0, 1.0],
     )
