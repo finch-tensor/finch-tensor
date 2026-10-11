@@ -8,11 +8,13 @@ def main(#A0#1: BufferizedNDArray, #A1#2: BufferizedNDArray, #A2#3: BufferizedND
     #_A2#10: BufferizedNDArray = unpack(#A2#3)
     #A2_dim_0#11: finch.int64 = #_A2#10.shape[0]
     #A2_dim_1#12: finch.int64 = #_A2#10.shape[1]
-    declare(#_A2#10, 0, add, ['#A2_dim_0#11', '#A2_dim_1#12'])
-    loop(#i0#13, make_extent(0, #A0_dim_0#5)):
-        loop(#i1#14, make_extent(0, #A0_dim_1#6)):
-            loop(#i2#15, make_extent(0, #A1_dim_1#9)):
-                increment(update(#_A2#10, ['#i0#13', '#i2#15'], add), mul(unwrap(read(#_A0#4, ['#i0#13', '#i1#14'])), unwrap(read(#_A1#7, ['#i1#14', '#i2#15']))))
+    #A2_dim_0#13: finch.int64 = #A0_dim_0#5
+    #A2_dim_1#14: finch.int64 = #A1_dim_1#9
+    declare(#_A2#10, 0, add, ['#A2_dim_0#13', '#A2_dim_1#14'])
+    loop(#i0#15, make_extent(0, #A0_dim_0#5)):
+        loop(#i1#16, make_extent(0, #A0_dim_1#6)):
+            loop(#i2#17, make_extent(0, #A1_dim_1#9)):
+                increment(update(#_A2#10, ['#i0#15', '#i2#17'], add), mul(unwrap(read(#_A0#4, ['#i0#15', '#i1#16'])), unwrap(read(#_A1#7, ['#i1#16', '#i2#17']))))
     freeze(#_A2#10, add)
     repack(#_A0#4, #A0#1)
     repack(#_A1#7, #A1#2)

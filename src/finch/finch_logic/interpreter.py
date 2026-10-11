@@ -39,7 +39,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader
 from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -189,7 +189,10 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(Table(Alias() as var, idxs), rhs):
                 rhs = self(Reorder(rhs, idxs))
-                if var not in self.bindings:
+                if (
+                    var not in self.bindings
+                    or self.bindings[var].shape != rhs.tns.shape
+                ):
                     self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
                         rhs.tns.fill,
@@ -286,8 +289,6 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return MockLogicLibrary(prgm, bindings), bindings, shape_vars, prgm
+        return MockLogicLibrary(prgm, bindings), bindings, prgm

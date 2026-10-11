@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from typing import Any
 
-import numpy as np
-
 from finch import finch_logic as lgc
 from finch.algebra import AbstractFill, is_dynamic
 from finch.algebra.tensor import Tensor, TensorFType
@@ -91,23 +89,15 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         arg_ftypes: dict[lgc.Alias, TensorFType] = {
             var: val.ftype for var, val in bindings.items()
         }
-        mod, binding_ftypes, binding_idxs, final_prgm = self._load_cached(
-            stmt, arg_ftypes, bindings
-        )
+        mod, binding_ftypes, final_prgm = self._load_cached(stmt, arg_ftypes, bindings)
 
         input_bindings = dict(
             zip(binding_ftypes.keys(), bindings.values(), strict=False)
         )
         bindings = input_bindings.copy()
 
-        binding_shapes = dict[lgc.Field | None, np.intp]()
-        for var, tns in bindings.items():
-            for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
-                if idx is not None:
-                    binding_shapes[idx] = dim
-
         # Dynamic output fills resolve at bind time against the actual
-        # argument fills, mirroring the shape resolution above.
+        # argument fills.
         fill_map: dict[lgc.Alias, AbstractFill] | None = None
         if any(
             is_dynamic(tns_ftype.fill_type)
@@ -120,7 +110,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
 
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
-                shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
+                shape = (0,) * tns_ftype.ndim
                 if is_dynamic(tns_ftype.fill_type):
                     assert fill_map is not None
                     # We preserve the dynamic fill value in the ftype so that

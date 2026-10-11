@@ -21,7 +21,6 @@ from finch.finch_logic import (
     LogicLoader,
     StatsFactory,
     TensorStats,
-    compute_shape_vars,
 )
 from finch.finch_notation import NotationInterpreter
 from finch.finch_notation.stages import NotationLoader
@@ -156,6 +155,27 @@ class NotationContext:
             if is_static(fill):
                 return ntn.Literal(fill.value)
         return PointwiseContext(self)(init, {})
+
+    def query_shape(
+        self, var: lgc.Alias, idxs: tuple[lgc.Field, ...], rhs: lgc.LogicExpression
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Bind the output shape from the RHS at this definition."""
+        dims = dict(
+            zip(rhs.fields(), rhs.dimmap(merge_shapes, self.shapes), strict=True)
+        )
+        shape = []
+        stmts = []
+        for i, (idx, dim_t) in enumerate(
+            zip(idxs, self.bindings[var].shape_type, strict=True)
+        ):
+            value = dims.get(idx) or ntn.Literal(dim_t(1))
+            if value.result_type != dim_t:
+                value = ntn.Call(ntn.Literal(ffuncs.astype(dim_t)), (value,))
+            dim = ntn.Variable(gensym(f"{var.name}_dim_{i}"), dim_t)
+            shape.append(dim)
+            stmts.append(ntn.Assign(dim, value))
+        self.shapes[var] = tuple(shape)
+        return tuple(stmts)
 
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""
@@ -364,18 +384,20 @@ class NotationContext:
                 # A copy starts from the fill value of arg, and the fields of
                 # arg which lhs lacks are reduced by overwriting.
                 loop_order = (*idxs, *(idx for idx in arg.idxs if idx not in idxs))
-                return self.fold(
+                stmts = self.query_shape(lhs, idxs, arg)
+                body = self.fold(
                     lhs,
                     idxs,
                     ffuncs.overwrite,
                     lgc.Reorder(arg, loop_order),
                     self.lower_init(lgc.fill_expression(arg)),
                 )
+                return ntn.Block((*stmts, body))
             case lgc.Query(
                 lgc.Table(lgc.Alias() as lhs, idxs),
                 lgc.Aggregate(lgc.Literal(op), init, lgc.Reorder() as arg, _),
             ):
-                stmts = self.freeze_reads(init)
+                stmts = self.query_shape(lhs, idxs, prgm.rhs) + self.freeze_reads(init)
                 body = self.fold(lhs, idxs, op, arg, self.lower_init(init))
                 return ntn.Block((*stmts, body))
             case lgc.QueryInto(
@@ -443,7 +465,6 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
         return self.ctx(prgm, bindings, stats, stats_factory)
@@ -539,11 +560,9 @@ class LogicCompiler(CompilerForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return lib, bindings, shape_vars, prgm
+        return lib, bindings, prgm

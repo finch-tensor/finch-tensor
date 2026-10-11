@@ -8,7 +8,6 @@ from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
     Aggregate,
     Alias,
-    Field,
     FillTable,
     Literal,
     LogicExpression,
@@ -348,7 +347,6 @@ class LogicFactorizer(AliasedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
         LogicStatement,
     ]:
         """
@@ -368,7 +366,6 @@ class LogicLoopOrderer(SingleAggregateForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
         LogicStatement,
     ]:
         """
@@ -388,7 +385,6 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        dict[Alias, tuple[Field | None, ...]],
         LogicStatement,
     ]:
         """

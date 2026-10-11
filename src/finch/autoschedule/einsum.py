@@ -7,6 +7,7 @@ from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_einsum import EinsumLoader, MockEinsumLoader
 from finch.finch_logic import Alias, LogicStatement, StatsFactory
 from finch.finch_logic.stages import LogicLoader
+from finch.symbolic import PostOrderDFS
 
 from .stages import FormattedForm, LogicEinsumLowerer
 
@@ -139,16 +140,15 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
         lgc.LogicStatement,
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
-        mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
+        # Query results are storage placeholders, not initialized einsum inputs.
+        defined = set()
+        for node in PostOrderDFS(prgm):
+            match node:
+                case lgc.Query(lgc.Table(lgc.Alias(name), _), _):
+                    defined.add(ein.Alias(name))
+        mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
         lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
-        lgc_shape_vars: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {
-            lgc.Alias(var.name): tuple(
-                lgc.Field(idx.name) if idx is not None else None for idx in idxs
-            )
-            for var, idxs in ein_shape_vars.items()
-        }
-        return mod, lgc_bindings, lgc_shape_vars, prgm
+        return mod, lgc_bindings, prgm

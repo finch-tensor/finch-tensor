@@ -267,7 +267,7 @@ def test_compiler_form_lowerer_keeps_definitions():
     )
     capture = LogicCapture()
     binds = bindings(d=np.zeros((2, 2)))
-    _, _, _, original = CompilerFormLowerer(capture)(
+    _, _, original = CompilerFormLowerer(capture)(
         plan, {var: tns.ftype for var, tns in binds.items()}, {}, DenseStatsFactory()
     )
     assert original == plan
