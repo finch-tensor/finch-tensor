@@ -26,6 +26,7 @@ from finch.algebra import (
     fisinstance,
     ftype,
     is_dynamic,
+    is_static,
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
@@ -382,7 +383,7 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
             return ctx(args[0])
         case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs._InitWriteFType(fill=fill):
+        case ffuncs._InitWriteFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
@@ -390,14 +391,14 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
             return ctx(args[1])
         case ffuncs._SameFType():
             return c_same(ctx, *args)
-        case ffuncs._ChooseFType(fill=fill):
+        case ffuncs._ChooseFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError("Pass a dynamic choose as a runtime operator")
             value = ctx.cache(
                 "fill",
-                asm.GetAttr(op, asm.Literal("fill_value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value),
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value")),
             )
             args = tuple(ctx.cache("choice", arg) for arg in args)
             result = ctx(value)
@@ -1159,7 +1160,7 @@ def serialize_to_c(fmt: FType, obj: Any) -> Any:
 
 def serialize_struct_to_c(fmt: StructFType, obj) -> Any:
     args = [
-        serialize_to_c(field, getattr(obj, name))
+        serialize_to_c(field, fmt.struct_getattr(obj, name))
         for name, field in fmt.struct_fields
         if c_type(field) is not None
     ]

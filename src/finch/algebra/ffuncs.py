@@ -16,11 +16,12 @@ from .algebra import (
 )
 from .fill import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     DynamicFillError,
     StaticFill,
     as_fill,
-    is_dynamic,
+    is_static,
 )
 from .ftypes import (
     FDType,
@@ -2244,7 +2245,7 @@ sign = _Sign()
 
 @dataclass(unsafe_hash=True)
 class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
-    fill: AbstractFill
+    fill_type: AbstractFillFType
 
     @property
     def struct_name(self):
@@ -2252,7 +2253,7 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("value", self.fill.element_type)]
+        return [("value", self.fill_type.element_type)]
 
     def __call__(self, value):
         if isinstance(value, _InitWrite) and value.ftype == self:
@@ -2261,15 +2262,15 @@ class _InitWriteFType(ImmutableStructFType, FinchOperatorFType):
 
     def from_fields(self, value):
         fill = (
-            DynamicFill(value, self.fill.element_type)
-            if is_dynamic(self.fill)
-            else self.fill
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(value, self.fill_type.element_type)
         )
         return _InitWrite(fill)
 
     def is_identity(self, val):
-        return not is_dynamic(self.fill) and builtins.bool(
-            np.all(same(val, self.fill.value))
+        return is_static(self.fill_type) and builtins.bool(
+            np.all(same(val, self.fill_type.value))
         )
 
     def return_type(self, *args: FType) -> FType:
@@ -2290,8 +2291,8 @@ class _InitWrite(FinchOperator):
     field; pass such operators through callable expressions in compiled code.
     """
 
-    def __init__(self, value):
-        self.fill = as_fill(value)
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
 
     @property
     def value(self):
@@ -2299,7 +2300,7 @@ class _InitWrite(FinchOperator):
 
     @property
     def ftype(self):
-        return _InitWriteFType(self.fill)
+        return _InitWriteFType(self.fill.ftype)
 
     def __eq__(self, other):
         return (
@@ -2319,7 +2320,8 @@ class _InitWrite(FinchOperator):
 
 
 def init_write(value):
-    return _InitWrite(value)
+    # The value may be raw, which is a static fill.
+    return _InitWrite(as_fill(value))
 
 
 class _OverwriteFType(SingletonOperatorFType):
@@ -2384,7 +2386,7 @@ first_arg = _FirstArg()
 
 @dataclass(unsafe_hash=True)
 class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
-    fill: AbstractFill
+    fill_type: AbstractFillFType
 
     @property
     def struct_name(self):
@@ -2392,13 +2394,13 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     @property
     def struct_fields(self):
-        return [("fill_value", self.fill.element_type)]
+        return [("fill_value", self.fill_type.element_type)]
 
     def from_fields(self, fill_value):
         fill = (
-            DynamicFill(fill_value, self.fill.element_type)
-            if is_dynamic(self.fill)
-            else self.fill
+            StaticFill(self.fill_type.value)
+            if is_static(self.fill_type)
+            else DynamicFill(fill_value, self.fill_type.element_type)
         )
         return _Choose(fill)
 
@@ -2408,7 +2410,7 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
 
     def return_type(self, *args: FType) -> FType:
         if not args:
-            return self.fill.element_type
+            return self.fill_type.element_type
         result_arg = args[0]
         assert isinstance(result_arg, FDType)
         result: FDType = result_arg
@@ -2418,20 +2420,20 @@ class _ChooseFType(ImmutableStructFType, FinchOperatorFType):
         return result
 
     def is_identity(self, val: Any) -> builtins.bool:
-        return not is_dynamic(self.fill) and builtins.bool(
-            np.all(same(val, self.fill.value))
+        return is_static(self.fill_type) and builtins.bool(
+            np.all(same(val, self.fill_type.value))
         )
 
     def init_value(self, type_: FType) -> Any:
         assert isinstance(type_, FDType)
-        if is_dynamic(self.fill):
-            raise DynamicFillError("A dynamic choose has no static initial value")
-        return type_(self.fill.value)
+        if is_static(self.fill_type):
+            return type_(self.fill_type.value)
+        raise DynamicFillError("A dynamic choose has no static initial value")
 
 
 class _Choose(FinchOperator):
-    def __init__(self, fill_value):
-        self.fill = as_fill(fill_value)
+    def __init__(self, fill: AbstractFill):
+        self.fill = fill
 
     @property
     def fill_value(self):
@@ -2458,11 +2460,12 @@ class _Choose(FinchOperator):
 
     @property
     def ftype(self):
-        return _ChooseFType(self.fill)
+        return _ChooseFType(self.fill.ftype)
 
 
 def choose(fill_value):
-    return _Choose(fill_value)
+    # The value may be raw, which is a static fill.
+    return _Choose(as_fill(fill_value))
 
 
 class _IdentityFType(SingletonOperatorFType):

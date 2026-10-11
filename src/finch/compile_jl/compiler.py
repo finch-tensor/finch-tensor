@@ -5,12 +5,14 @@ import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     DynamicFillError,
+    DynamicFillFType,
     StaticFill,
+    StaticFillFType,
     is_dynamic,
 )
-from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -368,7 +370,7 @@ class FinchJLGenerator:
                 return f"Finch.choose({value})"
 
             case ntn.Literal(val):
-                if isinstance(val, AbstractFill):
+                if isinstance(val, AbstractFill | AbstractFillFType):
                     # str() would silently emit broken source.
                     raise DynamicFillError(
                         "cannot emit a wrapped fill as a Julia literal"
@@ -392,14 +394,14 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
     dynamic_args = tuple(
         i
         for i, arg in enumerate(func.args)
-        if is_dynamic(getattr(arg.type_, "fill_value", None))
+        if is_dynamic(getattr(arg.type_, "fill_type", None))
     )
 
     def rule(node):
         match node:
-            case ntn.Literal(DynamicFill() as fill):
-                return ntn.Literal(ftype(fill.value)(0))
-            case ntn.Literal(StaticFill() as fill):
+            case ntn.Literal(DynamicFill() | DynamicFillFType() as fill):
+                return ntn.Literal(fill.element_type(0))
+            case ntn.Literal(StaticFill() | StaticFillFType() as fill):
                 return ntn.Literal(fill.value)
         return None
 

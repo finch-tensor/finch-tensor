@@ -2,7 +2,7 @@ import itertools
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import TypeVar
 
-from finch.algebra import StaticFill, ffuncs, is_annihilator
+from finch.algebra import StaticFillFType, ffuncs, is_annihilator
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
@@ -37,7 +37,7 @@ def stats_with_false_fill(
     stats: TS,
 ) -> TS:
     stats_copy = stats_factory.copy(stats)
-    stats_copy.fill_value = StaticFill(False)
+    stats_copy.fill_type = StaticFillFType(False)
     return stats_copy
 
 
@@ -76,9 +76,7 @@ def get_conjunctive_and_disjunctive_inputs(
                 arg_stats = insert_statistics(
                     stats_factory, arg, stats_bindings, replace=False, cache=cache
                 )
-                arg_is_conjunct = is_annihilator(
-                    op_node.val.ftype, arg_stats.fill_value
-                )
+                arg_is_conjunct = is_annihilator(op_node.val.ftype, arg_stats.fill_type)
                 arg_conjuncts, arg_disjuncts = get_conjunctive_and_disjunctive_inputs(
                     arg,
                     stats_factory,

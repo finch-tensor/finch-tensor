@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, cast
 from finch import tensor
 from finch.algebra import (
     CallableFType,
-    DynamicFill,
+    DynamicFillFType,
     FType,
-    StaticFill,
+    StaticFillFType,
     TensorFType,
     ftype,
     return_type,
@@ -292,11 +292,13 @@ class Full(NotationTree, NotationExpression):
     def result_type(self):
         match self.val:
             case Literal(val):
-                fill = StaticFill(val)
+                fill_type = StaticFillFType(val)
             case _:
-                fill = DynamicFill(self.val.result_type(0))
+                fill_type = DynamicFillFType(self.val.result_type)
         return tensor.patterns.FillTensorFType(
-            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+            fill_type,
+            self.val.result_type,
+            tuple(dim.result_type for dim in self.shape),
         )
 
     @classmethod

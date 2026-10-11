@@ -7,10 +7,9 @@ from typing import TYPE_CHECKING, TypeVar
 
 from finch import finch_logic as lgc
 from finch.algebra import (
-    AbstractFill,
+    AbstractFillFType,
     FType,
     TensorFType,
-    as_fill,
     ffuncs,
     ftype,
     ftypes,
@@ -45,14 +44,14 @@ def optimize_format(
     shape_type,
     stats,
     stats_factory,
-    fill_value,
+    fill_type: AbstractFillFType,
     candidates,
     leaf_cost_fn,
     over=(),
 ):
     n = len(fields)
-    fill_ftype = as_fill(fill_value).element_type
-    leaf = element(fill_value, fill_ftype)
+    fill_ftype = fill_type.element_type
+    leaf = element(fill_type, fill_ftype)
     val_size = np_dtype(fill_ftype).itemsize
     assert leaf.position_type is not None
     pos_size = np_dtype(leaf.position_type).itemsize
@@ -113,7 +112,7 @@ def total_tree_cost(
     leaf_cost_fn,
     over=(),
 ):
-    val_size = np_dtype(as_fill(lvl.fill_value).element_type).itemsize
+    val_size = np_dtype(lvl.fill_type.element_type).itemsize
     pos_size = np_dtype(ftype(lvl.position_type)).itemsize
 
     if level == len(fields):
@@ -150,7 +149,7 @@ class SmartFormatter(LogicFormatter):
     @abstractmethod
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
         over: tuple[lgc.Field, ...] = (),
@@ -171,8 +170,8 @@ class SmartFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -201,7 +200,7 @@ class SmartFormatter(LogicFormatter):
                             for dim in shape_types[alias][nfused:]
                         )
                         bindings[alias] = self.get_tensor_ftype(
-                            fill_values[alias],
+                            fill_types[alias],
                             shape_type,
                             rhs_stats,
                             rhs_stats.index_order[:nfused],
@@ -225,7 +224,7 @@ class SmartFormatter(LogicFormatter):
 class FDFormatter(SmartFormatter):
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
         over: tuple[lgc.Field, ...] = (),
@@ -241,8 +240,8 @@ class FDFormatter(SmartFormatter):
 
         # Slices are formatted by the support of every slice, so the fields of
         # `over` are dropped from the dense dimensions.
-        fill_ftype = as_fill(fill_value).element_type
-        lvl = element(fill_value, fill_ftype)
+        fill_ftype = fill_type.element_type
+        lvl = element(fill_type, fill_ftype)
         for dim in reversed(range(len(fields))):
             field = fields[dim]
             outer_fields = frozenset(fields[:dim])
@@ -333,7 +332,7 @@ class CostFormatter(SmartFormatter):
         self._stats_factory = stats_factory
         return super().lower(prgm, bindings, stats, stats_factory)
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats, over=()):
+    def get_tensor_ftype(self, fill_type, shape_type, stats, over=()):
         if self._stats_factory is None:
             raise ValueError("CostFormatter requires StatsFactory")
         # Each level is costed by the non-fill values of the largest slice.
@@ -342,7 +341,7 @@ class CostFormatter(SmartFormatter):
             shape_type,
             stats,
             self._stats_factory,
-            fill_value,
+            fill_type,
             self.candidates,
             self.leaf_cost_fn,
             over,

@@ -16,10 +16,12 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 from finch import finch_einsum as ein
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     CallableFType,
     FinchOperator,
     FinchOperatorFType,
     FType,
+    StaticFillFType,
     Tensor,
     TensorFType,
     apply_fill,
@@ -30,6 +32,7 @@ from finch.algebra import (
     ftype,
     init_value,
     normalize_device,
+    resolve_fill,
     result_type,
     return_type,
 )
@@ -85,18 +88,18 @@ def _shape_size(shape: tuple) -> int:
 
 
 class LazyTensorFType(TensorFType):
-    _fill_value: AbstractFill
+    _fill_type: AbstractFillFType
     _element_type: FType
     _shape_type: tuple[FType, ...]
 
     def __init__(
         self,
-        _fill_value: Any,
+        _fill_type: AbstractFillFType,
         _element_type: FType | type,
         _shape_type: tuple[FType | type, ...],
         _device=None,
     ):
-        self._fill_value = as_fill(_fill_value)
+        self._fill_type = _fill_type
         self._element_type = ftype(_element_type)
         self._shape_type = tuple(ftype(dim_t) for dim_t in _shape_type)
         self._device = normalize_device(_device)
@@ -105,7 +108,7 @@ class LazyTensorFType(TensorFType):
         if not isinstance(other, LazyTensorFType):
             return False
         return (
-            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
+            self._fill_type == other._fill_type
             and self._element_type == other._element_type
             and self._shape_type == other._shape_type
             and self.device == other.device
@@ -114,7 +117,7 @@ class LazyTensorFType(TensorFType):
     def __hash__(self):
         return hash(
             (
-                ffuncs.samehash(self._fill_value),
+                self._fill_type,
                 self._element_type,
                 self._shape_type,
                 self.device,
@@ -124,13 +127,14 @@ class LazyTensorFType(TensorFType):
     def construct(self, shape: tuple) -> LazyTensor:
         idxs = tuple(Field(gensym("i")) for _ in shape)
         ctx = EffectBlob()
-        expr = Table(Literal(FillTensor(shape, self._fill_value)), idxs)
+        fill = resolve_fill(self._fill_type)
+        expr = Table(Literal(FillTensor(shape, fill)), idxs)
         data, ctx = ctx.eval(expr)
         return LazyTensor(
             data=data,
             ctx=ctx,
             shape=shape,
-            fill_value=self._fill_value,
+            fill_value=fill,
             element_type=self._element_type,
             device=self.device,
         )
@@ -149,8 +153,8 @@ class LazyTensorFType(TensorFType):
         )
 
     @property
-    def fill_value(self) -> AbstractFill:
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        return self._fill_type
 
     @property
     def element_type(self) -> FType:
@@ -241,7 +245,7 @@ class LazyTensor(OverrideTensor):
         data: Alias,
         ctx: EffectBlob,
         shape: tuple,
-        fill_value: Any,
+        fill_value: AbstractFill,
         element_type: FType,
         device=None,
     ):
@@ -249,7 +253,7 @@ class LazyTensor(OverrideTensor):
         self.ctx = ctx
         self._shape = shape
         # Held as an AbstractFill so a dynamic fill survives ftype round trips.
-        self._fill_value = as_fill(fill_value)
+        self._fill_value = fill_value
         self._element_type = element_type
         self._device = normalize_device(device)
 
@@ -259,7 +263,7 @@ class LazyTensor(OverrideTensor):
     @property
     def ftype(self):
         return LazyTensorFType(
-            _fill_value=self._fill_value,
+            _fill_type=self._fill_value.ftype,
             _element_type=self._element_type,
             _shape_type=tuple(ftype(dim) for dim in self._shape),
             _device=self._device,
@@ -556,9 +560,7 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
     ctx = EffectBlob(stmt=Query(Table(tns, idxs), Table(Literal(arr), idxs)))
-    return LazyTensor(
-        tns, ctx, shape, arr.ftype.fill_value, arr.element_type, arr.device
-    )
+    return LazyTensor(tns, ctx, shape, arr.fill, arr.element_type, arr.device)
 
 
 def full(
@@ -689,7 +691,7 @@ def permute_dims(arg, /, axes: tuple[int, ...]) -> LazyTensor:
         data,
         ctx,
         tuple(arg.shape[i] for i in axis),
-        arg.fill_value,
+        arg.fill,
         arg.element_type,
         device=arg.device,
     )
@@ -756,7 +758,7 @@ def expand_dims(
         1 if n in axis else x.shape[n - offset[n]] for n in range(x.ndim + len(axis))
     )
     data_2, ctx = x.ctx.eval(expr)
-    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type, x.device)
+    return LazyTensor(data_2, ctx, shape_2, x.fill, x.element_type, x.device)
 
 
 def squeeze(
@@ -803,7 +805,7 @@ def squeeze(
     expr = Reorder(Table(x.data, idxs_1), idxs_2)
     shape_2 = tuple(x.shape[n] for n in newaxis)
     data_2, ctx = x.ctx.eval(expr)
-    return LazyTensor(data_2, ctx, shape_2, x.fill_value, x.element_type, x.device)
+    return LazyTensor(data_2, ctx, shape_2, x.fill, x.element_type, x.device)
 
 
 def reduce(
@@ -885,10 +887,12 @@ def reduce(
         )
         data = Reorder(data, keeps)
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
+    # The init may be a raw value, which is a static fill.
+    init_fill = as_fill(init)
     if dtype is None:
-        dtype = fixpoint_type(op_type, as_fill(init).ftype, x.element_type)
+        dtype = fixpoint_type(op_type, init_fill.ftype, x.element_type)
     expr, ctx = x.ctx.eval(data)
-    return LazyTensor(expr, ctx, shape, init, dtype, x.device)
+    return LazyTensor(expr, ctx, shape, init_fill, dtype, x.device)
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -980,7 +984,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
                 idims.append(Field(gensym("j")))
         bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
     expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
-    new_fill_value = apply_fill(f, *[a.ftype.fill_value for a in args])
+    new_fill_value = apply_fill(f, *[a.fill for a in args])
     op_type = f.ftype
     if not isinstance(op_type, CallableFType):
         raise TypeError(f"Expected a callable type, got {op_type}")
@@ -2142,7 +2146,7 @@ def cumulative(
     init = init_value(op_type, dtype)
     if explicit_dtype:
         init = dtype(init)
-    dtype = fixpoint_type(op_type, as_fill(init).ftype, x.element_type)
+    dtype = fixpoint_type(op_type, StaticFillFType(init), x.element_type)
 
     def cumulative_axis(
         arg: LazyTensor,
@@ -2959,7 +2963,7 @@ def outer(x1, x2) -> LazyTensor:
         data,
         ctx,
         (x1.shape[0], x2.shape[0]),
-        apply_fill(ffuncs.mul, x1.ftype.fill_value, x2.ftype.fill_value),
+        apply_fill(ffuncs.mul, x1.fill, x2.fill),
         return_type(ffuncs.mul.ftype, x1.element_type, x2.element_type),
         common_device(x1.device, x2.device),
     )

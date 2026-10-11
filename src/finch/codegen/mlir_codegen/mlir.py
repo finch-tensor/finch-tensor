@@ -20,6 +20,7 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     is_dynamic,
+    is_static,
     np_dtype,
     promote_type,
 )
@@ -671,7 +672,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             return ctx(args[0])
         case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs._InitWriteFType(fill=fill):
+        case ffuncs._InitWriteFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
@@ -680,13 +681,13 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
         case ffuncs._SameFType():
             x, y = args
             return mlir_same(ctx, ctx(x), ctx(y), x.result_type, y.result_type)
-        case ffuncs._ChooseFType(fill=fill):
+        case ffuncs._ChooseFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError("Pass a dynamic choose as a runtime operator")
             value = (
-                asm.GetAttr(op, asm.Literal("fill_value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value)
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value"))
             )
             fill_value = ctx(value)
             arg_values = [ctx(arg) for arg in args]

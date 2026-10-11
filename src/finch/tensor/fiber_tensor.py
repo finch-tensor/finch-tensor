@@ -9,15 +9,15 @@ import scipy.sparse as sps
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
-    DynamicFill,
-    DynamicFillError,
+    AbstractFillFType,
     ImmutableStructFType,
-    StaticFill,
+    StaticFillFType,
     TupleFType,
     as_fill,
     ftype,
     is_dynamic,
     normalize_device,
+    resolve_fill,
 )
 from finch.codegen import NumpyBuffer
 from finch.compile.lower import FinchTensorFType
@@ -197,7 +197,7 @@ class FiberTensor(OverrideTensor):
         indptr = obj.indptr
 
         element_lvl = element(
-            fill_value=np.zeros((), dtype=data.dtype)[()],
+            fill_type=np.zeros((), dtype=data.dtype)[()],
             element_type=ftype(data.dtype),
             position_type=ftype(indices.dtype),
         )
@@ -258,7 +258,7 @@ class FiberTensor(OverrideTensor):
         index_type = ftype(row.dtype)
 
         element_lvl = element(
-            fill_value=np.zeros((), dtype=data.dtype)[()],
+            fill_type=np.zeros((), dtype=data.dtype)[()],
             element_type=ftype(data.dtype),
             position_type=index_type,
         )
@@ -313,39 +313,34 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         self.get_child_type(attr)
         return asm.GetAttr(obj, asm.Literal(attr))
 
-    def with_fill(self, fill_value: Any) -> FiberTensorFType:
-        """Rebuild this ftype with the leaf fill value replaced."""
-        return FiberTensorFType(self.lvl_t.with_fill(fill_value), self._device)
+    def with_fill(self, fill_type: AbstractFillFType) -> FiberTensorFType:
+        """Rebuild this ftype with the leaf fill replaced."""
+        return FiberTensorFType(self.lvl_t.with_fill(fill_type), self._device)
 
     def fisinstance(self, other):
         other_t = ftype(other)
-        if is_dynamic(self.fill_value) and isinstance(other_t, FiberTensorFType):
+        if is_dynamic(self.fill_type) and isinstance(other_t, FiberTensorFType):
             # A dynamic-fill ftype accepts any fill value of matching dtype.
-            other_t = other_t.with_fill(self.fill_value)
+            other_t = other_t.with_fill(self.fill_type)
         return other_t == self
 
     def construct(self, shape: tuple[int, ...], fill_value: Any = None) -> FiberTensor:
         """
         Creates an instance of a FiberTensor with the given arguments.
         """
-        fmt = self
-        if fill_value is not None:
-            fill = as_fill(fill_value)
-            coerced = self.element_type(fill.value)
-            fmt = self.with_fill(
-                DynamicFill(coerced, self.element_type)
-                if is_dynamic(fill)
-                else StaticFill(coerced)
-            )
-        elif is_dynamic(self.fill_value):
-            raise DynamicFillError(
-                f"cannot construct {self!r} without a resolved fill value"
-            )
-        return FiberTensor(
+        # The fill value may be raw, which is a static fill.
+        fill = resolve_fill(
+            self.fill_type, None if fill_value is None else as_fill(fill_value)
+        )
+        # The levels are built with a static fill, which the tensor then
+        # replaces with its own.
+        fmt = self.with_fill(StaticFillFType(fill.value))
+        tns = FiberTensor(
             fmt.lvl_t.construct(shape=shape, pos=1),
             fmt.position_type(0),
             _device=fmt.device,
         )
+        return tns.with_fill(fill)
 
     def __call__(self, val: Any) -> FiberTensor:
         """
@@ -376,8 +371,8 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         return self.lvl_t.element_type
 
     @property
-    def fill_value(self):
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def device(self):
@@ -431,7 +426,12 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
         lvl, shape, pos = args
         return FiberTensor(lvl, pos, self.device)
 
-    def from_numpy(self, arr: np.ndarray) -> FiberTensor:
+    def from_numpy(self, arr: np.ndarray, fill_value: Any = None) -> FiberTensor:
+        # The fill value may be raw, which is a static fill.
+        fill = resolve_fill(
+            self.fill_type, None if fill_value is None else as_fill(fill_value)
+        )
+
         def build_level(lvl_t, shape):
             match lvl_t:
                 case levels.DenseLevelFType():
@@ -444,7 +444,7 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
                 case levels.ElementLevelFType():
                     if shape:
                         raise ValueError("Array rank does not match the fiber format")
-                    return lvl_t.from_fields(arr)
+                    return lvl_t.with_fill(fill.ftype).from_fields(arr, fill.value)
                 case _:
                     raise NotImplementedError(
                         f"NumPy conversion does not support {type(lvl_t).__name__}"

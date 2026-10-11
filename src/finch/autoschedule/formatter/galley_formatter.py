@@ -17,10 +17,9 @@ from typing import TypeVar
 
 from finch import finch_logic as lgc
 from finch.algebra import (
-    AbstractFill,
+    AbstractFillFType,
     FType,
     TensorFType,
-    as_fill,
     ffuncs,
     ftype,
     ftypes,
@@ -182,7 +181,7 @@ class GalleyFormatter(LogicFormatter):
 
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: NumericStats,
         stats_factory: StatsFactory,
@@ -198,7 +197,7 @@ class GalleyFormatter(LogicFormatter):
         formats = select_output_format(stats, stats_factory, loop_order, output_indices)
         logger.debug("Galley formats for %s: %s", output_indices, formats)
 
-        lvl = element(fill_value, as_fill(fill_value).element_type)
+        lvl = element(fill_type, fill_type.element_type)
         for level in reversed(range(len(output_indices))):
             lvl = formats[level].build(lvl, shape_type[level])
         return fiber_tensor(lvl)
@@ -216,8 +215,8 @@ class GalleyFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -255,7 +254,7 @@ class GalleyFormatter(LogicFormatter):
                             for dim in shape_types[alias][nfused:]
                         )
                         bindings[alias] = self.get_tensor_ftype(
-                            fill_values[alias],
+                            fill_types[alias],
                             shape_type,
                             format_stats,
                             stats_factory,

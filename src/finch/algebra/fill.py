@@ -46,6 +46,10 @@ class AbstractFillFType(FType, ABC):
         """The element type of the fill, always known."""
         ...
 
+    def as_dynamic(self) -> DynamicFillFType:
+        """This fill, marked so that kernels will not specialize on its value."""
+        return DynamicFillFType(self.element_type)
+
 
 class StaticFillFType(AbstractFillFType):
     """
@@ -104,6 +108,9 @@ class DynamicFillFType(AbstractFillFType):
     @property
     def element_type(self) -> FType:
         return self._element_type
+
+    def as_dynamic(self) -> DynamicFillFType:
+        return self
 
     def __call__(self, val: Any) -> DynamicFill:
         return DynamicFill(self._element_type(val), self._element_type)
@@ -255,11 +262,57 @@ def as_fill(fill: Any) -> AbstractFill:
     return StaticFill(fill)
 
 
-def is_dynamic(fill: Any) -> TypeGuard[DynamicFill]:
-    return isinstance(fill, DynamicFill)
+@overload
+def is_dynamic(fill: AbstractFillFType) -> TypeGuard[DynamicFillFType]: ...
 
 
-def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
+@overload
+def is_dynamic(fill: AbstractFill) -> TypeGuard[DynamicFill]: ...
+
+
+@overload
+def is_dynamic(fill: Any) -> TypeGuard[DynamicFill | DynamicFillFType]: ...
+
+
+def is_dynamic(fill: Any) -> TypeGuard[DynamicFill | DynamicFillFType]:
+    return isinstance(fill, DynamicFill | DynamicFillFType)
+
+
+@overload
+def is_static(fill: AbstractFillFType) -> TypeGuard[StaticFillFType]: ...
+
+
+@overload
+def is_static(fill: AbstractFill) -> TypeGuard[StaticFill]: ...
+
+
+@overload
+def is_static(fill: Any) -> TypeGuard[StaticFill | StaticFillFType]: ...
+
+
+def is_static(fill: Any) -> TypeGuard[StaticFill | StaticFillFType]:
+    return isinstance(fill, StaticFill | StaticFillFType)
+
+
+def resolve_fill(
+    fill_type: AbstractFillFType, fill: AbstractFill | None = None
+) -> AbstractFill:
+    """
+    The fill of a new tensor of a format whose fill is `fill_type`. A given
+    `fill` takes the element type of the format, and decides whether the fill of
+    the new tensor is dynamic. Otherwise the fill of the format must be static.
+    """
+    if fill is None:
+        if is_static(fill_type):
+            return StaticFill(fill_type.value)
+        raise DynamicFillError("A tensor with a dynamic fill needs a fill value")
+    value = fill_type.element_type(fill.value)
+    if is_dynamic(fill):
+        return DynamicFill(value, fill_type.element_type)
+    return StaticFill(value)
+
+
+def apply_fill(op: FinchOperator, *fills: AbstractFill) -> AbstractFill:
     """
     Compute the fill value of mapping `op` over tensors with fills `fills`.
 
@@ -272,7 +325,6 @@ def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
     # Imported lazily: `algebra` depends on this module.
     from .algebra import is_specializable_value
 
-    fills = tuple(as_fill(f) for f in fills)
     values = [f.value for f in fills]
     if not any(is_dynamic(f) for f in fills):
         result = op(*values)
@@ -285,3 +337,25 @@ def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
             return StaticFill(result_type(f.value))
     element_type = op.ftype.return_type(*(f.element_type for f in fills))
     return DynamicFill(op(*values), element_type)
+
+
+def apply_fill_type(
+    op: FinchOperator, *fill_types: AbstractFillFType
+) -> AbstractFillFType:
+    """
+    The fill of the format which results from mapping `op` over tensors whose
+    formats have the fills `fill_types`. This is the format of `apply_fill`.
+    """
+    from .algebra import is_specializable_value
+
+    statics = [f for f in fill_types if is_static(f)]
+    if len(statics) == len(fill_types):
+        result = op(*(f.value for f in statics))
+        if is_specializable_value(result):
+            return StaticFillFType(result)
+        return DynamicFillFType(ftype(result))
+    element_type = op.ftype.return_type(*(f.element_type for f in fill_types))
+    for f in statics:
+        if op.ftype.is_annihilator(f.value):
+            return StaticFillFType(element_type(f.value))
+    return DynamicFillFType(element_type)

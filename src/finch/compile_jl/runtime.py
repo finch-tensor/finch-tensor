@@ -10,7 +10,7 @@ from typing import Any
 import numpy as np
 
 from finch.algebra import Tensor, TensorFType
-from finch.algebra.fill import DynamicFill
+from finch.algebra.fill import DynamicFillFType
 from finch.tensor import BufferizedNDArray, FiberTensorFType
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
@@ -52,9 +52,9 @@ class _StoragePool:
         if self._free[key]:
             return self._free[key].popitem()[1]
         match ftype:
-            case FiberTensorFType(fill_value=DynamicFill() as fill):
-                # A dynamic-fill ftype can't construct storage without its fill.
-                tensor = ftype.construct(shape, fill_value=fill)
+            case FiberTensorFType(fill_type=DynamicFillFType() as fill_type):
+                # A dynamic fill is pinned in storage, so any value will do.
+                tensor = ftype.construct(shape, fill_value=fill_type(0))
             case _:
                 tensor = ftype.construct(shape)
         return _StorageLease(

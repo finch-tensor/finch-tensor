@@ -82,8 +82,8 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return 1 + self.lvl_t.ndim
 
     @property
-    def fill_value(self):
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self):

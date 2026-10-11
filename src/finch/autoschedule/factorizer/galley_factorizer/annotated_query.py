@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
 
 from finch.algebra import (
-    DynamicFill,
-    StaticFill,
+    StaticFillFType,
     cansplitpush,
     ffuncs,
     is_associative,
@@ -145,12 +144,15 @@ class AnnotatedQuery(Generic[TS]):
             top_counter += 1
 
             if op_lit.val is None:
-                idx_op[idx] = ffuncs.init_write(cache[agg_arg].fill_value)
-                match cache[agg_arg].fill_value:
-                    case DynamicFill() as fill:
-                        idx_init[idx] = fill
-                    case StaticFill() as fill:
-                        idx_init[idx] = fill.value
+                match cache[agg_arg].fill_type:
+                    case StaticFillFType() as fill_type:
+                        idx_op[idx] = ffuncs.init_write(fill_type.value)
+                        idx_init[idx] = fill_type.value
+                    case fill_type:
+                        # Kernels can't specialize on a dynamic fill, so the
+                        # output is overwritten from its runtime fill.
+                        idx_op[idx] = ffuncs.overwrite
+                        idx_init[idx] = fill_type
             else:
                 idx_op[idx] = op_lit.val
                 idx_init[idx] = init_lit.val
@@ -838,11 +840,11 @@ class AnnotatedQuery(Generic[TS]):
         """
         expr = self.point_expr
         if not isinstance(expr, Table):
-            match self.cache_point[expr].fill_value:
-                case DynamicFill() as fill:
-                    init = Literal(fill)
-                case StaticFill() as fill:
-                    init = Literal(fill.value)
+            match self.cache_point[expr].fill_type:
+                case StaticFillFType() as fill_type:
+                    init = Literal(fill_type.value)
+                case fill_type:
+                    init = Literal(fill_type)
             expr = Aggregate(
                 Literal(ffuncs.overwrite),
                 init,

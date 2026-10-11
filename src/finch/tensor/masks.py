@@ -36,8 +36,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         return self.body.position_type
 
     @property
-    def fill_value(self):
-        return self.body.fill_value
+    def fill_type(self):
+        return self.body.fill_type
 
     @property
     def shape_type(self):
@@ -129,8 +129,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         lvl = asm.GetAttr(ctx(tns.lvl), asm.Literal("body"))
         fill = (
             ntn.Value(self.body.lower_fill(lvl), self.element_type)
-            if is_dynamic(self.fill_value)
-            else ntn.Literal(self.fill_value.value)
+            if is_dynamic(self.fill_type)
+            else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,

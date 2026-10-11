@@ -4,7 +4,13 @@ import math
 from abc import ABC, abstractmethod
 from typing import Any
 
-from .fill import AbstractFill, AbstractFillFType, is_dynamic
+from .fill import (
+    AbstractFillFType,
+    DynamicFill,
+    DynamicFillFType,
+    StaticFill,
+    StaticFillFType,
+)
 from .ftypes import (
     CallableFType,
     FDTypeOrdered,
@@ -92,9 +98,14 @@ def is_idempotent(op: FinchOperatorFType) -> bool:
 
 
 def _specializable(val: Any) -> tuple[bool, Any]:
-    if isinstance(val, AbstractFill):
-        return not is_dynamic(val), val.value
-    return True, val
+    # A fill, or the fill of a format, may only be specialized on when static.
+    match val:
+        case StaticFill() | StaticFillFType():
+            return True, val.value
+        case DynamicFill() | DynamicFillFType():
+            return False, None
+        case _:
+            return True, val
 
 
 def is_identity(op: FinchOperatorFType, val: Any) -> bool:

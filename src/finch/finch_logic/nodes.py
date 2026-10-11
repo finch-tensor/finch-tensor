@@ -7,11 +7,13 @@ from typing import Any, Self, TypeVar
 
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFillFType,
     FinchOperator,
     FType,
     FTyped,
     apply_fill,
+    apply_fill_type,
     as_fill,
     ffuncs,
     fixpoint_type,
@@ -59,6 +61,8 @@ def merge_element_type(op: FinchOperator, *args: FType) -> FType:
 
 def reduce_element_type(op: FinchOperator, z: Any, t: FType) -> FType:
     match z:
+        case AbstractFillFType():
+            pass
         case FType():
             # An init table holds values of its element type.
             z = DynamicFillFType(z)
@@ -67,16 +71,41 @@ def reduce_element_type(op: FinchOperator, z: Any, t: FType) -> FType:
     return fixpoint_type(op.ftype, z, t)
 
 
+# Literals in a logic program may hold raw values, which are static fills, so
+# the fill inference below converts the values of literals as it meets them.
+
+
 def merge_fill_value(op: FinchOperator, *args) -> AbstractFill:
-    return apply_fill(op, *args)
+    return apply_fill(op, *(as_fill(arg) for arg in args))
 
 
-def reduce_fill_value(op, z, t) -> AbstractFill:
-    # `z` arrives from the IR, so it is a raw value or a Dynamic sentinel;
-    # normalize it, or fills would be compared against raw values downstream.
-    z = as_fill(z)
+def reduce_fill_value(op, z, t: AbstractFill) -> AbstractFill:
     # An overwrite reduction's background is the argument's background when
     # the init is not compile-time data.
+    if is_dynamic(z) and op == ffuncs.overwrite:
+        return t
+    match z:
+        case AbstractFillFType():
+            raise ValueError(f"The init {z} of a {op} reduction has no value")
+        case _:
+            return as_fill(z)
+
+
+def _literal_fill_type(val: Any) -> AbstractFillFType:
+    match val:
+        case AbstractFillFType():
+            return val
+        case _:
+            return as_fill(val).ftype
+
+
+def merge_fill_type(op: FinchOperator, *args) -> AbstractFillFType:
+    return apply_fill_type(op, *(_literal_fill_type(arg) for arg in args))
+
+
+def reduce_fill_type(op, z, t: AbstractFillFType) -> AbstractFillFType:
+    # Like `reduce_fill_value`, for the fills of formats.
+    z = _literal_fill_type(z)
     if is_dynamic(z) and op == ffuncs.overwrite:
         return t
     return z
@@ -245,7 +274,13 @@ class LogicExpression(LogicNode):
 
     def fill_value(self, bindings: dict[Alias, AbstractFill]) -> AbstractFill:
         """Returns fill value of the node."""
-        return self.valmap(merge_fill_value, reduce_fill_value, bindings)
+        return as_fill(self.valmap(merge_fill_value, reduce_fill_value, bindings))
+
+    def fill_type(self, bindings: dict[Alias, AbstractFillFType]) -> AbstractFillFType:
+        """Returns the fill of the node's format."""
+        return _literal_fill_type(
+            self.valmap(merge_fill_type, reduce_fill_type, bindings)
+        )
 
 
 class LogicStatement(LogicNode):
@@ -305,7 +340,23 @@ class LogicStatement(LogicNode):
     ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
+        self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
+        # A query of a bare literal leaves its raw value.
+        for var, fill in bindings.items():
+            bindings[var] = as_fill(fill)
+        return bindings
+
+    def infer_fill_type(
+        self, bindings: dict[Alias, AbstractFillFType]
+    ) -> dict[Alias, AbstractFillFType]:
+        """Infers the fills of the formats of all aliases defined in the
+        statement. The results will be stored in the dictionary passed to the
+        method."""
+        self.infer_valmap(merge_fill_type, reduce_fill_type, bindings)
+        # A query of a bare literal leaves its raw value.
+        for var, fill_type in bindings.items():
+            bindings[var] = _literal_fill_type(fill_type)
+        return bindings
 
 
 @dataclass(eq=True, frozen=True)

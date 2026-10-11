@@ -11,6 +11,7 @@ from finch.algebra import (
     ffuncs,
     ftypes,
     is_dynamic,
+    is_static,
 )
 from finch.algebra.tensor import TensorFType
 from finch.compile.lower import make_extent
@@ -143,8 +144,8 @@ class NotationContext:
         return (*stmts, ntn.Declare(self.slots[var], init, op, ()))
 
     def fill_literal(self, var: lgc.Alias) -> ntn.Literal:
-        fill = self.bindings[var].fill_value
-        return ntn.Literal(fill if is_dynamic(fill) else fill.value)
+        fill = self.bindings[var].fill_type
+        return ntn.Literal(fill.value if is_static(fill) else fill)
 
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""

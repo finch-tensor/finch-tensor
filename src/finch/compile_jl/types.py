@@ -6,8 +6,13 @@ from typing import Any
 import numpy as np
 
 import finch as ft
-from finch.algebra.fill import DynamicFill, StaticFill
-from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType, ftype
+from finch.algebra.fill import (
+    DynamicFill,
+    DynamicFillFType,
+    StaticFill,
+    StaticFillFType,
+)
+from finch.algebra.ftypes import FDTypeNumpy, FType, TupleFType
 from finch.tensor import DenseLevelFType, ElementLevelFType, LevelFType
 from finch.tensor.bufferized_ndarray import BufferizedNDArrayFType
 from finch.tensor.fiber_tensor import FiberTensorFType
@@ -191,9 +196,10 @@ def to_jl_vector(T, values, *, offset: int = 0):
 
 def _julia_literal(value: Any) -> str:
     match value:
-        case DynamicFill() as fill:
-            value = ftype(fill.value)(0)
-        case StaticFill() as fill:
+        case DynamicFill() | DynamicFillFType() as fill:
+            # A dynamic fill is bound at call time, so a zero stands in for it.
+            value = fill.element_type(0)
+        case StaticFill() | StaticFillFType() as fill:
             value = fill.value
     # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
@@ -240,7 +246,7 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     """
     if isinstance(level_ftype, ElementLevelFType):
         elem_t = _leaf_type_str(level_ftype.element_type)
-        fill = _julia_literal(level_ftype.fill_value)
+        fill = _julia_literal(level_ftype.fill_type)
         return f"Finch.ElementLevel({fill}, {elem_t}[])"
     if isinstance(level_ftype, DenseLevelFType):
         # interop.py's level_to_jl does `int(dimension)`, so the "shape"
@@ -299,7 +305,7 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     embedding directly in generated kernel source (see compiler.py)."""
     if isinstance(ftype, ScalarFType):
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_value)
+        fill = _julia_literal(ftype.fill_type)
         return f"Finch.Tensor(Finch.ElementLevel({fill}, {elem_t}[]))"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
@@ -308,14 +314,14 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
         # (regardless of the ftype's own dimension_type).
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_value)
+        fill = _julia_literal(ftype.fill_type)
         ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"
     if isinstance(ftype, FillTensorFType):
         # Matches interop.py, which passes a fill tensor as a Finch scalar.
-        return f"{scalar_type_str(ftype.fill_value, ftype.element_type)}()"
+        return f"{scalar_type_str(ftype.fill_type, ftype.element_type)}()"
     match ftype:
         case PatternTensorFType():
             shape = (1,) * ftype.ndim

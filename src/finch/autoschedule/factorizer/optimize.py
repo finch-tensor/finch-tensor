@@ -1,4 +1,4 @@
-from finch.algebra import DynamicFill, StaticFill, ffuncs
+from finch.algebra import DynamicFillFType, StaticFillFType, ffuncs
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
@@ -138,8 +138,8 @@ def with_unique_lhs(
 def add_aggregates(
     root: LogicStatement, bindings: dict[Alias, TensorFType]
 ) -> LogicStatement:
-    fill_values = root.infer_fill_value(
-        {var: val.fill_value for var, val in bindings.items()}
+    fill_types = root.infer_fill_type(
+        {var: val.fill_type for var, val in bindings.items()}
     )
 
     def rule_0(node):
@@ -147,11 +147,11 @@ def add_aggregates(
             case Query(_, Aggregate()):
                 return node
             case Query(Table(Alias() as lhs, _), arg):
-                match fill_values[lhs]:
-                    case DynamicFill() as fill:
-                        init = Literal(fill)
-                    case StaticFill() as fill:
-                        init = Literal(fill.value)
+                match fill_types[lhs]:
+                    case DynamicFillFType() as fill_type:
+                        init = Literal(fill_type)
+                    case StaticFillFType() as fill_type:
+                        init = Literal(fill_type.value)
                 return Query(
                     node.lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
                 )
@@ -350,9 +350,12 @@ def propagate_transpose_queries(root: LogicStatement):
 
     def rule_0(node):
         match node:
-            case Query(
-                Table(lhs, idxs), (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _))
-            ) as q:
+            case (
+                Query(
+                    Table(lhs, idxs),
+                    (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _)),
+                ) as q
+            ):
                 props[lhs] = Rewrite(PostWalk(rule_1))(reorder_to(q.rhs, idxs))
                 return Plan()
 

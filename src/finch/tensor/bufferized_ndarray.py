@@ -9,19 +9,24 @@ from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
+    DynamicFillFType,
     FType,
     ImmutableStructFType,
     MutableStructFType,
     StaticFill,
+    StaticFillFType,
     Tensor,
     TupleFType,
     as_fill,
     ffuncs,
     ftype,
     is_dynamic,
+    is_static,
     normalize_device,
     np_dtype,
+    resolve_fill,
 )
 from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.compile import looplets as lplt
@@ -58,7 +63,7 @@ class BufferizedNDArray(OverrideTensor):
         self._fill_value = (
             fill_value
             if isinstance(fill_value, AbstractFill)
-            else as_fill(elem_t(fill_value))
+            else StaticFill(elem_t(fill_value))
         )
 
         self._device = normalize_device(device)
@@ -121,7 +126,7 @@ class BufferizedNDArray(OverrideTensor):
             buffer_type=ftype(self.val),
             ndim=self.ndim,
             dimension_type=ftype(self._shape),
-            fill_value=self._fill_value,
+            fill_type=self._fill_value.ftype,
             device=self._device,
         )
 
@@ -139,10 +144,8 @@ class BufferizedNDArray(OverrideTensor):
         return self._fill_value.value
 
     @property
-    def fill(self) -> Any:
-        """The fill value as a struct field, for marshaling to kernels
-        compiled against a dynamic fill."""
-        return self._fill_value.value
+    def fill(self) -> AbstractFill:
+        return self._fill_value
 
     @property
     def device(self):
@@ -281,10 +284,16 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
             ("shape", self.shape_t),
             ("strides", self.strides_t),
         ]
-        if is_dynamic(self._fill_value):
+        if is_dynamic(self._fill_type):
             # The fill value is bound at call time through a struct field.
             fields.append(("fill", self.element_type))
         return fields
+
+    def struct_getattr(self, obj, attr):
+        # A dynamic fill is bound at call time through the "fill" field.
+        if attr == "fill":
+            return obj.fill_value
+        return getattr(obj, attr)
 
     def struct_setattr(self, obj, attr, value):
         match attr:
@@ -309,15 +318,11 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         return obj
 
     def from_fields(self, buf, shape, strides, fill=None):
-        if fill is not None and is_dynamic(self.fill_value):
-            # The fill field holds the value of a fill which stays dynamic.
+        if is_dynamic(self.fill_type):
+            # The fill field holds the value of the dynamic fill.
             fill = DynamicFill(fill, self.element_type)
         return BufferizedNDArray(
-            buf,
-            shape,
-            strides,
-            self.fill_value if fill is None else fill,
-            device=self.device,
+            buf, shape, strides, resolve_fill(self.fill_type, fill), device=self.device
         )
 
     def from_numpy(self, arr: np.ndarray, fill_value=None):
@@ -335,7 +340,9 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
                     strides, self.strides_t.struct_fieldtypes, strict=True
                 )
             ),
-            fill_value=self.fill_value if fill_value is None else fill_value,
+            fill_value=resolve_fill(
+                self.fill_type, None if fill_value is None else as_fill(fill_value)
+            ),
             device=self.device,
         )
 
@@ -345,7 +352,7 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         buffer_type: NumpyBufferFType,
         ndim: int,
         dimension_type: TupleFType | tuple[FType, ...],
-        fill_value: Any = 0,
+        fill_type: AbstractFillFType | None = None,
         device=None,
     ):
         if not isinstance(dimension_type, TupleFType):
@@ -360,12 +367,14 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         self._ndim = ndim
         self.shape_t = dimension_type
         self.strides_t = TupleFType.from_tuple((self.buf_t.length_type,) * ndim)
-        fill = as_fill(fill_value)
         elem_t = self.buf_t.element_type
-        self._fill_value = (
-            DynamicFill(elem_t(fill.value), elem_t)
-            if is_dynamic(fill)
-            else StaticFill(elem_t(fill.value))
+        # The fill defaults to a static zero, and takes the buffer's element type.
+        if fill_type is None:
+            fill_type = StaticFillFType(elem_t(0))
+        self._fill_type = (
+            StaticFillFType(elem_t(fill_type.value))
+            if is_static(fill_type)
+            else DynamicFillFType(elem_t)
         )
         self._device = normalize_device(device)
 
@@ -374,7 +383,10 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         shape: tuple[int, ...],
         fill_value: Any = None,
     ) -> BufferizedNDArray:
-        fill = self.fill_value if fill_value is None else as_fill(fill_value)
+        # The fill value may be raw, which is a static fill.
+        fill = resolve_fill(
+            self.fill_type, None if fill_value is None else as_fill(fill_value)
+        )
         arr = np.empty(shape, dtype=np_dtype(self.element_type))
         arr[...] = fill.value
         return self.from_numpy(arr, fill_value=fill)
@@ -402,24 +414,24 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
             self.buf_t == other.buf_t
             and self.ndim == other.ndim
             and self.shape_t == other.shape_t
-            and bool(np.all(ffuncs.same(self.fill_value, other.fill_value)))
+            and self.fill_type == other.fill_type
             and self.device == other.device
         )
 
-    def with_fill(self, fill_value: AbstractFill) -> "BufferizedNDArrayFType":
+    def with_fill(self, fill_type: AbstractFillFType) -> "BufferizedNDArrayFType":
         return BufferizedNDArrayFType(
             buffer_type=self.buf_t,
             ndim=self.ndim,
             dimension_type=self.shape_t,
-            fill_value=fill_value,
+            fill_type=fill_type,
             device=self.device,
         )
 
     def fisinstance(self, other):
         other_t = ftype(other)
-        if is_dynamic(self._fill_value) and isinstance(other_t, BufferizedNDArrayFType):
+        if is_dynamic(self._fill_type) and isinstance(other_t, BufferizedNDArrayFType):
             # A dynamic-fill ftype accepts any fill value of matching dtype.
-            other_t = other_t.with_fill(self._fill_value)
+            other_t = other_t.with_fill(self._fill_type)
         return other_t == self
 
     def __hash__(self):
@@ -428,7 +440,7 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
                 self.buf_t,
                 self.ndim,
                 self.shape_t,
-                ffuncs.samehash(self.fill_value),
+                self.fill_type,
                 self.device,
             )
         )
@@ -440,7 +452,7 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         return (
             f"BufferizedNDArrayFType(buffer_type={repr(self.buf_t)},"
             f" ndim = {self.ndim}, dimension_type ={repr(self.shape_t)},"
-            f" fill_value={self.fill_value!r})"
+            f" fill_type={self.fill_type!r})"
         )
 
     @property
@@ -452,8 +464,8 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         self._ndim = val
 
     @property
-    def fill_value(self) -> AbstractFill:
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        return self._fill_type
 
     @property
     def device(self):
@@ -675,12 +687,12 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
     def from_fields(self, tns):
         return BufferizedNDArrayLevel(tns, self.nind)
 
-    def with_fill(self, fill_value):
+    def with_fill(self, fill_type):
         tns = BufferizedNDArrayFType(
             buffer_type=self.tns.buf_t,
             ndim=self.tns.ndim,
             dimension_type=self.tns.shape_t,
-            fill_value=fill_value,
+            fill_type=fill_type,
             device=self.tns.device,
         )
         return BufferizedNDArrayLevelFType(tns, self.nind)
@@ -709,8 +721,8 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
         return self.tns.shape_type[self.nind :]
 
     @property
-    def fill_value(self):
-        return self.tns.fill_value
+    def fill_type(self):
+        return self.tns.fill_type
 
     @property
     def element_type(self):
@@ -760,9 +772,9 @@ class BufferizedNDArrayLevelFType(LevelFType, ImmutableStructFType):
         )
 
     def lower_fill(self, lvl_expr):
-        if is_dynamic(self.fill_value):
+        if is_dynamic(self.fill_type):
             return asm.GetAttr(lvl_expr, asm.Literal("fill"))
-        return asm.Literal(self.fill_value.value)
+        return asm.Literal(self.fill_type.value)
 
     def level_lower_unwrap(self, ctx, tns, pos):
         return asm.Load(
