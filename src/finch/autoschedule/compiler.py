@@ -465,7 +465,6 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        lgc.LogicStatement,
     ]:
         return self.ctx(prgm, bindings, stats, stats_factory)
 
@@ -560,9 +559,8 @@ class LogicCompiler(CompilerForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        lgc.LogicStatement,
     ]:
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
-        return lib, bindings, prgm
+        return lib, bindings

@@ -46,10 +46,8 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Aggregate(lgc.Literal(ffuncs.overwrite), _, arg, _),
         ):
-            # An overwrite writes every element of the output, so its init only
-            # matters as the fill of the output, which the executor sets when
-            # it constructs the output. Einsum can't read fills, so it can't
-            # start from any other init that isn't a literal.
+            # An overwrite needs no initializing einsum. Einsum can't read fills,
+            # so other reductions require a literal init.
             return ein.Einsum(
                 op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
@@ -140,7 +138,6 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        lgc.LogicStatement,
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
         # Query results are storage placeholders, not initialized einsum inputs.
@@ -151,4 +148,4 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
                     defined.add(ein.Alias(name))
         mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
         lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
-        return mod, lgc_bindings, prgm
+        return mod, lgc_bindings

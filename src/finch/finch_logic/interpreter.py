@@ -7,9 +7,11 @@ from finch.algebra import (
     DynamicFillFType,
     TupleFType,
     as_fill,
+    ffuncs,
     fisinstance,
     fixpoint_type,
     ftype,
+    is_dynamic,
     np_dtype,
     return_type,
 )
@@ -192,10 +194,16 @@ class LogicMachine:
                 if (
                     var not in self.bindings
                     or self.bindings[var].shape != rhs.tns.shape
+                    or not bool(
+                        ffuncs.same(self.bindings[var].fill_value, rhs.tns.fill_value)
+                    )
                 ):
+                    fill = rhs.tns.fill
+                    if var in self.bindings and is_dynamic(self.bindings[var].fill):
+                        fill = fill.as_dynamic()
                     self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
-                        rhs.tns.fill,
+                        fill,
                         dtype=rhs.tns.element_type,
                     )
                 tns = self.bindings[var]
@@ -289,6 +297,5 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
-        lgc.LogicStatement,
     ]:
-        return MockLogicLibrary(prgm, bindings), bindings, prgm
+        return MockLogicLibrary(prgm, bindings), bindings

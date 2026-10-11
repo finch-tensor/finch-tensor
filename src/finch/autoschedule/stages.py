@@ -347,7 +347,6 @@ class LogicFactorizer(AliasedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        LogicStatement,
     ]:
         """
         Optimize the aggregate structure of the given logic statement and
@@ -366,7 +365,6 @@ class LogicLoopOrderer(SingleAggregateForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        LogicStatement,
     ]:
         """
         Optimize the loop order of each query and add transposes where
@@ -385,7 +383,6 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[Alias, TensorFType],
-        LogicStatement,
     ]:
         """
         Optimize the tensor formats and output orders for each query.

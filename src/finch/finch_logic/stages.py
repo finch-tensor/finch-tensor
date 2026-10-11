@@ -31,12 +31,9 @@ class LogicLoader(Stage):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        lgc.LogicStatement,
     ]:
         """
         Generate Finch Library from the given logic and input types, with a
         single method called `main` which implements the logic. Also return a
-        dictionary including additional tables needed to run the kernel, and
-        the final program as lowered, for bind-time inference (e.g. resolving
-        dynamic output fills against actual argument fills).
+        dictionary including additional tables needed to run the kernel.
         """
