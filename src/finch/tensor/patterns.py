@@ -358,7 +358,7 @@ class PatternTensorFType(TensorFType):
         return hash(
             (
                 self._fill_type,
-                ffuncs.samehash(self._pattern_value),
+                ffuncs.canonical(self._pattern_value),
                 self._element_type,
                 self._shape_type,
                 self._tensor_type,

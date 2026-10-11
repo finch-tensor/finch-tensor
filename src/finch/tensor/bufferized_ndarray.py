@@ -11,7 +11,6 @@ from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
     DynamicFill,
-    DynamicFillFType,
     FType,
     ImmutableStructFType,
     MutableStructFType,
@@ -23,7 +22,6 @@ from finch.algebra import (
     ffuncs,
     ftype,
     is_dynamic,
-    is_static,
     normalize_device,
     np_dtype,
     resolve_fill,
@@ -371,11 +369,7 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
         # The fill defaults to a static zero, and takes the buffer's element type.
         if fill_type is None:
             fill_type = StaticFillFType(elem_t(0))
-        self._fill_type = (
-            StaticFillFType(elem_t(fill_type.value))
-            if is_static(fill_type)
-            else DynamicFillFType(elem_t)
-        )
+        self._fill_type = fill_type.astype(elem_t)
         self._device = normalize_device(device)
 
     def construct(

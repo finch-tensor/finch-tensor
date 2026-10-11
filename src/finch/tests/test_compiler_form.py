@@ -120,8 +120,8 @@ def test_tensor_is_frozen_before_it_is_read():
     assert lifecycle(program) == [
         ("C", "Declare", ffuncs.add),
         ("C", "Freeze", ffuncs.add),
-        ("D", "Declare", ffuncs.init_write(0.0)),
-        ("D", "Freeze", ffuncs.init_write(0.0)),
+        ("D", "Declare", ffuncs.init_write(np.float64(0.0))),
+        ("D", "Freeze", ffuncs.init_write(np.float64(0.0))),
     ]
     finch_assert_equal(run(program, binds), 2 * A_DATA.sum(axis=1))
 

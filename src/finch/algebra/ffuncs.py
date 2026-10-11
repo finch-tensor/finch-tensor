@@ -1,4 +1,5 @@
 import builtins
+import cmath
 import math
 import operator
 from dataclasses import dataclass
@@ -1471,6 +1472,11 @@ class _Same(FinchOperator):
             res = rsame_method(a)
             if res is not NotImplemented:
                 return res
+        if isinstance(a, tuple) and isinstance(b, tuple):
+            # Tuples are scalars, which are the same when all their fields are.
+            return len(a) == len(b) and all(
+                builtins.bool(self(x, y)) for x, y in zip(a, b, strict=True)
+            )
         try:
             return np.logical_or(
                 np.equal(a, b), np.logical_and(np.isnan(a), np.isnan(b))
@@ -1489,15 +1495,65 @@ class _Same(FinchOperator):
 same = _Same()
 
 
-def samehash(a: Any):
-    samehash_method = getattr(a, "__samehash__", None)
-    if samehash_method is not None:
-        res = samehash_method()
-        if res is not NotImplemented:
-            return res
-    if np.all(same(a, a)) and not np.array_equal(a, a):
-        return ("nan", ftype(a))
-    return a
+class _CanonicalFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return canonical
+
+    arity = 1
+
+    def return_type(self, a: FType) -> FType:  # type: ignore[override]
+        return a
+
+
+# NumPy has no complex NaN constant, so this one stands in for `np.nan`.
+_numpy_complex_nan = np.complex128(complex(np.nan, np.nan))
+
+
+class _Canonical(FinchOperator):
+    """
+    canonical(x) represents every value which is `same` as x, so
+    `hash(canonical(x))` is a hash consistent with `same`. NaNs hash by identity,
+    so each kind of NaN is one object: one complex NaN for NumPy complex values,
+    `cmath.nanj` for Python complex values, `np.nan` for NumPy floats and
+    `math.nan` for Python floats. -0.0 is 0.0, and other values keep their type.
+    Tuples are scalars, whose fields are made canonical. Override with
+    `__canonical__`, alongside `__same__`.
+    """
+
+    def __call__(self, a: Any):
+        canonical_method = getattr(a, "__canonical__", None)
+        if canonical_method is not None:
+            res = canonical_method()
+            if res is not NotImplemented:
+                return res
+        match a:
+            case tuple():
+                return tuple(self(x) for x in a)
+            # NumPy floats subclass Python floats, so they are matched first.
+            case np.complexfloating() if np.isnan(a):
+                return _numpy_complex_nan
+            case complex() if cmath.isnan(a):
+                return cmath.nanj
+            case np.floating() if np.isnan(a):
+                return np.nan
+            case float() if math.isnan(a):
+                return math.nan
+            case float() | complex() | np.floating() | np.complexfloating():
+                # Adding zero turns -0.0 into 0.0 and leaves other values alone.
+                return a + type(a)(0)
+            case _:
+                return a
+
+    def __repr__(self) -> str:
+        return "canonical"
+
+    @property
+    def ftype(self):
+        return _CanonicalFType()
+
+
+canonical = _Canonical()
 
 
 class _NotSameFType(ComparisonFinchOperatorFType):
@@ -2440,13 +2496,10 @@ class _Choose(FinchOperator):
         return self.fill.value
 
     def __eq__(self, other):
-        return (
-            isinstance(other, _Choose)
-            and self.fill == other.fill
-        )
+        return isinstance(other, _Choose) and self.fill == other.fill
 
     def __hash__(self):
-        return hash((type(self), self.fill, samehash(self.fill_value)))
+        return hash((type(self), self.fill, canonical(self.fill_value)))
 
     def __call__(self, *args: Any) -> Any:
         for arg in args:
@@ -3209,6 +3262,7 @@ __all__ = [
     "atan",
     "atan2",
     "atanh",
+    "canonical",
     "ceil",
     "choose",
     "clip",
@@ -3279,7 +3333,6 @@ __all__ = [
     "round",
     "rshift",
     "same",
-    "samehash",
     "scaled_negative_power",
     "scaled_power",
     "scaled_square",

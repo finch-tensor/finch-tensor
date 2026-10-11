@@ -8,7 +8,6 @@ from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
-    DynamicFillFType,
     FType,
     MutableStructFType,
     StaticFillFType,
@@ -88,11 +87,7 @@ class ElementLevelFType(LevelFType, MutableStructFType):
         fill_type = self.fill_type
         if fill_type is None:
             fill_type = StaticFillFType(self.element_type(0))
-        self.fill_type = (
-            StaticFillFType(self.element_type(fill_type.value))
-            if is_static(fill_type)
-            else DynamicFillFType(self.element_type)
-        )
+        self.fill_type = fill_type.astype(self.element_type)
 
     def construct(self, shape: tuple[Any, ...], *, pos: int) -> "ElementLevel":
         """

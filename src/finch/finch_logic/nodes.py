@@ -88,7 +88,9 @@ def reduce_fill_value(op, z, t: AbstractFill) -> AbstractFill:
         case AbstractFillFType():
             raise ValueError(f"The init {z} of a {op} reduction has no value")
         case _:
-            return as_fill(z)
+            # The init takes the element type of the reduction.
+            z = as_fill(z)
+            return z.astype(fixpoint_type(op.ftype, z.ftype, t.element_type))
 
 
 def _literal_fill_type(val: Any) -> AbstractFillFType:
@@ -108,7 +110,8 @@ def reduce_fill_type(op, z, t: AbstractFillFType) -> AbstractFillFType:
     z = _literal_fill_type(z)
     if is_dynamic(z) and op == ffuncs.overwrite:
         return t
-    return z
+    # The init takes the element type of the reduction.
+    return z.astype(fixpoint_type(op.ftype, z, t.element_type))
 
 
 """

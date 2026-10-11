@@ -18,9 +18,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
-import numpy as np
-
 from .ftypes import FType, FTyped, ftype
+from .ffuncs import canonical
 
 if TYPE_CHECKING:
     from .algebra import FinchOperator
@@ -50,6 +49,11 @@ class AbstractFillFType(FType, ABC):
         """This fill, marked so that kernels will not specialize on its value."""
         return DynamicFillFType(self.element_type)
 
+    @abstractmethod
+    def astype(self, element_type: FType) -> AbstractFillFType:
+        """This fill, with its value converted to `element_type`."""
+        ...
+
 
 class StaticFillFType(AbstractFillFType):
     """
@@ -68,6 +72,9 @@ class StaticFillFType(AbstractFillFType):
     @property
     def element_type(self) -> FType:
         return ftype(self._value)
+
+    def astype(self, element_type: FType) -> StaticFillFType:
+        return StaticFillFType(element_type(self._value))
 
     def __call__(self, val: Any) -> StaticFill:
         fill = StaticFill(self.element_type(val))
@@ -89,9 +96,8 @@ class StaticFillFType(AbstractFillFType):
         )
 
     def __hash__(self):
-        from .ffuncs import samehash
 
-        return hash((StaticFillFType, self.element_type, samehash(self._value)))
+        return hash((StaticFillFType, self.element_type, canonical(self._value)))
 
     def __repr__(self):
         return f"StaticFillFType({self._value!r})"
@@ -113,6 +119,9 @@ class DynamicFillFType(AbstractFillFType):
 
     def as_dynamic(self) -> DynamicFillFType:
         return self
+
+    def astype(self, element_type: FType) -> DynamicFillFType:
+        return DynamicFillFType(element_type)
 
     def __call__(self, val: Any) -> DynamicFill:
         return DynamicFill(self._element_type(val), self._element_type)
@@ -154,6 +163,11 @@ class AbstractFill(FTyped[AbstractFillFType], ABC):
         """This fill, marked so that kernels will not specialize on its value."""
         return DynamicFill(self.value, self.element_type)
 
+    @abstractmethod
+    def astype(self, element_type: FType) -> AbstractFill:
+        """This fill, with its value converted to `element_type`."""
+        ...
+
 
 class StaticFill(AbstractFill):
     """
@@ -175,6 +189,9 @@ class StaticFill(AbstractFill):
     def value(self) -> Any:
         return self._value
 
+    def astype(self, element_type: FType) -> StaticFill:
+        return StaticFill(element_type(self._value))
+
     def __eq__(self, other):
         return isinstance(other, StaticFill) and self.ftype == other.ftype
 
@@ -186,9 +203,6 @@ class StaticFill(AbstractFill):
 
     def __rsame__(self, other):
         return self == other
-
-    def __samehash__(self):
-        return self
 
     def __repr__(self):
         return f"StaticFill({self._value!r})"
@@ -227,6 +241,9 @@ class DynamicFill(AbstractFill):
     def as_dynamic(self) -> DynamicFill:
         return self
 
+    def astype(self, element_type: FType) -> DynamicFill:
+        return DynamicFill(element_type(self._value), element_type)
+
     def __eq__(self, other):
         return isinstance(other, DynamicFill) and self.ftype == other.ftype
 
@@ -238,9 +255,6 @@ class DynamicFill(AbstractFill):
 
     def __rsame__(self, other):
         return self == other
-
-    def __samehash__(self):
-        return self
 
     def __repr__(self):
         return f"DynamicFill({self._value!r}, {self._element_type!r})"
@@ -336,7 +350,7 @@ def apply_fill(op: FinchOperator, *fills: AbstractFill) -> AbstractFill:
     for f in fills:
         if not is_dynamic(f) and op.ftype.is_annihilator(f.value):
             result_type = op.ftype.return_type(*(g.element_type for g in fills))
-            return StaticFill(result_type(f.value))
+            return f.astype(result_type)
     element_type = op.ftype.return_type(*(f.element_type for f in fills))
     return DynamicFill(op(*values), element_type)
 
@@ -359,5 +373,5 @@ def apply_fill_type(
     element_type = op.ftype.return_type(*(f.element_type for f in fill_types))
     for f in statics:
         if op.ftype.is_annihilator(f.value):
-            return StaticFillFType(element_type(f.value))
+            return f.astype(element_type)
     return DynamicFillFType(element_type)

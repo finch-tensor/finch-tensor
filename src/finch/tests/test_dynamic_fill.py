@@ -97,7 +97,9 @@ def test_dynamic_fill_same():
     assert not ffuncs.same(d, DynamicFill(np.int64(0)))
     assert not ffuncs.same(d, 3.0)
     assert not ffuncs.same(3.0, d)
-    assert ffuncs.samehash(d) == ffuncs.samehash(DynamicFill(np.float64(0.0)))
+    assert hash(ffuncs.canonical(d)) == hash(
+        ffuncs.canonical(DynamicFill(np.float64(0.0)))
+    )
 
 
 def test_apply_fill_known_folds():
@@ -146,12 +148,13 @@ def test_apply_fill_annihilator_refinement():
     # A Static annihilator determines the fill regardless of the Dynamic args,
     # so the result is Static again.
     two = DynamicFill(np.float64(2.0))
-    assert apply_fill(ffuncs.mul, StaticFill(0.0), two) == StaticFill(0.0)
+    # The result takes the element type of the operation.
+    assert apply_fill(ffuncs.mul, StaticFill(0.0), two) == StaticFill(np.float64(0))
     inf = StaticFill(float("inf"))
-    assert apply_fill(ffuncs.add, inf, two) == inf
+    assert apply_fill(ffuncs.add, inf, two) == StaticFill(np.float64(np.inf))
     assert apply_fill(
         ffuncs.logical_and, StaticFill(False), DynamicFill(np.bool_(True))
-    ) == StaticFill(False)
+    ) == StaticFill(np.False_)
 
 
 def test_predicates_conservative_on_dynamic():
