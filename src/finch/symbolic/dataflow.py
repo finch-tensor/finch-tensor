@@ -1,5 +1,7 @@
 import copy
+import heapq
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 
 class BasicBlock:
@@ -89,14 +91,23 @@ class DataFlowAnalysis(ABC):
     This abstract class implements a generic work-list algorithm that can run either
     in a "forward" or "backward" direction. Subclasses must provide IR-specific
     semantics by implementing the abstract methods: transfer, join, stmt_str and
-    direction.
+    direction, and may override boundary_state.
+
+    only blocks reachable from the boundary block (ENTRY for forward, EXIT for
+    backward) are visited, and joins skip neighbors that weren't processed yet.
+    so loops start optimistic and dead blocks (e.g. after a `return`) never get
+    joined in. `transfer` must not mutate its input.
+
+    blocks are visited in reverse postorder, so a block is joined after the
+    neighbors before it.
 
     Key attributes
     - cfg: the ControlFlowGraph to analyze.
-    - input_states: a mapping from basic block id to the lattice state that holds
-        at the entry of the block.
-    - output_states: a mapping from basic block id to the lattice state that holds
-        at the exit of the block.
+    - input_states: a mapping from basic block id to the state flowing into the
+        block's transfer (its entry for forward, its exit for backward).
+    - output_states: a mapping from basic block id to the state the block's
+        transfer produces.
+    - reached: ids of the blocks visited by `analyze`.
     """
 
     def __init__(self, cfg: ControlFlowGraph):
@@ -107,6 +118,7 @@ class DataFlowAnalysis(ABC):
         self.output_states: dict[str, dict] = {
             block.id: {} for block in cfg.blocks.values()
         }
+        self.reached: set[str] = set()
 
     def __str__(self) -> str:
         """
@@ -121,40 +133,29 @@ class DataFlowAnalysis(ABC):
                 <stmt_representation_for_first_stmt>
                 <stmt_representation_for_second_stmt>
                 ...
+
+        statements are annotated with the state flowing into their transfer
+        (before them for forward, after them for backward), statements of
+        unreached blocks without annotations.
         """
         lines: list[str] = []
-        blocks = list(self.cfg.blocks.values())
+        forward = self.direction() == "forward"
 
-        for block in blocks:
-            # get successors of the block
-            if block.successors:
-                succ_names = [succ.id for succ in block.successors]
-                succ_str = f"#succs=[{', '.join(succ_names)}]"
+        for block in self.cfg.blocks.values():
+            succ_names = [succ.id for succ in block.successors]
+            lines.append(f"{block.id}: #succs=[{', '.join(succ_names)}]")
+
+            if block.id not in self.reached:
+                lines.extend(f"    {stmt}" for stmt in block.statements)
             else:
-                succ_str = "#succs=[]"
-
-            lines.append(f"{block.id}: {succ_str}")
-
-            # get the input state for this block
-            input_state = self.input_states.get(block.id, {})
-
-            if self.direction() == "forward":
-                # deep copy the input_state, otherwise original state
-                # in the input_states will be changed,
-                # which can lead to errors in future
-                state = copy.deepcopy(input_state)
-
-                # print each statement using subclasses stmt_str method
-                for stmt in block.statements:
-                    lines.append(f"    {self.stmt_str(stmt, state)}")
-                    # advance state with current statement
+                # deep copy, so printing never changes the stored states
+                state = copy.deepcopy(self.input_states[block.id])
+                stmts = block.statements if forward else block.statements[::-1]
+                annotated = []
+                for stmt in stmts:
+                    annotated.append(f"    {self.stmt_str(stmt, state)}")
                     state = self.transfer([stmt], state)
-            else:
-                # TODO: implement "backward" direction printing
-                lines.extend(
-                    f"    {self.stmt_str(stmt, input_state)}"
-                    for stmt in block.statements
-                )
+                lines.extend(annotated if forward else annotated[::-1])
 
             lines.append("")
 
@@ -192,64 +193,75 @@ class DataFlowAnalysis(ABC):
         """
         ...
 
+    def boundary_state(self) -> dict:
+        """state at the cfg boundary: out of ENTRY (forward) or into EXIT (backward)"""
+        return {}
+
     def analyze(self) -> None:
-        """
-        Perform the data flow analysis on the control flow graph.
-        This method initializes the work list and processes each block.
-        """
-        work_list: list[BasicBlock] = list(self.cfg.blocks.values())
-        if self.direction() == "forward":
-            while work_list:
-                block = work_list.pop(0)
+        """run the work list until the states of all reached blocks are stable"""
+        forward = self.direction() == "forward"
+        start = self.cfg.entry_block if forward else self.cfg.exit_block
 
-                # get current input state based on the predecessors output states
-                if not block.predecessors:
-                    input_state = {}
-                else:
-                    pred_outputs = [
-                        self.output_states.get(pred.id, {})
-                        for pred in block.predecessors
-                    ]
-                    input_state = pred_outputs[0].copy()
-                    for pred_output in pred_outputs[1:]:
-                        input_state = self.join(input_state, pred_output)
+        def upstream(block: BasicBlock) -> list[BasicBlock]:
+            return block.predecessors if forward else block.successors
 
-                self.input_states[block.id] = input_state
+        def downstream(block: BasicBlock) -> list[BasicBlock]:
+            return block.successors if forward else block.predecessors
 
-                # perform transfer based on the statements in the current basic block
-                output_state = self.transfer(block.statements, input_state)
+        rank = _depth_first(start, downstream)
 
-                # check if output_state changed
-                if output_state != self.output_states.get(block.id, {}):
-                    self.output_states[block.id] = output_state
+        work_list = [(rank[start.id], start.id)]
+        queued = {start.id}
+        while work_list:
+            _, block_id = heapq.heappop(work_list)
+            queued.remove(block_id)
+            block = self.cfg.blocks[block_id]
 
-                    for successor in block.successors:
-                        if successor not in work_list:
-                            work_list.append(successor)
+            # join the states of processed upstream neighbors
+            states = [
+                self.output_states[b.id]
+                for b in upstream(block)
+                if b.id in self.reached
+            ]
+            if block is start:
+                states.insert(0, self.boundary_state())
+            input_state = states[0].copy()
+            for other in states[1:]:
+                input_state = self.join(input_state, other)
+            self.input_states[block.id] = input_state
+
+            output_state = self.transfer(block.statements, input_state)
+            if (
+                block.id in self.reached
+                and output_state == self.output_states[block.id]
+            ):
+                continue
+            self.reached.add(block.id)
+            self.output_states[block.id] = output_state
+
+            for neighbor in downstream(block):
+                if neighbor.id not in queued:
+                    queued.add(neighbor.id)
+                    heapq.heappush(work_list, (rank[neighbor.id], neighbor.id))
+
+
+def _depth_first(
+    start: BasicBlock, downstream: Callable[[BasicBlock], list[BasicBlock]]
+) -> dict[str, int]:
+    """reverse postorder rank of the blocks reachable from `start`"""
+    postorder: list[str] = []
+    visited = {start.id}
+    # neighbors go last to first, so a loop body is ranked before the code after
+    # the loop, since the cfg builder links the body first
+    stack = [(start, reversed(downstream(start)))]
+    while stack:
+        block, neighbors = stack[-1]
+        for neighbor in neighbors:
+            if neighbor.id not in visited:
+                visited.add(neighbor.id)
+                stack.append((neighbor, reversed(downstream(neighbor))))
+                break
         else:
-            while work_list:
-                block = work_list.pop(0)
-
-                # get current input state based on the successors output states
-                if not block.successors:
-                    input_state = {}
-                else:
-                    succ_outputs = [
-                        self.output_states.get(succ.id, {}) for succ in block.successors
-                    ]
-                    input_state = succ_outputs[0].copy()
-                    for succ_output in succ_outputs[1:]:
-                        input_state = self.join(input_state, succ_output)
-
-                self.input_states[block.id] = input_state
-
-                # perform trasnfer based on the statements in the current basic block
-                output_state = self.transfer(block.statements, input_state)
-
-                # check if output state changed
-                if output_state != self.output_states.get(block.id, {}):
-                    self.output_states[block.id] = output_state
-
-                    for predecessor in block.predecessors:
-                        if predecessor not in work_list:
-                            work_list.append(predecessor)
+            stack.pop()
+            postorder.append(block.id)
+    return {block_id: i for i, block_id in enumerate(reversed(postorder))}
