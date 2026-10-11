@@ -7,7 +7,14 @@ from finch import ConstantScalar, Scalar
 from finch import finch_assembly as asm
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
-from finch.algebra import bool_, ffuncs, float64, ftype, int64, is_commutative
+from finch.algebra import (
+    bool_,
+    ffuncs,
+    float64,
+    ftype,
+    int64,
+    is_commutative,
+)
 from finch.autoschedule import (
     CompilerFormLowerer,
     DefaultLogicFactorizer,
@@ -32,6 +39,8 @@ from finch.symbolic import UnvalidatedForm
 from finch.symbolic.rewriters import Chain, Fixpoint, PostWalk, Rewrite
 from finch.symbolic.simplification import simplify_rules, try_evaluate
 from finch.symbolic.term import CallTerm
+
+from .utils import bump
 
 x = ntn.Variable("x", int64)
 y = ntn.Variable("y", int64)
@@ -502,3 +511,114 @@ def test_try_evaluate_declines_runtime_failures():
         (ffuncs.mul, (2**62, 4)),
     ]:
         assert try_evaluate(lit(op), tuple(lit(arg) for arg in args)) is None
+
+
+def _asm_module(args, *body, ret=int64):
+    func_t = asm.AssemblyKernelFType(
+        "f", tuple(arg.result_type for arg in args), ret, definition="f"
+    )
+    return asm.Module(
+        (asm.Function(asm.Variable("f", func_t), tuple(args), asm.Block(body)),)
+    )
+
+
+def test_assembly_simplify_keeps_failing_folds():
+    pow_call = asm.Call(
+        asm.Literal(ffuncs.pow), (asm.Literal(np.int64(2)), asm.Literal(np.int64(-1)))
+    )
+    prgm = _asm_module((), asm.Return(pow_call))
+    assert AssemblySimplify()(prgm) == prgm
+
+
+def test_assembly_simplify_folds_branches():
+    a = asm.Variable("a", int64)
+    x = asm.Variable("x", int64)
+    i = asm.Variable("i", int64)
+
+    def lit(val):
+        return asm.Literal(np.int64(val))
+
+    prgm = _asm_module(
+        (a,),
+        asm.Assign(x, lit(0)),
+        asm.If(asm.Literal(False), asm.Assign(x, lit(1))),
+        asm.WhileLoop(asm.Literal(np.False_), asm.Assign(x, lit(2))),
+        asm.ForLoop(i, lit(3), lit(1), asm.Assign(x, lit(3))),
+        asm.IfElse(
+            asm.Literal(True),
+            asm.Block((asm.Assign(x, a),)),
+            asm.Block((asm.Assign(x, lit(4)),)),
+        ),
+        asm.If(
+            asm.Call(asm.Literal(ffuncs.eq), (a, a)),
+            asm.Assign(x, asm.Call(asm.Literal(ffuncs.add), (x, lit(1)))),
+        ),
+        asm.Return(x),
+    )
+    expected = _asm_module(
+        (a,),
+        asm.Assign(x, lit(0)),
+        asm.IfElse(
+            asm.Literal(True),
+            asm.Block((asm.Assign(x, a),)),
+            asm.Block((asm.Assign(x, lit(4)),)),
+        ),
+        asm.If(
+            asm.Literal(np.True_),
+            asm.Assign(x, asm.Call(asm.Literal(ffuncs.add), (lit(1), x))),
+        ),
+        asm.Return(x),
+    )
+    result = AssemblySimplify()(prgm)
+    assert result == expected
+    for module in (prgm, result):
+        assert AssemblyInterpreter()(module).f(np.int64(6)) == 7
+
+
+def test_assembly_simplify_keeps_nan_and_effects():
+    """
+    if(true) bodies keep their scope, and if(x == x) on floats and an empty if
+    whose condition may have effects stay.
+    """
+    t = asm.Variable("t", int64)
+    y = asm.Variable("y", float64)
+
+    prgm = _asm_module(
+        (y,),
+        asm.If(asm.Literal(True), asm.Assign(t, asm.Literal(np.int64(1)))),
+        asm.If(
+            asm.Call(asm.Literal(ffuncs.eq), (y, y)),
+            asm.Assign(t, asm.Literal(np.int64(2))),
+        ),
+        asm.If(asm.Call(asm.Literal(bump), (y, y)), asm.Block(())),
+        asm.Assign(t, asm.Literal(np.int64(3))),
+        asm.Return(t),
+    )
+    assert AssemblySimplify()(prgm) == prgm
+
+
+def test_assembly_simplify_keeps_types_and_nan():
+    """
+    `mul(a, 1.0)` is a float for an integer `a`, and `mul(y, 0.0)` is nan for an
+    infinite `y`, so neither is simplified, while `mul(a, 0)` is.
+    """
+    a = asm.Variable("a", int64)
+    y = asm.Variable("y", float64)
+    u = asm.Variable("u", float64)
+    v = asm.Variable("v", float64)
+    w = asm.Variable("w", int64)
+
+    def mul(k, x):
+        return asm.Call(asm.Literal(ffuncs.mul), (asm.Literal(k), x))
+
+    def make(product):
+        return _asm_module(
+            (a, y),
+            asm.Assign(u, mul(np.float64(1.0), a)),
+            asm.Assign(v, mul(np.float64(0.0), y)),
+            asm.Assign(w, product),
+            asm.Return(w),
+        )
+
+    prgm = make(mul(np.int64(0), a))
+    assert AssemblySimplify()(prgm) == make(asm.Literal(np.int64(0)))
