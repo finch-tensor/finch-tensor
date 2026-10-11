@@ -14,6 +14,10 @@ from .dataflow import (
     assembly_dataflow_analyze,
     assembly_dataflow_run,
 )
+from .dead_code_elimination import (
+    AssemblyDeadCodeEliminationTransform,
+    assembly_dead_code_elimination,
+)
 from .global_value_numbering import (
     AssemblyGlobalValueNumbering,
     AssemblyGlobalValueNumberingTransform,
@@ -69,6 +73,7 @@ __all__ = [
     "AssemblyConstantPropagation",
     "AssemblyConstantPropagationTransform",
     "AssemblyCopyPropagation",
+    "AssemblyDeadCodeEliminationTransform",
     "AssemblyExpression",
     "AssemblyGlobalValueNumbering",
     "AssemblyGlobalValueNumberingTransform",
@@ -119,6 +124,7 @@ __all__ = [
     "assembly_copy_propagation",
     "assembly_dataflow_analyze",
     "assembly_dataflow_run",
+    "assembly_dead_code_elimination",
     "assembly_global_value_numbering",
     "element_type",
     "get_vars_in_expr",
