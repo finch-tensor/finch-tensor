@@ -2,7 +2,18 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
+import numpy as np
+
+from finch.algebra import (
+    FinchOperator,
+    FinchOperatorFType,
+    FType,
+    SingletonOperatorFType,
+    StructFType,
+)
+from finch.algebra.ftypes import FDType
 from finch.symbolic import (
+    Constant,
     DataFlowAnalysis,
     Namespace,
     PostOrderDFS,
@@ -19,12 +30,75 @@ from .cfg_builder import (
 from .nodes import (
     AssemblyNode,
     Assign,
+    Call,
+    GetAttr,
+    Literal,
     Variable,
 )
+from .utils import get_vars_in_expr
 
 # Type variable for dataflow analysis context,
 # bound to AbstractAssemblyDataflow or its subclasses.
 AnalysisT = TypeVar("AnalysisT", bound="AbstractAssemblyDataflow")
+
+
+def literal_constant(val) -> Constant | None:
+    """
+    the constant of a scalar literal value. constants compare by exact type and
+    bits, while `Literal` compares by value, so `0.0 == -0.0` and `1 == True`.
+    """
+    match val:
+        case bool() | int() | float() | complex() | np.number() | np.bool_():
+            return Constant(val)
+    return None
+
+
+def pure_op_key(op) -> object | None:
+    """key of an operator whose ftype is pure, or None if calls may have effects"""
+    match op:
+        case FinchOperator(ftype=SingletonOperatorFType(is_pure=True) as op_type):
+            return op_type
+        case FinchOperator(ftype=FinchOperatorFType(is_pure=True)):
+            # e.g. `choose(0.0) == choose(-0.0)`, so key by identity
+            return ("id", id(op))
+    return None
+
+
+def is_scalar_type(type_: FType | None) -> bool:
+    match type_:
+        case StructFType():
+            return False
+        case FDType():
+            return True
+    return False
+
+
+def has_effects(stmt: AssemblyNode) -> bool:
+    for node in PostOrderDFS(stmt):
+        match node:
+            case Call(Literal(op), _) if pure_op_key(op) is not None:
+                pass
+            case Call():
+                return True
+    return False
+
+
+def variables_read(stmt: AssemblyNode) -> list[str]:
+    match stmt:
+        case NumberedStatement(stmt, _):
+            pass
+    match stmt:
+        case Assign(_, rhs):
+            stmt = rhs
+    return list(get_vars_in_expr(stmt))
+
+
+def root_of(node: AssemblyNode) -> AssemblyNode:
+    """the variable or slot under a getattr chain"""
+    match node:
+        case GetAttr(obj, _):
+            return root_of(obj)
+    return node
 
 
 def assembly_dataflow_analyze(
