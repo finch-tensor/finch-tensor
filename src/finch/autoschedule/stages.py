@@ -9,6 +9,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Fuse,
     FusedAlias,
     HardAlias,
@@ -149,7 +150,7 @@ class SingleAggregateForm(AliasedForm):
                     for arg in args:
                         validate(arg, agg_allowed)
                     return None
-                case Literal() | Alias() | Table():
+                case Literal() | FillTable() | Alias() | Table():
                     return None
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
@@ -223,7 +224,7 @@ class LoopOrderedForm(SingleAggregateForm):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
                     raise ValueError("Reorder nodes should only appear in loop orders!")
-                case Literal():
+                case Literal() | FillTable():
                     return None
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
@@ -268,7 +269,7 @@ class FormattedForm(LoopOrderedForm):
                             f"Alias {tns.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
                         )
-                case Literal():
+                case Literal() | FillTable():
                     return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")

@@ -37,6 +37,7 @@ from finch.algebra import (
 from finch.autoschedule import (
     COMPILE_NUMBA,
     INTERPRET_ASSEMBLY,
+    INTERPRET_LOGIC,
     INTERPRET_NOTATION,
     CompilerFormLowerer,
     DefaultLogicFactorizer,
@@ -561,6 +562,36 @@ def test_declare_sets_a_dynamic_fill(loader):
     loader()(program).main(a, c)
     assert c.fill_value == 3.0
     np.testing.assert_array_equal(c.to_numpy(), [2.0, 3.0])
+
+
+# The logic interpreter computes the fills of its results from values, so they
+# are static.
+@pytest.mark.parametrize(
+    "ctx, dynamic",
+    [(None, True), (INTERPRET_LOGIC, False)],
+    ids=["default", "interpret_logic"],
+)
+@pytest.mark.parametrize(
+    "op, expected",
+    [
+        (lambda x: finch.reshape(x, (4,)), [9.0, 1.0, 2.0, 9.0]),
+        (lambda x: finch.sort(finch.reshape(x, (4,))), [1.0, 2.0, 9.0, 9.0]),
+        (finch.empty_like, [[9.0, 9.0], [9.0, 9.0]]),
+    ],
+    ids=["reshape", "sort", "empty_like"],
+)
+def test_lazy_functions_keep_a_dynamic_fill(ctx, dynamic, op, expected):
+    # Functions which use the fill of a tensor as data read it at runtime, so a
+    # dynamic fill stays dynamic rather than becoming a literal.
+    x = finch.BufferizedNDArray.from_numpy(
+        np.array([[9.0, 1.0], [2.0, 9.0]]), fill_value=DynamicFill(np.float64(9.0))
+    )
+    lazy_result = op(finch.defer(x))
+    assert is_dynamic(lazy_result.fill)
+    result = finch.compute(lazy_result, **({} if ctx is None else {"ctx": ctx}))
+    assert bool(is_dynamic(result.fill)) == dynamic
+    assert result.fill_value == 9.0
+    np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
 def test_backend_refusal_propagates():

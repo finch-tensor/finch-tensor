@@ -31,6 +31,7 @@ from finch.algebra import (
     fixpoint_type,
     ftype,
     init_value,
+    is_static,
     normalize_device,
     resolve_fill,
     result_type,
@@ -46,6 +47,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     HardAlias,
     Literal,
     LogicExpression,
@@ -593,6 +595,13 @@ def full(
     - out (array): an array where every element is equal to fill_value.
     """
     shape = (shape,) if isinstance(shape, int) else tuple(shape)
+    if isinstance(fill_value, LazyTensor):
+        # The value may be a zero-dimensional tensor, such as a dynamic fill.
+        if dtype is not None:
+            fill_value = astype(fill_value, dtype)
+        if device is not None:
+            fill_value = fill_value.to_device(device)
+        return broadcast_to(fill_value, shape)
     return broadcast_to(asarray(fill_value, dtype=dtype, device=device), shape)
 
 
@@ -637,7 +646,7 @@ def empty(shape: int | tuple[int, ...], *, dtype=None, device=None) -> LazyTenso
 
 def empty_like(x, /, *, dtype=None, device=None) -> LazyTensor:
     x = defer(x)
-    return full_like(x, x.fill_value, dtype=dtype, device=device)
+    return full_like(x, _fill_arg(x), dtype=dtype, device=device)
 
 
 def zeros_like(x, /, *, dtype=None, device=None) -> LazyTensor:
@@ -875,9 +884,21 @@ def reduce(
 
     shape = tuple(x.shape[n] for n in range(x.ndim) if n not in axis)
     fields = tuple(Field(gensym("i")) for _ in range(x.ndim))
+    ctx = x.ctx
+    if isinstance(init, LazyTensor):
+        # The init may be a zero-dimensional tensor, such as a fill value.
+        if init.ndim != 0:
+            raise ValueError("The init of a reduction must be zero-dimensional")
+        init_expr: LogicExpression = Table(init.data, ())
+        init_fill = init.fill
+        ctx = ctx.join(init.ctx)
+    else:
+        init_expr = Literal(init)
+        # The init may be a raw value, which is a static fill.
+        init_fill = as_fill(init)
     data: LogicExpression = Aggregate(
         Literal(op),
-        Literal(init),
+        init_expr,
         Table(x.data, fields),
         tuple(fields[i] for i in axis),
     )
@@ -887,12 +908,27 @@ def reduce(
         )
         data = Reorder(data, keeps)
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
-    # The init may be a raw value, which is a static fill.
-    init_fill = as_fill(init)
     if dtype is None:
         dtype = fixpoint_type(op_type, init_fill.ftype, x.element_type)
-    expr, ctx = x.ctx.eval(data)
+    expr, ctx = ctx.eval(data)
     return LazyTensor(expr, ctx, shape, init_fill, dtype, x.device)
+
+
+def _fill_arg(x: LazyTensor) -> Any:
+    """
+    The fill value of `x`, as an argument. A static fill is the value itself,
+    which kernels may specialize on, and a dynamic fill is a zero-dimensional
+    tensor which reads it.
+    """
+    if is_static(x.fill):
+        return x.fill_value
+    data, ctx = x.ctx.eval(FillTable(x.data))
+    return LazyTensor(data, ctx, (), x.fill, x.element_type, x.device)
+
+
+def _fill_arg_value(fill: Any) -> Any:
+    """The value of a fill argument from `_fill_arg`."""
+    return fill.fill_value if isinstance(fill, LazyTensor) else fill
 
 
 def _broadcast_shape(*args: tuple) -> tuple:
@@ -1241,11 +1277,12 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
             x2.ndim,
             EyeTensor((search_size, search_size), k=-stride, dtype=np.bool_),
         )
+        fill = _fill_arg(values)
         probe = reduce(
             ffuncs.choose(values.fill_value),
-            where(candidate, values, values.fill_value),
+            where(candidate, values, fill),
             axis=x2.ndim,
-            init=values.fill_value,
+            init=fill,
         )
         advance = logical_and(
             any(candidate, axis=x2.ndim),
@@ -1614,7 +1651,7 @@ def count_nonfill(
     x, /, *, axis: int | tuple[int, ...] | None = None, keepdims: bool = False
 ) -> LazyTensor:
     x = defer(x)
-    fill = full(x.shape, x.fill_value, dtype=x.element_type, device=x.device)
+    fill = full(x.shape, _fill_arg(x), dtype=x.element_type, device=x.device)
     return reduce(
         ffuncs.add,
         elementwise(ffuncs.not_same, x, fill),
@@ -2310,7 +2347,7 @@ def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
     if x.shape == shape:
         return x
     if _shape_size(shape) == 0:
-        return full(shape, x.fill_value, dtype=x.element_type, device=x.device)
+        return full(shape, _fill_arg(x), dtype=x.element_type, device=x.device)
     if x.shape == ():
         return broadcast_to(x, shape)
 
@@ -2318,23 +2355,21 @@ def reshape(x, /, shape: tuple, *, copy=None) -> LazyTensor:
         x,
         axis=tuple(range(x.ndim, x.ndim + len(shape))),
     )
-    masked = where(
-        ReshapeMaskTensor(x.shape, shape, dtype=np.bool_),
-        expanded,
-        x.fill_value,
-    )
+    fill = _fill_arg(x)
+    masked = where(ReshapeMaskTensor(x.shape, shape, dtype=np.bool_), expanded, fill)
     return reduce(
         ffuncs.choose(x.fill_value),
         masked,
         axis=tuple(range(x.ndim)),
-        init=x.fill_value,
+        init=fill,
     )
 
 
 def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTensor:
+    # The fill is a fill argument, the fill value of x unless given.
     if fill is None:
-        fill = x.fill_value
-    fill_value = fill
+        fill = _fill_arg(x)
+    fill_arg = fill
     selector = defer(selector)
     if selector.ndim == 2:
         selector = expand_dims(
@@ -2345,7 +2380,8 @@ def _select_along_axis(x: LazyTensor, axis: int, selector, fill=None) -> LazyTen
     if isinstance(fill, tuple):
         fill = defer(FillTensor(_broadcast_shape(selector.shape, expanded.shape), fill))
     masked = where(selector, expanded, fill)
-    return reduce(ffuncs.choose(fill_value), masked, axis=axis + 1, init=fill_value)
+    choice = ffuncs.choose(_fill_arg_value(fill_arg))
+    return reduce(choice, masked, axis=axis + 1, init=fill_arg)
 
 
 def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
@@ -2377,12 +2413,16 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
                 "must match"
             )
 
-    fill = arrays[0].fill_value
     concat_dtype = return_type(
-        ffuncs.choose(fill).ftype,
+        ffuncs.choose(arrays[0].fill_value).ftype,
         *(array.element_type for array in arrays),
     )
-    fill = concat_dtype(fill)
+    # The result takes the fill value of the first array.
+    fill = _fill_arg(arrays[0])
+    if not isinstance(fill, LazyTensor):
+        fill = concat_dtype(fill)
+    elif concat_dtype != arrays[0].element_type:
+        fill = astype(fill, concat_dtype)
     offset = 0
     skewed = []
     for array in arrays:
@@ -2396,7 +2436,7 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
         )
         offset += array.shape[axis]
 
-    return elementwise(ffuncs.choose(fill), *skewed)
+    return elementwise(ffuncs.choose(_fill_arg_value(fill)), *skewed)
 
 
 def flip(x, /, *, axis: int | tuple[int, ...] | None = None) -> LazyTensor:

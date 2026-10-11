@@ -3,10 +3,10 @@ from itertools import product
 
 import numpy as np
 
-import finch
 from finch.algebra import (
     DynamicFillFType,
     TupleFType,
+    as_fill,
     fisinstance,
     fixpoint_type,
     ftype,
@@ -49,10 +49,12 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
-    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    # The fill value may be raw, which is a static fill.
+    fill = as_fill(fill_value)
+    dtype = fill.element_type if dtype is None else ftype(dtype)
     arr = np.empty(shape, dtype=np_dtype(dtype))
-    arr[...] = fill_value
-    return finch.asarray(arr)
+    arr[...] = fill.value
+    return BufferizedNDArray.from_numpy(arr, fill_value=fill)
 
 
 class MockFusedTensor:
@@ -252,7 +254,7 @@ class LogicMachine:
                         case Alias():
                             self.bindings[key] = self.make_tensor(
                                 rhs.tns.shape,
-                                rhs.tns.fill_value,
+                                rhs.tns.fill,
                                 dtype=rhs.tns.element_type,
                             )
                 tns = self.bindings[key]

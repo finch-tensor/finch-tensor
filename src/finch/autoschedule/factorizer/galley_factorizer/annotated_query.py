@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
 
 from finch.algebra import (
-    StaticFillFType,
     cansplitpush,
     ffuncs,
     is_associative,
@@ -111,7 +110,7 @@ class AnnotatedQuery(Generic[TS]):
 
         def strip_aggregates(
             node: LogicNode,
-        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal, LogicNode]]]:
+        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal]]]:
             """Remove Aggregate nodes bottom-up, recording each reduction index
             together with the path of the aggregate's argument in the stripped
             tree."""
@@ -119,7 +118,7 @@ class AnnotatedQuery(Generic[TS]):
                 case Aggregate(Literal() as op, Literal() as init, arg, idxs):
                     new_arg, records = strip_aggregates(arg)
                     for idx in idxs:
-                        records.append((idx, (), op, init, new_arg))
+                        records.append((idx, (), op, init))
                     return new_arg, records
                 case LogicTree():
                     children = node.children
@@ -129,8 +128,8 @@ class AnnotatedQuery(Generic[TS]):
                         new_child, child_records = strip_aggregates(child)
                         new_children.append(new_child)
                         records.extend(
-                            (idx, (i, *path), op, init, arg)
-                            for idx, path, op, init, arg in child_records
+                            (idx, (i, *path), op, init)
+                            for idx, path, op, init in child_records
                         )
                     if new_children != children:
                         node = type(node).from_children(*new_children)
@@ -139,24 +138,13 @@ class AnnotatedQuery(Generic[TS]):
                     return node, []
 
         point_expr, agg_records = strip_aggregates(expr)
-        for idx, agg_path, op_lit, init_lit, agg_arg in agg_records:
+        for idx, agg_path, op_lit, init_lit in agg_records:
             idx_starting_path[idx] = agg_path
             idx_top_order[idx] = top_counter
             top_counter += 1
 
-            if op_lit.val is None:
-                match cache[agg_arg].fill_type:
-                    case StaticFillFType() as fill_type:
-                        idx_op[idx] = ffuncs.init_write(fill_type.value)
-                        idx_init[idx] = fill_type.value
-                    case fill_type:
-                        # Kernels can't specialize on a dynamic fill, so the
-                        # output is overwritten from its runtime fill.
-                        idx_op[idx] = ffuncs.overwrite
-                        idx_init[idx] = fill_type
-            else:
-                idx_op[idx] = op_lit.val
-                idx_init[idx] = init_lit.val
+            idx_op[idx] = op_lit.val
+            idx_init[idx] = init_lit.val
 
             starting_reduce_idxs.append(idx)
 

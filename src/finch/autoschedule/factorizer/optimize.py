@@ -17,6 +17,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     HardAlias,
     Literal,
     LogicNode,
@@ -207,11 +208,16 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
 
     assert isinstance(root, LogicNode)
     rets = get_productions(root)
+    # A definition whose fill value is read stays, since inlining the fill of
+    # every use would grow the program with each inlined definition.
+    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
     props = {}
 
     def rule_1(node):
         match node:
-            case Query(Table(Alias() as a, idxs), MapJoin() as rhs) if a not in rets:
+            case Query(Table(Alias() as a, idxs), MapJoin() as rhs) if (
+                a not in rets and a not in filled
+            ):
                 props[a] = reorder_to(rhs, idxs)
                 return Plan()
             case Table(a, idxs) if a in props:
@@ -243,13 +249,17 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                 defs[a] = reorder_to(b, idxs)
 
     rets = get_productions(root)
+    # A definition whose fill value is read stays, as in `propagate_map_queries`.
+    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
 
     def rule_1(ex):
         match ex:
-            case Query(Table(Alias() as a, _), _) if uses[a] == 1 and a not in rets:
+            case Query(Table(Alias() as a, _), _) if (
+                uses[a] == 1 and a not in rets and a not in filled
+            ):
                 return Plan()
             case Table(Alias() as a, idxs) if (
-                uses.get(a, 0) == 1 and a not in rets and a in defs
+                uses.get(a, 0) == 1 and a not in rets and a not in filled and a in defs
             ):
                 arg = defs[a]
                 assert isinstance(arg, LogicExpression)
@@ -331,6 +341,8 @@ def propagate_transpose_queries(root: LogicStatement):
         match node:
             case Table(Alias() as a, idxs) if a in props:
                 return Relabel(props[a], idxs)
+            case FillTable(Alias() as a) if a in props:
+                return fill_expression(props[a])
             case Produces(args):
                 bodies = [
                     Query(Table(a, props[a].fields()), props[a])
