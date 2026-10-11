@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
-from typing import Any, Self
+from typing import Any, Generic, Self, TypeVar
+
+from finch.algebra.ftypes import FType, FTyped
 
 """
 This module contains definitions for common functions that are useful for symbolic
@@ -44,22 +47,34 @@ Notes:
     your own method to override, and call that from make_term.
 """
 
+T = TypeVar("T")
+
 
 class Term:
     @abstractmethod
-    def head(self) -> Any:
+    def head(self) -> Callable[..., Self]:
         """Return the head type of the S-expression."""
         ...
 
     @classmethod
     @abstractmethod
-    def make_term(cls, head: Any, *children: Term) -> Self:
+    def make_term(cls, head: Callable[..., Self], *children: Term) -> Self:
         """
         Construct a new term in the same family of terms with the given head type and
         children. This function should satisfy
         `x == x.make_term(x.head(), *x.children)`
         """
         ...
+
+
+class ExpressionTerm(Term, FTyped, ABC):
+    @property
+    def ftype(self) -> FType:
+        return self.result_type
+
+    @property
+    @abstractmethod
+    def result_type(self) -> FType: ...
 
 
 @dataclass(frozen=True, eq=True)
@@ -71,20 +86,21 @@ class TermTree(Term, ABC):
         ...
 
 
-class LiteralTerm(Term, ABC):
+@dataclass(eq=True, frozen=True)
+class LiteralTerm(Term, Generic[T]):
     """
     A leaf term which wraps the constant `val`.
     """
 
-    val: Any
+    val: T
 
 
 class CallTerm(TermTree, ABC):
     """
-    A tree term which applies the operator held by the literal `op` to `args`.
+    A tree term which applies the operator computed by the expression `op` to `args`.
     """
 
-    op: LiteralTerm
+    op: ExpressionTerm
     args: tuple[Term, ...]
 
 

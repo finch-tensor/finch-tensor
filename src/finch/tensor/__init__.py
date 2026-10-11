@@ -28,6 +28,7 @@ from .level import (
 )
 from .override_tensor import OverrideTensor
 from .patterns import (
+    ChunkMaskTensor,
     EyeTensor,
     FillTensor,
     IndexTensor,
@@ -39,10 +40,12 @@ from .patterns import (
     PairSumTensor,
     ParityMaskTensor,
     PatternTensor,
+    RandomMaskTensor,
     RepeatTensor,
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    SplitMaskTensor,
     UpperTriangleTensor,
 )
 from .scalar import ConstantScalar, Scalar, ScalarFType
@@ -50,6 +53,7 @@ from .scalar import ConstantScalar, Scalar, ScalarFType
 __all__ = [
     "BufferizedNDArray",
     "BufferizedNDArrayFType",
+    "ChunkMaskTensor",
     "ConstantScalar",
     "DenseLevel",
     "DenseLevelFType",
@@ -71,6 +75,7 @@ __all__ = [
     "PairSumTensor",
     "ParityMaskTensor",
     "PatternTensor",
+    "RandomMaskTensor",
     "RepeatTensor",
     "ReshapeMaskTensor",
     "ReverseTensor",
@@ -85,6 +90,7 @@ __all__ = [
     "SparseHashLevelFType",
     "SparseListLevel",
     "SparseListLevelFType",
+    "SplitMaskTensor",
     "UpperTriangleTensor",
     "dense",
     "element",

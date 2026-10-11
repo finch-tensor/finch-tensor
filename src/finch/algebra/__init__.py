@@ -1,6 +1,8 @@
 from . import ffuncs
 from .algebra import (
     FinchOperator,
+    FinchOperatorFType,
+    SingletonOperatorFType,
     arity,
     cansplitpush,
     fixpoint_type,
@@ -11,6 +13,7 @@ from .algebra import (
     is_distributive,
     is_idempotent,
     is_identity,
+    is_specializable_value,
     repeat_operator,
     return_type,
 )
@@ -34,7 +37,7 @@ from .devices import (
     normalize_device,
     serial,
 )
-from .ffuncs import NAryFinchOperator
+from .ffuncs import NAryFinchOperatorFType
 from .fill import (
     AbstractFill,
     DynamicFill,
@@ -45,6 +48,7 @@ from .fill import (
     is_dynamic,
 )
 from .ftypes import (
+    CallableFType,
     FDTypeSignedInteger,
     FDTypeUnsignedInteger,
     FInfo,
@@ -78,6 +82,7 @@ from .ftypes import (
     intp,
     isdtype,
     none_,
+    np_dtype,
     promote_type,
     result_type,
     str_,
@@ -101,6 +106,7 @@ __all__ = [
     "CPUFType",
     "CPUThread",
     "CPUThreadFType",
+    "CallableFType",
     "DeviceFType",
     "DynamicFill",
     "DynamicFillError",
@@ -110,15 +116,17 @@ __all__ = [
     "FType",
     "FTyped",
     "FinchOperator",
+    "FinchOperatorFType",
     "IInfo",
     "ImmutableStructFType",
     "MutableStructFType",
-    "NAryFinchOperator",
+    "NAryFinchOperatorFType",
     "NamedTupleFType",
     "Serial",
     "SerialFType",
     "SerialTask",
     "SerialTaskFType",
+    "SingletonOperatorFType",
     "StaticFill",
     "StructFType",
     "TaskFType",
@@ -166,9 +174,11 @@ __all__ = [
     "is_identity",
     "is_on_device",
     "is_parent_device",
+    "is_specializable_value",
     "isdtype",
     "none_",
     "normalize_device",
+    "np_dtype",
     "promote_type",
     "repeat_operator",
     "result_type",

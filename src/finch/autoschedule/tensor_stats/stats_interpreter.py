@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections import OrderedDict
-from typing import overload
+from collections.abc import MutableMapping
+from typing import Generic, TypeVar, overload
 
 import numpy as np
 
@@ -19,6 +20,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     StatsFactory,
@@ -32,17 +34,21 @@ from .tensor_stats import TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
+TS = TypeVar("TS", bound=TensorStats)
 
-class StatsInterpreter:
+
+class StatsInterpreter(Generic[TS]):
     def __init__(
         self,
-        stats_factory: StatsFactory,
+        stats_factory: StatsFactory[TS],
     ):
         self.stats_factory = stats_factory
 
     def __call__(
-        self, node: LogicNode, bindings: OrderedDict[Alias, TensorStats]
-    ) -> TensorStats | tuple[TensorStats, ...]:
+        self, node: LogicNode, bindings: MutableMapping[Alias, TS]
+    ) -> TS | tuple[TS, ...]:
+        if not isinstance(bindings, OrderedDict):
+            bindings = OrderedDict(bindings)
         machine = StatsMachine(
             stats_factory=self.stats_factory,
             bindings=bindings,
@@ -50,10 +56,10 @@ class StatsInterpreter:
         return machine(node)
 
 
-class StatsMachine:
+class StatsMachine(Generic[TS]):
     def __init__(
         self,
-        stats_factory: StatsFactory,
+        stats_factory: StatsFactory[TS],
         bindings=None,
     ):
         self.stats_factory = stats_factory
@@ -62,18 +68,18 @@ class StatsMachine:
         self.bindings = bindings
 
     @overload
-    def __call__(self, node: LogicExpression) -> TensorStats: ...
+    def __call__(self, node: LogicExpression) -> TS: ...
 
     @overload
-    def __call__(self, node: Alias) -> TensorStats: ...
+    def __call__(self, node: Alias) -> TS: ...
 
     @overload
-    def __call__(self, node: LogicStatement) -> tuple[TensorStats, ...]: ...
+    def __call__(self, node: LogicStatement) -> tuple[TS, ...]: ...
 
     @overload
-    def __call__(self, node: LogicNode) -> TensorStats | tuple[TensorStats, ...]: ...
+    def __call__(self, node: LogicNode) -> TS | tuple[TS, ...]: ...
 
-    def __call__(self, node) -> TensorStats | tuple[TensorStats, ...]:
+    def __call__(self, node) -> TS | tuple[TS, ...]:
         logger.debug("Evaluating: %s", node)
         match node:
             case Plan():
@@ -82,10 +88,15 @@ class StatsMachine:
                     last_result = self(body)
                 return last_result
 
-            case Query():
-                rhs_stats = self(node.rhs)
-                self.bindings[node.lhs] = rhs_stats
+            case Query(Table(Alias() as var, idxs), rhs):
+                if rhs.fields() != idxs:
+                    rhs = Reorder(rhs, idxs)
+                rhs_stats = self(rhs)
+                self.bindings[var] = rhs_stats
                 return rhs_stats
+
+            case QueryInto():
+                return self(node.as_query())
 
             case Alias():
                 stats = self.bindings.get(node)
@@ -108,7 +119,7 @@ class StatsMachine:
             case MapJoin():
                 if not isinstance(node.op, Literal):
                     raise TypeError("MapJoin.op must be Literal(...).")
-                child_stats_list: list[TensorStats] = []
+                child_stats_list: list[TS] = []
                 for arg in node.args:
                     res = self(arg)
                     child_stats_list.append(res)
@@ -118,10 +129,18 @@ class StatsMachine:
                 if not isinstance(node.op, Literal):
                     raise TypeError("Aggregate.op must be Literal(...).")
                 op = node.op.val
-                init = node.init.val if isinstance(node.init, Literal) else None
                 arg2 = self(node.arg)
                 reduce_indices = node.idxs
-                return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
+                if isinstance(node.init, Literal):
+                    return self.stats_factory.aggregate(
+                        op, node.init.val, reduce_indices, arg2
+                    )
+                # A tensor init is folded into the reduction of the argument.
+                reduced = self.stats_factory.aggregate(op, None, reduce_indices, arg2)
+                return self.stats_factory.reorder(
+                    self.stats_factory.mapjoin(op, self(node.init), reduced),
+                    node.fields(),
+                )
 
             case Literal(val):
                 return self.stats_factory(Scalar(val), ())
@@ -135,7 +154,9 @@ class StatsMachine:
                 return self.stats_factory.relabel(base, new_indices)
 
             case Produces(args):
-                return tuple(self(arg) for arg in args)
+                ret = tuple(self(arg) for arg in args)
+                assert all(not isinstance(r, tuple) for r in ret)
+                return ret
 
             case _:
                 raise TypeError(f"Unhandled node type {type(node)}")
@@ -144,8 +165,8 @@ class StatsMachine:
 def calculate_estimated_error(
     node: LogicNode,
     stats_factory: StatsFactory,
-    logic_bindings: OrderedDict[Alias, TensorFType],
-    stats_bindings: OrderedDict[Alias, TensorStats],
+    logic_bindings: MutableMapping[Alias, TensorFType],
+    stats_bindings: MutableMapping[Alias, TensorStats],
 ) -> tuple[float, ...]:
     if logic_bindings is None:
         logic_bindings = OrderedDict()

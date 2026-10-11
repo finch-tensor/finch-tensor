@@ -322,9 +322,9 @@ class _LogicLocalValueNumbering:
                 case Produces():
                     self.reads(stmt)
                     break
-                case Query(lhs, rhs):
+                case Query(Table(Alias() as lhs, fields), rhs):
                     self.result.uses[sid] = self.reads(rhs)
-                    expr = self.expression(rhs)
+                    expr = self.expression(Reorder(rhs, fields))
                     old = self.values.get(lhs)
                     if expr is None:
                         self.invalidate(tuple(self.values), sid, unknown_effect=True)
@@ -345,6 +345,8 @@ class _LogicLocalValueNumbering:
                         )
                     self.record(LogicDefinition(sid, lhs, stmt), value)
                     sid += 1
+                case Query():
+                    raise TypeError("Query destination must be a Table of an Alias")
         return self.result
 
 

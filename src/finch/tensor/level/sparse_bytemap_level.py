@@ -5,15 +5,15 @@ import numpy as np
 
 from finch.algebra import FType, ImmutableStructFType, ftype, ftypes
 
-from .level import Level, LevelFType
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 _LOWERING_ERROR = "SparseByteMapLevelFType lowering is not implemented."
 
 
 @dataclass(unsafe_hash=True)
-class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
+class SparseByteMapLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: FType = ftypes.intp
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
     def __post_init__(self) -> None:
         if not isinstance(self._lvl_t, LevelFType):
@@ -103,9 +103,6 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
 
-    def from_numpy(self, shape, val):
-        raise NotImplementedError("sparse bytemap level doesn't support from_numpy")
-
     def level_asm_unpack(self, ctx, var_n, val):
         raise NotImplementedError(_LOWERING_ERROR)
 
@@ -118,10 +115,10 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -130,7 +127,7 @@ class SparseByteMapLevelFType(LevelFType, ImmutableStructFType):
     def level_lower_unwrap(self, ctx, obj, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def from_fields(self, lvl, dimension, ptr, tbl, srt) -> "SparseByteMapLevel":
@@ -142,7 +139,7 @@ def sparse_bytemap(lvl_t, dimension_type=None):
 
 
 @dataclass
-class SparseByteMapLevel(Level):
+class SparseByteMapLevel(SingleDimensionLevel):
     lvl: Level
     dimension: np.integer
     ptr: Any | None = None
@@ -160,10 +157,6 @@ class SparseByteMapLevel(Level):
     @property
     def shape(self) -> tuple:
         return (self.dimension, *self.lvl.shape)
-
-    @property
-    def stride(self) -> np.integer:
-        return np.intp(0)
 
     @property
     def ftype(self) -> SparseByteMapLevelFType:

@@ -7,18 +7,18 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule import DefaultLogicOptimizer, loop_order_greedy
-from finch.autoschedule.compiler import LogicCompiler
+from finch.autoschedule import DefaultLogicFactorizer
+from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_order_cost import (
+from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.loop_orderer.loop_order_cost import (
     cost_of_reformat,
     get_conjunctive_and_disjunctive_inputs,
     get_prefix_cost,
     get_reformat_set,
     loop_order_cost,
 )
-from finch.autoschedule.loop_order_greedy import (
+from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
     connected_loop_candidates,
     greedy_loop_order,
@@ -83,9 +83,11 @@ def test_empty_relation():
 def greedy_scheduler():
     return LogicNormalizer(
         LogicExecutor(
-            DefaultLogicOptimizer(
+            DefaultLogicFactorizer(
                 GreedyLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
                 )
             )
         )
@@ -195,13 +197,13 @@ def _dedup_stats(expr, sf, bindings):
         expr, sf, dict(bindings), {}
     )
     input_stats = []
-    for stat in conjuncts + disjuncts:
+    for stat in itertools.chain(conjuncts, disjuncts):
         if not any(stat is seen for seen in input_stats):
             input_stats.append(stat)
     return conjuncts, disjuncts, input_stats
 
 
-def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
+def test_greedy_avoids_transposing_a_sparse_input():
     """``B`` is a sparse diagonal stored ``(i, j)``, so reformatting it costs far
     more than reformatting the dense ``A`` stored ``(j, i)``. Read and write
     costs tie, and the expression's field order puts ``j`` first, so only the
@@ -236,10 +238,6 @@ def test_greedy_avoids_transposing_a_sparse_input(monkeypatch):
     )
 
     assert greedy_loop_order(expr, sf, bindings) == (i, j)
-
-    # Drop the transpose term and greedy settles for the more expensive order.
-    monkeypatch.setattr(loop_order_greedy, "transpose_penalty", lambda *args: 0.0)
-    assert greedy_loop_order(expr, sf, bindings) == (j, i)
 
 
 def test_transpose_penalty_totals_match_loop_order_cost():

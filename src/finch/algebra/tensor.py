@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import functools
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 import scipy.sparse as sps
@@ -27,18 +28,22 @@ def to_scipy(x):
     raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
 
 
-class TensorFType(FType, ABC):
+FT = TypeVar("FT", bound=FType)
+
+
+class TensorFType(FType, ABC, Generic[FT]):
     @property
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
         return len(self.shape_type)
 
     @property
-    def size(self):
-        size = 1
-        for dim in self.shape:
-            size *= int(dim)
-        return size
+    def shape(self) -> tuple[int, ...]:
+        raise TypeError("TensorFType does not have a shape.")
+
+    @property
+    def size(self) -> int:
+        return functools.reduce(lambda x, y: x * int(y), self.shape, 1)
 
     @property
     @abstractmethod
@@ -46,9 +51,17 @@ class TensorFType(FType, ABC):
         """AbstractFill value of the tensor, either static or dynamic."""
         ...
 
+    def with_fill(self, fill_value: AbstractFill) -> TensorFType:
+        """
+        This ftype carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
     @property
     @abstractmethod
-    def element_type(self) -> FType:
+    def element_type(self) -> FT:
         """Data type of the tensor elements."""
         ...
 
@@ -89,7 +102,7 @@ class TensorFType(FType, ABC):
     def from_numpy(self, arr: np.ndarray) -> Tensor: ...
 
 
-class Tensor(FTyped, ABC):
+class Tensor(FTyped[TensorFType[FT]], ABC):
     """
     Abstract base class for tensor-like data structures. Tensors are
     multi-dimensional arrays that can be used to represent data in various
@@ -113,7 +126,7 @@ class Tensor(FTyped, ABC):
 
     @property
     @abstractmethod
-    def ftype(self) -> TensorFType:
+    def ftype(self) -> TensorFType[FT]:
         """FType of the tensor, which may include metadata about the tensor."""
         ...
 
@@ -126,8 +139,16 @@ class Tensor(FTyped, ABC):
         """
         return self.ftype.fill_value.value
 
+    def with_fill(self, fill_value: AbstractFill) -> Tensor:
+        """
+        An equivalent tensor carrying `fill_value` as its fill.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} cannot replace its fill value"
+        )
+
     @property
-    def element_type(self) -> FType:
+    def element_type(self) -> FT:
         """The element type of the tensor.  The element type is the scalar type of
         the elements in a tensor, which may be different from the data type of the
         tensor.
@@ -164,7 +185,7 @@ class Tensor(FTyped, ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> tuple:
+    def shape(self) -> tuple[np.intp, ...]:
         """Shape of the tensor."""
         ...
 

@@ -114,7 +114,7 @@ class _LowerPackedStructSlotsContext:
                 expr_2 = asm.GetAttr(obj_2, attr)
                 return self._field_replacement(expr_2) or expr_2
             case asm.Call(op, args):
-                return asm.Call(op, tuple(self.expr(arg) for arg in args))
+                return asm.Call(self.expr(op), tuple(self.expr(arg) for arg in args))
             case asm.Load(buffer, index):
                 return asm.Load(self.expr(buffer), self.expr(index))
             case asm.Length(buffer):
@@ -205,10 +205,15 @@ class _LowerPackedStructSlotsContext:
             case asm.Block(bodies):
                 stmts: list[asm.AssemblyStatement] = []
                 for body in bodies:
+                    assert isinstance(body, asm.AssemblyStatement)
                     body_2 = self.stmt(body)
                     match body_2:
                         case asm.Block(nested):
-                            stmts.extend(nested)
+                            assert all(
+                                isinstance(stmt, asm.AssemblyStatement)
+                                for stmt in nested
+                            )
+                            stmts.extend(nested)  # ty: ignore[invalid-argument-type]
                         case _:
                             stmts.append(body_2)
                 return asm.Block(tuple(stmts))

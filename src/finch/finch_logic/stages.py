@@ -24,7 +24,7 @@ class LogicLoader(Stage):
     @abstractmethod
     def lower(
         self,
-        term: lgc.LogicStatement,
+        prgm: lgc.LogicStatement,
         bindings: dict[lgc.Alias, TensorFType],
         stats: dict[lgc.Alias, TensorStats],
         stats_factory: StatsFactory,

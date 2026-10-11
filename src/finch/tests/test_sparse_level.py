@@ -130,7 +130,11 @@ def test_asm_sparse_elemwise(file_regression, caplog, numba_compiler):
 
     with caplog.at_level(logging.DEBUG, logger="finch.compile.lower"):
         result = ft.multiply(la, lb)
-        _ = ft.compute(result)
+        out = ft.compute(result)
+
+    np.testing.assert_array_equal(
+        out.to_numpy(), np.array([[1, 0, 0], [1, 4, 0], [0, 0, 1]], dtype=dtype)
+    )
 
     log.propagate = True
 

@@ -15,7 +15,26 @@ from finch.tensor.level.sparse_bytemap_level import SparseByteMapLevelFType
 from finch.tensor.level.sparse_coo_level import SparseCOOLevelFType
 from finch.tensor.level.sparse_hash_level import SparseHashLevelFType
 from finch.tensor.level.sparse_list_level import SparseListLevelFType
-from finch.tensor.patterns import FillTensorFType
+from finch.tensor.patterns import (
+    ChunkMaskTensor,
+    EyeTensor,
+    FillTensorFType,
+    LowerTriangleTensor,
+    OddEvenMergeSortLowerMaskTensor,
+    OddEvenMergeSortPartnerMaskTensor,
+    OneHotMaskTensor,
+    PairCarryTensor,
+    PairSumTensor,
+    ParityMaskTensor,
+    PatternTensorFType,
+    RandomMaskTensor,
+    RepeatTensor,
+    ReshapeMaskTensor,
+    ReverseTensor,
+    RollTensor,
+    SplitMaskTensor,
+    UpperTriangleTensor,
+)
 from finch.tensor.scalar import ScalarFType
 
 from .julia import get_jl, jc
@@ -180,12 +199,26 @@ def _julia_literal(value: Any) -> str:
     # above), so `isinstance` must use `_py_bool` (captured before shadowing).
     if isinstance(value, (_py_bool, np.bool_)):
         return "true" if value else "false"
+    if isinstance(value, tuple):
+        elts = [_julia_literal(elt) for elt in value]
+        return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
+    literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):
-            return "-Inf" if value < 0 else "Inf"
-        if math.isnan(value):
-            return "NaN"
-    return str(value)
+            literal = "-Inf" if value < 0 else "Inf"
+        elif math.isnan(value):
+            literal = "NaN"
+    # Julia reads untyped literals as Float64 or Int64. Fills are type
+    # parameters of Julia levels, so other widths (e.g. Float32) must be
+    # constructed explicitly for prototypes to match the real arguments.
+    if isinstance(value, np.number) and value.dtype not in (np.float64, np.int64):
+        return f"{_leaf_type_str(type(value))}({literal})"
+    return literal
+
+
+def scalar_type_str(fill: Any, element_type: Any) -> str:
+    """The Julia type of a Finch scalar with the given fill and element type."""
+    return f"Finch.Scalar{{{_julia_literal(fill)}, {_leaf_type_str(element_type)}}}"
 
 
 def _leaf_type_str(T: Any) -> str:
@@ -224,11 +257,10 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
-        dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
             f"Finch.SparseByteMapLevel({_level_constructor_str(level_ftype.lvl_t)}, "
             f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
-            f"{_plus_one_ctor_str(dim_t)})"
+            f"{_plus_one_ctor_str(pos_t)})"
         )
     if isinstance(level_ftype, SparseCOOLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
@@ -282,10 +314,70 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
             ctor = f"Finch.DenseLevel({ctor}, 1)"
         return f"Finch.Tensor({ctor})"
     if isinstance(ftype, FillTensorFType):
-        ctor = "Finch.PatternLevel()"
-        for _ in range(ftype.ndim):
-            ctor = f"Finch.DenseLevel({ctor}, 1)"
-        return f"Finch.Tensor({ctor})"
+        # Matches interop.py, which passes a fill tensor as a Finch scalar.
+        return f"{scalar_type_str(ftype.fill_value, ftype.element_type)}()"
+    match ftype:
+        case PatternTensorFType():
+            shape = (1,) * ftype.ndim
+            obj = ftype.construct(shape)
+            # This matches the masks built by `_pattern_tensor_to_jl`.
+            swizzle = False
+            match obj:
+                case EyeTensor():
+                    ctor = "Finch.diagmask"
+                    if obj._k:
+                        ctor = f"Finch.offset({ctor}, 0, {int(obj._k)})"
+                case UpperTriangleTensor():
+                    ctor = f"Finch.offset(Finch.lotrimask, 0, {int(obj._k)})"
+                case LowerTriangleTensor():
+                    ctor = f"Finch.offset(Finch.uptrimask, 0, {int(obj._k)})"
+                case PairSumTensor():
+                    ctor = "Finch.repeatmask(2)"
+                case PairCarryTensor():
+                    ctor = "Finch.offset(Finch.pairsummask, 0, -1)"
+                case ReverseTensor():
+                    ctor = f"Finch.reversemask({int(obj.shape[1])})"
+                case RollTensor():
+                    ctor = f"Finch.rollmask({int(obj.shape[1])}, {-int(obj._k)})"
+                case RepeatTensor():
+                    ctor = f"Finch.repeatmask({int(obj._k)})"
+                case ChunkMaskTensor():
+                    ctor = f"Finch.chunkmask({int(obj.shape[1])}, {int(obj._b)})"
+                case SplitMaskTensor():
+                    ctor = f"Finch.splitmask({int(obj.shape[1])}, {int(obj.shape[0])})"
+                case RandomMaskTensor():
+                    ctor = (
+                        f"Finch.randommask({shape}, {obj._p}; seed=UInt64({obj._seed}))"
+                    )
+                case OddEvenMergeSortPartnerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortpartnermask("
+                        f"{int(obj.shape[1])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OddEvenMergeSortLowerMaskTensor():
+                    ctor = (
+                        "Finch.oddevenmergesortlowermask("
+                        f"{int(obj.shape[0])}, {int(obj._p)}, {int(obj._k)})"
+                    )
+                case OneHotMaskTensor():
+                    ctor = f"Finch.onehotmask({int(obj._index) + 1})"
+                case ParityMaskTensor():
+                    ctor = f"Finch.paritymask({int(obj._parity)})"
+                case ReshapeMaskTensor():
+                    old_shape = tuple(int(dim) for dim in obj._old_shape)
+                    new_shape = tuple(int(dim) for dim in obj._new_shape)
+                    ctor = f"Finch.reshapemask({old_shape}, {new_shape})"
+                    swizzle = True
+                case _:
+                    raise ValueError(
+                        f"Unsupported Julia pattern tensor type: {type(obj)}"
+                    )
+            dims = ", ".join("Finch.Extent(1, 1)" for _ in shape)
+            ctor = f"Finch.window({ctor}{', ' if dims else ''}{dims})"
+            if swizzle and ftype.ndim > 1:
+                axes = ", ".join(map(str, reversed(range(1, ftype.ndim + 1))))
+                ctor = f"Finch.swizzle({ctor}, {axes})"
+            return ctor
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported ftype kind {type(ftype).__name__}"
     )

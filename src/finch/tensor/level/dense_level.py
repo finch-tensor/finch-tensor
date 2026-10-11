@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import FType, ImmutableStructFType, ffuncs, ftype, ftypes
+from finch.algebra import ImmutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
-from finch.tensor.fiber_tensor import FiberTensorFType
 from finch.tensor.traits import Dense
 
-from .level import Level, LevelFType
+from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(LevelFType, ImmutableStructFType):
+class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
-    dimension_type: FType = ftypes.intp
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
     @property
     def struct_name(self):
@@ -69,19 +68,6 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         raise NotImplementedError(
             f"Level conversion not yet implemented for {type(self).__name__}"
         )
-
-    def from_numpy(self, shape: tuple[Any, ...], val: Any) -> DenseLevel:
-        """
-        Creates an instance of DenseLevel with the given shape.
-
-        Args:
-            shape: The shape to be used for the level.
-            val: Value to pass to ElementLevel.
-        Returns:
-            An instance of DenseLevel.
-        """
-        lvl = self.lvl_t.from_numpy(shape[1:], val)
-        return DenseLevel(lvl, self.dimension_type(shape[0]))
 
     def __str__(self):
         return f"DenseLevelFType({self.lvl_t})"
@@ -133,26 +119,47 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
     def level_format_properties(self, n):
         return [Dense(tuple(range(n + 1)))] + self.lvl_t.level_format_properties(n + 1)
 
-    def level_lower_dim(self, ctx, lvl, r):
+    def level_lower_dim(self, ctx, obj, r):
         if r == 0:
-            return asm.GetAttr(lvl, asm.Literal("dimension"))
+            return asm.GetAttr(obj, asm.Literal("dimension"))
         return self.lvl_t.level_lower_dim(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), r - 1
+            ctx, asm.GetAttr(obj, asm.Literal("lvl")), r - 1
         )
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(tns, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(lvl, asm.Literal("lvl")), init, op, shape, pos
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
         )
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_freeze(
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
+        pos = asm.Call(
+            asm.Literal(ffuncs.mul),
+            (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
+        )
         return self.lvl_t.level_lower_thaw(
             ctx, asm.GetAttr(lvl, asm.Literal("lvl")), op, pos
+        )
+
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        dimension = asm.GetAttr(lvl, asm.Literal("dimension"))
+        self.lvl_t.level_lower_assemble(
+            ctx,
+            asm.GetAttr(lvl, asm.Literal("lvl")),
+            asm.Call(asm.Literal(ffuncs.mul), (start, dimension)),
+            asm.Call(asm.Literal(ffuncs.mul), (stop, dimension)),
         )
 
     def level_lower_increment(self, ctx, obj, op, val, pos):
@@ -175,8 +182,8 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
         pos: asm.AssemblyExpression,
     ):
         tns = fiber
-        ft_ftype: FiberTensorFType = fiber.type
-        lvl = ctx.fiber_level(tns)
+        level = tns.lvl
+        lvl = ctx(level)
 
         def child_accessor(ctx: LoopletContext, idx: ntn.Variable):
             if idx.type_ is None:
@@ -184,40 +191,31 @@ class DenseLevelFType(LevelFType, ImmutableStructFType):
             pos_2 = asm.Variable(
                 ctx.freshen(idx, f"_pos_{self.ndim - 1}"), self.position_type
             )
-            ctx.exec(
-                asm.Assign(
-                    pos_2,
+            child_pos = asm.Call(
+                asm.Literal(ffuncs.add),
+                (
                     asm.Call(
-                        asm.Literal(ffuncs.add),
-                        (
-                            pos,
-                            asm.Call(
-                                asm.Literal(ffuncs.mul),
-                                (
-                                    asm.GetAttr(lvl, asm.Literal("stride")),
-                                    asm.Variable(
-                                        idx.name, idx.type_
-                                    ),  # TODO: lower with ctx.ctx
-                                ),
-                            ),
-                        ),
+                        asm.Literal(ffuncs.mul),
+                        (pos, asm.GetAttr(lvl, asm.Literal("dimension"))),
                     ),
+                    ctx.ctx(idx),
+                ),
+            )
+            if child_pos.result_type != self.position_type:
+                child_pos = asm.Call(
+                    asm.Literal(ffuncs.astype(self.position_type)), (child_pos,)
+                )
+            ctx.exec(asm.Assign(pos_2, child_pos))
+            return lplt.Run(
+                replace(
+                    tns,
+                    lvl=ntn.Child(level),
+                    pos=ntn.Value(pos_2, self.position_type),
+                    idxs=(*tns.idxs, idx),
                 )
             )
-            child_type = FiberTensorFType(ft_ftype.lvl_t.lvl_t)  # type: ignore[abstract]
-            return ntn.Fiber(
-                tns.root,
-                ntn.Child(tns.lvl),
-                pos_2,
-                child_type,
-                (*tns.idxs, idx),
-            )
 
-        return lplt.Lookup(
-            body=lambda ctx, idx: lplt.Leaf(
-                body=lambda ctx: child_accessor(ctx, idx),
-            )
-        )
+        return lplt.Lookup(child_accessor)
 
     def from_fields(self, lvl, dimension, stride) -> DenseLevel:
         return DenseLevel(lvl=lvl, dimension=dimension)
@@ -228,7 +226,7 @@ def dense(lvl, dimension_type=ftypes.intp):
 
 
 @dataclass
-class DenseLevel(Level):
+class DenseLevel(SingleDimensionLevel):
     """
     A class representing dense level.
     """
@@ -243,15 +241,15 @@ class DenseLevel(Level):
     @property
     def stride(self) -> np.integer:
         dim_t = ftype(self.dimension)
-        if self.lvl.ndim == 0 or self.lvl.stride == 0:
-            return dim_t(1)
-        return dim_t(self.lvl.shape[0] * self.lvl.stride)
+        match self.lvl:
+            case DenseLevel():
+                return dim_t(self.lvl.dimension * self.lvl.stride)
+            case _:
+                return dim_t(1)
 
     @property
     def ftype(self) -> DenseLevelFType:
-        # mypy does not understand that dataclasses generate __hash__ and __eq__
-        # https://github.com/python/mypy/issues/19799
-        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))  # type: ignore[abstract]
+        return DenseLevelFType(self.lvl.ftype, ftype(self.dimension))
 
     @property
     def val(self) -> Any:

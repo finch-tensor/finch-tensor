@@ -4,7 +4,7 @@ import copy
 import math
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, MutableMapping
 from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
@@ -12,7 +12,7 @@ import numpy as np
 from finch.algebra import (
     AbstractFill,
     FinchOperator,
-    NAryFinchOperator,
+    NAryFinchOperatorFType,
     apply_fill,
     as_fill,
     is_annihilator,
@@ -41,7 +41,7 @@ class BaseTensorStats(TensorStats):
     def __init__(
         self,
         index_order: Iterable[Field] | BaseTensorStats,
-        dim_sizes: Mapping[Field, float] | None = None,
+        dim_sizes: MutableMapping[Field, float] | None = None,
         fill_value: Any = None,
     ):
         if isinstance(index_order, BaseTensorStats):
@@ -60,7 +60,7 @@ class BaseTensorStats(TensorStats):
     def _init_from_fields(
         self,
         index_order: Iterable[Field],
-        dim_sizes: Mapping[Field, float],
+        dim_sizes: MutableMapping[Field, float],
         fill_value: Any,
     ):
         self._index_order = tuple(index_order)
@@ -73,7 +73,7 @@ class BaseTensorStats(TensorStats):
     def from_fields(
         cls,
         index_order: Iterable[Field],
-        dim_sizes: Mapping[Field, float],
+        dim_sizes: MutableMapping[Field, float],
         fill_value: Any,
     ) -> Self:
         return cls(index_order, dim_sizes, fill_value)
@@ -84,11 +84,11 @@ class BaseTensorStats(TensorStats):
         return new
 
     @property
-    def dim_sizes(self) -> Mapping[Field, float]:
+    def dim_sizes(self) -> MutableMapping[Field, float]:
         return self._dim_sizes
 
     @dim_sizes.setter
-    def dim_sizes(self, value: Mapping[Field, float]):
+    def dim_sizes(self, value: MutableMapping[Field, float]):
         self._dim_sizes = OrderedDict(value)
 
     def get_dim_size(self, idx: Field) -> float:
@@ -144,14 +144,14 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
-            if is_annihilator(op, s.fill_value):
+            if is_annihilator(op.ftype, s.fill_value):
                 join_args.append(s)
             else:
                 union_args.append(s)
         if (
-            op.is_associative
-            and op.is_commutative
-            and isinstance(op, NAryFinchOperator)
+            op.ftype.is_associative
+            and op.ftype.is_commutative
+            and isinstance(op.ftype, NAryFinchOperatorFType)
         ):
             if union_args:
                 join_args.append(self._mapjoin_union(op, *union_args))
@@ -219,11 +219,11 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                 # A dynamic background must stay dynamic through the reduction.
                 # NOTE: the computed d.fill_value.value is not necessarily correct.
                 new_fill = apply_fill(op, d.fill_value, d.fill_value)
-            elif is_identity(op, old_fill) or is_idempotent(op):
+            elif is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):
                 new_fill = as_fill(op(old_fill, old_fill))
             else:
                 try:
-                    new_fill = as_fill(repeat_operator(op)(old_fill, n))
+                    new_fill = as_fill(repeat_operator(op.ftype)(old_fill, n))
                 except AttributeError:
                     # This is going to be VERY SLOW. Should raise a warning about
                     #  reductions over non-identity fill values. Depending on the

@@ -7,6 +7,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
@@ -15,9 +16,10 @@ from finch.finch_logic import (
 from finch.symbolic import PostOrderDFS, PostWalk, PreWalk
 
 from .capture import LogicCapture
-from .compiler import LogicCompiler, NotationGenerator
+from .compiler import CompilerFormLowerer, LogicCompiler, NotationGenerator
 from .default_schedulers import (
     COMPILE_JULIA,
+    COMPILE_JULIA_GALLEY,
     COMPILE_MLIR,
     COMPILE_NUMBA,
     COMPILE_NUMBA_GALLEY,
@@ -31,15 +33,20 @@ from .default_schedulers import (
     with_default_scheduler,
 )
 from .executor import LogicExecutor
-from .formatter import BufferizedNDArrayFormatter, DefaultLogicFormatter, LogicFormatter
-from .loop_ordering import DefaultLoopOrderer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter.formatter import (
+    BufferizedNDArrayFormatter,
+    DefaultLogicFormatter,
+    LogicFormatter,
+)
+from .formatter.smart_formatter import FDFormatter, SmartFormatter
+from .loop_orderer.loop_ordering import DefaultLoopOrderer
 from .normalize import LogicNormalizer, normalize_names
-from .optimize import DefaultLogicOptimizer
-from .smart_formatter import FDFormatter, SmartFormatter
 from .stages import LogicEinsumLowerer, LogicNotationLowerer
 
 __all__ = [
     "COMPILE_JULIA",
+    "COMPILE_JULIA_GALLEY",
     "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "COMPILE_NUMBA_GALLEY",
@@ -51,8 +58,9 @@ __all__ = [
     "Aggregate",
     "Alias",
     "BufferizedNDArrayFormatter",
+    "CompilerFormLowerer",
+    "DefaultLogicFactorizer",
     "DefaultLogicFormatter",
-    "DefaultLogicOptimizer",
     "DefaultLoopOrderer",
     "FDFormatter",
     "Field",
@@ -72,6 +80,7 @@ __all__ = [
     "PreWalk",
     "Produces",
     "Query",
+    "QueryInto",
     "Relabel",
     "Reorder",
     "SmartFormatter",

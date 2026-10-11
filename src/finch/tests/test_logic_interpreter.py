@@ -47,25 +47,22 @@ def test_matrix_multiplication(a, b):
 
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal(a), (i, k))),
-            Query(Alias("B"), Table(Literal(b), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),
@@ -86,25 +83,22 @@ def test_plan_repr():
     # To avoid equality issues with numpy arrays, we use string literals here instead
     p = Plan(
         (
-            Query(Alias("A"), Table(Literal("A"), (i, k))),
-            Query(Alias("B"), Table(Literal("B"), (k, j))),
+            Query(Table(Alias("A"), (i, k)), Table(Literal("A"), (i, k))),
+            Query(Table(Alias("B"), (k, j)), Table(Literal("B"), (k, j))),
             Query(
-                Alias("AB"),
+                Table(Alias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
                 ),
             ),
             Query(
-                Alias("C"),
-                Reorder(
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(0),
-                        Table(Alias("AB"), (i, k, j)),
-                        (k,),
-                    ),
-                    (i, j),
+                Table(Alias("C"), (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0),
+                    Table(Alias("AB"), (i, k, j)),
+                    (k,),
                 ),
             ),
             Produces((Alias("C"),)),
@@ -123,28 +117,28 @@ def test_materialize():
     p = Plan(
         (
             Query(
-                Alias("A"),
+                Table(Alias("A"), (i, j)),
                 Table(Literal(ft.asarray(np.array([[1, 2], [3, 4]]))), (i, j)),
             ),
             Query(
-                Alias("B"),
+                Table(Alias("B"), (i, j)),
                 Table(Literal(ft.asarray(np.array([[1, 1], [1, 1]]))), (i, j)),
             ),
             Query(
-                Alias("C"),
+                Table(Alias("C"), (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
                     (Table(Alias("A"), (i, j)), Table(Alias("B"), (i, j))),
                 ),
             ),
             Query(
-                Alias("D"),
+                Table(Alias("D"), (i, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (Table(Alias("C"), (i, j)), Table(Alias("A"), (i, j))),
                 ),
             ),
-            Query(Alias("C"), Table(Alias("B"), (i, j))),
+            Query(Table(Alias("C"), (i, j)), Table(Alias("B"), (i, j))),
             Produces((Alias("D"), Alias("C"))),
         )
     )

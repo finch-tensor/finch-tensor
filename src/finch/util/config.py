@@ -1,3 +1,4 @@
+import functools
 import os
 import shutil
 import sys
@@ -30,14 +31,28 @@ is_apple = sys.platform == "darwin"
 
 COMPILERS = ["cc", "clang", "gcc"]
 if is_windows:
-    COMPILERS.insert(0, "clang-cl")
+    COMPILERS = ["clang-cl", "cl"] + COMPILERS
 
 
+@functools.lru_cache(maxsize=1)
 def get_cc() -> str | None:
+    cc = os.environ.get("CC")
+    if cc is not None and (ccpath := shutil.which(cc)) is not None:
+        return ccpath
     for cc in COMPILERS:
-        if shutil.which(cc):
-            return cc
+        ccpath = shutil.which(cc)
+        if ccpath is not None and Path(ccpath).exists():
+            return ccpath
     return None
+
+
+@functools.lru_cache(maxsize=1)
+def is_cl_or_wrapper() -> bool | None:
+    cc = get_cc()
+    if cc is None:
+        return cc
+
+    return Path(cc).stem in {"clang-cl", "cl"}
 
 
 default = {
@@ -45,10 +60,10 @@ default = {
     "cache_size": 10_000,
     "cache_enable": True,
     "cc": get_cc(),
-    "cflags": os.getenv("CFLAGS") or "-Og" if not is_windows else "/Og",
+    "cflags": os.getenv("CFLAGS") or "-Og" if not is_cl_or_wrapper() else "/Og",
     "shared_cflags": os.getenv(
         "SHARED_CFLAGS",
-        "-shared -fPIC" if not is_windows else "/LD /TC",
+        "-shared -fPIC" if not is_cl_or_wrapper() else "/LD /TC",
     ),
     "shared_library_suffix": (
         os.getenv(

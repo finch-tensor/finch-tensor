@@ -340,7 +340,7 @@ class EinsumPrinterContext(Context):
                     return f"{unary_strs[fn.val]}{args_e[0]}"
                 return f"{self(fn)}({', '.join(args_e)})"
             case Einsum(op, tns, idxs, arg):
-                op_str = infix_strs.get(op.val, op.val.__name__)
+                op_str = infix_strs.get(op.val, self(op))
                 self.exec(
                     f"{self.feed}{self(tns)}["
                     f"{', '.join(self(idx) for idx in idxs)}] "

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -6,16 +6,20 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import (
+    AbstractFill,
     DynamicFill,
     FType,
     ImmutableStructFType,
     StaticFill,
     as_fill,
+    ffuncs,
     ftype,
     is_dynamic,
+    np_dtype,
 )
 from finch.codegen import NumpyBufferFType
 from finch.compile.lower import AssemblyContext
+from finch.finch_assembly import parse_assembly
 
 from .level import Level, LevelFType
 
@@ -45,8 +49,8 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         # no inner level
         # cost = num_pos * bytes per value
-        elem_type = getattr(self.element_type, "dtype", np.float64)
-        val_size = np.dtype(elem_type).itemsize
+        assert self.element_type is not None
+        val_size = np_dtype(self.element_type).itemsize
         return num_pos * val_size
 
     def __post_init__(self):
@@ -62,7 +66,7 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         if self.buffer_type is None:
             self.buffer_type = self.buffer_factory(self.element_type)
         if self.position_type is None:
-            self.position_type = np.intp
+            self.position_type = ftype(np.intp)
         self.position_type = ftype(self.position_type)
         self.element_type = self.buffer_type.element_type
         fill = as_fill(self.fill_value)
@@ -142,12 +146,12 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         fmt = self if fill is None else self.with_fill(fill)
         return ElementLevel(_format=fmt, _val=val)
 
-    def level_lower_declare(self, ctx, lvl, init, op, shape, pos):
-        buf = asm.GetAttr(lvl, asm.Literal("val"))
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        buf = asm.GetAttr(tns, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
         init_e: asm.AssemblyExpression = (
             # The init value arrives at bind time through the fill field.
-            asm.GetAttr(lvl, asm.Literal("fill"))
+            asm.GetAttr(tns, asm.Literal("fill"))
             if is_dynamic(getattr(init, "val", None))
             else asm.Literal(init.val)
         )
@@ -155,7 +159,11 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):
-        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
         return asm.Load(buf, pos)
 
     def level_lower_increment(
@@ -164,10 +172,14 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         obj,
         op: ntn.Literal,
         val: ntn.NotationExpression,
-        pos: ntn.Variable,
+        pos: asm.AssemblyExpression,
     ):
-        buf = asm.GetAttr(ctx.fiber_level(obj), asm.Literal("val"))
-        pos_e, op_e, val_e = ctx(pos), ctx(op), ctx(val)
+        buf = asm.GetAttr(ctx(obj.lvl), asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
+        pos_e, op_e, val_e = pos, ctx(op), ctx(val)
         ctx.exec(
             asm.Store(
                 buf,
@@ -175,23 +187,74 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
                 asm.Call(op_e, (asm.Load(buf, pos_e), val_e)),
             )
         )
+        match obj:
+            case ntn.HollowFiber(dirty=dirty):
+                fill = (
+                    self.lower_fill(ctx(obj.lvl))
+                    if is_dynamic(self.fill_value)
+                    else asm.Literal(self.fill_value.value)
+                )
+                ctx.exec(
+                    asm.If(
+                        asm.Call(
+                            asm.Literal(ffuncs.not_),
+                            (
+                                asm.Call(
+                                    asm.Literal(ffuncs.same),
+                                    (asm.Load(buf, pos_e), fill),
+                                ),
+                            ),
+                        ),
+                        asm.Assign(ctx(dirty), asm.Literal(True)),
+                    )
+                )
+
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        p_t = self.buffer_type.length_type
+        to_size = asm.Literal(ffuncs.astype(p_t))
+        p = asm.Variable(ctx.freshen("p"), p_t)
+        p_start = asm.Variable(ctx.freshen("p_start"), p_t)
+        p_stop = asm.Variable(ctx.freshen("p_stop"), p_t)
+        length = asm.Length(buf)
+        fill = (
+            self.lower_fill(lvl)
+            if is_dynamic(self.fill_value)
+            else asm.Literal(self.fill_value.value)
+        )
+        expr = """finch
+        p_start = to_size(start)
+        p_stop = to_size(stop)
+        if (length < p_stop)
+            resize(buf, p_stop)
+        end
+        for (p in p_start:p_stop)
+            buf[p] = fill
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
-        return asm.GetAttr(lvl, asm.Literal("val"))
+        buf = asm.GetAttr(lvl, asm.Literal("val"))
+        size = asm.Call(
+            asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+        )
+        length = asm.Length(buf)
+        expr = """finch
+        if (length != size)
+            resize(buf, size)
+        end
+        """
+        ctx.exec(parse_assembly(expr, locals()))
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
-        return asm.GetAttr(lvl, asm.Literal("val"))
+        pass
 
     def level_lower_dim(self, ctx, obj, r):
         raise NotImplementedError("ElementLevelFType does not support level_lower_dim.")
 
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         raise NotImplementedError("ElementLevelFType does not support level_unfurl.")
-
-    def from_numpy(self, shape, val):
-        if len(shape) != 0:
-            raise ValueError("ElementLevelFType must be called with an empty shape.")
-        return self.from_fields(val)
 
 
 def element(
@@ -241,12 +304,11 @@ class ElementLevel(Level):
         return ()
 
     @property
-    def stride(self) -> np.integer:
-        return np.intp(1)  # TODO: add dimension_type to element_level.py
-
-    @property
     def ftype(self) -> ElementLevelFType:
         return self._format
+
+    def with_fill(self, fill_value: AbstractFill) -> "ElementLevel":
+        return replace(self, _format=self._format.with_fill(fill_value))
 
     @property
     def val(self) -> Any:

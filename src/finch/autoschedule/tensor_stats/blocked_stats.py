@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 
@@ -79,11 +79,14 @@ def get_blocks_subtensor(
 
         expr = build_block_expr(arr, fields, starts, ends, coord)
         out = Alias(f"block_{'_'.join(str(c) for c in coord)}")
-        prgm = Plan((Query(out, expr), Produces((out,))))
+        prgm = Plan((Query(Table(out, expr.fields()), expr), Produces((out,))))
         (result,) = NON_RECURSIVE_SCHEDULER(prgm)
         blocks[coord] = result
 
     return blocks
+
+
+NS = TypeVar("NS", bound=NumericStats)
 
 
 class BlockedStatsFactory(
@@ -91,7 +94,7 @@ class BlockedStatsFactory(
 ):
     def __init__(
         self,
-        stats_factory: StatsFactory[NumericStats],
+        stats_factory: StatsFactory[NS],
         block_count: int = 5,
         block_width: int = 5,
         blocks_per_dim: Mapping[Field, int] | None = None,
@@ -279,13 +282,13 @@ class BlockedStatsFactory(
         )
 
 
-class BlockedStats(NumericStats):
+class BlockedStats(NumericStats, Generic[NS]):
     def __init__(
         self,
         blocks: np.ndarray,
         blocks_per_dim: dict[Field, int],
         base: BaseTensorStats,
-        stats_factory: StatsFactory[NumericStats],
+        stats_factory: StatsFactory[NS],
     ):
         super().__init__(base)
         self.blocks = blocks
@@ -297,7 +300,7 @@ class BlockedStats(NumericStats):
         cls,
         d: BaseTensorStats,
         blocks_per_dim: Mapping[Field, int],
-        stats_factory: StatsFactory[NumericStats],
+        stats_factory: StatsFactory[NS],
         data: Any,
     ) -> np.ndarray:
 

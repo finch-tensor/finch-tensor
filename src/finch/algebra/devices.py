@@ -1,5 +1,7 @@
 """Device policies and execution tasks for Finch metadata."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from os import cpu_count
@@ -83,172 +85,6 @@ class AbstractTask(FTyped, ABC):
                 return True
             task = task.parent_task
         return False
-
-
-@dataclass(frozen=True, slots=True)
-class Serial(AbstractDevice):
-    @property
-    def ftype(self):
-        return SerialFType()
-
-    @property
-    def num_tasks(self):
-        return 1
-
-    @property
-    def device(self):
-        return self
-
-    @property
-    def parent_device(self):
-        return None
-
-    def __repr__(self):
-        return "Serial"
-
-
-def serial() -> Serial:
-    return Serial()
-
-
-def _normalize_parent_device(parent):
-    match parent:
-        case None:
-            return serial()
-        case type() if parent is Serial:
-            return serial()
-        case AbstractDevice():
-            return parent
-        case _:
-            raise ValueError(f"device parent is not supported; got {parent!r}")
-
-
-@dataclass(frozen=True, slots=True, eq=False, init=False)
-class CPU(AbstractDevice):
-    __match_args__ = ("parent", "id")
-
-    parent: AbstractDevice
-    n: int | None
-    id: Any
-
-    def __init__(self, parent=None, /, id: Any = "default", n: int | None = None):
-        if isinstance(parent, int):
-            if n is not None:
-                raise TypeError("CPU received task count twice")
-            n = parent
-            parent = serial()
-        if n is not None and n < 1:
-            raise ValueError(f"CPU device requires at least one task, got {n}")
-        object.__setattr__(self, "parent", _normalize_parent_device(parent))
-        object.__setattr__(self, "n", n)
-        object.__setattr__(self, "id", id)
-
-    @property
-    def ftype(self):
-        return CPUFType(self.parent.ftype, self.id)
-
-    @property
-    def num_tasks(self):
-        return _default_num_tasks() if self.n is None else self.n
-
-    @property
-    def device(self):
-        return self
-
-    @property
-    def parent_device(self):
-        return self.parent
-
-    def __eq__(self, other):
-        match other:
-            case CPU(parent=other_parent, id=other_id):
-                return self.parent == other_parent and self.id == other_id
-            case _:
-                return False
-
-    def __hash__(self):
-        return hash((CPU, self.parent, self.id))
-
-    def __repr__(self):
-        suffix = "" if self.id == "default" else f", id={self.id!r}"
-        if self.n is not None:
-            suffix += f", n={self.n!r}"
-        return f"CPU({self.parent!r}{suffix})"
-
-
-def cpu(id: Any = "default", n: int | None = None, parent=None) -> CPU:
-    return CPU(parent, id=id, n=n)
-
-
-@dataclass(frozen=True, slots=True)
-class SerialTask(AbstractTask):
-    @property
-    def ftype(self):
-        return SerialTaskFType()
-
-    @property
-    def num_tasks(self):
-        return 1
-
-    @property
-    def task_num(self):
-        return 1
-
-    @property
-    def device(self):
-        return serial()
-
-    @property
-    def parent_task(self):
-        return None
-
-
-@dataclass(frozen=True, slots=True, init=False)
-class CPUThread(AbstractTask):
-    __match_args__ = ("tid", "device", "parent")
-
-    tid: int
-    _device: CPU
-    parent: AbstractTask | None = None
-
-    def __init__(self, tid: int, device: CPU, parent: AbstractTask | None = None):
-        match device:
-            case CPU():
-                pass
-            case _:
-                raise ValueError(f"CPUThread device is not supported; got {device!r}")
-        object.__setattr__(self, "tid", tid)
-        object.__setattr__(self, "_device", device)
-        object.__setattr__(self, "parent", parent)
-
-    @property
-    def ftype(self):
-        parent_type = (
-            ftype(self.parent_task) if self.parent_task is not None else ftype(None)
-        )
-        return CPUThreadFType(parent_type, self.device.ftype)
-
-    @property
-    def num_tasks(self):
-        return self.device.num_tasks
-
-    @property
-    def task_num(self):
-        return self.tid
-
-    @property
-    def device(self):
-        return self._device
-
-    @property
-    def parent_task(self):
-        return self.parent
-
-    def __repr__(self):
-        return (
-            f"CPUThread(tid={self.tid!r}, "
-            f"device={self.device!r}, parent={self.parent!r})"
-        )
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -401,6 +237,172 @@ class CPUThreadFType(TaskFType):
     @property
     def parent_task(self):
         return self.parent_type
+
+
+@dataclass(frozen=True, slots=True)
+class Serial(AbstractDevice, FTyped[SerialFType]):
+    @property
+    def ftype(self):
+        return SerialFType()
+
+    @property
+    def num_tasks(self):
+        return 1
+
+    @property
+    def device(self):
+        return self
+
+    @property
+    def parent_device(self):
+        return None
+
+    def __repr__(self):
+        return "Serial"
+
+
+def serial() -> Serial:
+    return Serial()
+
+
+def _normalize_parent_device(parent):
+    match parent:
+        case None:
+            return serial()
+        case type() if parent is Serial:
+            return serial()
+        case AbstractDevice():
+            return parent
+        case _:
+            raise ValueError(f"device parent is not supported; got {parent!r}")
+
+
+@dataclass(frozen=True, slots=True, eq=False, init=False)
+class CPU(AbstractDevice, FTyped[CPUFType]):
+    __match_args__ = ("parent", "id")
+
+    parent: AbstractDevice
+    n: int | None
+    id: Any
+
+    def __init__(self, parent=None, /, id: Any = "default", n: int | None = None):
+        if isinstance(parent, int):
+            if n is not None:
+                raise TypeError("CPU received task count twice")
+            n = parent
+            parent = serial()
+        if n is not None and n < 1:
+            raise ValueError(f"CPU device requires at least one task, got {n}")
+        object.__setattr__(self, "parent", _normalize_parent_device(parent))
+        object.__setattr__(self, "n", n)
+        object.__setattr__(self, "id", id)
+
+    @property
+    def ftype(self):
+        return CPUFType(self.parent.ftype, self.id)
+
+    @property
+    def num_tasks(self):
+        return _default_num_tasks() if self.n is None else self.n
+
+    @property
+    def device(self):
+        return self
+
+    @property
+    def parent_device(self):
+        return self.parent
+
+    def __eq__(self, other):
+        match other:
+            case CPU(parent=other_parent, id=other_id):
+                return self.parent == other_parent and self.id == other_id
+            case _:
+                return False
+
+    def __hash__(self):
+        return hash((CPU, self.parent, self.id))
+
+    def __repr__(self):
+        suffix = "" if self.id == "default" else f", id={self.id!r}"
+        if self.n is not None:
+            suffix += f", n={self.n!r}"
+        return f"CPU({self.parent!r}{suffix})"
+
+
+def cpu(id: Any = "default", n: int | None = None, parent=None) -> CPU:
+    return CPU(parent, id=id, n=n)
+
+
+@dataclass(frozen=True, slots=True)
+class SerialTask(AbstractTask, FTyped[SerialTaskFType]):
+    @property
+    def ftype(self):
+        return SerialTaskFType()
+
+    @property
+    def num_tasks(self):
+        return 1
+
+    @property
+    def task_num(self):
+        return 1
+
+    @property
+    def device(self):
+        return serial()
+
+    @property
+    def parent_task(self):
+        return None
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class CPUThread(AbstractTask, FTyped[CPUThreadFType]):
+    __match_args__ = ("tid", "device", "parent")
+
+    tid: int
+    _device: CPU
+    parent: AbstractTask | None = None
+
+    def __init__(self, tid: int, device: CPU, parent: AbstractTask | None = None):
+        match device:
+            case CPU():
+                pass
+            case _:
+                raise ValueError(f"CPUThread device is not supported; got {device!r}")
+        object.__setattr__(self, "tid", tid)
+        object.__setattr__(self, "_device", device)
+        object.__setattr__(self, "parent", parent)
+
+    @property
+    def ftype(self):
+        parent_type = (
+            ftype(self.parent_task) if self.parent_task is not None else ftype(None)
+        )
+        return CPUThreadFType(parent_type, self.device.ftype)
+
+    @property
+    def num_tasks(self):
+        return self.device.num_tasks
+
+    @property
+    def task_num(self):
+        return self.tid
+
+    @property
+    def device(self):
+        return self._device
+
+    @property
+    def parent_task(self):
+        return self.parent
+
+    def __repr__(self):
+        return (
+            f"CPUThread(tid={self.tid!r}, "
+            f"device={self.device!r}, parent={self.parent!r})"
+        )
 
 
 def normalize_device(device: Any) -> AbstractDevice:

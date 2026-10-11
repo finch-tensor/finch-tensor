@@ -1,23 +1,42 @@
-from abc import ABC, abstractmethod
-from dataclasses import replace
-from typing import Any
+from __future__ import annotations
 
-import numpy as np
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, replace
+from typing import Any, Self, TypeVar
 
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
     FType,
     FTyped,
+    StructFType,
+    ftypes,
 )
+from finch.tensor.traits import FormatProperty
 
 
+@dataclass
 class LevelFType(FType, ABC):
     """
     An abstract base class representing the ftype of levels.
     """
 
-    def with_fill(self, fill_value: Any) -> "LevelFType":
+    def level_get_child_type(self, attr: str) -> LevelFType:
+        match self:
+            case StructFType() if self.struct_hasattr(attr):
+                child = self.struct_attrtype(attr)
+                match child:
+                    case LevelFType():
+                        return child
+        raise TypeError(f"{self} does not support child {attr!r}")
+
+    def level_get_child(
+        self, obj: asm.AssemblyExpression, attr: str
+    ) -> asm.AssemblyExpression:
+        self.level_get_child_type(attr)
+        return asm.GetAttr(obj, asm.Literal(attr))
+
+    def with_fill(self, fill_value: Any) -> LevelFType:
         """Rebuild this level ftype with the leaf fill value replaced."""
         # Level ftypes are dataclasses with a `_lvl_t` child field; non-
         # dataclass levels must override.
@@ -47,7 +66,7 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Type of elements stored in the fibers.
         """
@@ -97,21 +116,27 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+    def level_unfurl(self, ctx, lvl, ext, mode, proto, pos):
         """
         Emit code to unfurl the fiber at position `pos` in the level.
         """
         ...
 
     @abstractmethod
-    def level_lower_freeze(self, ctx, tns, op, pos):
+    def level_lower_freeze(self, ctx, lvl, op, pos):
         """
         Emit code to freeze `pos` previously assembled positions in the level.
         """
         ...
 
+    def level_lower_assemble(self, ctx, lvl, start, stop):
+        """Assemble parent positions in the half-open range [start, stop)."""
+        raise NotImplementedError(
+            f"Assembly is not implemented for {type(self).__name__}"
+        )
+
     @abstractmethod
-    def level_lower_thaw(self, ctx, tns, op, pos):
+    def level_lower_thaw(self, ctx, lvl, op, pos):
         """
         Emit code to thaw `pos` previously assembled positions in the level.
         """
@@ -147,22 +172,14 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def construct(self, shape: tuple[Any, ...], *, pos: int) -> "Level":
+    def construct(self, shape: tuple[Any, ...], *, pos: int) -> Level:
         """
         Construct a level instance with the given shape.
         """
         ...
 
     @abstractmethod
-    def from_numpy(self, shape, val):
-        """
-        Construct level from numpy array
-        (TODO not strictly safe, only works for dense, replace later)
-        """
-        ...
-
-    @abstractmethod
-    def level_format_properties(self, n):
+    def level_format_properties(self, n: int) -> list[FormatProperty]:
         """
         Return the format properties contributed by this level type and children.
 
@@ -173,7 +190,11 @@ class LevelFType(FType, ABC):
         ...
 
 
-class Level(FTyped, ABC):
+LT = TypeVar("LT", bound=LevelFType)
+
+
+@dataclass
+class Level(FTyped[LT], ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
@@ -186,10 +207,6 @@ class Level(FTyped, ABC):
         Shape of the fibers in the structure.
         """
         ...
-
-    @property
-    @abstractmethod
-    def stride(self) -> np.integer: ...
 
     @property
     @abstractmethod
@@ -224,3 +241,30 @@ class Level(FTyped, ABC):
     @property
     def buffer_type(self):
         return self.ftype.buffer_type
+
+    @abstractmethod
+    def with_fill(self, fill_value: AbstractFill) -> Self: ...
+
+
+class SingleDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
+
+
+class MultiDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.TupleFType
+
+
+class SingleDimensionLevel(Level):
+    lvl: Level
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+
+class MultiDimensionLevel(Level):
+    lvl: Level
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        """Rebuild this level with the leaf fill value replaced."""
+        return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]

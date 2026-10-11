@@ -1,4 +1,13 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class CompilerMode:
+    """Safe mode checks tensor extents; debug also checks buffer accesses."""
+
+    safe: bool = False
+    debug: bool = False
 
 
 class Stage(ABC):
@@ -8,9 +17,9 @@ class Stage(ABC):
     @abstractmethod
     def lower(self, *inputs): ...
 
-    def __call__(self, *inputs):
+    def __call__(self, *inputs, **options):
         self.validate_inputs(*inputs)
-        return self.lower(*inputs)
+        return self.lower(*inputs, **options)
 
 
 class Form(ABC):
@@ -31,6 +40,5 @@ class UnvalidatedForm(Form):
     This is essentially a to-do for validation and should be replaced.
     """
 
-    @classmethod
-    def validate_inputs(cls, *inputs):
+    def validate_inputs(self, *inputs):
         return

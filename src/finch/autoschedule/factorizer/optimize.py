@@ -1,0 +1,379 @@
+from finch.algebra import DynamicFill, StaticFill, ffuncs
+from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
+from finch.algebra.tensor import TensorFType
+from finch.algebra.utils import setdiff
+from finch.autoschedule.stages import LogicFactorizer
+from finch.autoschedule.util import (
+    desugar_query_into,
+    drop_query_reorders,
+    flatten_plans,
+    propagate_copy_queries,
+    push_fields,
+    reorder_to,
+    resugar_query_into,
+    split_aggregate_inits,
+)
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    Literal,
+    LogicNode,
+    LogicStatement,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Relabel,
+    Reorder,
+    StatsFactory,
+    Table,
+    TensorStats,
+)
+from finch.finch_logic.nodes import LogicExpression
+from finch.symbolic import (
+    Fixpoint,
+    Namespace,
+    PostOrderDFS,
+    PostWalk,
+    PreWalk,
+    Rewrite,
+    gensym,
+)
+
+
+def isolate_aggregates(root: LogicStatement) -> LogicStatement:
+    def transform(stmt):
+        stack = []
+
+        def rule_1(ex):
+            match ex:
+                case Aggregate(_, _, _, _) as agg:
+                    tbl = Table(Alias(gensym("A")), agg.fields())
+                    stack.append(Query(tbl, agg))
+                    return tbl
+                case _:
+                    return None
+
+        match stmt:
+            case Query(lhs, Aggregate(op, init, arg, idxs)):
+                arg = Rewrite(PostWalk(rule_1))(arg)
+                return Plan((*stack, Query(lhs, Aggregate(op, init, arg, idxs))))
+            case Query(lhs, rhs):
+                rhs = Rewrite(PostWalk(rule_1))(rhs)
+                return Plan((*stack, Query(lhs, rhs)))
+            case Produces(args):
+                args = tuple(Rewrite(PostWalk(rule_1))(arg) for arg in args)
+                return Plan((*stack, Produces(args)))
+            case _:
+                return None
+
+    return Rewrite(PostWalk(transform))(root)
+
+
+def with_unique_lhs(
+    f, root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
+    """
+    Ensures all left-hand sides (LHS) of queries are unique by inserting new
+    tensors.
+    """
+
+    spc = Namespace(root)
+    for var in bindings:
+        spc.freshen(var.name)
+    renames: dict[Alias, Alias] = {}
+    bound = set(bindings.keys())
+    writes: dict[Alias, Alias] = {}
+
+    def rule_0(node):
+        match node:
+            case Query(Table(Alias() as lhs, idxs), rhs):
+                if lhs in bound:
+                    var = Alias(spc.freshen(lhs.name))
+                    renames[lhs] = var
+                    if lhs in bindings:
+                        writes[lhs] = var
+                    return Query(Table(var, idxs), rhs)
+                bound.add(lhs)
+                return None
+            case Alias() as a if a in renames:
+                return renames[a]
+            case Produces(args):
+                return Produces(args + tuple(writes.values()))
+
+    root = Rewrite(PostWalk(rule_0))(root)
+    root, bindings = f(root, bindings)
+
+    unrenames = {v: k for k, v in renames.items()}
+
+    # Some produces may be renamed during the optimization,
+    # so we need to be a bit careful here.
+    def rule_1(node):
+        match node:
+            case Produces(args):
+                n_writes = len(writes)
+                v_post_list = args[-n_writes:] if n_writes else ()
+
+                bodies: list[LogicStatement] = []
+                for (k, _v_pre), v_post in zip(
+                    writes.items(), v_post_list, strict=True
+                ):
+                    idxs = tuple(
+                        Field(spc.freshen("i")) for _ in range(bindings[k].ndim)
+                    )
+                    bodies.append(Query(Table(k, idxs), Table(v_post, idxs)))
+
+                v_post_to_k = dict(zip(v_post_list, writes.keys(), strict=True))
+                args_2 = tuple(
+                    v_post_to_k.get(a, unrenames.get(a, a))
+                    for a in args[: len(args) - n_writes]
+                )
+                return Plan(tuple(bodies) + (Produces(args_2),))
+
+    return (Rewrite(PostWalk(rule_1))(root), bindings)
+
+
+def add_aggregates(
+    root: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> LogicStatement:
+    fill_values = root.infer_fill_value(
+        {var: val.fill_value for var, val in bindings.items()}
+    )
+
+    def rule_0(node):
+        match node:
+            case Query(_, Aggregate()):
+                return node
+            case Query(Table(Alias() as lhs, _), arg):
+                match fill_values[lhs]:
+                    case DynamicFill() as fill:
+                        init = Literal(fill)
+                    case StaticFill() as fill:
+                        init = Literal(fill.value)
+                return Query(
+                    node.lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
+                )
+
+    return Rewrite(PostWalk(rule_0))(root)
+
+
+def optimize(
+    prgm: LogicStatement, bindings: dict[Alias, TensorFType]
+) -> tuple[LogicStatement, dict[Alias, TensorFType]]:
+    def transform(prgm, bindings):
+        prgm = push_fields(prgm)
+        prgm = propagate_map_queries_backward(prgm)
+
+        prgm = isolate_aggregates(prgm)
+
+        prgm = propagate_copy_queries(prgm, bindings)
+        prgm = propagate_transpose_queries(prgm)
+        prgm = propagate_map_queries(prgm)
+
+        prgm = push_fields(prgm)
+        prgm = lift_fields(prgm)
+        prgm = push_fields(prgm)
+
+        prgm = propagate_transpose_queries(prgm)
+        prgm = push_fields(prgm)
+        prgm = resugar_query_into(prgm)
+        prgm = add_aggregates(prgm, bindings)
+        return prgm, bindings
+
+    prgm = split_aggregate_inits(
+        desugar_query_into(prgm), bindings, broadcast_only=True
+    )
+    prgm, bindings = with_unique_lhs(transform, prgm, bindings)
+    assert isinstance(prgm, Plan)
+    return flatten_plans(prgm), bindings
+
+
+def get_productions(root: LogicStatement) -> tuple[Alias, ...]:
+    match root:
+        case Plan(bodies):
+            return get_productions(bodies[-1])
+        case Produces(args):
+            assert all(isinstance(arg, Alias) for arg in args)
+            return args  # ty: ignore[invalid-return-type]
+        case Query(Table(Alias() as lhs, _), _):
+            return (lhs,)
+        case _:
+            raise ValueError(f"Invalid node type: {type(root)}")
+
+
+def propagate_map_queries(root: LogicStatement) -> LogicStatement:
+    # TODO: We're not ready for that optimization yet.
+    #       First we need to support Literals as MapJoin's
+    #       arguments (they're missing `fields`) or promote
+    #       `init` to a Table here.
+    # def rule_0(ex):
+    #     match ex:
+    #         case Aggregate(op, init, arg, ()):
+    #             return MapJoin(op, (init, arg))
+    # root = Rewrite(PostWalk(rule_0))(root)
+
+    assert isinstance(root, LogicNode)
+    rets = get_productions(root)
+    props = {}
+
+    def rule_1(node):
+        match node:
+            case Query(Table(Alias() as a, idxs), MapJoin() as rhs) if a not in rets:
+                props[a] = reorder_to(rhs, idxs)
+                return Plan()
+            case Table(a, idxs) if a in props:
+                return Relabel(props[a], idxs)
+
+    root = Rewrite(PostWalk(rule_1))(root)
+    return flatten_plans(root)
+
+
+def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
+    # TODO: We're not ready for that optimization yet.
+    #       First we need to support Literals as MapJoin's
+    #       arguments (they're missing `fields`) or promote
+    #       `init` to a Table here.
+    # def rule_0(ex):
+    #     match ex:
+    #         case Aggregate(op, init, arg, ()):
+    #             return MapJoin(op, (init, arg))
+    # root = Rewrite(PostWalk(rule_0))(root)
+
+    uses: dict[LogicNode, int] = {}
+    defs: dict[LogicNode, LogicNode] = {}
+    for node in PostOrderDFS(root):
+        match node:
+            case Alias() as a:
+                uses[a] = uses.get(a, 0) + 1
+            case Query(Table(Alias() as a, idxs), b):
+                uses[a] = uses.get(a, 0) - 1
+                defs[a] = reorder_to(b, idxs)
+
+    rets = get_productions(root)
+
+    def rule_1(ex):
+        match ex:
+            case Query(Table(Alias() as a, _), _) if uses[a] == 1 and a not in rets:
+                return Plan()
+            case Table(Alias() as a, idxs) if (
+                uses.get(a, 0) == 1 and a not in rets and a in defs
+            ):
+                arg = defs[a]
+                assert isinstance(arg, LogicExpression)
+                return Relabel(arg, idxs)
+
+    root = Rewrite(PreWalk(rule_1))(root)
+    root = push_fields(root)
+
+    def unwrap_reorder(ex):
+        match ex:
+            case Reorder(Aggregate() as agg, idxs) if set(idxs) == set(agg.fields()):
+                return agg
+        return ex
+
+    def rule_2(ex):
+        match ex:
+            case MapJoin(
+                Literal(f),
+                args,
+            ):
+                for idx, item in reversed(list(enumerate(args))):
+                    before_item = args[:idx]
+                    after_item = args[idx + 1 :]
+                    match unwrap_reorder(item):
+                        case Aggregate(Literal(g), Literal(init), arg, idxs) if (
+                            is_distributive(f.ftype, g.ftype)
+                            and is_annihilator(f.ftype, init)
+                            and len(arg.fields())
+                            == len(
+                                MapJoin(
+                                    Literal(f), (*before_item, arg, *after_item)
+                                ).fields()
+                            )
+                        ):
+                            return Aggregate(
+                                Literal(g),
+                                Literal(init),
+                                MapJoin(Literal(f), (*before_item, arg, *after_item)),
+                                idxs,
+                            )
+            case Aggregate(
+                Literal() as op_1,
+                Literal() as init_1,
+                Aggregate(op_2, Literal() as init_2, arg, idxs_1),
+                idxs_2,
+            ) if op_1 == op_2 and is_identity(op_2.val.ftype, init_2.val):
+                return Aggregate(op_1, init_1, arg, idxs_1 + idxs_2)
+            case Aggregate(
+                Literal() as op_1,
+                Literal() as init_1,
+                Reorder(Aggregate(op_2, Literal() as init_2, arg, idxs_1), idxs_3),
+                idxs_2,
+            ) if op_1 == op_2 and is_identity(op_2.val.ftype, init_2.val):
+                return Reorder(
+                    Aggregate(op_1, init_1, arg, idxs_1 + idxs_2),
+                    setdiff(idxs_3, idxs_2),
+                )
+
+        return None
+
+    return drop_query_reorders(Rewrite(Fixpoint(PreWalk(rule_2)))(root))
+
+
+def lift_fields(root):
+    def rule_0(ex):
+        match ex:
+            case Aggregate(op, init, arg, idxs):
+                return Aggregate(op, init, Reorder(arg, tuple(arg.fields())), idxs)
+            case Query(Table(_, idxs) as lhs, MapJoin() as rhs):
+                return Query(lhs, Reorder(rhs, idxs))
+
+    return Rewrite(PostWalk(rule_0))(root)
+
+
+def propagate_transpose_queries(root: LogicStatement):
+    props: dict[Alias, LogicExpression] = {}
+
+    def rule_1(node):
+        match node:
+            case Table(Alias() as a, idxs) if a in props:
+                return Relabel(props[a], idxs)
+            case Produces(args):
+                bodies = [
+                    Query(Table(a, props[a].fields()), props[a])
+                    for a in args
+                    if a in props
+                ]
+                return Plan(tuple(bodies) + (Produces(args),))
+
+    def rule_0(node):
+        match node:
+            case Query(
+                Table(lhs, idxs), (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _))
+            ) as q:
+                props[lhs] = Rewrite(PostWalk(rule_1))(reorder_to(q.rhs, idxs))
+                return Plan()
+
+    root = push_fields(root)
+
+    root = Rewrite(PostWalk(rule_0))(root)
+
+    root = Rewrite(PostWalk(rule_1))(root)
+
+    return flatten_plans(push_fields(root))
+
+
+class DefaultLogicFactorizer(LogicFactorizer):
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+    def lower(
+        self,
+        prgm: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, "TensorStats"],
+        stats_factory: StatsFactory,
+    ):
+        prgm, bindings = optimize(prgm, bindings)
+        return self.ctx(prgm, bindings, stats, stats_factory)

@@ -1,7 +1,7 @@
 from abc import abstractmethod
 
 from finch import finch_assembly as asm
-from finch.symbolic import Stage
+from finch.symbolic import CompilerMode, Stage
 
 
 class NumbaCode:
@@ -14,7 +14,7 @@ class NumbaCode:
 
 class NumbaLowerer(Stage):
     @abstractmethod
-    def lower(self, prgm: asm.Module) -> NumbaCode:
+    def lower(self, prgm: asm.Module, *, mode: CompilerMode | None = None) -> NumbaCode:
         """
         Lower the given assembly program to Numba code.
         """

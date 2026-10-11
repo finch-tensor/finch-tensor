@@ -7,7 +7,7 @@ import threading
 from collections import OrderedDict
 from collections.abc import Sequence
 from itertools import accumulate, zip_longest
-from typing import Any, cast, overload
+from typing import Any, overload
 
 import numpy as np
 import scipy.sparse as sps
@@ -16,7 +16,9 @@ from numpy.lib.array_utils import normalize_axis_index, normalize_axis_tuple
 from finch import finch_einsum as ein
 from finch.algebra import (
     AbstractFill,
+    CallableFType,
     FinchOperator,
+    FinchOperatorFType,
     FType,
     Tensor,
     TensorFType,
@@ -31,10 +33,10 @@ from finch.algebra import (
     result_type,
     return_type,
 )
+from finch.algebra.algebra import is_specializable_value
 from finch.algebra.ftypes import (
     FDTypeBoolean,
-    FDTypeBuiltin,
-    FDTypeNumpy,
+    np_dtype,
 )
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.finch_logic import (
@@ -57,6 +59,7 @@ from finch.tensor import (
     BufferizedNDArray,
     EyeTensor,
     FiberTensor,
+    FiberTensorFType,
     FillTensor,
     IndexTensor,
     LowerTriangleTensor,
@@ -211,7 +214,7 @@ class EffectBlob:
 
     def eval(self, ex: LogicExpression) -> tuple[Alias, EffectBlob]:
         var = Alias(gensym("A"))
-        return var, self.exec(Query(var, ex))
+        return var, self.exec(Query(Table(var, ex.fields()), ex))
 
     def join(self, *blobs: EffectBlob) -> EffectBlob:
         return EffectBlob(blobs=(self, *blobs))
@@ -363,6 +366,55 @@ class LazyTensor(OverrideTensor):
         return reshape(self, shape, copy=copy)
 
 
+@overload
+def asarray(
+    obj: np.ndarray,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: None = None,
+) -> BufferizedNDArray: ...
+
+
+@overload
+def asarray(
+    obj: sps.spmatrix | sps.sparray,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: None = None,
+) -> FiberTensor: ...
+
+
+@overload
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: FiberTensorFType,
+) -> FiberTensor: ...
+
+
+@overload
+def asarray(
+    obj: np.generic | complex,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: None = None,
+) -> Scalar: ...
+
+
+@overload
 def asarray(
     obj: Any,
     /,
@@ -371,7 +423,18 @@ def asarray(
     device=None,
     copy=None,
     format: TensorFType | None = None,
-) -> Any:
+) -> Tensor: ...
+
+
+def asarray(
+    obj: Any,
+    /,
+    *,
+    dtype=None,
+    device=None,
+    copy=None,
+    format: TensorFType | None = None,
+) -> Tensor:
     """
     Convert given argument and return wrapper type instance.
     If input argument is already array type, return unchanged.
@@ -446,15 +509,7 @@ def asarray(
             np_arr = np.asarray(obj)
             if np_arr.dtype != object:
                 if dtype is not None:
-                    ft = ftype(dtype)
-                    np_dtype = (
-                        ft.dtype
-                        if hasattr(ft, "dtype")
-                        else ft.type
-                        if hasattr(ft, "type")
-                        else dtype
-                    )
-                    np_arr = np_arr.astype(np_dtype)
+                    np_arr = np_arr.astype(np_dtype(ftype(dtype)))
                 elif copy is True:
                     np_arr = np_arr.copy()
                 return BufferizedNDArray.from_numpy(np_arr, device=device)
@@ -492,20 +547,17 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
     if isinstance(arr, LazyTensor):
         return arr
-    arr = Scalar(arr) if _is_numeric_constant(arr) else asarray(arr)
+    if _is_numeric_constant(arr):
+        arr = ConstantScalar(arr) if is_specializable_value(arr) else Scalar(arr)
+    else:
+        arr = asarray(arr)
     tns = Alias(gensym("A"))
     idxs = tuple(Field(gensym("i")) for _ in range(arr.ndim))
     shape = tuple(arr.shape)
-    ctx = EffectBlob(stmt=Query(tns, Table(Literal(arr), idxs)))
-    return LazyTensor(tns, ctx, shape, arr.fill_value, arr.element_type, arr.device)
-
-
-def _np_dtype(dtype):
-    if isinstance(dtype, FDTypeNumpy):
-        return dtype.dtype
-    if isinstance(dtype, FDTypeBuiltin):
-        return dtype.type
-    return dtype
+    ctx = EffectBlob(stmt=Query(Table(tns, idxs), Table(Literal(arr), idxs)))
+    return LazyTensor(
+        tns, ctx, shape, arr.ftype.fill_value, arr.element_type, arr.device
+    )
 
 
 def full(
@@ -552,9 +604,10 @@ def full_like(x, /, fill_value, *, dtype=None, device=None):
 
 
 def linspace(start, stop, /, num, *, dtype=None, endpoint=True, device=None):
+    np_dt = np_dtype(ftype(dtype)) if dtype is not None else None
     return broadcast_to(
         asarray(
-            np.linspace(start, stop, num, endpoint=endpoint, dtype=_np_dtype(dtype)),
+            np.linspace(start, stop, num, endpoint=endpoint, dtype=np_dt),
             device=device,
         ),
         (num,),
@@ -603,7 +656,8 @@ def arange(
 ) -> LazyTensor:
     if stop is None:
         start, stop = 0, start
-    arr = np.arange(start, stop, step, dtype=_np_dtype(dtype))
+    np_dt = np_dtype(ftype(dtype)) if dtype is not None else None
+    arr = np.arange(start, stop, step, dtype=np_dt)
     return defer(asarray(arr, device=device))
 
 
@@ -799,12 +853,14 @@ def reduce(
         ``dtype`` parameter above.
     """
     x = defer(x)
-    assert isinstance(op, FinchOperator)
+    op_type = op.ftype
+    if not isinstance(op_type, FinchOperatorFType):
+        raise TypeError(f"Expected a Finch operator type, got {op_type}")
     explicit_dtype = dtype is not None
     if dtype is not None:
         dtype = ftype(dtype)
     if init is None:
-        init = init_value(op, dtype or x.element_type)
+        init = init_value(op_type, dtype or x.element_type)
         if explicit_dtype:
             assert dtype is not None
             init = dtype(init)
@@ -829,7 +885,7 @@ def reduce(
         data = Reorder(data, keeps)
         shape = tuple(x.shape[i] if i not in axis else 1 for i in range(x.ndim))
     if dtype is None:
-        dtype = fixpoint_type(op, init, x.element_type)
+        dtype = fixpoint_type(op_type, init, x.element_type)
     expr, ctx = x.ctx.eval(data)
     return LazyTensor(expr, ctx, shape, init, dtype, x.device)
 
@@ -891,8 +947,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
 
     The function will automatically handle broadcasting of the input tensors to
     ensure they have compatible shapes.  For example, `elementwise(ffunc.add,
-    x, y)` is equivalent to `x + y`. If an input is a ConstantScalar, it will
-    be unwrapped into a Literal(val) node.
+    x, y)` is equivalent to `x + y`.
 
     Parameters:
     - f: The function to apply elementwise.
@@ -904,19 +959,13 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
     the input tensors.  After broadcasting the arguments to the same shape, for
     each index `i`, `out[*i] = f(args[0][*i], args[1][*i], ...)`.
     """
-    is_constant = tuple(isinstance(a, ConstantScalar) for a in args)
-    if builtins.all(is_constant):
-        return defer(ConstantScalar(f(*[a.val for a in args])))
-    args = tuple(a if c else defer(a) for a, c in zip(args, is_constant, strict=True))
-    shapes = tuple(() if c else a.shape for a, c in zip(args, is_constant, strict=True))
+    args = tuple(defer(a) for a in args)
+    shapes = tuple(a.shape for a in args)
     shape = _broadcast_shape(*shapes)
     ndim = len(shape)
     idxs = tuple(Field(gensym("i")) for _ in range(ndim))
     bargs: list[LogicExpression] = []
-    for arg, constant, arg_shape in zip(args, is_constant, shapes, strict=True):
-        if constant:
-            bargs.append(Literal(arg.val))
-            continue
+    for arg, arg_shape in zip(args, shapes, strict=True):
         arg_ndim = len(arg_shape)
         idims = []
         odims = []
@@ -931,9 +980,11 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
         bargs.append(Reorder(Table(arg.data, tuple(idims)), tuple(odims)))
     expr = Reorder(MapJoin(Literal(f), tuple(bargs)), idxs)
     new_fill_value = apply_fill(f, *[a.ftype.fill_value for a in args])
-    new_element_type = return_type(f, *[a.element_type for a in args])
-    tensors = [a for a, s in zip(args, is_constant, strict=True) if not s]
-    ctx = tensors[0].ctx.join(*[x.ctx for x in tensors[1:]])
+    op_type = f.ftype
+    if not isinstance(op_type, CallableFType):
+        raise TypeError(f"Expected a callable type, got {op_type}")
+    new_element_type = return_type(op_type, *[a.element_type for a in args])
+    ctx = args[0].ctx.join(*[x.ctx for x in args[1:]])
     data, ctx = ctx.eval(expr)
     return LazyTensor(
         data,
@@ -941,7 +992,7 @@ def elementwise(f: FinchOperator, *args) -> LazyTensor:
         shape,
         new_fill_value,
         new_element_type,
-        common_device(*(t.device for t in tensors)),
+        common_device(*(t.device for t in args)),
     )
 
 
@@ -1019,7 +1070,7 @@ def argmin(
             elementwise(ffuncs.make_tuple, x, indices),
             axis=axis,
             keepdims=keepdims,
-            init=(ffuncs.min.init_value(x.element_type), sentinel),
+            init=(ffuncs.min.ftype.init_value(x.element_type), sentinel),
         ),
     )
 
@@ -1053,7 +1104,7 @@ def argmax(
                 elementwise(ffuncs.make_tuple, x, indices),
                 axis=axis,
                 keepdims=keepdims,
-                init=(ffuncs.max.init_value(x.element_type), -sentinel),
+                init=(ffuncs.max.ftype.init_value(x.element_type), -sentinel),
             ),
         )
     )
@@ -1161,7 +1212,7 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
     if sorter is not None:
         x1 = take(x1, sorter)
 
-    axis_size = x1.shape[0]
+    axis_size = int(x1.shape[0])
     search_size = axis_size + 1
     device = common_device(x1.device, x2.device)
     values = _select_along_axis(
@@ -1172,10 +1223,7 @@ def searchsorted(x1, x2, /, *, side: str = "left", sorter=None) -> LazyTensor:
         x2.ndim,
         EyeTensor((search_size, axis_size), k=-1, dtype=np.bool_),
     )
-    marker = cast(
-        LazyTensor,
-        defer(OneHotMaskTensor(search_size, index=0, dtype=np.bool_)),
-    )
+    marker = defer(OneHotMaskTensor(search_size, index=0, dtype=np.bool_))
     marker = marker.to_device(device)
     if x2.ndim > 0:
         marker = expand_dims(marker, axis=tuple(range(x2.ndim)))
@@ -1700,7 +1748,7 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
 
     if p < 0.0:
         scaled_negative_power = ffuncs.scaled_negative_power(p)
-        scaled_type = scaled_negative_power.return_type(abs_x.element_type)
+        scaled_type = scaled_negative_power.ftype.return_type(abs_x.element_type)
         scaled_sum = reduce(
             ffuncs.add_scaled_negative_power(p),
             elementwise(scaled_negative_power, abs_x),
@@ -1711,7 +1759,7 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
         return elementwise(ffuncs.root_scaled_negative_power(p), scaled_sum)
 
     if p == 2.0:
-        scaled_square_type = ffuncs.scaled_square.return_type(abs_x.element_type)
+        scaled_square_type = ffuncs.scaled_square.ftype.return_type(abs_x.element_type)
         scaled_square_sum = reduce(
             ffuncs.add_scaled_square,
             elementwise(ffuncs.scaled_square, abs_x),
@@ -1722,7 +1770,7 @@ def vector_norm(x, /, *, axis=None, keepdims=False, ord=2) -> LazyTensor:
         return elementwise(ffuncs.root_scaled_square, scaled_square_sum)
 
     scaled_power = ffuncs.scaled_power(p)
-    scaled_type = scaled_power.return_type(abs_x.element_type)
+    scaled_type = scaled_power.ftype.return_type(abs_x.element_type)
     scaled_sum = reduce(
         ffuncs.add_scaled_power(p),
         elementwise(scaled_power, abs_x),
@@ -1933,15 +1981,12 @@ def eye(
 ) -> LazyTensor:
     explicit_device = device is not None
     device = normalize_device(device)
-    out = cast(
-        LazyTensor,
-        defer(
-            EyeTensor(
-                (n_rows, n_rows if n_cols is None else n_cols),
-                k=k,
-                dtype=dtype,
-            )
-        ),
+    out = defer(
+        EyeTensor(
+            (n_rows, n_rows if n_cols is None else n_cols),
+            k=k,
+            dtype=dtype,
+        )
     )
     return out.to_device(device) if explicit_device else out
 
@@ -1984,10 +2029,7 @@ def diag(x, /, *, k: int = 0) -> LazyTensor:
     if x.ndim in (1, 2):
         from .fuse import compute
 
-        return cast(
-            LazyTensor,
-            defer(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k))),
-        )
+        return defer(np.ascontiguousarray(np.diag(compute(x).to_numpy(), k=k)))
     raise ValueError(f"x must be a 1D or 2D array, got {x.ndim}D array")
 
 
@@ -1997,18 +2039,15 @@ def diagonal(x, /, *, offset: int = 0) -> LazyTensor:
         raise ValueError(f"x must be at least a 2D array, got {x.ndim}D array")
     from .fuse import compute
 
-    return cast(
-        LazyTensor,
-        defer(
-            np.ascontiguousarray(
-                np.diagonal(
-                    compute(x).to_numpy(),
-                    offset=offset,
-                    axis1=-2,
-                    axis2=-1,
-                )
+    return defer(
+        np.ascontiguousarray(
+            np.diagonal(
+                compute(x).to_numpy(),
+                offset=offset,
+                axis1=-2,
+                axis2=-1,
             )
-        ),
+        )
     )
 
 
@@ -2096,10 +2135,13 @@ def cumulative(
     dtype = ftype(dtype) if explicit_dtype else x.element_type
     if explicit_dtype and dtype != x.element_type:
         x = astype(x, dtype)
-    init = init_value(op, dtype)
+    op_type = op.ftype
+    if not isinstance(op_type, FinchOperatorFType):
+        raise TypeError(f"Expected a Finch operator type, got {op_type}")
+    init = init_value(op_type, dtype)
     if explicit_dtype:
         init = dtype(init)
-    dtype = fixpoint_type(op, init, x.element_type)
+    dtype = fixpoint_type(op_type, init, x.element_type)
 
     def cumulative_axis(
         arg: LazyTensor,
@@ -2332,7 +2374,7 @@ def concat(arrays: Sequence[Any], /, *, axis: int | None = 0) -> LazyTensor:
 
     fill = arrays[0].fill_value
     concat_dtype = return_type(
-        ffuncs.choose(fill),
+        ffuncs.choose(fill).ftype,
         *(array.element_type for array in arrays),
     )
     fill = concat_dtype(fill)
@@ -2406,7 +2448,7 @@ def roll(
 
 
 def _axis_indices(size: int, dtype=np.intp) -> LazyTensor:
-    return cast(LazyTensor, defer(IndexTensor((size,), dtype)))
+    return defer(IndexTensor((size,), dtype))
 
 
 def _normalize_take_indices(indices: LazyTensor, axis_size: int) -> LazyTensor:
@@ -2504,15 +2546,12 @@ def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
         )
         if axis_size == 0 or repeat_count == 0:
             return empty(out_shape, dtype=x.element_type, device=x.device)
-        return _select_along_axis(
-            x,
-            axis,
-            RepeatTensor(
-                (axis_size * repeat_count, axis_size),
-                k=repeat_count,
-                dtype=np.bool_,
-            ),
+        # The repeat mask visits each input index and then its repeats, so it
+        # is transposed to select each output from its input.
+        mask = RepeatTensor(
+            (axis_size, axis_size * repeat_count), k=repeat_count, dtype=np.bool_
         )
+        return _select_along_axis(x, axis, permute_dims(mask, (1, 0)))
 
     raise NotImplementedError(
         "repeat with repeat-count arrays has a data-dependent output shape"
@@ -2860,6 +2899,7 @@ def std(
 
 def einop(prgm, **kwargs):
     stmt = ein.parse_einop(prgm)
+    assert isinstance(stmt, ein.Einsum)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)
@@ -2919,6 +2959,6 @@ def outer(x1, x2) -> LazyTensor:
         ctx,
         (x1.shape[0], x2.shape[0]),
         apply_fill(ffuncs.mul, x1.ftype.fill_value, x2.ftype.fill_value),
-        return_type(ffuncs.mul, x1.element_type, x2.element_type),
+        return_type(ffuncs.mul.ftype, x1.element_type, x2.element_type),
         common_device(x1.device, x2.device),
     )

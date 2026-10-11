@@ -1,6 +1,7 @@
 import threading
 from contextlib import contextmanager
 
+from finch.autoschedule.tensor_stats.bound_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.fd_stats import FDStatsFactory
 from finch.codegen import MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
@@ -19,29 +20,30 @@ from finch.finch_logic import (
 from finch.finch_logic.stages import LogicEvaluator
 from finch.finch_notation.interpreter import NotationInterpreter
 
-from .compiler import LogicCompiler
+from .compiler import CompilerFormLowerer, LogicCompiler
 from .executor import LogicExecutor
-from .formatter import DefaultLogicFormatter
-from .galley_optimize import GalleyLogicalOptimizer
-from .loop_ordering import DefaultLoopOrderer
+from .factorizer.galley_factorizer.galley_optimize import GalleyLogicFactorizer
+from .factorizer.optimize import DefaultLogicFactorizer
+from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
+from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
-from .optimize import DefaultLogicOptimizer
-from .smart_formatter import FDFormatter
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(DefaultLogicFormatter(MockLogicLoader())))
         )
     )
 )
 INTERPRET_NOTATION = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
                 )
             )
         )
@@ -49,11 +51,13 @@ INTERPRET_NOTATION = LogicNormalizer(
 )
 INTERPRET_ASSEMBLY = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
-                        LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                        CompilerFormLowerer(
+                            LogicCompiler(NotationCompiler(AssemblyInterpreter()))
+                        )
                     )
                 )
             )
@@ -62,17 +66,19 @@ INTERPRET_ASSEMBLY = LogicNormalizer(
 )
 COMPILE_NUMBA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
-                        LogicCompiler(
-                            NotationCompiler(
-                                NumbaCompiler(),
-                                ctx_transforms=(
-                                    LowerPackedStructSlots(),
-                                    AssemblySimplify(),
-                                ),
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    NumbaCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
                             )
                         )
                     )
@@ -84,17 +90,19 @@ COMPILE_NUMBA = LogicNormalizer(
 
 COMPILE_NUMBA_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
-                        LogicCompiler(
-                            NotationCompiler(
-                                NumbaCompiler(),
-                                ctx_transforms=(
-                                    LowerPackedStructSlots(),
-                                    AssemblySimplify(),
-                                ),
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    NumbaCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
                             )
                         )
                     )
@@ -106,10 +114,12 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
 
 INTERPRET_NOTATION_GALLEY = LogicNormalizer(
     LogicExecutor(
-        GalleyLogicalOptimizer(
+        GalleyLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
-                    DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+                    DefaultLogicFormatter(
+                        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+                    )
                 )
             )
         )
@@ -118,17 +128,19 @@ INTERPRET_NOTATION_GALLEY = LogicNormalizer(
 
 COMPILE_MLIR = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
                 DefaultLoopOrderer(
                     DefaultLogicFormatter(
-                        LogicCompiler(
-                            NotationCompiler(
-                                MLIRCompiler(),
-                                ctx_transforms=(
-                                    LowerPackedStructSlots(),
-                                    AssemblySimplify(),
-                                ),
+                        CompilerFormLowerer(
+                            LogicCompiler(
+                                NotationCompiler(
+                                    MLIRCompiler(),
+                                    ctx_transforms=(
+                                        LowerPackedStructSlots(),
+                                        AssemblySimplify(),
+                                    ),
+                                )
                             )
                         )
                     )
@@ -140,12 +152,30 @@ COMPILE_MLIR = LogicNormalizer(
 
 COMPILE_JULIA = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(
-                DefaultLoopOrderer(FDFormatter(LogicCompiler(FinchJLCompiler())))
+                DefaultLoopOrderer(
+                    FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
+                )
             )
         ),
         stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+COMPILE_JULIA_GALLEY = LogicNormalizer(
+    LogicExecutor(
+        GalleyLogicFactorizer(
+            LogicSimplify(
+                BFSLoopOrderer(
+                    GalleyFormatter(
+                        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+                    )
+                )
+            )
+        ),
+        stats_factory=DCStatsFactory(),
         cache=True,
     )
 )
@@ -154,15 +184,36 @@ COMPILE_JULIA = LogicNormalizer(
 # Crucially, in order to avoid a circular dependency, this scheduler does not
 # cannot rely on a stats factory that itself calls the interface.
 _NON_RECURSIVE_BACKEND = (
-    FDFormatter(LogicCompiler(FinchJLCompiler()))
+    FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     if julia_available()
-    else DefaultLogicFormatter(LogicCompiler(NotationInterpreter()))
+    else DefaultLogicFormatter(
+        CompilerFormLowerer(LogicCompiler(NotationInterpreter()))
+    )
 )
 
 NON_RECURSIVE_SCHEDULER = LogicNormalizer(
     LogicExecutor(
-        DefaultLogicOptimizer(
+        DefaultLogicFactorizer(
             LogicSimplify(DefaultLoopOrderer(_NON_RECURSIVE_BACKEND))
+        ),
+        stats_factory=FDStatsFactory(),
+        cache=True,
+    )
+)
+
+# Accept already ordered, concordant statistics plans and use dense outputs.
+NON_RECURSIVE_STANDARD_SCHEDULER = LogicNormalizer(
+    LogicExecutor(
+        LogicSimplify(
+            DefaultLogicFormatter(
+                CompilerFormLowerer(
+                    LogicCompiler(
+                        FinchJLCompiler()
+                        if julia_available()
+                        else NotationInterpreter()
+                    )
+                )
+            )
         ),
         stats_factory=FDStatsFactory(),
         cache=True,

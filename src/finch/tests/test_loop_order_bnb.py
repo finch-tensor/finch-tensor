@@ -7,13 +7,13 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule.loop_order_bnb import (
+from finch.autoschedule.loop_orderer.loop_order_bnb import (
     loop_order_bfs,
     loop_order_brute_force,
     loop_order_dfs,
 )
-from finch.autoschedule.loop_order_cost import loop_order_cost
-from finch.autoschedule.loop_order_greedy import greedy_loop_order
+from finch.autoschedule.loop_orderer.loop_order_cost import loop_order_cost
+from finch.autoschedule.loop_orderer.loop_order_greedy import greedy_loop_order
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import Alias, Field, Literal, MapJoin, Table
 

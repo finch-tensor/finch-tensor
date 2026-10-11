@@ -16,11 +16,8 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
         case lgc.Plan(bodies):
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
         case lgc.Query(
-            lgc.Alias(name),
-            lgc.Reorder(
-                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
-                output_idxs,
-            ),
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
         ):
             einidxs = tuple(ein.Index(field.name) for field in output_idxs)
             body = ein.Einsum(
@@ -30,7 +27,7 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                 arg=generate_einsum_expr(arg),
             )
             if operation != ffuncs.overwrite and init != init_value(
-                operation, ftype(init)
+                operation.ftype, ftype(init)
             ):
                 return ein.Plan(
                     (
@@ -44,17 +41,32 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                     )
                 )
             return body
-        case lgc.Query(lgc.Alias(name), rhs):
+        case lgc.QueryInto(
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Literal(operation),
+            rhs,
+        ):
+            return ein.Einsum(
+                op=ein.Literal(operation),
+                tns=ein.Alias(name),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
+                arg=generate_einsum_expr(rhs),
+            )
+        case lgc.Query(lgc.Table(lgc.Alias(name), output_idxs), rhs):
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)
             return ein.Einsum(
                 op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
-                idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
                 arg=einarg,
             )
         case lgc.Produces(args):
-            return ein.Produces(tuple(ein.Alias(ret_arg.name) for ret_arg in args))
+            names = []
+            for arg in args:
+                assert isinstance(arg, lgc.Alias)
+                names.append(ein.Alias(arg.name))
+            return ein.Produces(tuple(names))
         case _:
             raise Exception(f"Unrecognized logic: {node}")
 

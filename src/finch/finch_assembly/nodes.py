@@ -1,12 +1,13 @@
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, TypeVar
 
-from finch.algebra import ftype, return_type
-from finch.algebra.ftypes import FType
+from finch.algebra import CallableFType, ftype, return_type
+from finch.algebra.ftypes import FType, StructFType
 from finch.symbolic import (
     CallTerm,
     Context,
+    ExpressionTerm,
     LiteralTerm,
     NamedTerm,
     Term,
@@ -15,7 +16,10 @@ from finch.symbolic import (
 )
 from finch.util import qual_str
 
-from .buffer import length_type
+from .buffer import BufferFType, length_type
+from .stages import AssemblyKernelFType
+
+T = TypeVar("T")
 
 
 class AssemblyNode(Term):
@@ -60,7 +64,7 @@ class AssemblyTree(AssemblyNode, TermTree):
         raise Exception(f"`children` isn't supported for {self.__class__}.")
 
 
-class AssemblyExpression(AssemblyNode):
+class AssemblyExpression(AssemblyNode, ExpressionTerm):
     """
     Assembly AST expression base class.
 
@@ -69,7 +73,7 @@ class AssemblyExpression(AssemblyNode):
 
     @property
     @abstractmethod
-    def result_type(self) -> FType:
+    def result_type(self) -> BufferFType:
         """Returns the type of the expression."""
         ...
 
@@ -83,16 +87,13 @@ class AssemblyStatement(AssemblyNode):
     """
 
 
-@dataclass(eq=True, frozen=True)
-class Literal(AssemblyExpression, LiteralTerm):
+class Literal(AssemblyExpression, LiteralTerm[T]):
     """
     Represents the literal value `val`.
 
     Attributes:
         val: The literal value.
     """
-
-    val: Any
 
     @property
     def result_type(self):
@@ -239,6 +240,7 @@ class GetAttr(AssemblyExpression, AssemblyTree):
     @property
     def result_type(self):
         """Returns the type of the expression."""
+        assert isinstance(self.obj.result_type, StructFType)
         return dict(self.obj.result_type.struct_fields)[self.attr.val]
 
 
@@ -272,7 +274,7 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
         args: The arguments to call on the function.
     """
 
-    op: Literal
+    op: AssemblyExpression
     args: tuple[AssemblyExpression, ...]
 
     @property
@@ -288,7 +290,9 @@ class Call(AssemblyExpression, AssemblyTree, CallTerm):
     def result_type(self):
         """Returns the type of the expression."""
         arg_types = [arg.result_type for arg in self.args]
-        return return_type(self.op.val, *arg_types)
+        op_type = self.op.result_type
+        assert isinstance(op_type, CallableFType)
+        return return_type(op_type, *arg_types)
 
 
 @dataclass(eq=True, frozen=True)
@@ -309,8 +313,9 @@ class Load(AssemblyExpression, AssemblyTree):
         return [self.buffer, self.index]
 
     @property
-    def result_type(self):
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
+        assert isinstance(self.buffer.result_type, BufferFType)
         return self.buffer.result_type.element_type
 
 
@@ -458,8 +463,8 @@ class If(AssemblyTree, AssemblyStatement):
 @dataclass(eq=True, frozen=True)
 class Assert(AssemblyTree, AssemblyStatement):
     """
-    Represents an assert node which asserts that expression is true.
-    Used in the dataflow analysis to assert conditions in conditionals and loops.
+    Checks that an expression is true at runtime. Also used in dataflow analysis
+    to record conditions in conditionals and loops.
 
     Attributes:
         exp: Expression which is being asserted.
@@ -498,12 +503,10 @@ class IfElse(AssemblyTree, AssemblyStatement):
 @dataclass(eq=True, frozen=True)
 class Function(AssemblyTree):
     """
-    Represents a logical AST statement that defines a function `fun` on the
-    arguments `args...`.
+    A module-level function definition with arguments `args...`.
 
     Attributes:
-        name: The name of the function to define as a variable typed with the
-            return type of this function.
+        name: The function variable, annotated with its AssemblyKernelFType.
         args: The arguments to the function.
         body: The body of the function. If it does not contain a return statement,
             the function returns the value of `body`.
@@ -564,7 +567,7 @@ class Block(AssemblyTree, AssemblyStatement):
         bodies: The sequence of statements to execute.
     """
 
-    bodies: tuple[AssemblyStatement, ...] = ()
+    bodies: tuple[AssemblyStatement | AssemblyExpression, ...] = ()
 
     @property
     def children(self):
@@ -628,7 +631,8 @@ class AssemblyPrinterContext(Context):
             case Literal(value):
                 return qual_str(value)
             case Assert(exp):
-                return f"assert({self(exp)})"
+                self.exec(f"{feed}assert({self(exp)})")
+                return None
             case Variable(name, _):
                 return str(name)
             case Assign(lhs, val):
@@ -642,7 +646,7 @@ class AssemblyPrinterContext(Context):
                 return f"{obj}.{attr}"
             case SetAttr(obj, attr, val):
                 return f"setattr({obj}, {attr})"
-            case Call(Literal(_) as lit, args):
+            case Call(lit, args):
                 call_expr = f"{self(lit)}({', '.join(self(arg) for arg in args)})"
                 if emit_calls:
                     self.exec(call_expr)
@@ -731,7 +735,7 @@ class AssemblyPrinterContext(Context):
                 feed = self.feed
 
                 match name:
-                    case Variable(func_name, return_t):
+                    case Variable(func_name, AssemblyKernelFType(result_type=return_t)):
                         func_decl = f"{func_name}"
                     case _:
                         raise NotImplementedError(

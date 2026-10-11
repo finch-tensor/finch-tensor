@@ -3,7 +3,7 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.capture import LogicCapture
-from finch.autoschedule.smart_formatter import (
+from finch.autoschedule.formatter.smart_formatter import (
     IterCostFormatter,
     StorageCostFormatter,
 )
@@ -32,7 +32,7 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
     prgm = Plan(
         (
             Query(
-                B,
+                Table(B, (i, j)),
                 MapJoin(
                     Literal(ffuncs.add),
                     (Table(A, (i, j)), Table(A, (i, j))),

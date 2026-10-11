@@ -20,7 +20,7 @@ Classes:
 """
 
 from collections.abc import Callable, Iterable
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 from .term import Term, TermTree
 
@@ -33,7 +33,7 @@ def default_rewrite(x: T | None, y: T) -> T:
     return x if x is not None else y
 
 
-class Rewrite:
+class Rewrite(Generic[T]):
     """
     A rewriter which returns the original argument even if `rw` returns nothing.
 
@@ -66,7 +66,7 @@ class PreWalk:
         if y is not None:
             if isinstance(y, TermTree):
                 args = y.children
-                return y.make_term(  # type: ignore[return-value]
+                return y.make_term(
                     y.head(), *[default_rewrite(self(arg), arg) for arg in args]
                 )
             return y
@@ -74,10 +74,12 @@ class PreWalk:
             args = x.children
             new_args = list(map(self, args))
             if not all(arg is None for arg in new_args):
-                return x.make_term(  # type: ignore[return-value]
+                ret = x.make_term(
                     x.head(),
                     *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args),
                 )
+                assert isinstance(ret, type(x))
+                return ret
         return None
 
 
@@ -103,11 +105,12 @@ class PostWalk:
             y = x.make_term(
                 x.head(), *map(lambda x1, x2: default_rewrite(x1, x2), new_args, args)
             )
-            return default_rewrite(self.rw(y), y)  # type: ignore[return-value]
+            assert isinstance(y, type(x))
+            return default_rewrite(self.rw(y), y)
         return self.rw(x)
 
 
-class Chain:
+class Chain(Generic[T]):
     """
     A rewriter which rewrites using each rewriter in `itr`. If all rewriters
     return `nothing`, return `nothing`.
@@ -131,7 +134,7 @@ class Chain:
         return None
 
 
-class Fixpoint:
+class Fixpoint(Generic[T]):
     """
     A rewriter which repeatedly applies `rw` to `x` until no changes are made. If
     the rewriter first returns `nothing`, returns `nothing`.
@@ -153,7 +156,7 @@ class Fixpoint:
         return None
 
 
-class Prestep:
+class Prestep(Generic[T]):
     """
     A rewriter which recursively rewrites each node using `rw`. If `rw` is
     nothing, it returns `nothing`, otherwise it recurses to the arguments.
@@ -175,7 +178,7 @@ class Prestep:
         return y
 
 
-class Memo:
+class Memo(Generic[T]):
     """
     A rewriter which caches the results of `rw` in `cache` and returns the
     result.

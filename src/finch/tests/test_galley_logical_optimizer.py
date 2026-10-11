@@ -6,7 +6,7 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.autoschedule.galley.logical_optimizer import (
+from finch.autoschedule.factorizer.galley_factorizer import (
     AnnotatedQuery,
     greedy_query,
     insert_statistics,
@@ -59,10 +59,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     )
 
     aq = object.__new__(AnnotatedQuery)
-    aq.stats_factory = object
-    aq.output_name = None
     aq.reduce_idxs = reduce_fields
-    aq.point_expr = None
     aq.idx_lowest_path = OrderedDict()
     aq.idx_op = OrderedDict()
     aq.idx_init = OrderedDict()
@@ -70,8 +67,7 @@ def test_get_reducible_idxs(reduce_idxs, parent_idxs, expected):
     aq.original_idx = OrderedDict()
     aq.connected_components = []
     aq.connected_idxs = OrderedDict()
-    aq.output_order = None
-    aq.output_format = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
 
     result = [field.name for field in AnnotatedQuery.get_reducible_idxs(aq)]
@@ -110,10 +106,7 @@ def test_get_reducible_idxs_for_component(
     )
 
     aq = object.__new__(AnnotatedQuery)
-    aq.stats_factory = object
-    aq.output_name = None
     aq.reduce_idxs = reduce_fields
-    aq.point_expr = None
     aq.idx_lowest_path = OrderedDict()
     aq.idx_op = OrderedDict()
     aq.idx_init = OrderedDict()
@@ -121,8 +114,7 @@ def test_get_reducible_idxs_for_component(
     aq.original_idx = OrderedDict()
     aq.connected_components = []
     aq.connected_idxs = OrderedDict()
-    aq.output_order = None
-    aq.output_format = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
 
     result = [
@@ -240,7 +232,11 @@ def test_node_at():
 )
 def test_replace_at(transforms, expected_names):
     out = AnnotatedQuery.replace_at(_abc_mapjoin(), transforms)
-    result = [tbl.idxs[0].name for tbl in out.args]
+    assert isinstance(out, MapJoin)
+    result: list[str] = []
+    for arg in out.args:
+        assert isinstance(arg, Table)
+        result.append(arg.idxs[0].name)
     assert result == expected_names
 
 
@@ -263,10 +259,12 @@ def test_replace_at_nested_transforms_compose():
             (2, 0): lambda _: Literal("b2"),
         },
     )
+    assert isinstance(out, MapJoin)
     wrapped = out.args[1]
-    assert wrapped.op == Literal("wrap")
-    assert wrapped.args[0] == Table(Literal("b2"), (Field("b"),))
-    assert wrapped.args[1] == Literal(2.0)
+    assert wrapped == MapJoin(
+        Literal(val="wrap"),
+        (Table(Literal(val="b2"), (Field(name="b"),)), Literal(val=2.0)),
+    )
 
 
 @pytest.mark.parametrize(
@@ -529,7 +527,6 @@ def test_find_lowest_roots(root, idx_name, expected):
 def test_get_reduce_query(expr, reduce_field, expected):
     aq = object.__new__(AnnotatedQuery)
     aq.stats_factory = DenseStatsFactory()
-    aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
     aq.idx_lowest_path = OrderedDict({reduce_field: (2,)})
@@ -539,8 +536,7 @@ def test_get_reduce_query(expr, reduce_field, expected):
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
     aq.connected_components = []
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
-    aq.output_order = None
-    aq.output_format = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 
@@ -694,7 +690,6 @@ def test_get_reduce_query(expr, reduce_field, expected):
 def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq = object.__new__(AnnotatedQuery)
     aq.stats_factory = DenseStatsFactory()
-    aq.output_name = None
     aq.reduce_idxs = [reduce_field]
     aq.point_expr = expr
     aq.idx_lowest_path = OrderedDict({reduce_field: ()})
@@ -704,8 +699,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     aq.original_idx = OrderedDict({reduce_field: reduce_field})
     aq.connected_components = []
     aq.connected_idxs = OrderedDict({reduce_field: {reduce_field}})
-    aq.output_order = None
-    aq.output_format = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 
@@ -726,7 +720,7 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     query = aq.reduce_idx(reduce_field)
     assert query.rhs == expected_query
 
-    alias_expr = Alias(query.lhs.name)
+    alias_expr = query.lhs.tns
     assert aq.point_expr == expected_point_expr(alias_expr)
 
 
@@ -754,7 +748,7 @@ def rename_aliases(expr):
     [
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("i"),)),
                 MapJoin(
                     Literal(ffuncs.mul),
                     (
@@ -765,7 +759,7 @@ def rename_aliases(expr):
             ),
             [],
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("i"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -782,7 +776,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -798,7 +792,7 @@ def rename_aliases(expr):
             ),
             [Field("i")],
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("j"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -815,7 +809,7 @@ def rename_aliases(expr):
         ),
         (
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -833,7 +827,7 @@ def rename_aliases(expr):
             [Field("i"), Field("j")],
             # Expect: Query(out, overwrite-Aggregate wrapping the same MapJoin)
             Query(
-                Alias("out"),
+                Table(Alias("out"), (Field("k"),)),
                 Aggregate(
                     Literal(ffuncs.overwrite),
                     Literal(np.float64(0.0)),
@@ -870,7 +864,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 1: sum_{i,j,k} A[i,j] * A[j,k], reduce over i
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -896,7 +890,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 2: same chain, reduce over j
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -928,7 +922,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 3: same chain, reduce over k
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -954,7 +948,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
         (
             # Case 4: chain_expr = sum_{i,j,k} max(A[i,j], A[j,k])
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -987,7 +981,7 @@ def test_get_remaining_query(input_query, elimination_order, expected):
             # Case 5:  sum_{j,k} max( sum_i A[i,j], A[j,k] )
             # inner Aggregate(+ over i) is already inside the MapJoin.
             Query(
-                Alias("out"),
+                Table(Alias("out"), ()),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
@@ -1050,8 +1044,7 @@ def test_greedy_query_multi_component():
     aq.original_idx = OrderedDict({fi: fi, fj: fj})
     aq.connected_components = [[fi], [fj]]
     aq.connected_idxs = OrderedDict({fi: set(), fj: set()})
-    aq.output_order = None
-    aq.output_format = None
+    aq.output_order = []
     aq.bindings = OrderedDict()
     aq.cache_point = {}
 

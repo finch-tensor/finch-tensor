@@ -24,7 +24,6 @@ from .numba import (
     numba_type,
     numba_unary_function_call,
     serialize_to_numba,
-    to_numpy_type,
 )
 from .stages import NumbaCode, NumbaLowerer
 
@@ -56,5 +55,4 @@ __all__ = [
     "numba_type",
     "numba_unary_function_call",
     "serialize_to_numba",
-    "to_numpy_type",
 ]

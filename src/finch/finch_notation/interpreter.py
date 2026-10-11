@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, overload
+from dataclasses import dataclass, replace
+from typing import Any, TypeVar, overload
 
 import numpy as np
 
 from finch import finch_assembly as asm
 from finch.algebra import (
+    FType,
     Tensor,
     TensorFType,
     fisinstance,
@@ -17,15 +18,17 @@ from finch.symbolic import ScopedDict, UnvalidatedForm
 from . import nodes as ntn
 from .stages import NotationLoader
 
+FT = TypeVar("FT", bound=FType)
 
-class TensorViewFType(TensorFType):
+
+class TensorViewFType(TensorFType[FT]):
     """
     A ftype for tensor views.
     This is used to represent the ftype of a tensor at specific indices.
     It is a subclass of ntn.FType to allow for custom formatting.
     """
 
-    def __init__(self, idxs: tuple[Any, ...], tns: Any, op: Any = None):
+    def __init__(self, idxs: tuple[Any, ...], tns: TensorFType[FT], op: Any = None):
         """
         Initialize the TensorViewFType with the specified indices, tensor, and
         operation.
@@ -69,9 +72,20 @@ class TensorViewFType(TensorFType):
         """
         return self.tns.shape_type[len(self.idxs) : -1]
 
+    def __call__(
+        self, idxs: tuple[Any, ...], tns: Tensor[FT], op: Any | None = None
+    ) -> TensorView:
+        return TensorView(idxs=idxs, tns=tns, op=op)
 
-class TensorView(Tensor):
-    def __init__(self, idxs: tuple[Any, ...], tns: ntn.NotationNode, op: Any = None):
+    def construct(self, shape: tuple[Any, ...]) -> TensorView:
+        raise RuntimeError("`TensorView`s cannot be constructed.")
+
+    def from_numpy(self, arr: np.ndarray) -> TensorView:
+        raise RuntimeError("`TensorView`s cannot be converted from NumPy arrays.")
+
+
+class TensorView(Tensor[FT]):
+    def __init__(self, idxs: tuple[Any, ...], tns: Tensor[FT], op: Any | None = None):
         """
         Initialize the TensorView with the specified indices, tensor, and operation.
 
@@ -89,7 +103,9 @@ class TensorView(Tensor):
         Get the ftype of the tensor view.
         This is the ftype of the tensor at the specified indices.
         """
-        return TensorViewFType(map(ftype, self.idxs), self.tns.ftype, self.op)
+        return TensorViewFType(
+            tuple(ftype(i) for i in self.idxs), self.tns.ftype, self.op
+        )
 
     @property
     def shape(self):
@@ -152,7 +168,7 @@ class TensorView(Tensor):
         """
         Unwrap the tensor view to get a scalar.
         """
-        val = self.tns[*self.idxs]
+        val = self.tns[*self.idxs]  # ty: ignore[not-subscriptable]
         assert isinstance(val, Tensor) and val.ndim == 0
         return val.item()
 
@@ -161,11 +177,55 @@ class TensorView(Tensor):
         Increment the value in the tensor view.
         This updates the tensor at the specified index with the operation and value.
         """
-        lhs = self.tns[*self.idxs]
+        lhs = self.tns[*self.idxs]  # ty: ignore[not-subscriptable]
         assert isinstance(lhs, Tensor) and lhs.ndim == 0
         lhs = lhs.item()
-        self.tns[*self.idxs] = self.op(lhs, val)
+        self.tns[*self.idxs] = self.op(lhs, val)  # ty: ignore[invalid-assignment]
         return
+
+
+class FullView(Tensor):
+    """An interpreter view of a read-only tensor filled with one value."""
+
+    def __init__(self, val, shape, type_):
+        self.val = val
+        self._shape = shape
+        self._type = type_
+
+    @property
+    def ftype(self):
+        return self._type
+
+    @property
+    def shape(self):
+        return self._shape
+
+    @property
+    def fill_value(self):
+        return self.val
+
+    def access(self, idxs, op=None):
+        if op is not None:
+            raise TypeError("Full views are read-only")
+        return FullView(
+            self.val,
+            self.shape[len(idxs) :],
+            replace(self.ftype, _shape_type=self.ftype.shape_type[len(idxs) :]),
+        )
+
+    def item(self):
+        if self.ndim != 0:
+            raise ValueError("Cannot convert non-scalar tensor to Python scalar.")
+        return self.val
+
+    def unwrap(self):
+        return self.item()
+
+    def to_numpy(self):
+        return np.full(self.shape, self.val)
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
 
 
 def access(tns, idxs, op=None):
@@ -248,13 +308,12 @@ class NotationInterpreterKernel(asm.AssemblyKernel):
     This is a simple interpreter that executes the assembly code.
     """
 
-    def __init__(self, ctx, func_n, ret_t):
-        self.ctx = ctx
-        self.func = ntn.Variable(func_n, ret_t)
+    def __init__(self, func, type_):
+        super().__init__(type_)
+        self.func = func
 
     def __call__(self, *args):
-        args_i = tuple(ntn.Literal(arg) for arg in args)
-        return self.ctx(ntn.Call(self.func, args_i))
+        return self.func(*args)
 
 
 class NotationInterpreterLibrary(asm.AssemblyLibrary):
@@ -293,11 +352,11 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
 
     def __init__(
         self,
-        bindings=None,
-        slots=None,
-        types=None,
-        loop_state=None,
-        function_state=None,
+        bindings: ScopedDict | None = None,
+        slots: ScopedDict | None = None,
+        types: ScopedDict[FType] | None = None,
+        loop_state: HaltState | None = None,
+        function_state: HaltState | None = None,
     ):
         if bindings is None:
             bindings = ScopedDict()
@@ -341,8 +400,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
             function_state=function_state,
         )
 
-    def lower(self, prgm: ntn.Module):
-        return self._dispatch(prgm)
+    def lower(self, term: ntn.Module):
+        return self._dispatch(term)
 
     @overload
     def __call__(self, prgm: ntn.Module) -> NotationInterpreterLibrary: ...
@@ -387,6 +446,14 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
                 return f_e(*args_e)
+            case ntn.Root(tns):
+                return self(tns).lvl
+            case ntn.Child(parent, attr):
+                return getattr(self(parent), attr)
+            case ntn.Full(val, shape):
+                return FullView(
+                    self(val), tuple(self(dim) for dim in shape), prgm.result_type
+                )
             case ntn.Unwrap(tns):
                 return unwrap(self(tns))
             case ntn.Assign(var, val):
@@ -432,7 +499,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                     return None
                 raise NotImplementedError(f"Unrecognized repack obj target: {val}")
             case ntn.Access(tns, mode, idxs):
-                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
                 match mode:
@@ -445,7 +511,6 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                         raise NotImplementedError(f"Unrecognized access mode: {mode}")
 
             case ntn.Dimension(tns, r):
-                assert isinstance(tns, ntn.Slot)
                 tns_e = self(tns)
                 r_e = self(r)
                 shape_ft = tns_e.ftype.shape_type[r_e]
@@ -495,7 +560,13 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 ctx_2 = self.scope()
                 ctx_2(body)
                 return None
-            case ntn.Function(ntn.Variable(func_n, ret_t), args, body):
+            case ntn.Function(
+                ntn.Variable(
+                    func_n, asm.AssemblyKernelFType(result_type=ret_t) as func_type
+                ),
+                args,
+                body,
+            ):
 
                 def my_func(*args_e):
                     ctx_2 = self.scope(function_state=HaltState())
@@ -526,9 +597,11 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                         f"but expected type {ret_t}."
                     )
 
-                self.bindings[func_n] = my_func
+                self.bindings[func_n] = NotationInterpreterKernel(my_func, func_type)
+                self.types[func_n] = func_type
                 return None
             case ntn.Return(value):
+                assert self.function_state is not None
                 self.function_state.has_returned = True
                 self.function_state.return_value = self(value)
                 return None
@@ -539,9 +612,15 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 kernels = {}
                 for func in funcs:
                     match func:
-                        case ntn.Function(ntn.Variable(func_n, ret_t), args, _):
-                            kernel = NotationInterpreterKernel(ctx_2, func_n, ret_t)
-                            kernels[func_n] = kernel
+                        case ntn.Function(
+                            ntn.Variable(
+                                func_n,
+                                ret_t,
+                            ),
+                            args,
+                            _,
+                        ):
+                            kernels[func_n] = ctx_2.bindings[func_n]
                         case _:
                             raise NotImplementedError(
                                 f"Unrecognized function definition: {func}"

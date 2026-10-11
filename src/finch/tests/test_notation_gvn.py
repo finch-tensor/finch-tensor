@@ -5,6 +5,7 @@ import numpy as np
 import finch
 import finch.finch_notation as ntn
 from finch.algebra import ffuncs
+from finch.finch_assembly import AssemblyKernelFType
 
 a, b, x, y, z, n, i = (
     ntn.Variable(name, finch.int64) for name in ("a", "b", "x", "y", "z", "n", "i")
@@ -27,7 +28,10 @@ def program(args, *body, name="f", result=finch.int64):
     return ntn.Module(
         (
             ntn.Function(
-                ntn.Variable(name, result),
+                ntn.Variable(
+                    name,
+                    AssemblyKernelFType(name, tuple(arg.type_ for arg in args), result),
+                ),
                 args,
                 ntn.Block(body),
             ),

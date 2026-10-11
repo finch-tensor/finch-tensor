@@ -1,15 +1,19 @@
 from abc import ABC
+from typing import TypeVar
 
 import numpy as np
 
+from finch.algebra.ftypes import FType
 from finch.codegen import NumpyBuffer
 from finch.finch_assembly import Buffer, BufferFType
 
 from .julia import jl
 
+FT = TypeVar("FT", bound=FType)
 
-class PlusOneBufferFType(BufferFType):
-    def __init__(self, data_ftype):
+
+class PlusOneBufferFType(BufferFType[FT]):
+    def __init__(self, data_ftype: BufferFType[FT]):
         self.data_ftype = data_ftype
 
     def __call__(self, *args, **kwargs):
@@ -23,6 +27,15 @@ class PlusOneBufferFType(BufferFType):
     def length_type(self):
         return self.data_ftype.length_type
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, PlusOneBufferFType)
+            and self.data_ftype == other.data_ftype
+        )
+
+    def __hash__(self):
+        return hash(self.data_ftype)
+
 
 class PlusOneBuffer(Buffer, ABC):
     """
@@ -30,8 +43,8 @@ class PlusOneBuffer(Buffer, ABC):
     element when stored.
     """
 
-    def __init__(self, data):
-        self.data: Buffer = data
+    def __init__(self, data: NumpyBuffer):
+        self.data = data
 
     def ftype(self):
         return PlusOneBufferFType(self.data.ftype())
@@ -49,7 +62,7 @@ class PlusOneBuffer(Buffer, ABC):
 
     @property
     def length_type(self):
-        return self.data.length_type()
+        return self.data.length_type
 
     def load(self, idx: int):
         return self.data.load(idx) + 1
@@ -61,8 +74,8 @@ class PlusOneBuffer(Buffer, ABC):
         self.data.resize(len)
 
 
-class MinusOneBufferFType(BufferFType):
-    def __init__(self, data_ftype):
+class MinusOneBufferFType(BufferFType[FT]):
+    def __init__(self, data_ftype: BufferFType[FT]):
         self.data_ftype = data_ftype
 
     def __call__(self, *args, **kwargs):
@@ -76,12 +89,21 @@ class MinusOneBufferFType(BufferFType):
     def length_type(self):
         return self.data_ftype.length_type
 
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, MinusOneBufferFType)
+            and self.data_ftype == other.data_ftype
+        )
+
+    def __hash__(self):
+        return hash(self.data_ftype)
+
 
 class MinusOneBuffer(Buffer, ABC):
     """Buffer that subtracts one on loads and adds one on stores."""
 
-    def __init__(self, data):
-        self.data: Buffer = data
+    def __init__(self, data: NumpyBuffer):
+        self.data = data
 
     @property
     def ftype(self):

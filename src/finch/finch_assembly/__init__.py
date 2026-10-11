@@ -41,7 +41,13 @@ from .nodes import (
 )
 from .parser import parse_assembly
 from .simplification import AssemblySimplify
-from .stages import AssemblyKernel, AssemblyLibrary, AssemblyLoader, AssemblyTransform
+from .stages import (
+    AssemblyKernel,
+    AssemblyKernelFType,
+    AssemblyLibrary,
+    AssemblyLoader,
+    AssemblyTransform,
+)
 from .struct_slots import LowerPackedStructSlots
 from .type_checker import AssemblyTypeChecker, AssemblyTypeError, assembly_check_types
 from .utils import get_vars_in_expr
@@ -53,6 +59,7 @@ __all__ = [
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyKernel",
+    "AssemblyKernelFType",
     "AssemblyLibrary",
     "AssemblyLoader",
     "AssemblyNode",

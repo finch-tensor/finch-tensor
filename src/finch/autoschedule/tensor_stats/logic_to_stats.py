@@ -1,0 +1,117 @@
+from __future__ import annotations
+
+from collections.abc import MutableMapping
+from typing import TypeVar
+
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Literal,
+    LogicNode,
+    MapJoin,
+    Query,
+    QueryInto,
+    Reorder,
+    StatsFactory,
+    Table,
+    TensorStats,
+)
+from finch.tensor import Scalar
+
+TS = TypeVar("TS", bound=TensorStats)
+
+
+def insert_statistics(
+    stats_factory: StatsFactory[TS],
+    node: LogicNode,
+    bindings: MutableMapping[Alias, TS],
+    replace: bool,
+    cache: MutableMapping[object, TS],
+) -> TS:
+    if node in cache:
+        return cache[node]
+
+    match node:
+        case MapJoin():
+            if not isinstance(node.op, Literal):
+                raise TypeError("MapJoin.op must be Literal(...).")
+            op = node.op.val
+            args = [
+                insert_statistics(stats_factory, a, bindings, replace, cache)
+                for a in node.args
+            ]
+            if not args:
+                raise ValueError("MapJoin expects at least one argument with stats.")
+            if len(args) == 1:
+                cache[node] = args[0]
+                return args[0]
+            st = stats_factory.mapjoin(op, *args)
+            cache[node] = st
+            return st
+        case Query(Table(Alias() as var, idxs), rhs):
+            if rhs.fields() != idxs:
+                rhs = Reorder(rhs, idxs)
+            stats = insert_statistics(stats_factory, rhs, bindings, replace, cache)
+            bindings[var] = stats
+            cache[node] = stats
+            return stats
+        case QueryInto():
+            stats = insert_statistics(
+                stats_factory, node.as_query(), bindings, replace, cache
+            )
+            cache[node] = stats
+            return stats
+
+        case Aggregate():
+            if not isinstance(node.op, Literal):
+                raise TypeError("Aggregate.op must be Literal(...).")
+            op = node.op.val
+            arg = insert_statistics(stats_factory, node.arg, bindings, replace, cache)
+            reduce_indices = list(node.idxs)
+            if isinstance(node.init, Literal):
+                st = stats_factory.aggregate(
+                    op, node.init.val, tuple(reduce_indices), arg
+                )
+            else:
+                # A tensor init is folded into the reduction of the argument.
+                init = insert_statistics(
+                    stats_factory, node.init, bindings, replace, cache
+                )
+                reduced = stats_factory.aggregate(op, None, tuple(reduce_indices), arg)
+                st = stats_factory.reorder(
+                    stats_factory.mapjoin(op, init, reduced), node.fields()
+                )
+            cache[node] = st
+            return st
+
+        case Reorder():
+            child = insert_statistics(stats_factory, node.arg, bindings, replace, cache)
+            st = stats_factory.reorder(child, node.idxs)
+            cache[node] = st
+            return st
+
+        case Table():
+            if isinstance(node.tns, Literal):
+                idxs = list(node.idxs)
+                tensor = stats_factory(node.tns.val, tuple(idxs))
+            elif isinstance(node.tns, Alias):
+                base_stats = bindings.get(node.tns)
+                if base_stats is None:
+                    raise ValueError(f"No TensorStats bound to alias {node.tns}")
+
+                new_indices = tuple(f for f in node.idxs)
+                tensor = stats_factory.relabel(base_stats, new_indices)
+
+            if (node not in cache) or replace:
+                cache[node] = tensor
+            return cache[node]
+
+        case Literal(val):
+            # A literal is a zero-dimensional constant, so its statistics are
+            # those of a rank-0 dense tensor holding that value.
+            st = stats_factory(Scalar(val), ())
+            cache[node] = st
+            return st
+
+        case _:
+            raise TypeError(f"Unhandled node type: {type(node)}")
