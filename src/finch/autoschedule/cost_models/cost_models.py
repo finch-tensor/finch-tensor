@@ -64,6 +64,33 @@ class CostModel(Form):
         return float(np.dot(self.coefficients, features))
 
 
+class LoopCostModel(CostModel):
+    """A cost model with features for individual loop prefixes."""
+
+    @abstractmethod
+    def get_prefix_features(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> np.ndarray: ...
+
+    def predict_prefix_cost(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> float:
+        features = self.get_prefix_features(
+            prefix, exec_space, out_space, args, stats_factory
+        )
+        return float(np.dot(self.coefficients, features))
+
+
 class FlopsCostModel(CostModel, AliasedForm):
     """
     FlopsCostModel counts the non-fill values in the iteration space of each
@@ -150,7 +177,7 @@ class FlopsCostModel(CostModel, AliasedForm):
         return features
 
 
-class PigeonCostModel(CostModel, LoopOrderedForm):
+class PigeonCostModel(LoopCostModel, LoopOrderedForm):
     """
     PigeonCostModel counts iteration, operation, and output costs across loop
     prefixes. Writes are weighted 10x reads and operations.
@@ -215,19 +242,6 @@ class PigeonCostModel(CostModel, LoopOrderedForm):
                 out_cost,
             ]
         )
-
-    def predict_prefix_cost(
-        self,
-        prefix: tuple[Field, ...],
-        exec_space: NS,
-        out_space: NS,
-        args: Mapping[Field, Sequence[NS]],
-        stats_factory: StatsFactory[NS],
-    ) -> float:
-        features = self.get_prefix_features(
-            prefix, exec_space, out_space, args, stats_factory
-        )
-        return float(np.dot(self.coefficients, features))
 
     def get_features(
         self,
