@@ -211,7 +211,13 @@ class LogicMachine:
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case QueryInto() as stmt:
-                return self(stmt.as_query())
+                tns = self(stmt.lhs.tns)
+                rhs = self(Reorder(stmt.as_query().rhs, stmt.lhs.idxs))
+                if tns.shape != rhs.tns.shape:
+                    raise ValueError("QueryInto cannot change the tensor shape.")
+                for crds in product(*[range(dim) for dim in tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (TableValue(tns, stmt.lhs.idxs),)
             case Plan(bodies):
                 res = ()
                 for body in bodies:
