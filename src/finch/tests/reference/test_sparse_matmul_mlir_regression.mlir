@@ -336,262 +336,274 @@ module {
         } else {
           scf.yield %v_249 : index
         }
-        %v_295:3 = scf.while (%v_273 = %v_233, %v_274 = %v_272, %v_275 = %v_262) : (index, index, index) -> (index, index, index) {
+        %v_299:3 = scf.while (%v_273 = %v_233, %v_274 = %v_272, %v_275 = %v_262) : (index, index, index) -> (index, index, index) {
           %v_276 = arith.addi %v_237, %v_263 : index
           %v_277 = arith.minsi %v_27, %v_276 : index
           %v_278 = arith.cmpi slt, %v_275, %v_277 : index
           scf.condition(%v_278) %v_273, %v_274, %v_275 : index, index, index
         } do {
           ^bb(%v_273: index, %v_274: index, %v_275: index):
-          %v_279 = arith.maxsi %v_273, %v_275 : index
-          %v_280 = arith.addi %v_237, %v_275 : index
-          scf.for %v_281 = %v_279 to %v_280 step %v_237 {
-            %v_282 = arith.cmpi eq, %v_281, %v_242 : index
-            scf.if %v_282 {
-              %v_283 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-              %v_284 = builtin.unrealized_conversion_cast %v_283 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-              %v_285 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-              %v_286 = builtin.unrealized_conversion_cast %v_285 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-              %v_287 = memref.load %v_286[%v_274] : memref<?xf64>
-              memref.store %v_287, %v_284[%v_246] : memref<?xf64>
+          %v_279 = arith.constant 1 : i1
+          %v_296, %v_297, %v_298 = scf.if %v_279 -> (index, index, index) {
+            %v_280 = arith.maxsi %v_273, %v_275 : index
+            %v_281 = arith.addi %v_237, %v_275 : index
+            scf.for %v_282 = %v_280 to %v_281 step %v_237 {
+              %v_283 = arith.cmpi eq, %v_282, %v_242 : index
+              scf.if %v_283 {
+                %v_284 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+                %v_285 = builtin.unrealized_conversion_cast %v_284 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+                %v_286 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+                %v_287 = builtin.unrealized_conversion_cast %v_286 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+                %v_288 = memref.load %v_287[%v_274] : memref<?xf64>
+                memref.store %v_288, %v_285[%v_246] : memref<?xf64>
+              }
             }
-          }
-          %v_288 = arith.addi %v_237, %v_275 : index
-          %v_289 = arith.addi %v_237, %v_274 : index
-          %v_290 = arith.cmpi slt, %v_289, %v_253 : index
-          %v_294 = scf.if %v_290 -> (index) {
-            %v_291 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_292 = builtin.unrealized_conversion_cast %v_291 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-            %v_293 = memref.load %v_292[%v_289] : memref<?xindex>
-            scf.yield %v_293 : index
+            %v_289 = arith.addi %v_237, %v_275 : index
+            %v_290 = arith.addi %v_237, %v_274 : index
+            %v_291 = arith.cmpi slt, %v_290, %v_253 : index
+            %v_295 = scf.if %v_291 -> (index) {
+              %v_292 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_293 = builtin.unrealized_conversion_cast %v_292 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+              %v_294 = memref.load %v_293[%v_290] : memref<?xindex>
+              scf.yield %v_294 : index
+            } else {
+              scf.yield %v_27 : index
+            }
+            scf.yield %v_289, %v_290, %v_295 : index, index, index
           } else {
-            scf.yield %v_27 : index
+            scf.yield %v_273, %v_274, %v_275 : index, index, index
           }
-          scf.yield %v_288, %v_289, %v_294 : index, index, index
+          scf.yield %v_296, %v_297, %v_298 : index, index, index
         }
       }
     }
-    %v_296 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_297 = builtin.unrealized_conversion_cast %v_296 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_298 = memref.dim %v_297, %v_233 : memref<?xf64>
-    scf.for %v_299 = %v_233 to %v_298 step %v_237 {
-      %v_300 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-      %v_301 = builtin.unrealized_conversion_cast %v_300 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-      %v_302 = arith.constant 0.0 : f64
-      memref.store %v_302, %v_301[%v_299] : memref<?xf64>
+    %v_300 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_301 = builtin.unrealized_conversion_cast %v_300 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_302 = memref.dim %v_301, %v_233 : memref<?xf64>
+    scf.for %v_303 = %v_233 to %v_302 step %v_237 {
+      %v_304 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+      %v_305 = builtin.unrealized_conversion_cast %v_304 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+      %v_306 = arith.constant 0.0 : f64
+      memref.store %v_306, %v_305[%v_303] : memref<?xf64>
     }
-    scf.for %v_303 = %v_233 to %v_167 step %v_237 {
-      %v_304 = arith.muli %v_197, %v_303 : index
-      scf.for %v_305 = %v_233 to %v_193 step %v_237 {
-        %v_306 = arith.muli %v_228, %v_305 : index
-        %v_307 = arith.muli %v_201, %v_305 : index
-        %v_308 = arith.addi %v_304, %v_307 : index
-        %v_309 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-        %v_310 = builtin.unrealized_conversion_cast %v_309 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-        %v_311 = memref.load %v_310[%v_303] : memref<?xindex>
-        %v_312 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-        %v_313 = builtin.unrealized_conversion_cast %v_312 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-        %v_314 = arith.addi %v_237, %v_303 : index
-        %v_315 = memref.load %v_313[%v_314] : memref<?xindex>
-        %v_316 = arith.cmpi slt, %v_311, %v_315 : index
-        %v_324, %v_325 = scf.if %v_316 -> (index, index) {
-          %v_317 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-          %v_318 = builtin.unrealized_conversion_cast %v_317 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-          %v_319 = memref.load %v_318[%v_311] : memref<?xindex>
-          %v_320 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-          %v_321 = builtin.unrealized_conversion_cast %v_320 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-          %v_322 = arith.subi %v_315, %v_237 : index
-          %v_323 = memref.load %v_321[%v_322] : memref<?xindex>
-          scf.yield %v_319, %v_323 : index, index
+    scf.for %v_307 = %v_233 to %v_167 step %v_237 {
+      %v_308 = arith.muli %v_197, %v_307 : index
+      scf.for %v_309 = %v_233 to %v_193 step %v_237 {
+        %v_310 = arith.muli %v_228, %v_309 : index
+        %v_311 = arith.muli %v_201, %v_309 : index
+        %v_312 = arith.addi %v_308, %v_311 : index
+        %v_313 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        %v_314 = builtin.unrealized_conversion_cast %v_313 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+        %v_315 = memref.load %v_314[%v_307] : memref<?xindex>
+        %v_316 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        %v_317 = builtin.unrealized_conversion_cast %v_316 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+        %v_318 = arith.addi %v_237, %v_307 : index
+        %v_319 = memref.load %v_317[%v_318] : memref<?xindex>
+        %v_320 = arith.cmpi slt, %v_315, %v_319 : index
+        %v_328, %v_329 = scf.if %v_320 -> (index, index) {
+          %v_321 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+          %v_322 = builtin.unrealized_conversion_cast %v_321 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+          %v_323 = memref.load %v_322[%v_315] : memref<?xindex>
+          %v_324 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+          %v_325 = builtin.unrealized_conversion_cast %v_324 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+          %v_326 = arith.subi %v_319, %v_237 : index
+          %v_327 = memref.load %v_325[%v_326] : memref<?xindex>
+          scf.yield %v_323, %v_327 : index, index
         } else {
           scf.yield %v_237, %v_233 : index, index
         }
-        %v_326 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-        %v_327 = builtin.unrealized_conversion_cast %v_326 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-        %v_328 = memref.load %v_327[%v_311] : memref<?xindex>
-        %v_329 = arith.cmpi slt, %v_328, %v_233 : index
-        %v_334 = scf.if %v_329 -> (index) {
-          %v_330 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-          %v_331 = builtin.unrealized_conversion_cast %v_330 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-          %v_332 = arith.subi %v_315, %v_237 : index
-          %v_333 = func.call @scansearch_index(%v_331, %v_233, %v_311, %v_332) : (memref<?xindex>, index, index, index) -> index
-          scf.yield %v_333 : index
+        %v_330 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+        %v_331 = builtin.unrealized_conversion_cast %v_330 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+        %v_332 = memref.load %v_331[%v_315] : memref<?xindex>
+        %v_333 = arith.cmpi slt, %v_332, %v_233 : index
+        %v_338 = scf.if %v_333 -> (index) {
+          %v_334 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+          %v_335 = builtin.unrealized_conversion_cast %v_334 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+          %v_336 = arith.subi %v_319, %v_237 : index
+          %v_337 = func.call @scansearch_index(%v_335, %v_233, %v_315, %v_336) : (memref<?xindex>, index, index, index) -> index
+          scf.yield %v_337 : index
         } else {
-          scf.yield %v_311 : index
+          scf.yield %v_315 : index
         }
-        %v_376:3 = scf.while (%v_335 = %v_233, %v_336 = %v_334, %v_337 = %v_324) : (index, index, index) -> (index, index, index) {
-          %v_338 = arith.addi %v_237, %v_325 : index
-          %v_339 = arith.minsi %v_111, %v_338 : index
-          %v_340 = arith.cmpi slt, %v_337, %v_339 : index
-          scf.condition(%v_340) %v_335, %v_336, %v_337 : index, index, index
+        %v_384:3 = scf.while (%v_339 = %v_233, %v_340 = %v_338, %v_341 = %v_328) : (index, index, index) -> (index, index, index) {
+          %v_342 = arith.addi %v_237, %v_329 : index
+          %v_343 = arith.minsi %v_111, %v_342 : index
+          %v_344 = arith.cmpi slt, %v_341, %v_343 : index
+          scf.condition(%v_344) %v_339, %v_340, %v_341 : index, index, index
         } do {
-          ^bb_2(%v_335: index, %v_336: index, %v_337: index):
-          %v_341 = arith.addi %v_237, %v_337 : index
-          %v_342 = arith.minsi %v_341, %v_337 : index
-          scf.for %v_343 = %v_335 to %v_342 step %v_237 {
-            %v_344 = arith.muli %v_232, %v_343 : index
-            %v_345 = arith.addi %v_306, %v_344 : index
-            %v_346 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_347 = builtin.unrealized_conversion_cast %v_346 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_348 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_349 = builtin.unrealized_conversion_cast %v_348 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_350 = memref.load %v_349[%v_345] : memref<?xf64>
-            memref.store %v_350, %v_347[%v_345] : memref<?xf64>
-          }
-          %v_351 = arith.maxsi %v_335, %v_337 : index
-          %v_352 = arith.addi %v_237, %v_337 : index
-          scf.for %v_353 = %v_351 to %v_352 step %v_237 {
-            %v_354 = arith.muli %v_232, %v_353 : index
-            %v_355 = arith.addi %v_306, %v_354 : index
-            %v_356 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_357 = builtin.unrealized_conversion_cast %v_356 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_358 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_359 = builtin.unrealized_conversion_cast %v_358 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_360 = memref.load %v_359[%v_355] : memref<?xf64>
-            %v_361 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_362 = builtin.unrealized_conversion_cast %v_361 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_363 = memref.load %v_362[%v_308] : memref<?xf64>
-            %v_364 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_365 = builtin.unrealized_conversion_cast %v_364 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-            %v_366 = memref.load %v_365[%v_336] : memref<?xf64>
-            %v_367 = arith.mulf %v_363, %v_366 : f64
-            %v_368 = arith.addf %v_360, %v_367 : f64
-            memref.store %v_368, %v_357[%v_355] : memref<?xf64>
-          }
-          %v_369 = arith.addi %v_237, %v_337 : index
-          %v_370 = arith.addi %v_237, %v_336 : index
-          %v_371 = arith.cmpi slt, %v_370, %v_315 : index
-          %v_375 = scf.if %v_371 -> (index) {
-            %v_372 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-            %v_373 = builtin.unrealized_conversion_cast %v_372 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-            %v_374 = memref.load %v_373[%v_370] : memref<?xindex>
-            scf.yield %v_374 : index
+          ^bb_2(%v_339: index, %v_340: index, %v_341: index):
+          %v_345 = arith.constant 1 : i1
+          %v_381, %v_382, %v_383 = scf.if %v_345 -> (index, index, index) {
+            %v_346 = arith.addi %v_237, %v_341 : index
+            %v_347 = arith.minsi %v_346, %v_341 : index
+            scf.for %v_348 = %v_339 to %v_347 step %v_237 {
+              %v_349 = arith.muli %v_232, %v_348 : index
+              %v_350 = arith.addi %v_310, %v_349 : index
+              %v_351 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_352 = builtin.unrealized_conversion_cast %v_351 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_353 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_354 = builtin.unrealized_conversion_cast %v_353 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_355 = memref.load %v_354[%v_350] : memref<?xf64>
+              memref.store %v_355, %v_352[%v_350] : memref<?xf64>
+            }
+            %v_356 = arith.maxsi %v_339, %v_341 : index
+            %v_357 = arith.addi %v_237, %v_341 : index
+            scf.for %v_358 = %v_356 to %v_357 step %v_237 {
+              %v_359 = arith.muli %v_232, %v_358 : index
+              %v_360 = arith.addi %v_310, %v_359 : index
+              %v_361 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_362 = builtin.unrealized_conversion_cast %v_361 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_363 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_364 = builtin.unrealized_conversion_cast %v_363 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_365 = memref.load %v_364[%v_360] : memref<?xf64>
+              %v_366 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_367 = builtin.unrealized_conversion_cast %v_366 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_368 = memref.load %v_367[%v_312] : memref<?xf64>
+              %v_369 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_370 = builtin.unrealized_conversion_cast %v_369 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+              %v_371 = memref.load %v_370[%v_340] : memref<?xf64>
+              %v_372 = arith.mulf %v_368, %v_371 : f64
+              %v_373 = arith.addf %v_365, %v_372 : f64
+              memref.store %v_373, %v_362[%v_360] : memref<?xf64>
+            }
+            %v_374 = arith.addi %v_237, %v_341 : index
+            %v_375 = arith.addi %v_237, %v_340 : index
+            %v_376 = arith.cmpi slt, %v_375, %v_319 : index
+            %v_380 = scf.if %v_376 -> (index) {
+              %v_377 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+              %v_378 = builtin.unrealized_conversion_cast %v_377 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+              %v_379 = memref.load %v_378[%v_375] : memref<?xindex>
+              scf.yield %v_379 : index
+            } else {
+              scf.yield %v_111 : index
+            }
+            scf.yield %v_374, %v_375, %v_380 : index, index, index
           } else {
-            scf.yield %v_111 : index
+            scf.yield %v_339, %v_340, %v_341 : index, index, index
           }
-          scf.yield %v_369, %v_370, %v_375 : index, index, index
+          scf.yield %v_381, %v_382, %v_383 : index, index, index
         }
-        %v_377 = arith.addi %v_237, %v_325 : index
-        %v_378 = arith.maxsi %v_233, %v_377 : index
-        scf.for %v_379 = %v_378 to %v_111 step %v_237 {
-          %v_380 = arith.muli %v_232, %v_379 : index
-          %v_381 = arith.addi %v_306, %v_380 : index
-          %v_382 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-          %v_383 = builtin.unrealized_conversion_cast %v_382 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-          %v_384 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-          %v_385 = builtin.unrealized_conversion_cast %v_384 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-          %v_386 = memref.load %v_385[%v_381] : memref<?xf64>
-          memref.store %v_386, %v_383[%v_381] : memref<?xf64>
+        %v_385 = arith.addi %v_237, %v_329 : index
+        %v_386 = arith.maxsi %v_233, %v_385 : index
+        scf.for %v_387 = %v_386 to %v_111 step %v_237 {
+          %v_388 = arith.muli %v_232, %v_387 : index
+          %v_389 = arith.addi %v_310, %v_388 : index
+          %v_390 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+          %v_391 = builtin.unrealized_conversion_cast %v_390 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+          %v_392 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+          %v_393 = builtin.unrealized_conversion_cast %v_392 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+          %v_394 = memref.load %v_393[%v_389] : memref<?xf64>
+          memref.store %v_394, %v_391[%v_389] : memref<?xf64>
         }
       }
     }
-    %v_387 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_388 = builtin.unrealized_conversion_cast %v_387 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_389 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_390 = builtin.unrealized_conversion_cast %v_389 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_391 = memref.dim %v_390, %v_233 : memref<?xf64>
-    %v_392 = arith.index_cast %v_391 : index to i64
-    %v_393 = llvm.getelementptr %v_7[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_392, %v_393 : i64, !llvm.ptr
-    %v_394 = memref.extract_aligned_pointer_as_index %v_388 : memref<?xf64> -> index
-    %v_395 = arith.index_cast %v_394 : index to i64
-    %v_396 = llvm.inttoptr %v_395 : i64 to !llvm.ptr
-    %v_397 = llvm.getelementptr %v_7[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_396, %v_397 : !llvm.ptr, !llvm.ptr
-    %v_398 = llvm.load %v_44 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_399 = builtin.unrealized_conversion_cast %v_398 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_400 = llvm.load %v_44 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_401 = builtin.unrealized_conversion_cast %v_400 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_402 = memref.dim %v_401, %v_233 : memref<?xindex>
+    %v_395 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_396 = builtin.unrealized_conversion_cast %v_395 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_397 = llvm.load %v_22 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_398 = builtin.unrealized_conversion_cast %v_397 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_399 = memref.dim %v_398, %v_233 : memref<?xf64>
+    %v_400 = arith.index_cast %v_399 : index to i64
+    %v_401 = llvm.getelementptr %v_7[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_400, %v_401 : i64, !llvm.ptr
+    %v_402 = memref.extract_aligned_pointer_as_index %v_396 : memref<?xf64> -> index
     %v_403 = arith.index_cast %v_402 : index to i64
-    %v_404 = llvm.getelementptr %v_31[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_403, %v_404 : i64, !llvm.ptr
-    %v_405 = memref.extract_aligned_pointer_as_index %v_399 : memref<?xindex> -> index
-    %v_406 = arith.index_cast %v_405 : index to i64
-    %v_407 = llvm.inttoptr %v_406 : i64 to !llvm.ptr
-    %v_408 = llvm.getelementptr %v_31[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_407, %v_408 : !llvm.ptr, !llvm.ptr
-    %v_409 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_410 = builtin.unrealized_conversion_cast %v_409 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_411 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_412 = builtin.unrealized_conversion_cast %v_411 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_413 = memref.dim %v_412, %v_233 : memref<?xindex>
+    %v_404 = llvm.inttoptr %v_403 : i64 to !llvm.ptr
+    %v_405 = llvm.getelementptr %v_7[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_404, %v_405 : !llvm.ptr, !llvm.ptr
+    %v_406 = llvm.load %v_44 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_407 = builtin.unrealized_conversion_cast %v_406 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_408 = llvm.load %v_44 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_409 = builtin.unrealized_conversion_cast %v_408 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_410 = memref.dim %v_409, %v_233 : memref<?xindex>
+    %v_411 = arith.index_cast %v_410 : index to i64
+    %v_412 = llvm.getelementptr %v_31[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_411, %v_412 : i64, !llvm.ptr
+    %v_413 = memref.extract_aligned_pointer_as_index %v_407 : memref<?xindex> -> index
     %v_414 = arith.index_cast %v_413 : index to i64
-    %v_415 = llvm.getelementptr %v_48[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_414, %v_415 : i64, !llvm.ptr
-    %v_416 = memref.extract_aligned_pointer_as_index %v_410 : memref<?xindex> -> index
-    %v_417 = arith.index_cast %v_416 : index to i64
-    %v_418 = llvm.inttoptr %v_417 : i64 to !llvm.ptr
-    %v_419 = llvm.getelementptr %v_48[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_418, %v_419 : !llvm.ptr, !llvm.ptr
-    %v_420 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_421 = builtin.unrealized_conversion_cast %v_420 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_422 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_423 = builtin.unrealized_conversion_cast %v_422 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_424 = memref.dim %v_423, %v_233 : memref<?xf64>
+    %v_415 = llvm.inttoptr %v_414 : i64 to !llvm.ptr
+    %v_416 = llvm.getelementptr %v_31[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_415, %v_416 : !llvm.ptr, !llvm.ptr
+    %v_417 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_418 = builtin.unrealized_conversion_cast %v_417 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_419 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_420 = builtin.unrealized_conversion_cast %v_419 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_421 = memref.dim %v_420, %v_233 : memref<?xindex>
+    %v_422 = arith.index_cast %v_421 : index to i64
+    %v_423 = llvm.getelementptr %v_48[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_422, %v_423 : i64, !llvm.ptr
+    %v_424 = memref.extract_aligned_pointer_as_index %v_418 : memref<?xindex> -> index
     %v_425 = arith.index_cast %v_424 : index to i64
-    %v_426 = llvm.getelementptr %v_93[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_425, %v_426 : i64, !llvm.ptr
-    %v_427 = memref.extract_aligned_pointer_as_index %v_421 : memref<?xf64> -> index
-    %v_428 = arith.index_cast %v_427 : index to i64
-    %v_429 = llvm.inttoptr %v_428 : i64 to !llvm.ptr
-    %v_430 = llvm.getelementptr %v_93[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_429, %v_430 : !llvm.ptr, !llvm.ptr
-    %v_431 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_432 = builtin.unrealized_conversion_cast %v_431 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_433 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_434 = builtin.unrealized_conversion_cast %v_433 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_435 = memref.dim %v_434, %v_233 : memref<?xindex>
+    %v_426 = llvm.inttoptr %v_425 : i64 to !llvm.ptr
+    %v_427 = llvm.getelementptr %v_48[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_426, %v_427 : !llvm.ptr, !llvm.ptr
+    %v_428 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_429 = builtin.unrealized_conversion_cast %v_428 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_430 = llvm.load %v_106 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_431 = builtin.unrealized_conversion_cast %v_430 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_432 = memref.dim %v_431, %v_233 : memref<?xf64>
+    %v_433 = arith.index_cast %v_432 : index to i64
+    %v_434 = llvm.getelementptr %v_93[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_433, %v_434 : i64, !llvm.ptr
+    %v_435 = memref.extract_aligned_pointer_as_index %v_429 : memref<?xf64> -> index
     %v_436 = arith.index_cast %v_435 : index to i64
-    %v_437 = llvm.getelementptr %v_115[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_436, %v_437 : i64, !llvm.ptr
-    %v_438 = memref.extract_aligned_pointer_as_index %v_432 : memref<?xindex> -> index
-    %v_439 = arith.index_cast %v_438 : index to i64
-    %v_440 = llvm.inttoptr %v_439 : i64 to !llvm.ptr
-    %v_441 = llvm.getelementptr %v_115[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_440, %v_441 : !llvm.ptr, !llvm.ptr
-    %v_442 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_443 = builtin.unrealized_conversion_cast %v_442 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_444 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_445 = builtin.unrealized_conversion_cast %v_444 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
-    %v_446 = memref.dim %v_445, %v_233 : memref<?xindex>
+    %v_437 = llvm.inttoptr %v_436 : i64 to !llvm.ptr
+    %v_438 = llvm.getelementptr %v_93[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_437, %v_438 : !llvm.ptr, !llvm.ptr
+    %v_439 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_440 = builtin.unrealized_conversion_cast %v_439 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_441 = llvm.load %v_128 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_442 = builtin.unrealized_conversion_cast %v_441 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_443 = memref.dim %v_442, %v_233 : memref<?xindex>
+    %v_444 = arith.index_cast %v_443 : index to i64
+    %v_445 = llvm.getelementptr %v_115[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_444, %v_445 : i64, !llvm.ptr
+    %v_446 = memref.extract_aligned_pointer_as_index %v_440 : memref<?xindex> -> index
     %v_447 = arith.index_cast %v_446 : index to i64
-    %v_448 = llvm.getelementptr %v_132[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_447, %v_448 : i64, !llvm.ptr
-    %v_449 = memref.extract_aligned_pointer_as_index %v_443 : memref<?xindex> -> index
-    %v_450 = arith.index_cast %v_449 : index to i64
-    %v_451 = llvm.inttoptr %v_450 : i64 to !llvm.ptr
-    %v_452 = llvm.getelementptr %v_132[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_451, %v_452 : !llvm.ptr, !llvm.ptr
-    %v_453 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_454 = builtin.unrealized_conversion_cast %v_453 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_455 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_456 = builtin.unrealized_conversion_cast %v_455 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_457 = memref.dim %v_456, %v_233 : memref<?xf64>
+    %v_448 = llvm.inttoptr %v_447 : i64 to !llvm.ptr
+    %v_449 = llvm.getelementptr %v_115[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_448, %v_449 : !llvm.ptr, !llvm.ptr
+    %v_450 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_451 = builtin.unrealized_conversion_cast %v_450 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_452 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_453 = builtin.unrealized_conversion_cast %v_452 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
+    %v_454 = memref.dim %v_453, %v_233 : memref<?xindex>
+    %v_455 = arith.index_cast %v_454 : index to i64
+    %v_456 = llvm.getelementptr %v_132[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_455, %v_456 : i64, !llvm.ptr
+    %v_457 = memref.extract_aligned_pointer_as_index %v_451 : memref<?xindex> -> index
     %v_458 = arith.index_cast %v_457 : index to i64
-    %v_459 = llvm.getelementptr %v_172[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_458, %v_459 : i64, !llvm.ptr
-    %v_460 = memref.extract_aligned_pointer_as_index %v_454 : memref<?xf64> -> index
-    %v_461 = arith.index_cast %v_460 : index to i64
-    %v_462 = llvm.inttoptr %v_461 : i64 to !llvm.ptr
-    %v_463 = llvm.getelementptr %v_172[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_462, %v_463 : !llvm.ptr, !llvm.ptr
-    %v_464 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_465 = builtin.unrealized_conversion_cast %v_464 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_466 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
-    %v_467 = builtin.unrealized_conversion_cast %v_466 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
-    %v_468 = memref.dim %v_467, %v_233 : memref<?xf64>
+    %v_459 = llvm.inttoptr %v_458 : i64 to !llvm.ptr
+    %v_460 = llvm.getelementptr %v_132[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_459, %v_460 : !llvm.ptr, !llvm.ptr
+    %v_461 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_462 = builtin.unrealized_conversion_cast %v_461 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_463 = llvm.load %v_185 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_464 = builtin.unrealized_conversion_cast %v_463 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_465 = memref.dim %v_464, %v_233 : memref<?xf64>
+    %v_466 = arith.index_cast %v_465 : index to i64
+    %v_467 = llvm.getelementptr %v_172[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_466, %v_467 : i64, !llvm.ptr
+    %v_468 = memref.extract_aligned_pointer_as_index %v_462 : memref<?xf64> -> index
     %v_469 = arith.index_cast %v_468 : index to i64
-    %v_470 = llvm.getelementptr %v_203[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_469, %v_470 : i64, !llvm.ptr
-    %v_471 = memref.extract_aligned_pointer_as_index %v_465 : memref<?xf64> -> index
-    %v_472 = arith.index_cast %v_471 : index to i64
-    %v_473 = llvm.inttoptr %v_472 : i64 to !llvm.ptr
-    %v_474 = llvm.getelementptr %v_203[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
-    llvm.store %v_473, %v_474 : !llvm.ptr, !llvm.ptr
-    %v_475 = llvm.mlir.undef : !llvm.struct<(!llvm.ptr)>
-    %v_476 = llvm.insertvalue %_A_7, %v_475[0] : !llvm.struct<(!llvm.ptr)>
-    llvm.store %v_476, %_ret : !llvm.struct<(!llvm.ptr)>, !llvm.ptr
+    %v_470 = llvm.inttoptr %v_469 : i64 to !llvm.ptr
+    %v_471 = llvm.getelementptr %v_172[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_470, %v_471 : !llvm.ptr, !llvm.ptr
+    %v_472 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_473 = builtin.unrealized_conversion_cast %v_472 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_474 = llvm.load %v_216 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
+    %v_475 = builtin.unrealized_conversion_cast %v_474 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xf64>
+    %v_476 = memref.dim %v_475, %v_233 : memref<?xf64>
+    %v_477 = arith.index_cast %v_476 : index to i64
+    %v_478 = llvm.getelementptr %v_203[0, 2] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_477, %v_478 : i64, !llvm.ptr
+    %v_479 = memref.extract_aligned_pointer_as_index %v_473 : memref<?xf64> -> index
+    %v_480 = arith.index_cast %v_479 : index to i64
+    %v_481 = llvm.inttoptr %v_480 : i64 to !llvm.ptr
+    %v_482 = llvm.getelementptr %v_203[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(ptr, ptr, i64, ptr)>
+    llvm.store %v_481, %v_482 : !llvm.ptr, !llvm.ptr
+    %v_483 = llvm.mlir.undef : !llvm.struct<(!llvm.ptr)>
+    %v_484 = llvm.insertvalue %_A_7, %v_483[0] : !llvm.struct<(!llvm.ptr)>
+    llvm.store %v_484, %_ret : !llvm.struct<(!llvm.ptr)>, !llvm.ptr
     func.return
   }
 }
