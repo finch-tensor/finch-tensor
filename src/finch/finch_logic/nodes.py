@@ -79,7 +79,8 @@ def merge_fill_value(op: FinchOperator, *args) -> AbstractFill:
     return apply_fill(op, *(as_fill(arg) for arg in args))
 
 
-def reduce_fill_value(op, z, t: AbstractFill) -> AbstractFill:
+def reduce_fill_value(op, z, t) -> AbstractFill:
+    t = as_fill(t)
     # An overwrite reduction's background is the argument's background when
     # the init is not compile-time data.
     if is_dynamic(z) and op == ffuncs.overwrite:
@@ -105,9 +106,9 @@ def merge_fill_type(op: FinchOperator, *args) -> AbstractFillFType:
     return apply_fill_type(op, *(_literal_fill_type(arg) for arg in args))
 
 
-def reduce_fill_type(op, z, t: AbstractFillFType) -> AbstractFillFType:
+def reduce_fill_type(op, z, t) -> AbstractFillFType:
     # Like `reduce_fill_value`, for the fills of formats.
-    z = _literal_fill_type(z)
+    z, t = _literal_fill_type(z), _literal_fill_type(t)
     if is_dynamic(z) and op == ffuncs.overwrite:
         return t
     # The init takes the element type of the reduction.

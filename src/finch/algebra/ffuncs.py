@@ -2496,7 +2496,11 @@ class _Choose(FinchOperator):
         return self.fill.value
 
     def __eq__(self, other):
-        return isinstance(other, _Choose) and self.fill == other.fill
+        return (
+            isinstance(other, _Choose)
+            and self.fill == other.fill
+            and builtins.bool(same(self.fill_value, other.fill_value))
+        )
 
     def __hash__(self):
         return hash((type(self), self.fill, canonical(self.fill_value)))

@@ -19,7 +19,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
 from .ftypes import FType, FTyped, ftype
-from .ffuncs import canonical
 
 if TYPE_CHECKING:
     from .algebra import FinchOperator
@@ -96,6 +95,7 @@ class StaticFillFType(AbstractFillFType):
         )
 
     def __hash__(self):
+        from .ffuncs import canonical
 
         return hash((StaticFillFType, self.element_type, canonical(self._value)))
 
