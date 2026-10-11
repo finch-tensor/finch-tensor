@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from collections.abc import Mapping
 from typing import TypeVar
 
@@ -6,6 +7,7 @@ import numpy as np
 
 from finch.algebra import StaticFill, ffuncs, ftype, np_dtype
 from finch.algebra.tensor import TensorFType
+from finch.algebra.utils import is_subsequence
 from finch.autoschedule.stages import AliasedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -252,6 +254,79 @@ class FormatCostModel(CostModel, LoopOrderedForm):
             ]
         )
 
+    def get_access_features(
+        self,
+        alias: Alias,
+        level: int,
+        term: LogicStatement,
+        machine: StatsMachine[NS],
+    ) -> np.ndarray:
+        """
+        Return the accesses to alias at a zero-based depth in each query of term:
+        sequential reads, scatter reads, sequential writes, and scatter writes.
+        Each access is counted by the PigeonCostModel iterations of the loops
+        from the root to the current level. The element level is accessed with
+        its parent.
+        """
+        # A sequential write is when the prefix of loops from root to current
+        # level matches the ordering of the access exactly.
+        # A sequential read is when the prefix of loops from root to current
+        # level is a supersequence of the ordering of the access.
+        features = np.zeros(4)
+        stats_interpreter = StatsMachine(
+            machine.stats_factory, OrderedDict(machine.bindings)
+        )
+        pigeon = PigeonCostModel()
+
+        def visit_access(idxs, loop_order, rhs, lhs_idxs, is_write):
+            if not idxs:
+                return
+            depth = min(level, len(idxs) - 1)
+            order = tuple(idxs[: depth + 1])
+            loops = tuple(loop_order[: loop_order.index(idxs[depth]) + 1])
+            iterations = pigeon.get_prefix_features(
+                loops, rhs, stats_interpreter, lhs_idxs
+            )[0]
+            if is_write:
+                features[2 if loops == order else 3] += iterations
+            else:
+                features[0 if is_subsequence(order, loops) else 1] += iterations
+
+        def visit_stmt(stmt: LogicStatement):
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                    return
+                case QueryInto(Table(), _, Literal()):
+                    stats_interpreter(stmt)
+                    return
+                case Produces():
+                    return
+                case Query(Table(lhs, lhs_idxs), Table() as rhs):
+                    arg = rhs
+                    loop_order = lhs_idxs
+                case Query(
+                    Table(lhs, lhs_idxs),
+                    Aggregate(_, _, Reorder(arg, loop_order), _) as rhs,
+                ):
+                    pass
+                case QueryInto(Table(lhs, lhs_idxs), _, Reorder(arg, loop_order)):
+                    rhs = stmt.as_query().rhs
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+            for node in PostOrderDFS(arg):
+                match node:
+                    case Table(tns, idxs) if tns == alias:
+                        visit_access(idxs, loop_order, rhs, lhs_idxs, False)
+            if lhs == alias:
+                visit_access(lhs_idxs, loop_order, rhs, lhs_idxs, True)
+            stats_interpreter(stmt)
+
+        visit_stmt(term)
+        return features
+
     def get_format_features(
         self,
         alias: Alias,
@@ -264,7 +339,9 @@ class FormatCostModel(CostModel, LoopOrderedForm):
         """Return the features at a zero-based depth with num_pos input positions.
 
         format_key selects a level option; None selects the element level at
-        the tensor's rank. term is the statement which writes alias.
+        the tensor's rank. term is the LoopOrderedForm program which reads and
+        writes alias. The features of a level are its level features, followed
+        by its access features.
         """
         stats = machine(alias)
         fields = stats.index_order
@@ -279,16 +356,23 @@ class FormatCostModel(CostModel, LoopOrderedForm):
             for key, format in self.formats.items()
         }
         element_features = np.zeros(len(self.element_coefficients))
+        access_features = self.get_access_features(alias, level, term, machine)
         if format_key is None:
             # The element level stores one value for each position.
-            element_features += self.get_level_features(
-                num_pos, 1, num_pos, val_size, pos_size
+            element_features += np.concatenate(
+                [
+                    self.get_level_features(num_pos, 1, num_pos, val_size, pos_size),
+                    access_features,
+                ]
             )
         else:
             n_l = stats.get_dim_size(fields[level])
             nnz_l = self.nnz_after(stats, machine.stats_factory, level)
-            features[format_key] += self.get_level_features(
-                num_pos, n_l, nnz_l, val_size, pos_size
+            features[format_key] += np.concatenate(
+                [
+                    self.get_level_features(num_pos, n_l, nnz_l, val_size, pos_size),
+                    access_features,
+                ]
             )
         return np.concatenate([*features.values(), element_features])
 
@@ -338,7 +422,7 @@ class FormatCostModel(CostModel, LoopOrderedForm):
                             num_pos = 1.0
                             for level, key in enumerate((*format_keys, None)):
                                 features += self.get_format_features(
-                                    lhs, level, num_pos, key, stmt, stats_interpreter
+                                    lhs, level, num_pos, key, term, stats_interpreter
                                 )
                                 if key is not None:
                                     n_l = lhs_stats.get_dim_size(

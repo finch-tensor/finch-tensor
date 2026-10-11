@@ -13,29 +13,36 @@ from finch.autoschedule.formatter.smart_formatter import (
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
-from finch.finch_logic import Alias, Field, Literal, Plan, Produces, Query, Table
+from finch.finch_logic import Alias, Field, Plan, Produces, Query, Table
 
 
 def get_stats(matrix, fields):
     factory = DCStatsFactory()
-    query = Query(Table(Alias("A"), fields), Table(Literal(fl.asarray(matrix)), fields))
-    machine = StatsMachine(factory, OrderedDict())
+    M = Alias("M")
+    query = Query(Table(Alias("A"), fields), Table(M, fields))
+    machine = StatsMachine(
+        factory, OrderedDict({M: factory(fl.asarray(matrix), fields)})
+    )
     stats = machine(query)
     return stats, query, machine
 
 
-def format_cost(cost_model, query, format_keys, factory):
+def format_cost(cost_model, query, format_keys, machine):
     prgm = Plan((query, Produces((query.lhs.tns,))))
+    M = query.rhs.tns
     return cost_model.predict_cost(
-        prgm, {query.lhs.tns: list(format_keys)}, {}, factory
+        prgm,
+        {query.lhs.tns: list(format_keys)},
+        {M: machine.bindings[M]},
+        machine.stats_factory,
     )
 
 
-def brute_force_best(cost_model, query, shape_type, factory, fill_value):
+def brute_force_best(cost_model, query, shape_type, machine, fill_value):
     best_cost = None
     best_keys: tuple[str, ...] = ()
     for format_keys in itertools.product(cost_model.formats, repeat=len(shape_type)):
-        cost = format_cost(cost_model, query, format_keys, factory)
+        cost = format_cost(cost_model, query, format_keys, machine)
         if best_cost is None or cost < best_cost:
             best_cost, best_keys = cost, format_keys
     lvl = fl.element(fill_value, fl.ftype(fill_value))
@@ -74,10 +81,9 @@ def test_search_and_brute(formatter_cls, matrix):
     shape_type = tuple(fl.ftype(np.intp) for _ in fields)
     formatter = formatter_cls()
     cost_model = formatter.cost_model
-    factory = machine.stats_factory
 
     brute_fmt = brute_force_best(
-        cost_model, query, shape_type, factory, stats.fill_value
+        cost_model, query, shape_type, machine, stats.fill_value
     )
 
     search_fmt = formatter.get_tensor_ftype(

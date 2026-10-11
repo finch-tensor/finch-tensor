@@ -189,20 +189,21 @@ class FDFormatter(SmartFormatter):
 
 
 # Level features are positions, slots, entries, position bytes, index bytes,
-# and value bytes.
+# value bytes, sequential reads, scatter reads, sequential writes, and scatter
+# writes.
 ITER_COST_MODEL = FormatCostModel(
     {
-        "dense": DenseLevelOption((0, 1, 0, 0, 0, 0)),
-        "sparse_hash": SparseHashLevelOption((1, 0, 1, 0, 0, 0)),
+        "dense": DenseLevelOption((0, 1, 0, 0, 0, 0, 0, 0, 0, 0)),
+        "sparse_hash": SparseHashLevelOption((1, 0, 1, 0, 0, 0, 0, 0, 0, 0)),
     },
-    (0, 0, 0, 0, 0, 0),
+    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
 )
 STORAGE_COST_MODEL = FormatCostModel(
     {
-        "dense": DenseLevelOption((0, 0, 0, 0, 0, 0)),
-        "sparse_hash": SparseHashLevelOption((0, 0, 0, 1, 1, 0)),
+        "dense": DenseLevelOption((0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+        "sparse_hash": SparseHashLevelOption((0, 0, 0, 1, 1, 0, 0, 0, 0, 0)),
     },
-    (0, 0, 0, 0, 0, 1),
+    (0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
 )
 
 
@@ -267,7 +268,7 @@ class CostFormatter(LogicFormatter):
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
-                            lhs, node, machine, fill_values[lhs], shape_type
+                            lhs, prgm, machine, fill_values[lhs], shape_type
                         )
                 case lgc.Produces():
                     return

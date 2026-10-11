@@ -12,6 +12,7 @@ from finch.autoschedule.formatter.smart_formatter import (
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
+    Aggregate,
     Alias,
     Field,
     Literal,
@@ -19,15 +20,19 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    Reorder,
     Table,
 )
 
 
 def _format_matrix(formatter, matrix, fill_value):
     i, j = Field("i"), Field("j")
-    A = Alias("A")
-    query = Query(Table(A, (i, j)), Table(Literal(fl.asarray(matrix)), (i, j)))
-    machine = StatsMachine(DCStatsFactory(), {})
+    A, M = Alias("A"), Alias("M")
+    stats_factory = DCStatsFactory()
+    query = Query(Table(A, (i, j)), Table(M, (i, j)))
+    machine = StatsMachine(
+        stats_factory, {M: stats_factory(fl.asarray(matrix), (i, j))}
+    )
     machine(query)
     shape_type = tuple(fl.ftype(np.intp) for _ in matrix.shape)
     return formatter.get_tensor_ftype(A, query, machine, fill_value, shape_type)
@@ -46,9 +51,17 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
         (
             Query(
                 Table(B, (i, j)),
-                MapJoin(
-                    Literal(ffuncs.add),
-                    (Table(A, (i, j)), Table(A, (i, j))),
+                Aggregate(
+                    Literal(ffuncs.overwrite),
+                    Literal(0.0),
+                    Reorder(
+                        MapJoin(
+                            Literal(ffuncs.add),
+                            (Table(A, (i, j)), Table(A, (i, j))),
+                        ),
+                        (i, j),
+                    ),
+                    (),
                 ),
             ),
             Produces((B,)),
@@ -145,3 +158,56 @@ def test_format_cost_uses_depth_and_input_positions(formatter_cls, expected):
         )
     ]
     np.testing.assert_allclose(costs, expected)
+
+
+def test_format_access_features_separate_sequential_and_scatter():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    X, Y, A, C = Alias("X"), Alias("Y"), Alias("A"), Alias("C")
+    stats_factory = DCStatsFactory()
+    ones = fl.asarray(np.ones((3, 3)))
+    machine = StatsMachine(
+        stats_factory,
+        {X: stats_factory(ones, (i, k)), Y: stats_factory(ones, (k, j))},
+    )
+    prgm = Plan(
+        (
+            # A[i, j] = sum_k X[i, k] * Y[k, j], looping over (i, k, j).
+            Query(
+                Table(A, (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0.0),
+                    Reorder(
+                        MapJoin(
+                            Literal(ffuncs.mul), (Table(X, (i, k)), Table(Y, (k, j)))
+                        ),
+                        (i, k, j),
+                    ),
+                    (k,),
+                ),
+            ),
+            # C[i, j] = A[i, j], looping over (i, j).
+            Query(
+                Table(C, (i, j)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0.0),
+                    Reorder(Table(A, (i, j)), (i, j)),
+                    (),
+                ),
+            ),
+            Produces((C,)),
+        )
+    )
+    machine(prgm)
+    model = StorageCostFormatter().cost_model
+
+    def accessed(level, key, block):
+        features = model.get_format_features(A, level, 1.0, key, prgm, machine)
+        return tuple(features[10 * block + 6 : 10 * block + 10] > 0)
+
+    # Reading A in loop order is sequential at every level. Writing A is
+    # sequential at i, but the k loop makes it scatter at j.
+    assert accessed(0, "dense", 0) == (True, False, True, False)
+    assert accessed(1, "dense", 0) == (True, False, False, True)
+    assert accessed(2, None, 2) == (True, False, False, True)
