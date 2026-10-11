@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from typing import cast
 
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
@@ -142,7 +143,8 @@ class NotationContext:
         can be updated with `op`."""
         stmts = self.freeze(var)
         self.modes[var] = ntn.Update(op)
-        return (*stmts, ntn.Declare(self.slots[var], init, op, ()))
+        shape = cast(tuple[ntn.NotationExpression, ...], self.shapes[var])
+        return (*stmts, ntn.Declare(self.slots[var], init, op, shape))
 
     def lower_init(self, init: lgc.LogicExpression) -> ntn.NotationExpression:
         """The value of `init`, a zero-dimensional expression. A fill expression

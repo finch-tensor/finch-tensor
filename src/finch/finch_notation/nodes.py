@@ -648,8 +648,8 @@ class Repack(NotationTree, NotationStatement):
 class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
-    with `op` in the current scope. A tensor with a dynamic fill takes `init` as
-    its fill.
+    with `op` in the current scope, resizing it to `shape`. A tensor with a
+    dynamic fill takes `init` as its fill.
     """
 
     tns: NotationExpression

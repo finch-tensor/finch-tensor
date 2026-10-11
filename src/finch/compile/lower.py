@@ -81,7 +81,8 @@ class FinchTensorFType(TensorFType[FT], ABC):
     @abstractmethod
     def lower_declare(self, ctx, tns, init, op, shape):
         """
-        Declare a tensor. A tensor with a dynamic fill takes `init` as its fill.
+        Resize a tensor to `shape` and initialize it. A tensor with a dynamic
+        fill takes `init` as its fill.
         """
 
     def lower_fill(self, ctx, obj):
@@ -648,9 +649,27 @@ class AssemblyContext(Context):
                         f"Declaring {tns} with {init} would change its static "
                         f"fill {fill.value!r}"
                     )
+                # Evaluate initializers and shapes before changing tensor fields.
                 init_e = self(init)
+                match init_e:
+                    case asm.Literal() | asm.Variable():
+                        pass
+                    case _:
+                        var = asm.Variable(self.freshen("init"), init_e.result_type)
+                        self.exec(asm.Assign(var, init_e))
+                        init_e = var
                 op_e = self(op)
-                shape_e = [self(s) for s in shape]
+                shape_e = []
+                for dim in shape:
+                    dim_e = self(dim)
+                    match dim_e:
+                        case asm.Literal() | asm.Variable():
+                            pass
+                        case _:
+                            var = asm.Variable(self.freshen("dim"), dim_e.result_type)
+                            self.exec(asm.Assign(var, dim_e))
+                            dim_e = var
+                    shape_e.append(dim_e)
                 return tns.result_type.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 self._freeze_tensor(tns.name, op)
