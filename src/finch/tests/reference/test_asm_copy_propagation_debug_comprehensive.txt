@@ -79,7 +79,7 @@ main_20: #succs=[main_20, main_21]
     [41] assert(lt(j_5, 2))
     [40] j: finch.int64 = j_5
     [18] b: finch.int64 = j
-    [19] result: finch.int64 = add(result, add(a, b)) 	# b = ('j', 40)
+    [19] result: finch.int64 = add(result, add(a, b)) 	# a = ('i', 39), b = ('j', 40)
     j_5: finch.int64 = add(j_5, 1)
 
 main_21: #succs=[main_18, main_19]
