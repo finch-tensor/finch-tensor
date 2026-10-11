@@ -6,9 +6,12 @@ from finch import ffuncs
 from finch.codegen import NumpyBuffer
 from finch.finch_assembly import (
     AssemblyCopyPropagation,
+    NumberedStatement,
     assembly_copy_propagation,
     assembly_dataflow_analyze,
+    get_vars_in_expr,
 )
+from finch.finch_assembly.dataflow import AbstractAssemblyDataflow
 from finch.symbolic import Namespace
 
 from .scripts.nodes import (
@@ -140,3 +143,95 @@ def test_asm_copy_propagation_generated_shapes():
         out = NumpyBuffer(np.zeros(3))
         assert asm.AssemblyInterpreter()(module).f(np.float64(3.0), out) == 12.0
         np.testing.assert_array_equal(out.arr, np.full(3, 12.0))
+
+
+def test_asm_copy_propagation_skips_dead_blocks():
+    """the dead block after an early return must not erase `b = a` at the join"""
+    a = asm.Variable("a", finch.int64)
+    b = asm.Variable("b", finch.int64)
+    func = asm.Variable("f", asm.AssemblyKernelFType("f", (finch.int64,), finch.int64))
+
+    def make_prgm(ret):
+        return asm.Module(
+            (
+                asm.Function(
+                    func,
+                    (a,),
+                    asm.Block(
+                        (
+                            asm.Assign(b, a),
+                            asm.If(
+                                asm.Call(
+                                    asm.Literal(ffuncs.lt),
+                                    (b, asm.Literal(np.int64(0))),
+                                ),
+                                asm.Block((asm.Return(asm.Literal(np.int64(0))),)),
+                            ),
+                            asm.Return(ret),
+                        )
+                    ),
+                ),
+            )
+        )
+
+    ctx, _ = assembly_dataflow_analyze(make_prgm(b), AssemblyCopyPropagation)
+    dead = {
+        block.id
+        for block in ctx.cfg.blocks.values()
+        if not block.predecessors and block is not ctx.cfg.entry_block
+    }
+    assert dead
+    assert not dead & ctx.reached
+    assert assembly_copy_propagation(make_prgm(b)) == make_prgm(a)
+
+
+class _VariablesReadLater(AbstractAssemblyDataflow):
+    """toy backward analysis: the variables read after each statement"""
+
+    def direction(self):
+        return "backward"
+
+    def transfer(self, stmts, state):
+        state = dict(state)
+        for stmt in reversed(stmts):
+            match stmt:
+                case NumberedStatement(asm.Assign(_, rhs), _) | asm.Assign(_, rhs):
+                    state.update(dict.fromkeys(get_vars_in_expr(rhs), True))
+                case NumberedStatement(stmt, _):
+                    state.update(dict.fromkeys(get_vars_in_expr(stmt), True))
+        return state
+
+    def join(self, state_1, state_2):
+        return state_1 | state_2
+
+    def get_lattice_value(self, state, stmt):
+        return [("read_later", sorted(state))] if state else []
+
+
+def test_backward_dataflow_printing():
+    """backward analyses annotate each statement with the state after it"""
+    a = asm.Variable("a", finch.int64)
+    b = asm.Variable("b", finch.int64)
+    c = asm.Variable("c", finch.int64)
+    func = asm.Variable("f", asm.AssemblyKernelFType("f", (finch.int64,), finch.int64))
+    prgm = asm.Module(
+        (
+            asm.Function(
+                func,
+                (a,),
+                asm.Block(
+                    (
+                        asm.Assign(b, a),
+                        asm.Assign(c, b),
+                        asm.Return(c),
+                    )
+                ),
+            ),
+        )
+    )
+    ctx, _ = assembly_dataflow_analyze(prgm, _VariablesReadLater)
+    states = {stmt.sid: sorted(state) for stmt, state in ctx.statement_states()}
+    assert states == {3: ["a", "b", "c"], 0: ["b", "c"], 1: ["c"], 2: []}
+    lines = [line.strip() for line in str(ctx).splitlines()]
+    assert "[0] b: finch.int64 = a \t# read_later = ['b', 'c']" in lines
+    assert "[2] return c" in lines
