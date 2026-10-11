@@ -90,6 +90,61 @@ class LoopCostModel(CostModel):
         )
         return float(np.dot(self.coefficients, features))
 
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, NumericStats],
+        stats_factory: StatsFactory[NumericStats],
+    ) -> np.ndarray:
+        stats = dict(stats)
+        features = np.zeros(len(self.coefficients))
+        stats_interpreter = StatsMachine(stats_factory, stats)
+
+        def visit_stmt(stmt: LogicStatement):
+            nonlocal features
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                    return
+                case QueryInto(Table(), _, Literal()):
+                    stats_interpreter(stmt)
+                    return
+                case Produces():
+                    return
+                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
+                    idxs = lhs_idxs
+                    out = rhs
+                case Query(
+                    Table(Alias() as lhs, lhs_idxs),
+                    Aggregate(_, _, Reorder(_, idxs) as rhs, _) as out,
+                ):
+                    pass
+                case QueryInto(
+                    Table(Alias() as lhs, lhs_idxs), _, Reorder(_, idxs) as rhs
+                ):
+                    out = stmt.as_query().rhs
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+            exec_space = stats_interpreter(rhs)
+            args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
+            for node in PostOrderDFS(rhs):
+                match node:
+                    case Table(_, arg_idxs):
+                        arg_stats = stats_interpreter(node)
+                        for idx in arg_idxs:
+                            args[idx].append(arg_stats)
+            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
+            stats[lhs] = out_space
+            for n in range(len(idxs) + 1):
+                features += self.get_prefix_features(
+                    idxs[:n], exec_space, out_space, args, stats_factory
+                )
+
+        visit_stmt(term)
+        return features
 
 class FlopsCostModel(CostModel, AliasedForm):
     """
@@ -243,61 +298,6 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
             ]
         )
 
-    def get_features(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NumericStats],
-        stats_factory: StatsFactory[NumericStats],
-    ) -> np.ndarray:
-        stats = dict(stats)
-        features = np.zeros(len(self.coefficients))
-        stats_interpreter = StatsMachine(stats_factory, stats)
-
-        def visit_stmt(stmt: LogicStatement):
-            nonlocal features
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body)
-                    return
-                case QueryInto(Table(), _, Literal()):
-                    stats_interpreter(stmt)
-                    return
-                case Produces():
-                    return
-                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
-                    idxs = lhs_idxs
-                    out = rhs
-                case Query(
-                    Table(Alias() as lhs, lhs_idxs),
-                    Aggregate(_, _, Reorder(_, idxs) as rhs, _) as out,
-                ):
-                    pass
-                case QueryInto(
-                    Table(Alias() as lhs, lhs_idxs), _, Reorder(_, idxs) as rhs
-                ):
-                    out = stmt.as_query().rhs
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-            exec_space = stats_interpreter(rhs)
-            args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
-            for node in PostOrderDFS(rhs):
-                match node:
-                    case Table(_, arg_idxs):
-                        arg_stats = stats_interpreter(node)
-                        for idx in arg_idxs:
-                            args[idx].append(arg_stats)
-            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
-            stats[lhs] = out_space
-            for n in range(len(idxs) + 1):
-                features += self.get_prefix_features(
-                    idxs[:n], exec_space, out_space, args, stats_factory
-                )
-
-        visit_stmt(term)
-        return features
 
 
 class TransposeCostModel(LoopCostModel, LoopOrderedForm):
@@ -340,61 +340,3 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
                 features[0 if dense else 1] += nnz
         return features
 
-    def get_features(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NumericStats],
-        stats_factory: StatsFactory[NumericStats],
-    ) -> np.ndarray:
-        stats = dict(stats)
-        features = np.zeros(len(self.coefficients))
-        stats_interpreter = StatsMachine(stats_factory, stats)
-
-        def visit_stmt(stmt: LogicStatement):
-            nonlocal features
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body)
-                    return
-                case QueryInto(Table(), _, Literal()):
-                    stats_interpreter(stmt)
-                    return
-                case Produces():
-                    return
-                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
-                    idxs = lhs_idxs
-                    out = rhs
-                case Query(
-                    Table(Alias() as lhs, lhs_idxs),
-                    Aggregate(_, _, Reorder(_, idxs) as rhs, _) as out,
-                ):
-                    pass
-                case QueryInto(
-                    Table(Alias() as lhs, lhs_idxs), _, Reorder(_, idxs) as rhs
-                ):
-                    out = stmt.as_query().rhs
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-            exec_space = stats_interpreter(rhs)
-            args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
-            table_stats: dict[Table, NumericStats] = {}
-            for node in PostOrderDFS(rhs):
-                match node:
-                    case Table(_, arg_idxs):
-                        if node not in table_stats:
-                            table_stats[node] = stats_interpreter(node)
-                        arg_stats = table_stats[node]
-                        for idx in arg_idxs:
-                            args[idx].append(arg_stats)
-            out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)
-            stats[lhs] = out_space
-            for n in range(len(idxs) + 1):
-                features += self.get_prefix_features(
-                    idxs[:n], exec_space, out_space, args, stats_factory
-                )
-
-        visit_stmt(term)
-        return features
