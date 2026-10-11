@@ -10,6 +10,7 @@ from .constant_propagation import (
 )
 from .dataflow import (
     AssemblyCopyPropagation,
+    AssemblyCopyPropagationTransform,
     assembly_copy_propagation,
     assembly_dataflow_analyze,
     assembly_dataflow_run,
@@ -73,6 +74,7 @@ __all__ = [
     "AssemblyConstantPropagation",
     "AssemblyConstantPropagationTransform",
     "AssemblyCopyPropagation",
+    "AssemblyCopyPropagationTransform",
     "AssemblyDeadCodeEliminationTransform",
     "AssemblyExpression",
     "AssemblyGlobalValueNumbering",

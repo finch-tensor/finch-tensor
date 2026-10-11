@@ -8,6 +8,10 @@ from finch.compile import NotationCompiler
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.julia import julia_available
 from finch.finch_assembly import (
+    AssemblyConstantPropagationTransform,
+    AssemblyCopyPropagationTransform,
+    AssemblyDeadCodeEliminationTransform,
+    AssemblyGlobalValueNumberingTransform,
     AssemblyInterpreter,
     AssemblySimplify,
     LowerPackedStructSlots,
@@ -27,6 +31,20 @@ from .factorizer.optimize import DefaultLogicFactorizer
 from .formatter import DefaultLogicFormatter, FDFormatter, GalleyFormatter
 from .loop_orderer import BFSLoopOrderer, DefaultLoopOrderer
 from .normalize import LogicNormalizer
+
+
+def assembly_transforms():
+    return (
+        LowerPackedStructSlots(),
+        AssemblySimplify(),
+        AssemblyGlobalValueNumberingTransform(),
+        AssemblyCopyPropagationTransform(),
+        AssemblyConstantPropagationTransform(),
+        AssemblyDeadCodeEliminationTransform(),
+        # removes the loops and ifs that dead code elimination emptied
+        AssemblySimplify(),
+    )
+
 
 INTERPRET_LOGIC = LogicInterpreter()
 OPTIMIZE_LOGIC = LogicNormalizer(
@@ -74,10 +92,7 @@ COMPILE_NUMBA = LogicNormalizer(
                             LogicCompiler(
                                 NotationCompiler(
                                     NumbaCompiler(),
-                                    ctx_transforms=(
-                                        LowerPackedStructSlots(),
-                                        AssemblySimplify(),
-                                    ),
+                                    ctx_transforms=assembly_transforms(),
                                 )
                             )
                         )
@@ -98,10 +113,7 @@ COMPILE_NUMBA_GALLEY = LogicNormalizer(
                             LogicCompiler(
                                 NotationCompiler(
                                     NumbaCompiler(),
-                                    ctx_transforms=(
-                                        LowerPackedStructSlots(),
-                                        AssemblySimplify(),
-                                    ),
+                                    ctx_transforms=assembly_transforms(),
                                 )
                             )
                         )
@@ -136,10 +148,7 @@ COMPILE_MLIR = LogicNormalizer(
                             LogicCompiler(
                                 NotationCompiler(
                                     MLIRCompiler(),
-                                    ctx_transforms=(
-                                        LowerPackedStructSlots(),
-                                        AssemblySimplify(),
-                                    ),
+                                    ctx_transforms=assembly_transforms(),
                                 )
                             )
                         )
