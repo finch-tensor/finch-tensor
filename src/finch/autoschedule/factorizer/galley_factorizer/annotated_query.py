@@ -30,6 +30,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
     TensorStats,
+    fill_expression,
 )
 from finch.symbolic import gensym
 from finch.tensor import Scalar
@@ -840,17 +841,9 @@ class AnnotatedQuery(Generic[TS]):
         """
         expr = self.point_expr
         if not isinstance(expr, Table):
-            match self.cache_point[expr].fill_type:
-                case StaticFillFType() as fill_type:
-                    init = Literal(fill_type.value)
-                case fill_type:
-                    init = Literal(fill_type)
-            expr = Aggregate(
-                Literal(ffuncs.overwrite),
-                init,
-                cast(LogicExpression, expr),
-                (),
-            )
+            arg = cast(LogicExpression, expr)
+            # The result starts from the fill value of what overwrites it.
+            expr = Aggregate(Literal(ffuncs.overwrite), fill_expression(arg), arg, ())
         return Query(
             Table(self.output_name, tuple(self.output_order)),
             cast(LogicExpression, expr),

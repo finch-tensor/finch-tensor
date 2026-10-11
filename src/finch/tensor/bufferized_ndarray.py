@@ -178,9 +178,15 @@ class BufferizedNDArray(OverrideTensor):
         Declare a bufferized NDArray with the given initialization value,
         operation, and shape.
         """
-        if is_dynamic(init):
-            # The value arrives at bind time: use this instance's fill.
-            init = self._fill_value.value
+        if is_dynamic(self._fill_value):
+            # Declaring a tensor sets its dynamic fill to the init.
+            init = self.val.ftype.element_type(init)
+            self._fill_value = DynamicFill(init, self.val.ftype.element_type)
+        elif not bool(ffuncs.same(init, self._fill_value.value)):
+            raise ValueError(
+                f"Declaring with {init!r} would change the static fill "
+                f"{self._fill_value.value!r}"
+            )
         for i in range(self.val.length()):
             self.val.store(i, init)
         return self
@@ -476,19 +482,23 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
     def lower_dim(self, ctx, obj, r):
         return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
 
+    def lower_fill(self, ctx, obj):
+        return self.lvl_t.lower_fill(ctx(obj.lvl))
+
     def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
+        root = ctx(tns.lvl.root)
+        if is_dynamic(self.fill_type):
+            # The init becomes the fill of the tensor.
+            if init.result_type != self.element_type:
+                init = asm.Call(asm.Literal(ffuncs.astype(self.element_type)), (init,))
+            ctx.exec(asm.SetAttr(root, asm.Literal("fill"), init))
+            init = asm.GetAttr(root, asm.Literal("fill"))
         i_var = asm.Variable("i", self.buf_t.length_type)
-        buf = asm.GetAttr(ctx(tns.lvl.root), asm.Literal("val"))
-        init_e: asm.AssemblyExpression = (
-            # The init value arrives at bind time through the fill field.
-            asm.GetAttr(ctx(tns.lvl.root), asm.Literal("fill"))
-            if is_dynamic(getattr(init, "val", None))
-            else asm.Literal(init.val)
-        )
+        buf = asm.GetAttr(root, asm.Literal("val"))
         body = asm.Store(
             buf,
             i_var,
-            init_e,
+            init,
         )
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
         return

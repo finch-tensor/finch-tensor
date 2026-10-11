@@ -25,6 +25,7 @@ from finch.finch_logic import (
     Reorder,
     StatsFactory,
     Table,
+    is_fill_expression,
 )
 from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
@@ -135,6 +136,9 @@ class StatsMachine(Generic[TS]):
                     return self.stats_factory.aggregate(
                         op, node.init.val, reduce_indices, arg2
                     )
+                if is_fill_expression(node.init):
+                    # The result starts from the background, as reductions do.
+                    return self.stats_factory.aggregate(op, None, reduce_indices, arg2)
                 # A tensor init is folded into the reduction of the argument.
                 reduced = self.stats_factory.aggregate(op, None, reduce_indices, arg2)
                 return self.stats_factory.reorder(

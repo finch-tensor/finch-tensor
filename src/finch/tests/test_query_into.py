@@ -151,7 +151,7 @@ def test_single_aggregate_form_rejects_tensor_init():
         )
     )
     ftypes = {var: tns.ftype for var, tns in bindings().items()}
-    with pytest.raises(ValueError, match="literal"):
+    with pytest.raises(ValueError, match="0-D expression"):
         SingleAggregateForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 

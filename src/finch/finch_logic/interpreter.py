@@ -26,6 +26,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Fuse,
     FusedAlias,
     HardAlias,
@@ -208,6 +209,9 @@ class LogicMachine:
                         result[*out_crds].item(), arg.tns[*arg_crds].item()
                     )
                 return TableValue(result, tuple(out_dims))
+            case FillTable(tns):
+                fill = self(tns).fill
+                return TableValue(Scalar(fill.value, fill), ())
             case Relabel(arg, idxs):
                 arg = self(arg)
                 if len(arg.idxs) != len(idxs):

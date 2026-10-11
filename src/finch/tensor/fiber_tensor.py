@@ -16,6 +16,7 @@ from finch.algebra import (
     as_fill,
     ftype,
     is_dynamic,
+    is_static,
     normalize_device,
     resolve_fill,
 )
@@ -421,6 +422,11 @@ class FiberTensorFType(FinchTensorFType, ImmutableStructFType):
 
     def lower_dim(self, ctx, obj, r):
         return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+
+    def lower_fill(self, ctx, obj):
+        if is_static(self.fill_type):
+            return asm.Literal(self.fill_type.value)
+        return self.lvl_t.lower_fill(ctx(obj.lvl))
 
     def from_fields(self, *args) -> FiberTensor:
         lvl, shape, pos = args

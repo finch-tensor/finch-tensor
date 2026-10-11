@@ -45,13 +45,19 @@ from finch.autoschedule import (
     LogicCompiler,
     LogicExecutor,
     LogicNormalizer,
+    NotationGenerator,
 )
 from finch.autoschedule.normalize import inline_constant_scalars
 from finch.finch_logic import (
+    Aggregate,
+    Field,
+    FillTable,
+    HardAlias,
     Literal,
     LogicLoader,
     MapJoin,
     Plan,
+    Produces,
     Query,
     Reorder,
     Table,
@@ -521,6 +527,40 @@ class _DynamicRejectingLoader(UnvalidatedForm, LogicLoader):
         if builtins.any(is_dynamic(t.fill_type) for t in bindings.values()):
             raise DynamicFillError("dynamic fills unsupported here")
         return self.ctx(prgm, bindings, stats, stats_factory)
+
+
+@pytest.mark.parametrize(
+    "loader",
+    [_numba_backend, NotationInterpreter],
+    ids=["compile_numba", "interpret_notation"],
+)
+def test_declare_sets_a_dynamic_fill(loader):
+    # A kernel computes the dynamic fill of its output from the fills of its
+    # inputs, rather than keeping the fill the output was constructed with.
+    i = Field("i")
+    A, C = HardAlias("A"), HardAlias("C")
+    one = Literal(np.float64(1.0))
+    arg = MapJoin(Literal(ffuncs.add), (Table(A, (i,)), one))
+    init = MapJoin(Literal(ffuncs.add), (FillTable(A), one))
+    plan = Plan(
+        (
+            Query(
+                Table(C, (i,)),
+                Aggregate(Literal(ffuncs.overwrite), init, Reorder(arg, (i,)), ()),
+            ),
+            Produces((C,)),
+        )
+    )
+    a = finch.BufferizedNDArray.from_numpy(
+        np.array([1.0, 2.0]), fill_value=DynamicFill(np.float64(2.0))
+    )
+    c = finch.BufferizedNDArray.from_numpy(
+        np.zeros(2), fill_value=DynamicFill(np.float64(0.0))
+    )
+    program = NotationGenerator()(plan, {A: a.ftype, C: c.ftype}, {}, None)
+    loader()(program).main(a, c)
+    assert c.fill_value == 3.0
+    np.testing.assert_array_equal(c.to_numpy(), [2.0, 3.0])
 
 
 def test_backend_refusal_propagates():

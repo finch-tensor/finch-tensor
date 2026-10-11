@@ -10,7 +10,6 @@ from finch.algebra import (
     FType,
     ffuncs,
     ftypes,
-    is_dynamic,
     is_static,
 )
 from finch.algebra.tensor import TensorFType
@@ -62,6 +61,8 @@ class PointwiseContext:
                 )
             case lgc.Literal(val):
                 return ntn.Literal(val)
+            case lgc.FillTable(lgc.Alias() as var):
+                return ntn.FillValue(self.ctx.slots[var.unfused])
             case lgc.Relabel(arg, idxs):
                 return self(
                     arg,
@@ -135,7 +136,7 @@ class NotationContext:
         return (*stmts, ntn.Thaw(self.slots[var], op))
 
     def declare(
-        self, var: lgc.Alias, init: ntn.Literal, op: ntn.Literal
+        self, var: lgc.Alias, init: ntn.NotationExpression, op: ntn.Literal
     ) -> tuple[ntn.NotationStatement, ...]:
         """Statements which reset `var` to `init`, leaving it thawed, so that it
         can be updated with `op`."""
@@ -143,9 +144,16 @@ class NotationContext:
         self.modes[var] = ntn.Update(op)
         return (*stmts, ntn.Declare(self.slots[var], init, op, ()))
 
-    def fill_literal(self, var: lgc.Alias) -> ntn.Literal:
-        fill = self.bindings[var].fill_type
-        return ntn.Literal(fill.value if is_static(fill) else fill)
+    def lower_init(self, init: lgc.LogicExpression) -> ntn.NotationExpression:
+        """The value of `init`, a zero-dimensional expression. A fill expression
+        whose fill is static is a literal, so that kernels may specialize on it."""
+        if lgc.is_fill_expression(init):
+            fill = init.fill_type(
+                {var: val.fill_type for var, val in self.bindings.items()}
+            )
+            if is_static(fill):
+                return ntn.Literal(fill.value)
+        return PointwiseContext(self)(init, {})
 
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""
@@ -169,7 +177,14 @@ class NotationContext:
             for dim in reduced
             if dim is not None
         )
-        init = self.fill_literal(var)
+        # An overwrite keeps the static fill of var, and otherwise gives var the
+        # fill of rhs.
+        fill = self.bindings[var].fill_type
+        init = (
+            ntn.Literal(fill.value)
+            if is_static(fill)
+            else self.lower_init(lgc.fill_expression(rhs))
+        )
         if not nonempty:
             return self.fold(var, idxs, ffuncs.overwrite, rhs, init)
         # Each branch must leave every tensor in the same mode.
@@ -186,7 +201,7 @@ class NotationContext:
         idxs: tuple[lgc.Field, ...],
         op: FinchOperator,
         rhs: lgc.Reorder,
-        init: ntn.Literal | None,
+        init: ntn.NotationExpression | None,
     ) -> ntn.NotationStatement:
         """Fold `rhs` into `var` with `op`, after resetting `var` to `init`
         unless it is None."""
@@ -195,8 +210,9 @@ class NotationContext:
             stmts += self.thaw(var, ntn.Literal(op))
         else:
             reduced = any(idx not in idxs for idx in rhs.fields())
-            if op == ffuncs.overwrite and not reduced and not is_dynamic(init.val):
-                op = ffuncs.init_write(init.val)
+            match init:
+                case ntn.Literal(val) if op == ffuncs.overwrite and not reduced:
+                    op = ffuncs.init_write(val)
             stmts += self.declare(var, init, ntn.Literal(op))
         match rhs:
             case lgc.Reorder(lgc.Table() as arg, loop_order):
@@ -343,7 +359,7 @@ class NotationContext:
                 stmts = (self(body) for body in bodies)
                 return ntn.Block(tuple(s for s in stmts if s != ntn.Block(())))
             case lgc.Query(lgc.Table(lgc.Alias() as lhs, idxs), lgc.Table() as arg):
-                # A copy starts from the fill value of lhs, and the fields of
+                # A copy starts from the fill value of arg, and the fields of
                 # arg which lhs lacks are reduced by overwriting.
                 loop_order = (*idxs, *(idx for idx in arg.idxs if idx not in idxs))
                 return self.fold(
@@ -351,22 +367,32 @@ class NotationContext:
                     idxs,
                     ffuncs.overwrite,
                     lgc.Reorder(arg, loop_order),
-                    self.fill_literal(lhs.unfused),
+                    self.lower_init(lgc.fill_expression(arg)),
                 )
             case lgc.Query(
                 lgc.Table(lgc.Alias() as lhs, idxs),
-                lgc.Aggregate(
-                    lgc.Literal(op), lgc.Literal(init), lgc.Reorder() as arg, _
-                ),
+                lgc.Aggregate(lgc.Literal(op), init, lgc.Reorder() as arg, _),
             ):
-                return self.fold(lhs.unfused, idxs, op, arg, ntn.Literal(init))
+                stmts = self.freeze_reads(init)
+                body = self.fold(lhs.unfused, idxs, op, arg, self.lower_init(init))
+                return ntn.Block((*stmts, body))
             case lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, _),
+                lgc.Table(lgc.Alias() as lhs, idxs),
                 lgc.Literal(ffuncs.overwrite),
                 lgc.Literal(init),
             ):
                 lhs = lhs.unfused
                 op = ntn.Literal(ffuncs.overwrite)
+                fill = self.bindings[lhs].fill_type
+                if is_static(fill) and not bool(ffuncs.same(init, fill.value)):
+                    # A static fill can't change, so lhs is declared with its
+                    # fill, and then every element is overwritten with init.
+                    stmts = self.declare(lhs, ntn.Literal(fill.value), op)
+                    arg = lgc.Reorder(lgc.Literal(init), idxs)
+                    body = self._lower_query_of_aggregate(
+                        lhs, ffuncs.overwrite, arg, idxs
+                    )
+                    return ntn.Block((*stmts, body))
                 return ntn.Block(self.declare(lhs, ntn.Literal(init), op))
             case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs),

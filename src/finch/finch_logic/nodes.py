@@ -12,9 +12,9 @@ from finch.algebra import (
     FinchOperator,
     FType,
     FTyped,
+    StaticFill,
     apply_fill,
     apply_fill_type,
-    as_fill,
     ffuncs,
     fixpoint_type,
     ftype,
@@ -59,60 +59,45 @@ def merge_element_type(op: FinchOperator, *args: FType) -> FType:
     return return_type(op.ftype, *args)
 
 
-def reduce_element_type(op: FinchOperator, z: Any, t: FType) -> FType:
-    match z:
-        case AbstractFillFType():
-            pass
-        case FType():
-            # An init table holds values of its element type.
-            z = DynamicFillFType(z)
-        case _:
-            z = as_fill(z).ftype
-    return fixpoint_type(op.ftype, z, t)
+def reduce_element_type(op: FinchOperator, z: FType, t: FType) -> FType:
+    # Only the element type of the init matters, not its value.
+    return fixpoint_type(op.ftype, DynamicFillFType(z), t)
 
 
-# Literals in a logic program may hold raw values, which are static fills, so
-# the fill inference below converts the values of literals as it meets them.
-
-
-def merge_fill_value(op: FinchOperator, *args) -> AbstractFill:
-    return apply_fill(op, *(as_fill(arg) for arg in args))
-
-
-def reduce_fill_value(op, z, t) -> AbstractFill:
-    t = as_fill(t)
+def reduce_fill_value(
+    op: FinchOperator, z: AbstractFill, t: AbstractFill
+) -> AbstractFill:
     # An overwrite reduction's background is the argument's background when
     # the init is not compile-time data.
     if is_dynamic(z) and op == ffuncs.overwrite:
         return t
-    match z:
-        case AbstractFillFType():
-            raise ValueError(f"The init {z} of a {op} reduction has no value")
-        case _:
-            # The init takes the element type of the reduction.
-            z = as_fill(z)
-            return z.astype(fixpoint_type(op.ftype, z.ftype, t.element_type))
+    # The init takes the element type of the reduction.
+    return z.astype(fixpoint_type(op.ftype, z.ftype, t.element_type))
 
 
-def _literal_fill_type(val: Any) -> AbstractFillFType:
-    match val:
-        case AbstractFillFType():
-            return val
-        case _:
-            return as_fill(val).ftype
-
-
-def merge_fill_type(op: FinchOperator, *args) -> AbstractFillFType:
-    return apply_fill_type(op, *(_literal_fill_type(arg) for arg in args))
-
-
-def reduce_fill_type(op, z, t) -> AbstractFillFType:
+def reduce_fill_type(
+    op: FinchOperator, z: AbstractFillFType, t: AbstractFillFType
+) -> AbstractFillFType:
     # Like `reduce_fill_value`, for the fills of formats.
-    z, t = _literal_fill_type(z), _literal_fill_type(t)
     if is_dynamic(z) and op == ffuncs.overwrite:
         return t
     # The init takes the element type of the reduction.
     return z.astype(fixpoint_type(op.ftype, z, t.element_type))
+
+
+# The values of literals for `valmap`, from their fill values.
+
+
+def literal_element_type(fill: AbstractFill) -> FType:
+    return fill.element_type
+
+
+def literal_fill_value(fill: AbstractFill) -> AbstractFill:
+    return fill
+
+
+def literal_fill_type(fill: AbstractFill) -> AbstractFillFType:
+    return fill.ftype
 
 
 """
@@ -251,11 +236,13 @@ class LogicExpression(LogicNode):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        """Compute per-tensor values. `f(op, args)` is used to combine values in
-        mapjoin, and `g(op, init, arg)` is used to combine values in
-        aggregation."""
+        """Compute per-tensor values. The value of an alias comes from
+        `bindings`, and the value of a literal is `h(fill)` of its fill value.
+        `f(op, args)` is used to combine values in mapjoin, and
+        `g(op, init, arg)` is used to combine values in aggregation."""
         ...
 
     def shape_type(
@@ -274,16 +261,18 @@ class LogicExpression(LogicNode):
 
     def element_type(self, bindings: dict[Alias, FType]) -> FType:
         """Returns element type of the node."""
-        return ftype(self.valmap(merge_element_type, reduce_element_type, bindings))
+        return self.valmap(
+            merge_element_type, reduce_element_type, literal_element_type, bindings
+        )
 
     def fill_value(self, bindings: dict[Alias, AbstractFill]) -> AbstractFill:
         """Returns fill value of the node."""
-        return as_fill(self.valmap(merge_fill_value, reduce_fill_value, bindings))
+        return self.valmap(apply_fill, reduce_fill_value, literal_fill_value, bindings)
 
     def fill_type(self, bindings: dict[Alias, AbstractFillFType]) -> AbstractFillFType:
         """Returns the fill of the node's format."""
-        return _literal_fill_type(
-            self.valmap(merge_fill_type, reduce_fill_type, bindings)
+        return self.valmap(
+            apply_fill_type, reduce_fill_type, literal_fill_type, bindings
         )
 
 
@@ -312,6 +301,7 @@ class LogicStatement(LogicNode):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
@@ -337,18 +327,18 @@ class LogicStatement(LogicNode):
     def infer_element_type(self, bindings: dict[Alias, FType]) -> dict[Alias, FType]:
         """Infers element types for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.infer_valmap(merge_element_type, reduce_element_type, bindings)
+        return self.infer_valmap(
+            merge_element_type, reduce_element_type, literal_element_type, bindings
+        )
 
     def infer_fill_value(
         self, bindings: dict[Alias, AbstractFill]
     ) -> dict[Alias, AbstractFill]:
         """Infers fill_values for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        self.infer_valmap(merge_fill_value, reduce_fill_value, bindings)
-        # A query of a bare literal leaves its raw value.
-        for var, fill in bindings.items():
-            bindings[var] = as_fill(fill)
-        return bindings
+        return self.infer_valmap(
+            apply_fill, reduce_fill_value, literal_fill_value, bindings
+        )
 
     def infer_fill_type(
         self, bindings: dict[Alias, AbstractFillFType]
@@ -356,11 +346,9 @@ class LogicStatement(LogicNode):
         """Infers the fills of the formats of all aliases defined in the
         statement. The results will be stored in the dictionary passed to the
         method."""
-        self.infer_valmap(merge_fill_type, reduce_fill_type, bindings)
-        # A query of a bare literal leaves its raw value.
-        for var, fill_type in bindings.items():
-            bindings[var] = _literal_fill_type(fill_type)
-        return bindings
+        return self.infer_valmap(
+            apply_fill_type, reduce_fill_type, literal_fill_type, bindings
+        )
 
 
 @dataclass(eq=True, frozen=True)
@@ -417,9 +405,11 @@ class Literal(LogicExpression, LiteralTerm, ExpressionTerm):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.val
+        # A literal is a scalar, so its fill value is itself.
+        return h(StaticFill(self.val))
 
 
 @dataclass(eq=True, frozen=True)
@@ -488,6 +478,7 @@ class Alias(LogicNode, NamedTerm):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
         if bindings is None or self.unfused not in bindings:
@@ -578,11 +569,12 @@ class Table(LogicTree, LogicExpression):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
         match self.tns:
             case Alias():
-                return self.tns.valmap(f, g, bindings)
+                return self.tns.valmap(f, g, h, bindings)
         raise NotImplementedError("Cannot resolve value of Tables")
 
     @classmethod
@@ -636,9 +628,10 @@ class MapJoin(LogicTree, LogicExpression, CallTerm):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return f(self.op.val, *[arg.valmap(f, g, bindings) for arg in self.args])
+        return f(self.op.val, *[arg.valmap(f, g, h, bindings) for arg in self.args])
 
     @classmethod
     def from_children(cls, op, *args):
@@ -700,12 +693,13 @@ class Aggregate(LogicTree, LogicExpression):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
         return g(
             self.op.val,
-            self.init.valmap(f, g, bindings),
-            self.arg.valmap(f, g, bindings),
+            self.init.valmap(f, g, h, bindings),
+            self.arg.valmap(f, g, h, bindings),
         )
 
     @classmethod
@@ -753,9 +747,10 @@ class Reorder(LogicTree, LogicExpression):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.arg.valmap(f, g, bindings)
+        return self.arg.valmap(f, g, h, bindings)
 
     @classmethod
     def from_children(cls, arg, *idxs):
@@ -789,9 +784,10 @@ class Relabel(LogicTree, LogicExpression):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        return self.arg.valmap(f, g, bindings)
+        return self.arg.valmap(f, g, h, bindings)
 
     @property
     def children(self):
@@ -801,6 +797,81 @@ class Relabel(LogicTree, LogicExpression):
     @classmethod
     def from_children(cls, arg, *idxs):
         return cls(arg, idxs)
+
+
+@dataclass(eq=True, frozen=True)
+class FillTable(LogicTree, LogicExpression):
+    """
+    Represents a logical AST expression for the fill value of the tensor `tns`,
+    as a zero-dimensional tensor. Like a literal, it has no fields, but its
+    value is only known once `tns` is bound.
+
+    Attributes:
+        tns: The alias of the tensor whose fill value is taken.
+    """
+
+    tns: Alias
+
+    def fields(self) -> tuple[Field, ...]:
+        """Returns fields of the node."""
+        return ()
+
+    def dimmap(
+        self, op: Callable, dim_bindings: dict[Alias, tuple[T | None, ...]]
+    ) -> tuple[T | None, ...]:
+        return ()
+
+    def valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        h: Callable,
+        bindings: dict[Alias, T],
+    ) -> T:
+        # The fill value of a tensor has the element type, fill value and fill
+        # format of the tensor.
+        return self.tns.valmap(f, g, h, bindings)
+
+    @property
+    def children(self):
+        """Returns the children of the node."""
+        return [self.tns]
+
+    @classmethod
+    def from_children(cls, tns):
+        return cls(tns)
+
+
+def fill_expression(ex: LogicExpression) -> LogicExpression:
+    """
+    A zero-dimensional expression for the fill value of `ex`, made of the fill
+    values of the tensors which `ex` reads.
+    """
+    match ex:
+        case Table(Alias() as tns, _):
+            return FillTable(tns)
+        case Table(Literal(tns), _):
+            # The fill value of a literal tensor is compile-time data too.
+            return Literal(tns.fill_value)
+        case Literal() | FillTable():
+            return ex
+        case MapJoin(op, args):
+            return MapJoin(op, tuple(fill_expression(arg) for arg in args))
+        case Reorder(arg, _) | Relabel(arg, _):
+            return fill_expression(arg)
+        case _:
+            raise NotImplementedError(f"No fill expression for {ex}")
+
+
+def is_fill_expression(ex: LogicNode) -> bool:
+    """Whether `ex` is made of literals and fill values, as `fill_expression`."""
+    match ex:
+        case Literal() | FillTable():
+            return True
+        case MapJoin(Literal(), args):
+            return all(is_fill_expression(arg) for arg in args)
+        case _:
+            return False
 
 
 @dataclass(eq=True, frozen=True)
@@ -848,6 +919,7 @@ class Query(LogicTree, LogicStatement):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
@@ -856,13 +928,13 @@ class Query(LogicTree, LogicStatement):
         assert isinstance(var, Alias)
         var = var.unfused
         if var in bindings:
-            val = self.rhs.valmap(f, g, bindings)
+            val = self.rhs.valmap(f, g, h, bindings)
             prev = bindings[var]
             # A dynamic value is compatible with any value of its dtype.
             if not (is_dynamic(val) or is_dynamic(prev)) and val != prev:
                 raise ValueError(f"Cannot rebind alias {var} to a different values")
         else:
-            bindings[var] = self.rhs.valmap(f, g, bindings)
+            bindings[var] = self.rhs.valmap(f, g, h, bindings)
         return bindings
 
 
@@ -910,11 +982,12 @@ class QueryInto(LogicTree, LogicStatement):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.as_query().infer_valmap(f, g, bindings)
+        return self.as_query().infer_valmap(f, g, h, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -946,9 +1019,10 @@ class Fuse(LogicTree, LogicStatement):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
-        return self.body.infer_valmap(f, g, bindings)
+        return self.body.infer_valmap(f, g, h, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -985,6 +1059,7 @@ class Produces(LogicTree, LogicStatement):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
@@ -1019,12 +1094,13 @@ class Plan(LogicTree, LogicStatement):
         self,
         f: Callable,
         g: Callable,
+        h: Callable,
         bindings: dict[Alias, T],
     ) -> dict[Alias, T]:
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         for body in self.bodies:
-            body.infer_valmap(f, g, bindings)
+            body.infer_valmap(f, g, h, bindings)
         return bindings
 
     @property
@@ -1096,6 +1172,8 @@ class LogicPrinterContext(Context):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Relabel({arg}, {idxs_e})"
+            case FillTable(tns):
+                return f"FillTable({self(tns)})"
             case Reorder(arg, idxs):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)

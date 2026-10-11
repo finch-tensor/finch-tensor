@@ -8,6 +8,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Fuse,
     FusedAlias,
     HardAlias,
@@ -27,6 +28,8 @@ from .nodes import (
     TableValue,
     TableValueFType,
     Value,
+    fill_expression,
+    is_fill_expression,
 )
 from .simplification import LogicSimplify
 from .stages import (
@@ -40,6 +43,7 @@ __all__ = [
     "Aggregate",
     "Alias",
     "Field",
+    "FillTable",
     "Fuse",
     "FusedAlias",
     "HardAlias",
@@ -69,4 +73,6 @@ __all__ = [
     "TensorStats",
     "Value",
     "compute_shape_vars",
+    "fill_expression",
+    "is_fill_expression",
 ]

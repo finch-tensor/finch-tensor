@@ -63,11 +63,10 @@ def copy_program(
         stmts.append(
             ntn.Declare(
                 dst_slot,
-                ntn.Literal(
-                    target.ftype.fill_type
-                    if is_dynamic(target.ftype.fill_type)
-                    else target.fill_value
-                ),
+                # A static fill can't change, so it is declared with itself.
+                ntn.FillValue(dst_slot)
+                if is_dynamic(target.ftype.fill_type)
+                else ntn.Literal(target.fill_value),
                 op,
                 tuple(ntn.Literal(dim) for dim in target.shape),
             )

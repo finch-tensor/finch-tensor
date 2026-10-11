@@ -219,7 +219,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         fill_type = d.fill_type
         if init is not None:
             # The init comes from a literal in the logic program.
-            new_fill = reduce_fill_type(op, init, fill_type)
+            new_fill = reduce_fill_type(op, StaticFillFType(init), fill_type)
         elif is_static(fill_type):
             old_fill = fill_type.value
             if is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):

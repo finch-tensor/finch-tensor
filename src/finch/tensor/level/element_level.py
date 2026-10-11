@@ -159,15 +159,16 @@ class ElementLevelFType(LevelFType, MutableStructFType):
         return ElementLevel(_format=self, _val=val, _fill=fill)
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        if is_dynamic(self.fill_type):
+            # The init becomes the fill of the tensor.
+            elem_t = self.fill_type.element_type
+            if init.result_type != elem_t:
+                init = asm.Call(asm.Literal(ffuncs.astype(elem_t)), (init,))
+            ctx.exec(asm.SetAttr(tns, asm.Literal("fill"), init))
+            init = asm.GetAttr(tns, asm.Literal("fill"))
         buf = asm.GetAttr(tns, asm.Literal("val"))
         i_var = asm.Variable("i", self.buffer_type.length_type)
-        init_e: asm.AssemblyExpression = (
-            # The init value arrives at bind time through the fill field.
-            asm.GetAttr(tns, asm.Literal("fill"))
-            if is_dynamic(getattr(init, "val", None))
-            else asm.Literal(init.val)
-        )
-        body = asm.Store(buf, i_var, init_e)
+        body = asm.Store(buf, i_var, init)
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))
 
     def level_lower_unwrap(self, ctx, obj, pos):

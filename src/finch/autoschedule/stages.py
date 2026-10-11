@@ -13,6 +13,7 @@ from finch.finch_logic import (
     FusedAlias,
     HardAlias,
     Literal,
+    LogicExpression,
     LogicStatement,
     LogicTree,
     MapJoin,
@@ -82,6 +83,13 @@ class AliasedForm(Form):
         validate(term)
 
 
+def _is_init(init: LogicExpression) -> bool:
+    # The init of an aggregate is a 0-D expression without aggregates or reorders.
+    return init.fields() == () and not any(
+        isinstance(node, Aggregate | Reorder) for node in PostOrderDFS(init)
+    )
+
+
 class SingleAggregateForm(AliasedForm):
     """
     SingleAggregateForm assumes that the fusion strategy has
@@ -89,7 +97,8 @@ class SingleAggregateForm(AliasedForm):
     1) transpose queries
         Query(Table(_, output_order), Table(_, _))
     2) aggregate queries
-        Query(Table(_, output_order), Aggregate(_, Literal(), arg, _))
+        Query(Table(_, output_order), Aggregate(_, init, arg, _))
+    (init is a 0-D expression without aggregates or reorders.)
     3) in-place queries
         QueryInto(Table(_, output_order), op, arg)
     (Here, arg has no aggregates. The fields of arg which are not in
@@ -117,11 +126,12 @@ class SingleAggregateForm(AliasedForm):
                         validate(body, True)
                 case Query(Table(), Table()):
                     return None
-                case Query(Table(), Aggregate(_, Literal(), arg, _)):
+                case Query(Table(), Aggregate(_, init, arg, _)) if _is_init(init):
                     return validate(arg, False)
                 case Query(Table(), Aggregate(_, init, _, _)):
                     raise ValueError(
-                        f"Aggregate queries must start from a literal, not {init}. "
+                        f"Aggregate queries must start from a 0-D expression "
+                        f"without aggregates or reorders, not {init}. "
                         "Copy the init into the output and update it with a "
                         "QueryInto instead."
                     )
@@ -280,8 +290,9 @@ class CompilerForm(FormattedForm):
     lhs_idxs are reduced by overwriting.)
     2) reductions
         Query(Table(lhs, lhs_idxs),
-              Aggregate(op, Literal(init), Reorder(arg, loop_order), _))
-    (lhs is reset to init, and arg is folded into it with op.)
+              Aggregate(op, init, Reorder(arg, loop_order), _))
+    (lhs is reset to init, a 0-D expression without aggregates or reorders,
+    and arg is folded into it with op.)
     There are two valid kinds of update:
     1) initializations
         QueryInto(Table(lhs, _), overwrite, Literal(init))
@@ -332,17 +343,18 @@ class CompilerForm(FormattedForm):
                     f"{type(body).__name__} can't both read and write {lhs}."
                 )
             match body:
-                case Query(_, Aggregate(_, Literal(), Reorder(arg, loop_order), _)) | (
+                case Query(_, Aggregate(_, init, _, _)) if not _is_init(init):
+                    raise ValueError(
+                        f"The init of an aggregate into {lhs} must be a 0-D "
+                        "expression without aggregates or reorders."
+                    )
+                case Query(_, Aggregate(_, _, Reorder(arg, loop_order), _)) | (
                     QueryInto(_, _, Reorder(arg, loop_order))
                 ):
                     if len(set(loop_order)) != len(loop_order):
                         raise ValueError("Loop order must not repeat fields.")
                     if not set(arg.fields()).issubset(loop_order):
                         raise ValueError("Loop order must include every RHS field.")
-                case Query(_, Aggregate()):
-                    raise ValueError(
-                        f"The init of an aggregate into {lhs} must be a literal."
-                    )
                 case QueryInto(_, Literal(op), Literal()) if op != ffuncs.overwrite:
                     raise ValueError(f"Initializing {lhs} must overwrite it, not {op}.")
 

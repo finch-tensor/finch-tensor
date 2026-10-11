@@ -387,9 +387,10 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
-    which argument positions carried a Dynamic fill. This is a necessary but
-    potentially unsound rewrite which should be removed eventually.
+    """Rewrite every Dynamic fill in `func`, and every read of one, to a zero of
+    its dtype, and report which argument positions carried a Dynamic fill. This
+    is a necessary but potentially unsound rewrite which should be removed
+    eventually.
     """
     dynamic_args = tuple(
         i
@@ -403,6 +404,12 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
                 return ntn.Literal(fill.element_type(0))
             case ntn.Literal(StaticFill() | StaticFillFType() as fill):
                 return ntn.Literal(fill.value)
+            case ntn.FillValue(tns):
+                match tns.result_type.fill_type:
+                    case DynamicFillFType() as fill:
+                        return ntn.Literal(fill.element_type(0))
+                    case StaticFillFType() as fill:
+                        return ntn.Literal(fill.value)
         return None
 
     return Rewrite(PostWalk(rule))(func), dynamic_args

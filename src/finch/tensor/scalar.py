@@ -18,6 +18,7 @@ from finch.algebra import (
     ffuncs,
     ftype,
     is_dynamic,
+    is_static,
     normalize_device,
     resolve_fill,
 )
@@ -107,6 +108,12 @@ class ScalarFType(TensorFType, ImmutableStructFType):
             # A dynamic-fill ftype accepts any fill value of matching dtype.
             other_t = other_t.with_fill(self._fill_type)
         return other_t == self
+
+    def lower_fill(self, ctx, obj):
+        if is_static(self._fill_type):
+            return asm.Literal(self._fill_type.value)
+        # The dynamic fill of a scalar is its value.
+        return self.lower_unwrap(ctx, obj)
 
     def lower_unwrap(self, ctx, obj):
         match obj:

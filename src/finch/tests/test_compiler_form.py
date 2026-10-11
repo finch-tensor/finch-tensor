@@ -135,6 +135,8 @@ def test_changing_op_refreezes_and_thaws():
         )
     )
     binds = bindings()
+    # A declaration can't change a static fill, so C starts from the init.
+    binds[C] = BufferizedNDArray.from_numpy(np.zeros(2), fill_value=1.0)
     program = lower(plan, binds)
     assert lifecycle(program) == [
         ("C", "Declare", ffuncs.add),

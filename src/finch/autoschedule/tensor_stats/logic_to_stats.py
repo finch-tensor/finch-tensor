@@ -15,6 +15,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
     TensorStats,
+    is_fill_expression,
 )
 from finch.tensor import Scalar
 
@@ -72,6 +73,9 @@ def insert_statistics(
                 st = stats_factory.aggregate(
                     op, node.init.val, tuple(reduce_indices), arg
                 )
+            elif is_fill_expression(node.init):
+                # The result starts from the background, as reductions do.
+                st = stats_factory.aggregate(op, None, tuple(reduce_indices), arg)
             else:
                 # A tensor init is folded into the reduction of the argument.
                 init = insert_statistics(
