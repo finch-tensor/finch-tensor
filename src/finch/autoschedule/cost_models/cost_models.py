@@ -302,8 +302,7 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
 
 class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     """
-    PigeonCostModel counts iteration, operation, and output costs across loop
-    prefixes. Writes are weighted 10x reads and operations.
+    Count dense and sparse transposed entries, charging each input once per query.
     """
 
     def __init__(self):
@@ -311,7 +310,7 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
 
     @property
     def coefficients(self) -> np.ndarray:
-        return np.array([1.0, 1.0, 10.0])
+        return np.array([0.5, 60.0])
 
     def get_prefix_features(
         self,
@@ -321,50 +320,25 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
         args: Mapping[Field, Sequence[NS]],
         stats_factory: StatsFactory[NS],
     ) -> np.ndarray:
-        """Return the incremental features for an outermost-first loop prefix.
+        """Charge only the input transpositions newly forced by this prefix.
 
-        The statistics are unprojected: exec_space describes the query's RHS,
-        out_space describes its output in lhs order, and args groups input Table
-        occurrences by field. They can be reused across candidate prefixes.
-
-        A nonempty prefix charges its last index, projecting execution and
-        output onto prefix[:-1], as in the inside-out calculation. The empty
-        prefix charges the output's non-fill values once. Summing all prefixes,
-        including the empty one, gives the query's features.
+        Repeated occurrences of an input share the same statistics object in
+        args. Comparing with the parent prefix avoids charging it again at
+        deeper loop levels. Empty prefixes have no transposition cost.
         """
+        features = np.zeros(len(self.coefficients))
         if not prefix:
-            return np.array([0.0, 0.0, out_space.estimate_non_fill_values()])
+            return features
 
-        def support(stat: NS) -> NS:
-            stat = stats_factory.copy(stat)
-            stat.fill_value = StaticFill(False)
-            return stat
-
-        def project(stat: NS) -> NS:
-            reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
-            return stats_factory.aggregate(
-                ffuncs.or_, False, reduce_idxs, support(stat)
-            )
-
-        parent = set(prefix[:-1])
-        idx = prefix[-1]
-        exec_space = project(exec_space)
-        inputs = [support(stat) for stat in args.get(idx, ())]
-        iter_space = exec_space
-        if inputs:
-            iter_space = stats_factory.mapjoin(
-                ffuncs.and_, exec_space, stats_factory.mapjoin(ffuncs.or_, *inputs)
-            )
-        out_cost = 0.0
-        if idx in out_space.index_order:
-            out_cost = project(out_space).estimate_non_fill_values()
-        return np.array(
-            [
-                iter_space.estimate_non_fill_values(),
-                exec_space.estimate_non_fill_values() * len(inputs),
-                out_cost,
-            ]
-        )
+        for stat in set(args.get(prefix[-1], ())):
+            order = stat.index_order
+            parent = tuple(idx for idx in prefix[:-1] if idx in order)
+            if parent == order[: len(parent)] and prefix[-1] != order[len(parent)]:
+                nnz = stat.estimate_non_fill_values()
+                space = stat.get_dim_space_size(order)
+                dense = 0 < space < float("inf") and nnz / space > 0.1
+                features[0 if dense else 1] += nnz
+        return features
 
     def get_features(
         self,
@@ -406,10 +380,13 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
 
             exec_space = stats_interpreter(rhs)
             args: dict[Field, list[NumericStats]] = {idx: [] for idx in idxs}
+            table_stats: dict[Table, NumericStats] = {}
             for node in PostOrderDFS(rhs):
                 match node:
                     case Table(_, arg_idxs):
-                        arg_stats = stats_interpreter(node)
+                        if node not in table_stats:
+                            table_stats[node] = stats_interpreter(node)
+                        arg_stats = table_stats[node]
                         for idx in arg_idxs:
                             args[idx].append(arg_stats)
             out_space = stats_factory.reorder(stats_interpreter(out), lhs_idxs)

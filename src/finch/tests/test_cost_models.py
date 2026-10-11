@@ -6,7 +6,7 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule.cost_models import PigeonCostModel
+from finch.autoschedule.cost_models import PigeonCostModel, TransposeCostModel
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
@@ -212,3 +212,113 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     np.testing.assert_array_equal(
         model.get_prefix_features((i,), broadcast, broadcast, {}, sf), [1, 0, 1]
     )
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+@pytest.mark.parametrize("sparse", [False, True])
+@pytest.mark.parametrize("transpose", [False, True])
+@pytest.mark.parametrize("inplace", [False, True])
+def test_transpose_cost_model_queries(factory, sparse, transpose, inplace):
+    sf = factory()
+    model = TransposeCostModel()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    tensor = fl.asarray(np.eye(16) if sparse else np.ones((16, 16)))
+    stats = {a: sf(tensor, (i, j))}
+    bindings = {a: tensor.ftype}
+    order = (j, i) if transpose else (i, j)
+    table = Table(a, (i, j))
+    if inplace:
+        output = fl.asarray(np.zeros((16, 16)))
+        stats[out] = sf(output, order)
+        bindings[out] = output.ftype
+        query = QueryInto(Table(out, order), Literal(ffuncs.add), Reorder(table, order))
+    else:
+        query = Query(Table(out, order), table)
+    plan = Plan((query, Produces((out,))))
+    original_stats = dict(stats)
+    expected = (16 * 60 if sparse else 256 * 0.5) if transpose else 0
+    expected_features = ([0, 16] if sparse else [256, 0]) if transpose else [0, 0]
+
+    model.validate_inputs(plan, bindings, stats, sf)
+    np.testing.assert_array_equal(
+        model.get_features(plan, bindings, stats, sf), expected_features
+    )
+    assert model.predict_cost(plan, bindings, stats, sf) == expected
+    assert stats == original_stats
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+def test_transpose_prefix_costs_charge_each_input_once(factory):
+    sf = factory()
+    model = TransposeCostModel()
+    i, j, k = (Field(name) for name in "ijk")
+    a, b, out = (Alias(name) for name in ("a", "b", "out"))
+    stats = {
+        a: sf(fl.asarray(np.ones((2, 3))), (i, j)),
+        b: sf(fl.asarray(np.ones((3, 4))), (j, k)),
+    }
+    a_table, b_table = Table(a, (i, j)), Table(b, (j, k))
+    arg = MapJoin(Literal(ffuncs.mul), (a_table, a_table, b_table))
+    exec_space = StatsMachine(sf, dict(stats))(arg)
+    out_space = sf.aggregate(ffuncs.add, 0.0, (i, j, k), exec_space)
+    args = {i: [stats[a], stats[a]], j: [stats[a], stats[a], stats[b]], k: [stats[b]]}
+    original_fills = [stat.fill_value for stat in stats.values()]
+
+    for order in itertools.permutations((i, j, k)):
+        expected = (3 if order.index(j) < order.index(i) else 0) + (
+            6 if order.index(k) < order.index(j) else 0
+        )
+        cost = sum(
+            model.predict_prefix_cost(order[:n], exec_space, out_space, args, sf)
+            for n in range(len(order) + 1)
+        )
+        query = Query(
+            Table(out, ()),
+            Aggregate(
+                Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (i, j, k)
+            ),
+        )
+
+        assert cost == expected
+        assert model.predict_cost(query, {}, stats, sf) == expected
+
+    assert all(
+        stat.fill_value is fill
+        for stat, fill in zip(stats.values(), original_fills, strict=True)
+    )
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+def test_transpose_cost_model_dependent_queries(factory):
+    sf = factory()
+    model = TransposeCostModel()
+    i, j = Field("i"), Field("j")
+    a, b, c, reduced = (Alias(name) for name in ("a", "b", "c", "reduced"))
+    tensor = fl.asarray(np.ones((2, 3)))
+    stats = {a: sf(tensor, (i, j))}
+    bindings = {a: tensor.ftype}
+    plan = Plan(
+        (
+            Query(Table(b, (j, i)), Table(a, (i, j))),
+            Query(
+                Table(reduced, (j,)),
+                Aggregate(
+                    Literal(ffuncs.add),
+                    Literal(0.0),
+                    Reorder(Table(b, (j, i)), (j, i)),
+                    (i,),
+                ),
+            ),
+            Query(Table(c, (i, j)), Table(b, (j, i))),
+            QueryInto(Table(c, (i, j)), Literal(ffuncs.overwrite), Literal(0.0)),
+            Produces((c, reduced)),
+        )
+    )
+
+    model.validate_inputs(plan, bindings, stats, sf)
+    np.testing.assert_array_equal(
+        model.get_features(plan, bindings, stats, sf), [12, 0]
+    )
+    assert model.predict_cost(plan, bindings, stats, sf) == 6
+    assert set(stats) == {a}
