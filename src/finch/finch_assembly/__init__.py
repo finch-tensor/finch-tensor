@@ -45,6 +45,7 @@ from .nodes import (
     WhileLoop,
 )
 from .parser import parse_assembly
+from .reaching_definitions import AssemblyReachingDefinitions
 from .simplification import AssemblySimplify
 from .stages import (
     AssemblyKernel,
@@ -70,6 +71,7 @@ __all__ = [
     "AssemblyLibrary",
     "AssemblyLoader",
     "AssemblyNode",
+    "AssemblyReachingDefinitions",
     "AssemblySimplify",
     "AssemblyTransform",
     "AssemblyTypeChecker",
