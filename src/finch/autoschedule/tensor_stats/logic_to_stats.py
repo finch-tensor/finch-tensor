@@ -6,6 +6,7 @@ from typing import TypeVar
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Literal,
     LogicNode,
     MapJoin,
@@ -18,6 +19,8 @@ from finch.finch_logic import (
     is_fill_expression,
 )
 from finch.tensor import Scalar
+
+from .util import fill_statistics
 
 TS = TypeVar("TS", bound=TensorStats)
 
@@ -109,6 +112,14 @@ def insert_statistics(
             if (node not in cache) or replace:
                 cache[node] = tensor
             return cache[node]
+
+        case FillTable(tns):
+            base = bindings.get(tns)
+            if base is None:
+                raise ValueError(f"No TensorStats bound to alias {tns}")
+            st = fill_statistics(stats_factory, base.fill_type)
+            cache[node] = st
+            return st
 
         case Literal(val):
             # A literal is a zero-dimensional constant, so its statistics are

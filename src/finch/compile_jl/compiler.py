@@ -24,6 +24,7 @@ from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
     _julia_literal,
     _leaf_type_str,
+    _zero_value,
     ftype_to_jl_constructor_str,
     ftype_to_jl_type_str,
 )
@@ -401,13 +402,13 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
     def rule(node):
         match node:
             case ntn.Literal(DynamicFill() | DynamicFillFType() as fill):
-                return ntn.Literal(fill.element_type(0))
+                return ntn.Literal(_zero_value(fill.element_type))
             case ntn.Literal(StaticFill() | StaticFillFType() as fill):
                 return ntn.Literal(fill.value)
             case ntn.FillValue(tns):
                 match tns.result_type.fill_type:
                     case DynamicFillFType() as fill:
-                        return ntn.Literal(fill.element_type(0))
+                        return ntn.Literal(_zero_value(fill.element_type))
                     case StaticFillFType() as fill:
                         return ntn.Literal(fill.value)
         return None

@@ -3,15 +3,25 @@ import pytest
 import numpy as np
 
 import finch as ft
-from finch.algebra import ffuncs
-from finch.autoschedule.tensor_stats import DCStatsFactory, VPStatsFactory
+from finch.algebra import DynamicFillFType, StaticFillFType, ffuncs, ftype
+from finch.autoschedule.tensor_stats import (
+    DCStatsFactory,
+    SamplingStatsFactory,
+    UniformStatsFactory,
+    VPStatsFactory,
+)
+from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
+from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import (
     StatsInterpreter,
     calculate_estimated_error,
 )
 from finch.finch_logic import (
     Aggregate,
+    Alias,
     Field,
+    FillTable,
     HardAlias,
     Literal,
     MapJoin,
@@ -20,6 +30,61 @@ from finch.finch_logic import (
     Query,
     Table,
 )
+
+
+@pytest.mark.parametrize("use_interpreter", [False, True])
+@pytest.mark.parametrize(
+    "factory_cls,expected_nnz",
+    [
+        (DCStatsFactory, 1),  # Degree bounds conservatively count any scalar as one.
+        (UniformStatsFactory, 0),
+        (ExactStatsFactory, 0),
+        (SamplingStatsFactory, 0),
+    ],
+)
+@pytest.mark.parametrize(
+    "fill_type",
+    [
+        StaticFillFType(np.float64(3)),
+        DynamicFillFType(ftype(np.float64)),
+        StaticFillFType((np.float64(0), np.intp(0))),
+        DynamicFillFType(ftype((np.float64(0), np.intp(0)))),
+    ],
+)
+def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_type):
+    factory = factory_cls()
+    fields = (Field("i"), Field("j"))
+    alias = HardAlias("a")
+    source = factory(ft.asarray(np.ones((2, 3))), fields)
+    source.fill_type = fill_type
+    bindings: dict[Alias, NumericStats] = {alias: source}
+    node = FillTable(alias)
+    if use_interpreter:
+        result = StatsInterpreter(factory)(node, bindings)
+    else:
+        cache = {}
+        result = insert_statistics(factory, node, bindings, False, cache)
+        assert cache[node] is result
+
+    assert isinstance(result, NumericStats)
+    assert result.index_order == ()
+    assert result.dim_sizes == {}
+    assert result.fill_type == fill_type
+    assert result.estimate_non_fill_values() == expected_nnz
+    assert source.index_order == fields
+    assert source.fill_type == fill_type
+    assert source.estimate_non_fill_values() == 6
+
+
+@pytest.mark.parametrize("use_interpreter", [False, True])
+def test_fill_table_statistics_requires_binding(use_interpreter):
+    factory = DCStatsFactory()
+    node = FillTable(HardAlias("missing"))
+    with pytest.raises(ValueError, match="alias"):
+        if use_interpreter:
+            StatsInterpreter(factory)(node, {})
+        else:
+            insert_statistics(factory, node, {}, False, {})
 
 
 @pytest.mark.parametrize(

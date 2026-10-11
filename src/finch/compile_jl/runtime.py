@@ -19,6 +19,7 @@ from finch.tensor.scalar import Scalar
 from .analyze import reset_argument_positions, returned_argument_positions
 from .interop import jl_tensor_to_python, tensor_to_jl
 from .julia import jl
+from .types import _zero_value
 
 
 @dataclass
@@ -54,7 +55,9 @@ class _StoragePool:
         match ftype:
             case FiberTensorFType(fill_type=DynamicFillFType() as fill_type):
                 # A dynamic fill is pinned in storage, so any value will do.
-                tensor = ftype.construct(shape, fill_value=fill_type(0))
+                tensor = ftype.construct(
+                    shape, fill_value=fill_type(_zero_value(fill_type.element_type))
+                )
             case _:
                 tensor = ftype.construct(shape)
         return _StorageLease(

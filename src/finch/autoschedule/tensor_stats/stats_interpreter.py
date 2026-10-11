@@ -11,6 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Literal,
     LogicExpression,
     LogicInterpreter,
@@ -32,6 +33,7 @@ from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
 from .tensor_stats import TensorStats
+from .util import fill_statistics
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -116,6 +118,9 @@ class StatsMachine(Generic[TS]):
                     new_indices = tuple(f for f in node.idxs)
                     tensor = self.stats_factory.relabel(base, new_indices)
                 return tensor
+
+            case FillTable(tns):
+                return fill_statistics(self.stats_factory, self(tns).fill_type)
 
             case MapJoin():
                 if not isinstance(node.op, Literal):

@@ -194,11 +194,19 @@ def to_jl_vector(T, values, *, offset: int = 0):
     return get_jl().Vector(values)
 
 
+def _zero_value(type_: FType):
+    match type_:
+        case TupleFType():
+            return tuple(_zero_value(field) for field in type_.struct_fieldtypes)
+        case _:
+            return type_(0)
+
+
 def _julia_literal(value: Any) -> str:
     match value:
         case DynamicFill() | DynamicFillFType() as fill:
             # A dynamic fill is bound at call time, so a zero stands in for it.
-            value = fill.element_type(0)
+            value = _zero_value(fill.element_type)
         case StaticFill() | StaticFillFType() as fill:
             value = fill.value
     # NOTE: this module shadows the builtin `bool` (see `bool: FDTypeNumpy`

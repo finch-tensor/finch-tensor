@@ -17,7 +17,7 @@ from finch import (
     ffuncs,
     ftype,
 )
-from finch.algebra import DynamicFill, DynamicFillError
+from finch.algebra import DynamicFill, DynamicFillError, DynamicFillFType
 from finch.autoschedule import (
     CompilerFormLowerer,
     DefaultLogicFactorizer,
@@ -65,6 +65,14 @@ EXPECTED_ROW_SUMS = np.array([3, 3, 9], dtype=DTYPE)
 def _requires_julia_backend():
     if not julia_available():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
+
+
+@pytest.mark.parametrize("fill_wrapper", [DynamicFill, DynamicFillFType])
+def test_julia_nested_tuple_fill_placeholder(fill_wrapper):
+    from finch.compile_jl.types import _julia_literal
+
+    value = (np.float64(3), (np.intp(2), np.bool_(True)))
+    assert _julia_literal(fill_wrapper(value)) == "(0.0, (0, false))"
 
 
 def test_compile_julia_preserves_definition_type():
