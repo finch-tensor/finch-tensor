@@ -97,7 +97,9 @@ def estimate_nnz(
     """
     reduce_fields = tuple(idx for idx in stats.index_order if idx not in indices)
     if reduce_fields:
-        stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        stats = stats_factory.aggregate(
+            ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
+        )
     return stats.estimate_non_fill_values()
 
 
@@ -244,7 +246,10 @@ class GalleyFormatter(LogicFormatter):
                         if nfused:
                             fused_indices = format_stats.index_order[:nfused]
                             format_stats = stats_factory.aggregate(
-                                ffuncs.or_, False, fused_indices, format_stats
+                                ffuncs.or_,
+                                False,
+                                fused_indices,
+                                stats_factory.support(format_stats),
                             )
                             loop_order = tuple(
                                 idx for idx in loop_order if idx not in fused_indices

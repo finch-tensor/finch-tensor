@@ -186,11 +186,10 @@ def annihilate(node: Term) -> Term | None:
 
 
 def _keeps_type(old: Term, new: Term) -> bool:
-    """Whether `new` has the type of `old`. Terms which don't know their types
-    are assumed to keep them."""
+    """Whether `new` is known to have the type of `old`."""
     old_t = getattr(old, "result_type", None)
     new_t = getattr(new, "result_type", None)
-    return old_t is None or new_t is None or old_t == new_t
+    return old_t is not None and new_t is not None and old_t == new_t
 
 
 def drop_identities(node: Term) -> Term | None:

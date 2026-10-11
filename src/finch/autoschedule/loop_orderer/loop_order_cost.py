@@ -2,7 +2,7 @@ import itertools
 from collections.abc import Mapping, MutableMapping, Sequence
 from typing import TypeVar
 
-from finch.algebra import StaticFillFType, ffuncs, is_annihilator
+from finch.algebra import ffuncs, is_annihilator
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
@@ -30,15 +30,6 @@ SPARSE_ALLOCATE_COST = 60
 
 TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)
-
-
-def stats_with_false_fill(
-    stats_factory: StatsFactory[TS],
-    stats: TS,
-) -> TS:
-    stats_copy = stats_factory.copy(stats)
-    stats_copy.fill_type = StaticFillFType(False)
-    return stats_copy
 
 
 def merge_prefix_stats(
@@ -106,12 +97,12 @@ def get_loop_lookups(
 ) -> float:
     prefix_set = set(prefix)
     rel_conjuncts = [
-        stats_with_false_fill(stats_factory, stat)
+        stats_factory.support(stat)
         for stat in conjunct_stats
         if prefix_set.intersection(stat.index_order)
     ]
     rel_disjuncts = [
-        stats_with_false_fill(stats_factory, stat)
+        stats_factory.support(stat)
         for stat in disjunct_stats
         if prefix_set.intersection(stat.index_order)
     ]

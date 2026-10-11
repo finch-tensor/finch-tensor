@@ -33,7 +33,9 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def nnz_after(fields, stats, stats_factory, level, over=()):
     reduce_fields = tuple(fields[level + 1 :])
     if reduce_fields:
-        reduced = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        reduced = stats_factory.aggregate(
+            ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
+        )
     else:
         reduced = stats
     return reduced.estimate_non_fill_values(over=over)

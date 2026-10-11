@@ -105,7 +105,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:
             reduced_stats = stats_factory.aggregate(
-                ffuncs.or_, False, reduce_fields, stats
+                ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
             )
         else:
             reduced_stats = stats
