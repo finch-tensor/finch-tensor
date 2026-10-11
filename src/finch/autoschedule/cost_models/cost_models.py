@@ -63,6 +63,25 @@ class CostModel(Form):
         features = self.get_features(term, bindings, stats, stats_factory)
         return float(np.dot(self.coefficients, features))
 
+class MultiCostModel(CostModel):
+    """A cost model that sums the costs of its sub-statements."""
+
+    def __init__(self, *submodels):
+        self.submodels = submodels
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> np.ndarray:
+        return np.concatenate([model.get_features(term, bindings, stats, stats_factory) for model in self.submodels])
+
+    @property
+    def coefficients(self):
+        return np.concatenate([model.coefficients for model in self.submodels])
+
 
 class LoopCostModel(CostModel):
     """A cost model with features for individual loop prefixes."""
@@ -145,6 +164,23 @@ class LoopCostModel(CostModel):
 
         visit_stmt(term)
         return features
+
+class MultiLoopCostModel(MultiCostModel):
+    """A cost model that sums the costs of its sub-statements."""
+
+    def __init__(self, *submodels):
+        self.submodels = submodels
+
+    def get_prefix_features(
+        self,
+        prefix: tuple[Field, ...],
+        exec_space: NS,
+        out_space: NS,
+        args: Mapping[Field, Sequence[NS]],
+        stats_factory: StatsFactory[NS],
+    ) -> np.ndarray:
+        return np.concatenate([model.get_prefix_features(prefix, exec_space, out_space, args, stats_factory) for model in self.submodels])
+
 
 class FlopsCostModel(CostModel, AliasedForm):
     """
