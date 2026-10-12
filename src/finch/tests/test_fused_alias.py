@@ -12,10 +12,10 @@ from finch.autoschedule.normalize import normalize_names
 from finch.autoschedule.stages import AliasedForm, CompilerForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
+from finch.autoschedule.util import fuse_loop_order
 from finch.compile import NotationCompiler
 from finch.finch_logic.interpreter import MockFusedTensor
 from finch.finch_notation.nodes import NotationTree
-from finch.symbolic import PostOrderDFS
 
 
 def test_fused_alias_node():
@@ -50,7 +50,7 @@ def test_fused_alias_node():
 
 def test_alias_is_abstract():
     with pytest.raises(TypeError, match="abstract"):
-        lgc.Alias("scratch")
+        lgc.Alias("scratch")  # ty: ignore[call-non-callable]
 
 
 @pytest.mark.parametrize("n", [-1, 1.5, True])
@@ -181,12 +181,15 @@ def test_compiler_form_definition_defines_a_view():
         a: ftype(ft.asarray(np.ones(2))),
         _SCRATCH: ftype(ft.asarray(np.ones(2))),
     }
-    fold = lgc.QueryInto(
-        lgc.Table(fused, (i,)),
-        lgc.Literal(ffuncs.add),
-        lgc.Reorder(lgc.Table(a, (i,)), (i,)),
+    fold = fuse_loop_order(
+        lgc.QueryInto(
+            lgc.Table(fused, (i,)),
+            lgc.Literal(ffuncs.add),
+            lgc.Table(a, (i,)),
+        ),
+        (i,),
     )
-    init = lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,)))
+    init = fuse_loop_order(lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,))), (i,))
     CompilerForm.validate_inputs(
         lgc.Plan((init, fold, lgc.Produces((fused,)))), ftypes, {}, DenseStatsFactory()
     )
@@ -241,30 +244,38 @@ def test_fused_alias_compilation(compiler, n):
     i, j, k = map(lgc.Field, ("i", "j", "k"))
     a, b, scratch, out = map(lgc.HardAlias, ("a", "b", "scratch", "out"))
     fused = lgc.FusedAlias(scratch, n)
+    materialized = lgc.HardAlias("materialized")
     data_a = np.array([[1, 2, 0], [0, 3, 4]])
     data_b = np.array([[1, 0], [0, 1], [2, 2]])
     plan = lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(fused, (i, j)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.add),
-                    lgc.Literal(0),
-                    lgc.Reorder(
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(fused, (i, j)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.add),
+                        lgc.Literal(0),
                         lgc.MapJoin(
                             lgc.Literal(ffuncs.mul),
-                            (lgc.Table(a, (i, k)), lgc.Table(b, (k, j))),
+                            (lgc.Table(a, (i, k)), lgc.Table(b, (j, k))),
                         ),
-                        (i, k, j),
+                        (k,),
                     ),
-                    (k,),
                 ),
+                (i, j, k),
             ),
-            lgc.Query(lgc.Table(out, (j, i)), lgc.Table(fused, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))),
+                (i, j),
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out, (j, i)), lgc.Table(materialized, (i, j))),
+                (j, i),
+            ),
             lgc.Produces((out, fused)),
         )
     )
-    bindings = {a: ft.asarray(data_a), b: ft.asarray(data_b)}
+    bindings = {a: ft.asarray(data_a), b: ft.asarray(data_b.T)}
     capture = LogicCapture()
     DefaultLogicFormatter(CompilerFormLowerer(capture))(
         plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
@@ -273,6 +284,7 @@ def test_fused_alias_compilation(compiler, n):
     assert fused not in capture.last_bindings
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     bindings[scratch] = capture.last_bindings[scratch].construct((2, 2))
+    bindings[materialized] = capture.last_bindings[materialized].construct((2, 2))
     bindings[out] = capture.last_bindings[out].construct((2, 2))
     result, intermediate = compiler()(program).main(*bindings.values())
     np.testing.assert_array_equal(result.to_numpy(), (data_a @ data_b).T)
@@ -283,7 +295,7 @@ def test_fused_alias_compilation(compiler, n):
     "op, error",
     [
         # A definition defines the fused view, after reading the hard one.
-        (None, "both read and write"),
+        (None, "cannot occur on both lhs and rhs"),
         # Updating requires the fused view to be current already, even when
         # every element is overwritten.
         (ffuncs.overwrite, "invalidated"),
@@ -295,12 +307,15 @@ def test_fused_alias_cannot_hide_inplace_read(op, error):
     a = lgc.HardAlias("a")
     fused = lgc.FusedAlias(a, 1)
     stmt = (
-        lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,)))
+        fuse_loop_order(lgc.Query(lgc.Table(fused, (i,)), lgc.Table(a, (i,))), (i,))
         if op is None
-        else lgc.QueryInto(
-            lgc.Table(fused, (i,)),
-            lgc.Literal(op),
-            lgc.Reorder(lgc.Table(a, (i,)), (i,)),
+        else fuse_loop_order(
+            lgc.QueryInto(
+                lgc.Table(fused, (i,)),
+                lgc.Literal(op),
+                lgc.Table(a, (i,)),
+            ),
+            (i,),
         )
     )
     plan = lgc.Plan((stmt, lgc.Produces((fused,))))
@@ -316,27 +331,39 @@ def test_compiling_a_redefined_view(compiler, n):
     i, j = lgc.Field("i"), lgc.Field("j")
     a, scratch, out, out2 = map(lgc.HardAlias, ("a", "scratch", "out", "out2"))
     fused = lgc.FusedAlias(scratch, n)
+    materialized = lgc.HardAlias("materialized")
     data = np.array([[1, 2, 0], [0, 3, 4]])
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(a, (i, j))),
-            lgc.Query(lgc.Table(out, (j, i)), lgc.Table(scratch, (i, j))),
-            lgc.Query(
-                lgc.Table(fused, (i, j)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.add),
-                    lgc.Literal(0),
-                    lgc.Reorder(
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(a, (i, j))), (i, j)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out, (j, i)), lgc.Table(scratch, (i, j))), (j, i)
+            ),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(fused, (i, j)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.add),
+                        lgc.Literal(0),
                         lgc.MapJoin(
                             lgc.Literal(ffuncs.mul),
                             (lgc.Table(a, (i, j)), lgc.Literal(2)),
                         ),
-                        (i, j),
+                        (),
                     ),
-                    (),
                 ),
+                (i, j),
             ),
-            lgc.Query(lgc.Table(out2, (j, i)), lgc.Table(fused, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))),
+                (i, j),
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out2, (j, i)), lgc.Table(materialized, (i, j))),
+                (j, i),
+            ),
             lgc.Produces((out, out2)),
         )
     )
@@ -350,7 +377,12 @@ def test_compiling_a_redefined_view(compiler, n):
         capture.last_prgm, capture.last_bindings, {}, DenseStatsFactory()
     )
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
-    for var, shape in ((scratch, (2, 3)), (out, (3, 2)), (out2, (3, 2))):
+    for var, shape in (
+        (scratch, (2, 3)),
+        (out, (3, 2)),
+        (materialized, (2, 3)),
+        (out2, (3, 2)),
+    ):
         bindings[var] = capture.last_bindings[var].construct(shape)
     result, result2 = compiler()(program).main(*bindings.values())
     np.testing.assert_array_equal(result.to_numpy(), data.T)
@@ -367,22 +399,25 @@ def gustavson_plan(a, b, w, c):
                 i,
                 lgc.Plan(
                     (
-                        lgc.Query(
-                            lgc.Table(fused, (i, k)),
-                            lgc.Aggregate(
-                                lgc.Literal(ffuncs.add),
-                                lgc.Literal(0),
-                                lgc.Reorder(
+                        fuse_loop_order(
+                            lgc.Query(
+                                lgc.Table(fused, (i, k)),
+                                lgc.Aggregate(
+                                    lgc.Literal(ffuncs.add),
+                                    lgc.Literal(0),
                                     lgc.MapJoin(
                                         lgc.Literal(ffuncs.mul),
                                         (lgc.Table(a, (i, j)), lgc.Table(b, (j, k))),
                                     ),
-                                    (i, j, k),
+                                    (j,),
                                 ),
-                                (j,),
                             ),
+                            (j, k),
                         ),
-                        lgc.Query(lgc.Table(c, (i, k)), lgc.Table(fused, (i, k))),
+                        fuse_loop_order(
+                            lgc.Query(lgc.Table(c, (i, k)), lgc.Table(fused, (i, k))),
+                            (k,),
+                        ),
                     )
                 ),
             ),
@@ -391,26 +426,22 @@ def gustavson_plan(a, b, w, c):
     )
 
 
-def declared(program, slot_name):
-    """Whether `program` declares the slot `slot_name` inside a loop, and outside."""
-    inside, outside = False, False
+def declare_depths(program):
+    """The number of loops around each declaration in `program`, by tensor."""
+    depths: dict[str, list[int]] = {}
 
-    def visit(node, in_loop):
-        nonlocal inside, outside
+    def visit(node, depth):
         match node:
-            case ntn.Declare(ntn.Slot(name, _), _, _, _) if name == slot_name:
-                if in_loop:
-                    inside = True
-                else:
-                    outside = True
+            case ntn.Declare(ntn.Slot(name, _), _, _, _):
+                depths.setdefault(name.strip("#_").split("#")[0], []).append(depth)
             case ntn.Loop(_, _, body):
-                visit(body, True)
+                visit(body, depth + 1)
             case NotationTree():
                 for child in node.children:
-                    visit(child, in_loop)
+                    visit(child, depth)
 
-    visit(program, False)
-    return inside, outside
+    visit(program, 0)
+    return depths
 
 
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
@@ -432,14 +463,8 @@ def test_fuse_compilation_uses_a_workspace(compiler):
     }
     CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
     program = NotationGenerator()(plan, ftypes, {}, None)
-    slots = {
-        node.name.strip("#").split("#")[0]: node.name
-        for node in PostOrderDFS(program)
-        if isinstance(node, ntn.Slot)
-    }
     # The workspace is reset for each row, and the output only once.
-    assert declared(program, slots["_w"]) == (True, False)
-    assert declared(program, slots["_c"]) == (False, True)
+    assert declare_depths(program) == {"w": [1], "c": [0]}
     (result,) = compiler()(program).main(*bindings.values())
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
     assert bindings[w].shape == (2,)
@@ -478,11 +503,8 @@ def test_nested_fuse_with_scalar_workspaces(compiler):
         return lgc.Aggregate(
             lgc.Literal(ffuncs.overwrite),
             lgc.Literal(0.0),
-            lgc.Reorder(
-                lgc.MapJoin(
-                    lgc.Literal(ffuncs.mul), (lgc.Table(a, (i, j)), lgc.Literal(factor))
-                ),
-                (i, j),
+            lgc.MapJoin(
+                lgc.Literal(ffuncs.mul), (lgc.Table(a, (i, j)), lgc.Literal(factor))
             ),
             (),
         )
@@ -539,7 +561,7 @@ def test_workspace_needs_its_fuse():
     ftypes: dict[lgc.Alias, TensorFType] = {
         var: val.ftype for var, val in bindings.items()
     }
-    with pytest.raises(ValueError, match="outside of the Fuse nodes"):
+    with pytest.raises(ValueError, match="need Fuse nodes"):
         NotationGenerator()(unfused, ftypes, {}, None)
 
 
@@ -565,4 +587,119 @@ def test_compiler_form_checks_fuse_bodies():
         var: ft.asarray(np.ones(2)).ftype for var in (a, b)
     }
     with pytest.raises(ValueError, match="cannot occur on both lhs and rhs"):
+        CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_fuse_nodes_give_the_loop_order(compiler):
+    # Without Reorders, the Fuse nodes around each query are its loop order.
+    i, j, k = map(lgc.Field, "ijk")
+    a, b, w, c = map(lgc.HardAlias, "abwc")
+    fused = lgc.FusedAlias(w, 1)
+    product = lgc.MapJoin(
+        lgc.Literal(ffuncs.mul), (lgc.Table(a, (i, j)), lgc.Table(b, (j, k)))
+    )
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Fuse(
+                            j,
+                            lgc.Fuse(
+                                k,
+                                lgc.Query(
+                                    lgc.Table(fused, (i, k)),
+                                    lgc.Aggregate(
+                                        lgc.Literal(ffuncs.add),
+                                        lgc.Literal(0),
+                                        product,
+                                        (j,),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        lgc.Fuse(
+                            k, lgc.Query(lgc.Table(c, (i, k)), lgc.Table(fused, (i, k)))
+                        ),
+                    )
+                ),
+            ),
+            lgc.Produces((c,)),
+        )
+    )
+    data_a = np.array([[1, 2, 0], [0, 3, 4]])
+    data_b = np.array([[1, 0], [0, 1], [2, 2]])
+    bindings = {
+        a: ft.asarray(data_a),
+        b: ft.asarray(data_b),
+        w: ft.asarray(np.zeros(0, dtype=np.int64)),
+        c: ft.asarray(np.zeros((0, 0), dtype=np.int64)),
+    }
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    # The workspace is reset in each row, before the loop which reduces j.
+    assert declare_depths(program) == {"w": [1], "c": [0]}
+    (result,) = compiler()(program).main(*bindings.values())
+    np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+@pytest.mark.parametrize("columns", [2, 0])
+def test_fused_overwrite_resets_once(compiler, columns):
+    # Overwriting with a reduction resets the output before the fused loops,
+    # unless the reduction is empty and leaves the output as it was.
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, d = lgc.HardAlias("a"), lgc.HardAlias("d")
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Fuse(
+                    j,
+                    lgc.QueryInto(
+                        lgc.Table(d, (i,)),
+                        lgc.Literal(ffuncs.overwrite),
+                        lgc.Table(a, (i, j)),
+                    ),
+                ),
+            ),
+            lgc.Produces((d,)),
+        )
+    )
+    data = np.arange(2 * columns, dtype=np.float64).reshape((2, columns))
+    bindings = {a: ft.asarray(data), d: ft.asarray(np.full(2, 7.0))}
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    (result,) = compiler()(program).main(*bindings.values())
+    expected = data[:, -1] if columns else np.full(2, 7.0)
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
+def test_queries_without_loop_orders_fuse_every_field():
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, d = lgc.HardAlias("a"), lgc.HardAlias("d")
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.QueryInto(
+                    lgc.Table(d, (i,)), lgc.Literal(ffuncs.add), lgc.Table(a, (i, j))
+                ),
+            ),
+            lgc.Produces((d,)),
+        )
+    )
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        a: ft.asarray(np.ones((2, 2))).ftype,
+        d: ft.asarray(np.ones(2)).ftype,
+    }
+    with pytest.raises(ValueError, match="need Fuse nodes"):
         CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())

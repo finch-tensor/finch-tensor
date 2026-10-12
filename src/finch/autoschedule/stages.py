@@ -175,19 +175,21 @@ class SingleAggregateForm(AliasedForm):
 class LoopOrderedForm(SingleAggregateForm):
     """
     LoopOrderedForm assumes that the input query has had its loop order set.
-    There are four valid forms for a query in LoopOrderedForm:
+    The loop order of a query is the fields of its enclosing Fuse nodes, from
+    outermost to innermost, which include every field of the query. There are
+    four valid forms for a query in LoopOrderedForm:
         1) transpose queries
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
-            Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
+            Query(Table(_, output_order), Aggregate(_, _, arg, _))
         3) in-place queries
-            QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
+            QueryInto(Table(_, lhs_idxs), _, arg)
         4) in-place initializations
             QueryInto(Table(_, _), _, Literal(_))
-    For aggregate and in-place queries, the loop order includes every lhs
-    field and visits those fields in order. The Tables of arg follow the loop
-    order, except that an in-place query of a single Table may read it in
-    another order, representing a transpose.
+    Initializations need no loop order. Otherwise, the loop order visits the
+    lhs fields in order, and the Tables of arg follow the loop order, except
+    that a transpose query, or an in-place query of a single Table, may read
+    its Table in another order. Queries have no Reorder nodes.
     """
 
     @staticmethod
@@ -205,48 +207,59 @@ class LoopOrderedForm(SingleAggregateForm):
     ) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
 
+        def validate_query(lhs_idxs, arg, loop_order):
+            unfused = {*lhs_idxs, *arg.fields()} - set(loop_order)
+            if unfused:
+                names = ", ".join(sorted(idx.name for idx in unfused))
+                raise ValueError(
+                    f"The loop order of a query is given by its enclosing Fuse "
+                    f"nodes, which must include every field, so {names} need "
+                    "Fuse nodes."
+                )
+            if not cls._check_loop_order(lhs_idxs, loop_order):
+                raise ValueError("Table index order does not match loop order.")
+
         def validate(node, loop_order):
             match node:
                 case Plan(bodies):
-                    for body in bodies[:-1]:
+                    for body in bodies:
                         validate(body, loop_order)
-                case Fuse(_, body):
-                    for stmt in _fused_statements(body):
-                        validate(stmt, loop_order)
-                case Query(Table(), Table()) | QueryInto(Table(), _, Literal()):
-                    return None
-                case QueryInto(Table(_, lhs_idxs), _, Reorder(Table(), idxs)):
-                    if not cls._check_loop_order(lhs_idxs, idxs):
-                        raise ValueError("Table index order does not match loop order.")
-                    return None
-                case Query(
-                    Table(_, lhs_idxs), Aggregate(_, _, Reorder(arg, idxs), _)
-                ) | QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs)):
-                    if not cls._check_loop_order(lhs_idxs, idxs):
-                        raise ValueError("Table index order does not match loop order.")
-                    return validate(arg, idxs)
-                case Query(Table(), Aggregate(_, _, arg, _)):
-                    raise ValueError(
-                        "All aggregates must wrap a Reorder node specifying\
-                             the loop order."
-                    )
-                case QueryInto():
-                    raise ValueError("In-place queries must have a loop order!")
+                case Fuse(idx, body):
+                    if idx in loop_order:
+                        raise ValueError(
+                            f"Fuse({idx}) is nested in another Fuse of {idx}."
+                        )
+                    validate(body, (*loop_order, idx))
+                case Produces() | QueryInto(Table(), _, Literal()):
+                    return
+                case Query(Table(_, lhs_idxs), Table() as arg) | QueryInto(
+                    Table(_, lhs_idxs), _, Table() as arg
+                ):
+                    validate_query(lhs_idxs, arg, loop_order)
+                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, lhs_idxs), _, arg
+                ):
+                    validate_query(lhs_idxs, arg, loop_order)
+                    validate(arg, loop_order)
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
                 case Table(_, idxs):
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
-                case Reorder(arg, _):
-                    raise ValueError("Reorder nodes should only appear in loop orders!")
+                case Reorder():
+                    raise ValueError(
+                        "Queries with loop orders can't have Reorder nodes, "
+                        "since Fuse nodes give the loop order and the left-hand "
+                        "tables order the results."
+                    )
                 case Literal() | FillTable():
-                    return None
+                    return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
-            return None
+            return
 
-        validate(term, None)
+        validate(term, ())
 
 
 class FormattedForm(LoopOrderedForm):
@@ -277,7 +290,7 @@ class FormattedForm(LoopOrderedForm):
                 case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
-                case Aggregate(_, _, arg, _) | Reorder(arg, _):
+                case Aggregate(_, _, arg, _):
                     validate(arg)
                 case MapJoin(_, args):
                     for arg in args:
@@ -309,8 +322,7 @@ class CompilerForm(FormattedForm):
     equality-constrained loops to read arg in storage order. Fields absent from
     lhs_idxs are reduced by overwriting.)
     2) reductions
-        Query(Table(lhs, lhs_idxs),
-              Aggregate(op, init, Reorder(arg, loop_order), _))
+        Query(Table(lhs, lhs_idxs), Aggregate(op, init, arg, _))
     (lhs is reset to init, a 0-D expression without aggregates or reorders,
     and arg is folded into it with op.)
     There are two valid kinds of update:
@@ -318,21 +330,23 @@ class CompilerForm(FormattedForm):
         QueryInto(Table(lhs, _), overwrite, Literal(init))
     (Every element of lhs is set to init.)
     2) folds
-        QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
+        QueryInto(Table(lhs, lhs_idxs), op, arg)
     (arg is folded into lhs with op. A fold which overwrites lhs resets it to
     its fill value first.)
-    In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
-    loop order contains each field once and visits all fields of lhs_idxs in
-    order. Tables in a MapJoin must also follow loop order, but a single Table
-    argument may have a different storage order, as in a copy. Fields absent
-    from lhs_idxs are reduced with op. Every alias must have a TensorFType in
-    the bindings, and a statement can't read the alias it writes. Definitions
-    may change dimension sizes but must preserve the allocated tensor's rank.
-
     A statement may also be a Fuse, whose body is a Plan of these statements
     and Fuse nodes, without a Produces, in FusedForm. It runs its body once for
     each value of its field. Within Fuse nodes, a FusedAlias may store only the
     dimensions after its fused ones, as a workspace for each fused iteration.
+
+    In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
+    loop order of every statement but an initialization is the fields of its
+    enclosing Fuse nodes, as in LoopOrderedForm, which include every field of
+    the statement and visit lhs_idxs in order. Tables in a MapJoin must also
+    follow loop order, but a single Table argument may have a different storage
+    order, as in a copy. Fields absent from lhs_idxs are reduced with op. Every
+    alias must have a TensorFType in the bindings, and a statement can't read
+    the alias it writes. Definitions may change dimension sizes but must
+    preserve the allocated tensor's rank.
     """
 
     @classmethod
@@ -386,13 +400,6 @@ class CompilerForm(FormattedForm):
                         f"The init of an aggregate into {lhs} must be a 0-D "
                         "expression without aggregates or reorders."
                     )
-                case Query(_, Aggregate(_, _, Reorder(arg, loop_order), _)) | (
-                    QueryInto(_, _, Reorder(arg, loop_order))
-                ):
-                    if len(set(loop_order)) != len(loop_order):
-                        raise ValueError("Loop order must not repeat fields.")
-                    if not set(arg.fields()).issubset(loop_order):
-                        raise ValueError("Loop order must include every RHS field.")
                 case QueryInto(_, Literal(op), Literal()) if op != ffuncs.overwrite:
                     raise ValueError(f"Initializing {lhs} must overwrite it, not {op}.")
 

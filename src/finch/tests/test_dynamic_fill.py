@@ -49,6 +49,7 @@ from finch.autoschedule import (
     NotationGenerator,
 )
 from finch.autoschedule.normalize import inline_constant_scalars
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -545,9 +546,12 @@ def test_declare_sets_a_dynamic_fill(loader):
     init = MapJoin(Literal(ffuncs.add), (FillTable(A), one))
     plan = Plan(
         (
-            Query(
-                Table(C, (i,)),
-                Aggregate(Literal(ffuncs.overwrite), init, Reorder(arg, (i,)), ()),
+            fuse_loop_order(
+                Query(
+                    Table(C, (i,)),
+                    Aggregate(Literal(ffuncs.overwrite), init, arg, ()),
+                ),
+                (i,),
             ),
             Produces((C,)),
         )

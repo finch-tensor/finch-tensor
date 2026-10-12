@@ -9,6 +9,7 @@ from finch.algebra import ffuncs
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler
 from finch.compile.lower import AssemblyGenerator
@@ -53,14 +54,17 @@ def pointwise_plan():
     rhs = lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.Table(a, (i,)), lgc.Table(b, (i,))))
     return lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(c, (i,)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.overwrite),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(rhs, (i,)),
-                    (),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, (i,)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.overwrite),
+                        lgc.Literal(np.int64(0)),
+                        rhs,
+                        (),
+                    ),
                 ),
+                (i,),
             ),
             lgc.Produces((c,)),
         )
@@ -93,20 +97,20 @@ def test_reduced_dimensions_checked_even_with_empty_output(executor):
     i, j, k = (lgc.Field(name) for name in "ijk")
     plan = lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(c, (i, j)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.add),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, (i, j)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.add),
+                        lgc.Literal(np.int64(0)),
                         lgc.MapJoin(
                             lgc.Literal(ffuncs.mul),
                             (lgc.Table(a, (i, k)), lgc.Table(b, (k, j))),
                         ),
-                        (i, k, j),
+                        (k,),
                     ),
-                    (k,),
                 ),
+                (i, k, j),
             ),
             lgc.Produces((c,)),
         )
@@ -131,10 +135,13 @@ def test_query_into_checks_shared_fields_and_allows_broadcast(executor, op):
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.QueryInto(
-                lgc.Table(c, (i, j)),
-                lgc.Literal(op),
-                lgc.Reorder(lgc.Table(a, (i,)), (i, j)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i, j)),
+                    lgc.Literal(op),
+                    lgc.Table(a, (i,)),
+                ),
+                (i, j),
             ),
             lgc.Produces((c,)),
         )
@@ -159,10 +166,13 @@ def test_empty_overwrite_reduction_still_checks_output_shape(executor):
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.QueryInto(
-                lgc.Table(c, (i,)),
-                lgc.Literal(ffuncs.overwrite),
-                lgc.Reorder(lgc.Table(a, (i, j)), (i, j)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i,)),
+                    lgc.Literal(ffuncs.overwrite),
+                    lgc.Table(a, (i, j)),
+                ),
+                (i, j),
             ),
             lgc.Produces((c,)),
         )
@@ -180,12 +190,15 @@ def test_shape_checks_use_current_definition(executor):
     i = lgc.Field("i")
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(c, (i,)), lgc.Table(b, (i,))),
-            lgc.QueryInto(
-                lgc.Table(c, (i,)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Table(b, (i,)), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(c, (i,)), lgc.Table(b, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i,)),
+                    lgc.Literal(ffuncs.add),
+                    lgc.Table(b, (i,)),
+                ),
+                (i,),
             ),
             lgc.Produces((c,)),
         )

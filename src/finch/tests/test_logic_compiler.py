@@ -7,11 +7,11 @@ import finch.finch_notation as ntn
 from finch import ffuncs, ftype
 from finch.algebra import DynamicFill
 from finch.autoschedule import (
-    INTERPRET_NOTATION,
     CompilerFormLowerer,
     LogicCapture,
     NotationGenerator,
 )
+from finch.autoschedule.util import fuse_loop_order
 from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
@@ -23,7 +23,6 @@ from finch.finch_logic import (
     Produces,
     Query,
     QueryInto,
-    Reorder,
     Table,
 )
 from finch.tensor.bufferized_ndarray import (
@@ -54,14 +53,14 @@ def test_generated_init_write(kind, init, compiler):
         rhs = Aggregate(
             Literal(ffuncs.overwrite),
             Literal(fill),
-            Reorder(Table(src, (i, j)), (i, j)),
+            Table(src, (i, j)),
             reduced,
         )
         if kind == "inplace":
             query = QueryInto(
                 Table(dst, output_idxs),
                 Literal(ffuncs.overwrite),
-                Reorder(Table(src, (i, j)), (i, j)),
+                Table(src, (i, j)),
             )
         else:
             query = Query(Table(dst, output_idxs), rhs)
@@ -77,7 +76,8 @@ def test_generated_init_write(kind, init, compiler):
             np.full(expected.shape, 9, dtype=np.int64), fill_value=fill
         ),
     }
-    plan = Plan((query, Produces((dst,))))
+    loop_order = (j, i) if kind in ("copy", "dynamic_copy") else (i, j)
+    plan = Plan((fuse_loop_order(query, loop_order), Produces((dst,))))
     capture = LogicCapture()
     CompilerFormLowerer(capture)(
         plan,
@@ -93,12 +93,14 @@ def test_generated_init_write(kind, init, compiler):
 def test_logic_compiler(file_regression):
     plan = Plan(
         bodies=(
-            Query(
-                lhs=Table(HardAlias(name="A2"), (Field(name="i0"), Field(name="i2"))),
-                rhs=Aggregate(
-                    op=logic.Literal(val=ffuncs.add),
-                    init=logic.Literal(val=0),
-                    arg=Reorder(
+            fuse_loop_order(
+                Query(
+                    lhs=Table(
+                        HardAlias(name="A2"), (Field(name="i0"), Field(name="i2"))
+                    ),
+                    rhs=Aggregate(
+                        op=logic.Literal(val=ffuncs.add),
+                        init=logic.Literal(val=0),
                         arg=MapJoin(
                             op=logic.Literal(val=ffuncs.mul),
                             args=(
@@ -112,10 +114,10 @@ def test_logic_compiler(file_regression):
                                 ),
                             ),
                         ),
-                        idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
+                        idxs=(Field(name="i1"),),
                     ),
-                    idxs=(Field(name="i1"),),
                 ),
+                (Field(name="i0"), Field(name="i1"), Field(name="i2")),
             ),
             Produces(args=(HardAlias(name="A2"),)),
         ),
@@ -142,7 +144,7 @@ def test_logic_compiler(file_regression):
         basename="test_logic_compiler_program",
     )
 
-    result = INTERPRET_NOTATION(plan, bindings)
+    result = ntn.NotationInterpreter()(program).main(*bindings.values())
 
     expected = np.matmul(
         bindings[HardAlias(name="A0")].to_numpy(),
@@ -156,11 +158,13 @@ def test_logic_compiler(file_regression):
 def test_logic_compiler_inplace(file_regression):
     plan = Plan(
         bodies=(
-            QueryInto(
-                lhs=Table(HardAlias(name="A2"), (Field(name="i0"), Field(name="i2"))),
-                op=Literal(ffuncs.add),
-                rhs=Reorder(
-                    arg=MapJoin(
+            fuse_loop_order(
+                QueryInto(
+                    lhs=Table(
+                        HardAlias(name="A2"), (Field(name="i0"), Field(name="i2"))
+                    ),
+                    op=Literal(ffuncs.add),
+                    rhs=MapJoin(
                         op=logic.Literal(val=ffuncs.mul),
                         args=(
                             Table(
@@ -173,8 +177,8 @@ def test_logic_compiler_inplace(file_regression):
                             ),
                         ),
                     ),
-                    idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                 ),
+                (Field(name="i0"), Field(name="i1"), Field(name="i2")),
             ),
             Produces(args=(HardAlias(name="A2"),)),
         ),
@@ -201,7 +205,7 @@ def test_logic_compiler_inplace(file_regression):
         basename="test_logic_compiler_inplace_program",
     )
 
-    result = INTERPRET_NOTATION(plan, bindings)
+    result = ntn.NotationInterpreter()(program).main(*bindings.values())
 
     expected = np.ones_like(bindings[HardAlias(name="A2")].to_numpy()) + np.matmul(
         bindings[HardAlias(name="A0")].to_numpy(),

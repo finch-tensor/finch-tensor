@@ -20,6 +20,7 @@ from finch.autoschedule.tensor_stats import (
     StatsInterpreter,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.util import fuse_loop_order
 
 
 @pytest.mark.parametrize("nfused", range(4))
@@ -181,7 +182,10 @@ def test_galley_removes_fused_fields_from_loop_order(monkeypatch, transpose):
     monkeypatch.setattr(capture, "ctx", lambda *args: None)
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(fused, output_fields), lgc.Table(a, fields)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, output_fields), lgc.Table(a, fields)),
+                (t, i, j),
+            ),
             lgc.Produces((fused,)),
         )
     )

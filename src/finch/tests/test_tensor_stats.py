@@ -41,13 +41,13 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
     HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
-    Reorder,
     Table,
 )
 from finch.symbolic import PostOrderDFS
@@ -1837,8 +1837,12 @@ def test_blocked_uniform_grid(shape, counts, fill_value, monkeypatch):
 
     def check_loop_order(plan):
         for query in plan.bodies[:-1]:
+            loop_order = []
+            while isinstance(query, Fuse):
+                loop_order.append(query.idx)
+                query = query.body
             match query:
-                case Query(_, Aggregate(_, _, Reorder(_, loop_order), _)):
+                case Query(_, Aggregate()):
                     for node in PostOrderDFS(query):
                         match node:
                             case Table(_, idxs):

@@ -150,23 +150,6 @@ def select_output_format(
     return tuple(formats)
 
 
-def query_loop_order(rhs: lgc.LogicExpression) -> tuple[Field, ...]:
-    """
-    The loop order a query's right hand side is evaluated under.
-
-    Loop orders are carried by the `Reorder` node interior to an aggregate, or
-    at the root of an in-place update; a transpose query is looped in the order
-    its input is stored.
-    """
-    match rhs:
-        case lgc.Table(_, idxs):
-            return idxs
-        case lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _) | lgc.Reorder(_, idxs):
-            return idxs
-        case _:
-            return rhs.fields()
-
-
 class GalleyFormatter(LogicFormatter):
     """
     A formatter which picks output formats the way Galley's physical optimizer
@@ -221,14 +204,19 @@ class GalleyFormatter(LogicFormatter):
             {var: val.fill_type for var, val in bindings.items()}
         )
 
-        def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
+        # The loop order of a query is the fields of its enclosing Fuse nodes.
+        def formatter(
+            node: lgc.LogicStatement, loop_order: tuple[Field, ...] = ()
+        ) -> lgc.LogicStatement:
             match node:
                 case lgc.Plan(bodies):
-                    return lgc.Plan(tuple(formatter(body) for body in bodies))
+                    return lgc.Plan(
+                        tuple(formatter(body, loop_order) for body in bodies)
+                    )
                 case lgc.Fuse(idx, body):
-                    return lgc.Fuse(idx, formatter(body))
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as lhs, _), _, rhs
+                    return lgc.Fuse(idx, formatter(body, (*loop_order, idx)))
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
                     node.infer_shape_type(shape_types)
                     # Evaluating the query gives the stats of the stored result,
@@ -245,7 +233,6 @@ class GalleyFormatter(LogicFormatter):
                             nfused = 0
                     if alias not in bindings:
                         format_stats = stats_bindings[lhs]
-                        loop_order = query_loop_order(rhs)
                         if nfused:
                             fused_indices = format_stats.index_order[:nfused]
                             format_stats = stats_factory.aggregate(

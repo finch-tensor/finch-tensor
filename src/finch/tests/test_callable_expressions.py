@@ -18,6 +18,7 @@ from finch.algebra import (
     ffuncs,
     ftype,
 )
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import (
     CCompiler,
     CGenerator,
@@ -433,14 +434,17 @@ def test_logic_lowering_preserves_literal_callee(compiler, fill):
     )
     plan = lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(output, (index,)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.overwrite),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(expression, (index,)),
-                    (),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(output, (index,)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.overwrite),
+                        lgc.Literal(np.int64(0)),
+                        expression,
+                        (),
+                    ),
                 ),
+                (index,),
             ),
             lgc.Produces((output,)),
         )

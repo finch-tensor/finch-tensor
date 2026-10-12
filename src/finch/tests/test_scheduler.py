@@ -24,7 +24,7 @@ from finch.autoschedule.loop_orderer.loop_ordering import (
     heuristic_loop_order,
 )
 from finch.autoschedule.tensor_stats import DenseStatsFactory
-from finch.autoschedule.util import flatten_plans, push_fields
+from finch.autoschedule.util import flatten_plans, fuse_loop_order, push_fields
 from finch.finch_logic import (
     Aggregate,
     Field,
@@ -549,22 +549,26 @@ def test_normalize_names():
 def test_concordize():
     # A0 is read transposed under the loop order of A1, so it needs a
     # swizzled copy. A2 reads A0 in storage order and needs none.
-    def overwrite(arg, loop_order):
-        return Aggregate(
-            Literal(ffuncs.overwrite), Literal(0), Reorder(arg, loop_order), ()
-        )
+    def overwrite(arg):
+        return Aggregate(Literal(ffuncs.overwrite), Literal(0), arg, ())
 
     i0, i1 = Field("i0"), Field("i1")
     plan = Plan(
         (
             Query(Table(HardAlias("A0"), (i0, i1)), Table(Literal(0), (i0, i1))),
-            Query(
-                Table(HardAlias("A1"), (i1, i0)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i1, i0)),
+            fuse_loop_order(
+                Query(
+                    Table(HardAlias("A1"), (i1, i0)),
+                    overwrite(Table(HardAlias("A0"), (i0, i1))),
+                ),
+                (i1, i0),
             ),
-            Query(
-                Table(HardAlias("A2"), (i0, i1)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i0, i1)),
+            fuse_loop_order(
+                Query(
+                    Table(HardAlias("A2"), (i0, i1)),
+                    overwrite(Table(HardAlias("A0"), (i0, i1))),
+                ),
+                (i0, i1),
             ),
             Produces((HardAlias("A1"), HardAlias("A2"))),
         )
@@ -577,13 +581,19 @@ def test_concordize():
                 Table(HardAlias("A0_4"), (Field("i_1"), Field("i_0"))),
                 Table(HardAlias("A0"), (Field("i_0"), Field("i_1"))),
             ),
-            Query(
-                Table(HardAlias("A1"), (i1, i0)),
-                overwrite(Table(HardAlias("A0_4"), (i1, i0)), (i1, i0)),
+            fuse_loop_order(
+                Query(
+                    Table(HardAlias("A1"), (i1, i0)),
+                    overwrite(Table(HardAlias("A0_4"), (i1, i0))),
+                ),
+                (i1, i0),
             ),
-            Query(
-                Table(HardAlias("A2"), (i0, i1)),
-                overwrite(Table(HardAlias("A0"), (i0, i1)), (i0, i1)),
+            fuse_loop_order(
+                Query(
+                    Table(HardAlias("A2"), (i0, i1)),
+                    overwrite(Table(HardAlias("A0"), (i0, i1))),
+                ),
+                (i0, i1),
             ),
             Produces((HardAlias("A1"), HardAlias("A2"))),
         )
@@ -624,43 +634,10 @@ def test_heuristic_loop_order():
         )
     )
 
+    # The contracted index i1 is shared by both inputs, so it is outermost.
     expected = Plan(
         (
-            Query(
-                Table(HardAlias("C"), (Field("i0"), Field("i2"))),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0),
-                    Reorder(
-                        Reorder(
-                            MapJoin(
-                                Literal(ffuncs.mul),
-                                (
-                                    Reorder(
-                                        Table(
-                                            HardAlias("A"),
-                                            (Field("i0"), Field("i1")),
-                                        ),
-                                        (Field("i0"), Field("i1")),
-                                    ),
-                                    Reorder(
-                                        Table(
-                                            HardAlias("B"),
-                                            (Field("i1"), Field("i2")),
-                                        ),
-                                        (Field("i1"), Field("i2")),
-                                    ),
-                                ),
-                            ),
-                            (Field("i0"), Field("i2"), Field("i1")),
-                        ),
-                        # The contracted index `i1` is shared by both inputs,
-                        # so it is placed outermost for an outer-product order.
-                        (Field("i1"), Field("i0"), Field("i2")),
-                    ),
-                    (Field("i1"),),
-                ),
-            ),
+            fuse_loop_order(plan.bodies[0], (Field("i1"), Field("i0"), Field("i2"))),
             Produces((HardAlias("C"),)),
         )
     )

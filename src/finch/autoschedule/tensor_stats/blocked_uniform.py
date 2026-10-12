@@ -16,7 +16,6 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reorder,
     StatsFactory,
     Table,
 )
@@ -29,6 +28,7 @@ def build_grid_uniform(
     d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: Any
 ) -> tuple[np.ndarray, dict[Field, np.ndarray]]:
     from finch.autoschedule.default_schedulers import NON_RECURSIVE_STANDARD_SCHEDULER
+    from finch.autoschedule.util import fuse_loop_order
 
     index_order = d.index_order
     block_order = tuple(Field(f"out_{idx.name}") for idx in index_order)
@@ -53,22 +53,17 @@ def build_grid_uniform(
         idx for pair in zip(block_order, index_order, strict=True) for idx in pair
     )
     nnz_grid_expr = Aggregate(
-        Literal(ffuncs.add),
-        Literal(np.intp(0)),
-        Reorder(joined, loop_order),
-        index_order,
+        Literal(ffuncs.add), Literal(np.intp(0)), joined, index_order
     )
     out = HardAlias("blocked_uniform_nnz_grid")
     size_outputs = tuple(HardAlias(f"block_sizes_{axis}") for axis in range(len(masks)))
     size_queries = tuple(
-        Query(
-            Table(size_out, (block_idx,)),
-            Aggregate(
-                Literal(ffuncs.add),
-                Literal(np.intp(0)),
-                Reorder(mask, (block_idx, idx)),
-                (idx,),
+        fuse_loop_order(
+            Query(
+                Table(size_out, (block_idx,)),
+                Aggregate(Literal(ffuncs.add), Literal(np.intp(0)), mask, (idx,)),
             ),
+            (block_idx, idx),
         )
         for idx, block_idx, mask, size_out in zip(
             index_order, block_order, masks, size_outputs, strict=True
@@ -76,7 +71,7 @@ def build_grid_uniform(
     )
     prgm = Plan(
         (
-            Query(Table(out, block_order), nnz_grid_expr),
+            fuse_loop_order(Query(Table(out, block_order), nnz_grid_expr), loop_order),
             *size_queries,
             Produces((out, *size_outputs)),
         )

@@ -30,6 +30,7 @@ from finch.autoschedule.loop_orderer.loop_order_bnb import (
 )
 from finch.autoschedule.loop_orderer.loop_order_greedy import GreedyLoopOrderer
 from finch.autoschedule.tensor_stats import DenseStatsFactory, FDStatsFactory
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import NotationCompiler
 
@@ -157,10 +158,18 @@ def test_formatters_infer_each_definition(monkeypatch, formatter, factory_cls):
     a_tensor, b_tensor = ft.asarray(np.ones(3)), ft.asarray(np.ones((2, 4)))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(scratch, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(before, (i,)), lgc.Table(scratch, (i,))),
-            lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(b, (i, j))),
-            lgc.Query(lgc.Table(after, (i, j)), lgc.Table(scratch, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i,)), lgc.Table(a, (i,))), (i,)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(before, (i,)), lgc.Table(scratch, (i,))), (i,)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(b, (i, j))), (i, j)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(after, (i, j)), lgc.Table(scratch, (i, j))), (i, j)
+            ),
             lgc.Produces((before, after)),
         )
     )
@@ -269,13 +278,18 @@ def test_allocated_buffer_redefinition(executor):
     a, b, out, before = map(lgc.HardAlias, ("a", "b", "out", "before"))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(before, (i,)), lgc.Table(out, (i,))),
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(b, (i,))),
-            lgc.QueryInto(
-                lgc.Table(out, (i,)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Table(b, (i,)), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(before, (i,)), lgc.Table(out, (i,))), (i,)
+            ),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(b, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(out, (i,)),
+                    lgc.Literal(ffuncs.add),
+                    lgc.Table(b, (i,)),
+                ),
+                (i,),
             ),
             lgc.Produces((before, out)),
         )
@@ -299,8 +313,10 @@ def test_allocated_buffer_rank_change():
     a, b, out = map(lgc.HardAlias, ("a", "b", "out"))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(out, (i, j)), lgc.Table(b, (i, j))),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out, (i, j)), lgc.Table(b, (i, j))), (i, j)
+            ),
             lgc.Produces((out,)),
         )
     )
@@ -316,7 +332,10 @@ def test_redefinition_preserves_query_unit_dimensions(executor):
     a, b = map(lgc.HardAlias, "ab")
     original = ft.asarray(np.arange(3))
     plan = lgc.Plan(
-        (lgc.Query(lgc.Table(a, (i,)), lgc.Table(b, ())), lgc.Produces((a,)))
+        (
+            fuse_loop_order(lgc.Query(lgc.Table(a, (i,)), lgc.Table(b, ())), (i,)),
+            lgc.Produces((a,)),
+        )
     )
     assert plan.infer_shape({a: (3,), b: ()})[a] == (None,)
     (result,) = executor(plan, {a: original, b: ft.asarray(np.array(2))})
