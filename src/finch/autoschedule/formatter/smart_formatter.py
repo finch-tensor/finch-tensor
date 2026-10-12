@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from finch import finch_logic as lgc
 from finch.algebra import (
-    AbstractFill,
+    AbstractFillFType,
     FType,
     TensorFType,
     ffuncs,
@@ -33,7 +33,9 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST
 def nnz_after(fields, stats, stats_factory, level):
     reduce_fields = tuple(fields[level + 1 :])
     if reduce_fields:
-        reduced = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        reduced = stats_factory.aggregate(
+            ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
+        )
     else:
         reduced = stats
     return reduced.estimate_non_fill_values()
@@ -44,13 +46,13 @@ def optimize_format(
     shape_type,
     stats,
     stats_factory,
-    fill_value,
+    fill_type: AbstractFillFType,
     candidates,
     leaf_cost_fn,
 ):
     n = len(fields)
-    fill_ftype = ftype(fill_value)
-    leaf = element(fill_value, fill_ftype)
+    fill_ftype = fill_type.element_type
+    leaf = element(fill_type, fill_ftype)
     val_size = np_dtype(fill_ftype).itemsize
     assert leaf.position_type is not None
     pos_size = np_dtype(leaf.position_type).itemsize
@@ -103,7 +105,7 @@ def optimize_format(
 def total_tree_cost(
     lvl, fields, stats, stats_factory, num_pos, level, candidates, leaf_cost_fn
 ):
-    val_size = np_dtype(ftype(lvl.fill_value)).itemsize
+    val_size = np_dtype(lvl.fill_type.element_type).itemsize
     pos_size = np_dtype(ftype(lvl.position_type)).itemsize
 
     if level == len(fields):
@@ -139,7 +141,7 @@ class SmartFormatter(LogicFormatter):
     @abstractmethod
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType: ...
@@ -157,8 +159,8 @@ class SmartFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -182,7 +184,7 @@ class SmartFormatter(LogicFormatter):
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
-                            fill_values[lhs],
+                            fill_types[lhs],
                             shape_type,
                             rhs_stats,
                         )
@@ -205,7 +207,7 @@ class SmartFormatter(LogicFormatter):
 class FDFormatter(SmartFormatter):
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> FiberTensorFType:
@@ -217,8 +219,8 @@ class FDFormatter(SmartFormatter):
                 f"{len(stats.index_order)} stats dimensions."
             )
 
-        fill_ftype = ftype(fill_value)
-        lvl = element(fill_value, fill_ftype)
+        fill_ftype = fill_type.element_type
+        lvl = element(fill_type, fill_ftype)
         for dim in reversed(range(len(stats.index_order))):
             field = stats.index_order[dim]
             outer_fields = frozenset(stats.index_order[:dim])
@@ -309,7 +311,7 @@ class CostFormatter(SmartFormatter):
         self._stats_factory = stats_factory
         return super().lower(prgm, bindings, stats, stats_factory)
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
+    def get_tensor_ftype(self, fill_type, shape_type, stats):
         if self._stats_factory is None:
             raise ValueError("CostFormatter requires StatsFactory")
         lvl = optimize_format(
@@ -317,7 +319,7 @@ class CostFormatter(SmartFormatter):
             shape_type,
             stats,
             self._stats_factory,
-            fill_value,
+            fill_type,
             self.candidates,
             self.leaf_cost_fn,
         )

@@ -16,10 +16,12 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Literal,
     MapJoin,
     Query,
     Table,
+    fill_expression,
 )
 
 A = ft.asarray(np.ones((2,)))
@@ -724,6 +726,11 @@ def test_reduce_idx(expr, reduce_field, expected_query, expected_point_expr):
     assert aq.point_expr == expected_point_expr(alias_expr)
 
 
+def overwrite_with(arg):
+    """The overwrite of an output, which starts from the fill value of `arg`."""
+    return Aggregate(Literal(ffuncs.overwrite), fill_expression(arg), arg, ())
+
+
 def rename_aliases(expr):
     if isinstance(expr, Table):
         return Table(
@@ -736,10 +743,12 @@ def rename_aliases(expr):
     if isinstance(expr, Aggregate):
         return Aggregate(
             expr.op,
-            expr.init,
+            rename_aliases(expr.init),
             rename_aliases(expr.arg),
             expr.idxs,
         )
+    if isinstance(expr, FillTable):
+        return FillTable(rename_aliases(expr.tns))
     return expr
 
 
@@ -760,9 +769,7 @@ def rename_aliases(expr):
             [],
             Query(
                 Table(Alias("out"), (Field("i"),)),
-                Aggregate(
-                    Literal(ffuncs.overwrite),
-                    Literal(np.float64(0.0)),
+                overwrite_with(
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -770,7 +777,6 @@ def rename_aliases(expr):
                             Table(Literal(A), (Field("i"),)),
                         ),
                     ),
-                    (),
                 ),
             ),
         ),
@@ -793,9 +799,7 @@ def rename_aliases(expr):
             [Field("i")],
             Query(
                 Table(Alias("out"), (Field("j"),)),
-                Aggregate(
-                    Literal(ffuncs.overwrite),
-                    Literal(np.float64(0.0)),
+                overwrite_with(
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -803,7 +807,6 @@ def rename_aliases(expr):
                             Table(Literal(A), (Field("j"),)),
                         ),
                     ),
-                    (),
                 ),
             ),
         ),
@@ -828,9 +831,7 @@ def rename_aliases(expr):
             # Expect: Query(out, overwrite-Aggregate wrapping the same MapJoin)
             Query(
                 Table(Alias("out"), (Field("k"),)),
-                Aggregate(
-                    Literal(ffuncs.overwrite),
-                    Literal(np.float64(0.0)),
+                overwrite_with(
                     MapJoin(
                         Literal(ffuncs.mul),
                         (
@@ -839,7 +840,6 @@ def rename_aliases(expr):
                             Table(Literal(A), (Field("k"),)),
                         ),
                     ),
-                    (),
                 ),
             ),
         ),

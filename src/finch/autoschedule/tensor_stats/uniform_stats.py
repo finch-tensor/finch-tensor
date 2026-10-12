@@ -23,7 +23,7 @@ class UniformStatsFactory(
         base = super().__call__(tensor, fields)
 
         if tensor.ndim == 0:
-            nnz = float(tensor.item() != base.fill_value.value)
+            nnz = float(tensor.item() != tensor.fill_value)
         else:
             lps = get_lp_norms(tensor, fields, norms=(1.0,))
             nnz = lps[fields[0]][0]
@@ -93,9 +93,9 @@ class UniformStatsFactory(
             p_old = stats.estimate_non_fill_values() / old_vol if old_vol > 0 else 0.0
         else:
             raise TypeError("Stats Class must be inherit from NumericStats")
-        if is_annihilator(op.ftype, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_type):
             res_p = math.pow(p_old, k)
-        elif is_identity(op.ftype, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_type):
             res_p = 1 - math.pow((1 - p_old), k)
         else:
             res_p = 1.0

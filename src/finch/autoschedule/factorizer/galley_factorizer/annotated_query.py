@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
 
 from finch.algebra import (
-    DynamicFill,
-    StaticFill,
     cansplitpush,
     ffuncs,
     is_associative,
@@ -30,6 +28,7 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
     TensorStats,
+    fill_expression,
 )
 from finch.symbolic import gensym
 from finch.tensor import Scalar
@@ -110,7 +109,7 @@ class AnnotatedQuery(Generic[TS]):
 
         def strip_aggregates(
             node: LogicNode,
-        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal, LogicNode]]]:
+        ) -> tuple[LogicNode, list[tuple[Field, Path, Literal, Literal]]]:
             """Remove Aggregate nodes bottom-up, recording each reduction index
             together with the path of the aggregate's argument in the stripped
             tree."""
@@ -118,7 +117,7 @@ class AnnotatedQuery(Generic[TS]):
                 case Aggregate(Literal() as op, Literal() as init, arg, idxs):
                     new_arg, records = strip_aggregates(arg)
                     for idx in idxs:
-                        records.append((idx, (), op, init, new_arg))
+                        records.append((idx, (), op, init))
                     return new_arg, records
                 case LogicTree():
                     children = node.children
@@ -128,8 +127,8 @@ class AnnotatedQuery(Generic[TS]):
                         new_child, child_records = strip_aggregates(child)
                         new_children.append(new_child)
                         records.extend(
-                            (idx, (i, *path), op, init, arg)
-                            for idx, path, op, init, arg in child_records
+                            (idx, (i, *path), op, init)
+                            for idx, path, op, init in child_records
                         )
                     if new_children != children:
                         node = type(node).from_children(*new_children)
@@ -138,21 +137,13 @@ class AnnotatedQuery(Generic[TS]):
                     return node, []
 
         point_expr, agg_records = strip_aggregates(expr)
-        for idx, agg_path, op_lit, init_lit, agg_arg in agg_records:
+        for idx, agg_path, op_lit, init_lit in agg_records:
             idx_starting_path[idx] = agg_path
             idx_top_order[idx] = top_counter
             top_counter += 1
 
-            if op_lit.val is None:
-                idx_op[idx] = ffuncs.init_write(cache[agg_arg].fill_value)
-                match cache[agg_arg].fill_value:
-                    case DynamicFill() as fill:
-                        idx_init[idx] = fill
-                    case StaticFill() as fill:
-                        idx_init[idx] = fill.value
-            else:
-                idx_op[idx] = op_lit.val
-                idx_init[idx] = init_lit.val
+            idx_op[idx] = op_lit.val
+            idx_init[idx] = init_lit.val
 
             starting_reduce_idxs.append(idx)
 
@@ -837,17 +828,9 @@ class AnnotatedQuery(Generic[TS]):
         """
         expr = self.point_expr
         if not isinstance(expr, Table):
-            match self.cache_point[expr].fill_value:
-                case DynamicFill() as fill:
-                    init = Literal(fill)
-                case StaticFill() as fill:
-                    init = Literal(fill.value)
-            expr = Aggregate(
-                Literal(ffuncs.overwrite),
-                init,
-                cast(LogicExpression, expr),
-                (),
-            )
+            arg = cast(LogicExpression, expr)
+            # The result starts from the fill value of what overwrites it.
+            expr = Aggregate(Literal(ffuncs.overwrite), fill_expression(arg), arg, ())
         return Query(
             Table(self.output_name, tuple(self.output_order)),
             cast(LogicExpression, expr),

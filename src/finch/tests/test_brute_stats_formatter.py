@@ -31,10 +31,10 @@ def get_stats(matrix, fields):
 
 
 def brute_force_best(
-    fields, shape_type, stats, factory, fill_value, candidates, leaf_cost_fn
+    fields, shape_type, stats, factory, fill_type, candidates, leaf_cost_fn
 ):
-    fill_ftype = fl.ftype(fill_value)
-    leaf_lvl = fl.element(fill_value, fill_ftype)
+    fill_ftype = fill_type.element_type
+    leaf_lvl = fl.element(fill_type, fill_ftype)
     best_cost = None
     best_fmt = None
     for combination in itertools.product(candidates, repeat=len(fields)):
@@ -87,12 +87,12 @@ def test_storage_dp_and_brute(matrix, fields_2d):
         shape_type,
         stats,
         factory,
-        stats.fill_value,
+        stats.fill_type,
         formatter.candidates,
         formatter.leaf_cost_fn,
     )
 
-    dp_fmt = formatter.get_tensor_ftype(stats.fill_value, shape_type, stats).lvl_t
+    dp_fmt = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats).lvl_t
     dp_cost = total_tree_cost(
         dp_fmt,
         fields_2d,
@@ -120,12 +120,12 @@ def test_iter_dp_and_brute(matrix, fields_2d):
         shape_type,
         stats,
         factory,
-        stats.fill_value,
+        stats.fill_type,
         formatter.candidates,
         formatter.leaf_cost_fn,
     )
 
-    dp_fmt = formatter.get_tensor_ftype(stats.fill_value, shape_type, stats).lvl_t
+    dp_fmt = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats).lvl_t
     dp_cost = total_tree_cost(
         dp_fmt,
         fields_2d,

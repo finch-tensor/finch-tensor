@@ -193,6 +193,45 @@ def test_codegen(compiler, buffer):
     finch_assert_equal(result, expected)
 
 
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        NumbaCompiler(),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_kernels_write_tensor_fields_back(compiler):
+    # A kernel which changes a dimension or a dynamic fill of a tensor it was
+    # given updates the tensor, so that kernels can redefine shapes and fills.
+    fill = DynamicFill(np.float64(0.0))
+    fiber = fiber_tensor(dense(element(fill.ftype))).from_numpy(np.zeros(3), fill)
+    array = finch.BufferizedNDArray.from_numpy(np.zeros(3), fill_value=fill)
+    formats = (fiber.ftype, array.ftype)
+    t, a = asm.Variable("t", fiber.ftype), asm.Variable("a", array.ftype)
+    alias = asm.Variable("alias", array.ftype)
+    dense_lvl = asm.GetAttr(t, asm.Literal("lvl"))
+    element_lvl = asm.GetAttr(dense_lvl, asm.Literal("lvl"))
+    body = asm.Block(
+        (
+            asm.Assign(alias, a),
+            asm.SetAttr(dense_lvl, asm.Literal("dimension"), asm.Literal(np.intp(5))),
+            asm.SetAttr(element_lvl, asm.Literal("fill"), asm.Literal(np.float64(7))),
+            asm.SetAttr(alias, asm.Literal("fill"), asm.Literal(np.float64(8))),
+            asm.Return(asm.Literal(np.intp(0))),
+        )
+    )
+    kernel_t = asm.AssemblyKernelFType("f", (fiber.ftype, array.ftype), finch.intp)
+    prgm = asm.Module((asm.Function(asm.Variable("f", kernel_t), (t, a), body),))
+    compiler(prgm).f(fiber, array)
+    assert fiber.shape == (5,)
+    assert fiber.fill_value == 7.0
+    assert array.fill_value == 8.0
+    # The tensors keep their formats, so later calls reuse the same kernels.
+    assert (fiber.ftype, array.ftype) == formats
+
+
 @pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "buffer"],

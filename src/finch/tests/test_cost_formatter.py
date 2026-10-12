@@ -1,13 +1,23 @@
+import pytest
+
 import numpy as np
 
 import finch as fl
 from finch import ffuncs
+from finch.algebra import DynamicFillFType, StaticFillFType
 from finch.autoschedule.capture import LogicCapture
+from finch.autoschedule.formatter.galley_formatter import estimate_nnz
 from finch.autoschedule.formatter.smart_formatter import (
     IterCostFormatter,
     StorageCostFormatter,
+    nnz_after,
 )
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import (
+    BaseTensorStats,
+    DCStatsFactory,
+    UniformStatsFactory,
+)
+from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.finch_logic import (
     Alias,
     Field,
@@ -18,6 +28,40 @@ from finch.finch_logic import (
     Query,
     Table,
 )
+
+
+@pytest.mark.parametrize(
+    "fill_type",
+    [
+        StaticFillFType(np.float64(0)),
+        StaticFillFType(np.float64(1)),
+        StaticFillFType(np.float64(-1)),
+        DynamicFillFType(fl.float64),
+    ],
+)
+@pytest.mark.parametrize(
+    "level_type", [fl.SparseListLevelFType, fl.SparseHashLevelFType]
+)
+def test_sparse_costs_reduce_support(fill_type, level_type):
+    i, j = Field("i"), Field("j")
+    stats = UniformStats(BaseTensorStats((i, j), {i: 4, j: 3}, fill_type), nnz=6)
+    factory = UniformStatsFactory()
+    support = factory.support(stats)
+
+    assert support is not stats
+    assert support.fill_type == StaticFillFType(False)
+    assert support.index_order == stats.index_order
+    assert support.dim_sizes == stats.dim_sizes
+    assert support.nnz == stats.nnz
+    assert nnz_after((i, j), stats, factory, 0) == pytest.approx(3.5)
+    assert estimate_nnz(stats, factory, (i,)) == pytest.approx(3.5)
+
+    leaf = fl.element(fill_type, fl.float64)
+    level = level_type(fl.dense(leaf))
+    pos_size = np.dtype(np.intp).itemsize
+    expected = (2 + 3.5) * pos_size + 3.5 * 3 * 8
+    assert level.level_cost((i, j), stats, factory, 1, 0) == pytest.approx(expected)
+    assert stats.fill_type == fill_type
 
 
 def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
@@ -63,7 +107,7 @@ def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     formatter = StorageCostFormatter()
     formatter._stats_factory = stats_factory
     ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
+        StaticFillFType(np.float64(0.0)), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
@@ -83,7 +127,7 @@ def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     formatter = IterCostFormatter()
     formatter._stats_factory = stats_factory
     ftype = formatter.get_tensor_ftype(
-        np.float64(0.0), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
+        StaticFillFType(np.float64(0.0)), (fl.ftype(np.intp), fl.ftype(np.intp)), stats
     )
 
     assert isinstance(ftype, fl.FiberTensorFType)
@@ -94,7 +138,7 @@ def _cost_output_pattern(formatter_cls, stats, stats_factory):
     formatter = formatter_cls()
     formatter._stats_factory = stats_factory
     shape_type = tuple(fl.ftype(np.intp) for _ in stats.index_order)
-    ftype = formatter.get_tensor_ftype(stats.fill_value, shape_type, stats)
+    ftype = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats)
 
     lvl = ftype.lvl_t
     pattern = []
