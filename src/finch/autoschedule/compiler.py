@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import cast
 
 from finch import finch_logic as lgc
@@ -56,7 +57,10 @@ class PointwiseContext:
                     ntn.Access(
                         self.ctx.slots[var.unfused],
                         ntn.Read(),
-                        tuple(loops[idx] for idx in idxs),
+                        tuple(
+                            loops[idx]
+                            for idx in self.ctx.stored_idxs(var.unfused, idxs)
+                        ),
                     )
                 )
             case lgc.Literal(val):
@@ -73,6 +77,18 @@ class PointwiseContext:
                 )
             case _:
                 raise Exception(f"Unrecognized logic: {ex}")
+
+
+@dataclass
+class FusedLoop:
+    """An enclosing Fuse node being lowered to a loop over `idx`."""
+
+    idx: lgc.Field
+    var: ntn.Variable
+    # The statements which run before the loop, rather than in each iteration.
+    hoisted: list[ntn.NotationStatement] = field(default_factory=list)
+    # The modes of the tensors which hoisted statements declare.
+    modes: dict[lgc.Alias, ntn.AccessMode] = field(default_factory=dict)
 
 
 def merge_shapes(a: ntn.Variable | None, b: ntn.Variable | None) -> ntn.Variable | None:
@@ -118,6 +134,40 @@ class NotationContext:
         self.modes: dict[lgc.Alias, ntn.AccessMode] = {
             var: ntn.Read() for var in bindings
         }
+        # The enclosing fused loops, from outermost to innermost.
+        self.fused: list[FusedLoop] = []
+
+    def stored_idxs(
+        self, var: lgc.Alias, idxs: tuple[lgc.Field, ...]
+    ) -> tuple[lgc.Field, ...]:
+        """The fields of a table of `var` which its storage holds. A fused alias
+        may store only the fields after its fused ones, within the loops which
+        iterate over them."""
+        split = len(idxs) - self.bindings[var].ndim
+        fused = [loop.idx for loop in self.fused]
+        if not all(idx in fused for idx in idxs[:split]):
+            raise ValueError(
+                f"{var} stores only the fields {idxs[split:]} of {idxs}, outside "
+                "of the Fuse nodes which iterate over the rest."
+            )
+        return idxs[split:]
+
+    def fused_level(self, var: lgc.Alias, idxs: tuple[lgc.Field, ...]) -> int | None:
+        """The outermost fused loop which iterates over a stored field of `var`,
+        so that `var` is declared before it rather than in each iteration."""
+        stored = self.stored_idxs(var, idxs)
+        for level, loop in enumerate(self.fused):
+            if loop.idx in stored:
+                return level
+        return None
+
+    def hoist(
+        self, level: int, var: lgc.Alias, stmts: tuple[ntn.NotationStatement, ...]
+    ) -> None:
+        """Run `stmts`, which declare `var`, before the fused loop at `level`."""
+        self.fused[level].hoisted.extend(stmts)
+        for loop in self.fused[level:]:
+            loop.modes[var] = self.modes[var]
 
     def freeze(self, var: lgc.Alias) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave `var` frozen, so that it can be read."""
@@ -146,6 +196,7 @@ class NotationContext:
         stmts = self.freeze(var)
         self.modes[var] = ntn.Update(op)
         shape = cast(tuple[ntn.NotationExpression, ...], self.shapes[var])
+        shape = shape[len(shape) - self.bindings[var].ndim :]
         return (*stmts, ntn.Declare(self.slots[var], init, op, shape))
 
     def lower_init(self, init: lgc.LogicExpression) -> ntn.NotationExpression:
@@ -168,16 +219,25 @@ class NotationContext:
         )
         shape = []
         stmts = list(self.check_shapes(rhs))
-        for i, (idx, dim_t) in enumerate(
-            zip(idxs, self.bindings[var].shape_type, strict=True)
-        ):
-            value = dims.get(idx) or ntn.Literal(dim_t(1))
+        # A fused alias may store only its trailing fields, so its leading
+        # fused fields take the types of their extents.
+        stored_types = self.bindings[var].shape_type
+        dim_types = (None,) * (len(idxs) - len(stored_types)) + tuple(stored_types)
+        for i, (idx, dim_t) in enumerate(zip(idxs, dim_types, strict=True)):
+            value = dims.get(idx) or ntn.Literal((dim_t or ftypes.intp)(1))
+            if dim_t is None:
+                dim_t = value.result_type
             if value.result_type != dim_t:
                 value = ntn.Call(ntn.Literal(ffuncs.astype(dim_t)), (value,))
             dim = ntn.Variable(gensym(f"{var.name}_dim_{i}"), dim_t)
             shape.append(dim)
             stmts.append(ntn.Assign(dim, value))
         self.shapes[var] = tuple(shape)
+        self.shape_types[var] = tuple(dim.result_type for dim in shape)
+        if self.fused:
+            # Shapes don't change across fused iterations.
+            self.fused[0].hoisted.extend(stmts)
+            return ()
         return tuple(stmts)
 
     def check_shapes(
@@ -237,6 +297,10 @@ class NotationContext:
         )
         if not nonempty:
             return self.fold(var, idxs, ffuncs.overwrite, rhs, init)
+        if self.fused_level(var, idxs) is not None:
+            raise NotImplementedError(
+                f"Overwriting {var} across fused iterations with a reduction"
+            )
         # Each branch must leave every tensor in the same mode.
         stmts = (*self.freeze_reads(rhs), *self.freeze(var))
         body = self.fold(var, idxs, ffuncs.overwrite, rhs, init)
@@ -263,7 +327,12 @@ class NotationContext:
             match init:
                 case ntn.Literal(val) if op == ffuncs.overwrite and not reduced:
                     op = ffuncs.init_write(val)
-            stmts += self.declare(var, init, ntn.Literal(op))
+            declare = self.declare(var, init, ntn.Literal(op))
+            level = self.fused_level(var, idxs)
+            if level is None:
+                stmts += declare
+            else:
+                self.hoist(level, var, declare)
         match rhs:
             case lgc.Reorder(lgc.Table() as arg, loop_order):
                 body = self._lower_query_of_reorder(var, op, arg, idxs, loop_order)
@@ -315,8 +384,12 @@ class NotationContext:
                 read_idxs.append(new_idx)
                 read_idx = next(pending, None)
         assert read_idx is None
+        # The enclosing fused loops iterate over their fields already.
+        fused = {loop.idx: loop.var for loop in self.fused}
         loops = {
-            idx: ntn.Variable(
+            idx: fused[idx]
+            if idx in fused
+            else ntn.Variable(
                 gensym(idx.name),
                 shape_type.get(idx) or shape_type[remap_idxs[idx]],
             )
@@ -327,10 +400,12 @@ class NotationContext:
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(op)),
-            tuple(loops[idx] for idx in reorder_idxs),
+            tuple(loops[idx] for idx in self.stored_idxs(query_lhs, reorder_idxs)),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(loop_idxs):
+            if idx in fused:
+                continue
             stop = shapes.get(idx) or shapes[remap_idxs[idx]]
             ext = ntn.Call(
                 ntn.Literal(make_extent),
@@ -374,18 +449,25 @@ class NotationContext:
             **dict(zip(agg_arg.arg.fields(), arg_types, strict=True)),
         }
         shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs}
+        # The enclosing fused loops iterate over their fields already.
+        fused = {loop.idx: loop.var for loop in self.fused}
         loops = {
-            idx: ntn.Variable(gensym(idx.name), shape_type[idx]) for idx in loop_idxs
+            idx: fused[idx]
+            if idx in fused
+            else ntn.Variable(gensym(idx.name), shape_type[idx])
+            for idx in loop_idxs
         }
         ctx = PointwiseContext(self)
         rhs = ctx(agg_arg.arg, loops)
         lhs_access = ntn.Access(
             self.slots[query_lhs],
             ntn.Update(ntn.Literal(agg_op)),
-            tuple(loops[idx] for idx in output_idxs),
+            tuple(loops[idx] for idx in self.stored_idxs(query_lhs, output_idxs)),
         )
         body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
         for idx in reversed(loop_idxs):
+            if idx in fused:
+                continue
             ext = ntn.Call(
                 ntn.Literal(make_extent),
                 (ntn.Literal(shape_type[idx](0)), shapes[idx]),
@@ -398,6 +480,52 @@ class NotationContext:
 
         return body
 
+    def fused_extent(
+        self, idx: lgc.Field, body: lgc.LogicStatement
+    ) -> ntn.NotationExpression:
+        """The extent of the fused field `idx`, from a tensor which `body` reads
+        but doesn't write, so its shape is known before the loop."""
+        written = set()
+        for node in PostOrderDFS(body):
+            match node:
+                case lgc.Query(lgc.Table(lgc.Alias() as var, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as var, _), _, _
+                ):
+                    written.add(var.unfused)
+        for node in PostOrderDFS(body):
+            match node:
+                case lgc.Table(lgc.Alias() as var, idxs) if (
+                    idx in idxs and var.unfused not in written
+                ):
+                    shape = self.shapes[var.unfused]
+                    dim = shape[idxs.index(idx) - len(idxs) + len(shape)]
+                    if dim is not None:
+                        return dim
+        raise ValueError(f"No tensor read in the body of Fuse({idx}) has its extent.")
+
+    def lower_fuse(
+        self, idx: lgc.Field, body: lgc.LogicStatement
+    ) -> ntn.NotationStatement:
+        """Lower `body` to a loop over `idx`. The shapes of the body, and the
+        declarations of tensors which span its iterations, run before the loop."""
+        dim = self.fused_extent(idx, body)
+        loop = FusedLoop(idx, ntn.Variable(gensym(idx.name), dim.result_type))
+        self.fused.append(loop)
+        start = dict(self.modes)
+        stmts = [self(body)]
+        # Each iteration leaves every tensor in the mode the next one expects.
+        for var, mode in {**start, **loop.modes}.items():
+            match mode:
+                case ntn.Read():
+                    stmts += self.freeze(var)
+                case ntn.Update(ntn.Literal() as op):
+                    stmts += self.thaw(var, op)
+        self.fused.pop()
+        ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(dim.result_type(0)), dim))
+        return ntn.Block(
+            (*loop.hoisted, ntn.Loop(loop.var, ext, ntn.Block(tuple(stmts))))
+        )
+
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
         Lower Finch Logic to Finch Notation. First we check for early
@@ -408,6 +536,8 @@ class NotationContext:
             case lgc.Plan(bodies):
                 stmts = (self(body) for body in bodies)
                 return ntn.Block(tuple(s for s in stmts if s != ntn.Block(())))
+            case lgc.Fuse(idx, body):
+                return self.lower_fuse(idx, body)
             case lgc.Query(lgc.Table(lgc.Alias() as lhs, idxs), lgc.Table() as arg):
                 # A copy starts from the fill value of arg, and the fields of
                 # arg which lhs lacks are reduced by overwriting.
@@ -438,6 +568,15 @@ class NotationContext:
                 lhs = lhs.unfused
                 op = ntn.Literal(ffuncs.overwrite)
                 fill = self.bindings[lhs].fill_type
+                level = self.fused_level(lhs, idxs)
+                if level is not None:
+                    if is_static(fill) and not bool(ffuncs.same(init, fill.value)):
+                        raise NotImplementedError(
+                            f"Initializing {lhs} across fused iterations to a "
+                            "value other than its static fill"
+                        )
+                    self.hoist(level, lhs, self.declare(lhs, ntn.Literal(init), op))
+                    return ntn.Block(())
                 if is_static(fill) and not bool(ffuncs.same(init, fill.value)):
                     # A static fill can't change, so lhs is declared with its
                     # fill, and then every element is overwritten with init.

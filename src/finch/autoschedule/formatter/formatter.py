@@ -60,6 +60,8 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     new_bodies = tuple(formatter(body) for body in bodies)
                     return lgc.Plan(new_bodies)
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body))
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):

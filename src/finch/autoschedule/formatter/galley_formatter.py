@@ -225,6 +225,8 @@ class GalleyFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body))
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, rhs
                 ):

@@ -14,6 +14,8 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
 from finch.compile import NotationCompiler
 from finch.finch_logic.interpreter import MockFusedTensor
+from finch.finch_notation.nodes import NotationTree
+from finch.symbolic import PostOrderDFS
 
 
 def test_fused_alias_node():
@@ -353,3 +355,214 @@ def test_compiling_a_redefined_view(compiler, n):
     result, result2 = compiler()(program).main(*bindings.values())
     np.testing.assert_array_equal(result.to_numpy(), data.T)
     np.testing.assert_array_equal(result2.to_numpy(), 2 * data.T)
+
+
+def gustavson_plan(a, b, w, c):
+    # C[i, k] = sum_j A[i, j] * B[j, k], one row of C at a time.
+    i, j, k = map(lgc.Field, "ijk")
+    fused = lgc.FusedAlias(w, 1)
+    return lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Query(
+                            lgc.Table(fused, (i, k)),
+                            lgc.Aggregate(
+                                lgc.Literal(ffuncs.add),
+                                lgc.Literal(0),
+                                lgc.Reorder(
+                                    lgc.MapJoin(
+                                        lgc.Literal(ffuncs.mul),
+                                        (lgc.Table(a, (i, j)), lgc.Table(b, (j, k))),
+                                    ),
+                                    (i, j, k),
+                                ),
+                                (j,),
+                            ),
+                        ),
+                        lgc.Query(lgc.Table(c, (i, k)), lgc.Table(fused, (i, k))),
+                    )
+                ),
+            ),
+            lgc.Produces((c,)),
+        )
+    )
+
+
+def declared(program, slot_name):
+    """Whether `program` declares the slot `slot_name` inside a loop, and outside."""
+    inside, outside = False, False
+
+    def visit(node, in_loop):
+        nonlocal inside, outside
+        match node:
+            case ntn.Declare(ntn.Slot(name, _), _, _, _) if name == slot_name:
+                if in_loop:
+                    inside = True
+                else:
+                    outside = True
+            case ntn.Loop(_, _, body):
+                visit(body, True)
+            case NotationTree():
+                for child in node.children:
+                    visit(child, in_loop)
+
+    visit(program, False)
+    return inside, outside
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_fuse_compilation_uses_a_workspace(compiler):
+    # The fused alias stores only its trailing field, as the formatters which
+    # format stored dimensions choose, so each row reuses one workspace.
+    a, b, w, c = map(lgc.HardAlias, "abwc")
+    data_a = np.array([[1, 2, 0], [0, 3, 4]])
+    data_b = np.array([[1, 0], [0, 1], [2, 2]])
+    bindings = {
+        a: ft.asarray(data_a),
+        b: ft.asarray(data_b),
+        w: ft.asarray(np.zeros(0, dtype=np.int64)),
+        c: ft.asarray(np.zeros((0, 0), dtype=np.int64)),
+    }
+    plan = gustavson_plan(a, b, w, c)
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    slots = {
+        node.name.strip("#").split("#")[0]: node.name
+        for node in PostOrderDFS(program)
+        if isinstance(node, ntn.Slot)
+    }
+    # The workspace is reset for each row, and the output only once.
+    assert declared(program, slots["_w"]) == (True, False)
+    assert declared(program, slots["_c"]) == (False, True)
+    (result,) = compiler()(program).main(*bindings.values())
+    np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
+    assert bindings[w].shape == (2,)
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_fuse_compilation_with_full_storage(compiler):
+    # The default formatter stores every field of the fused alias, so it spans
+    # the fused iterations like any other output.
+    a, b, w, c = map(lgc.HardAlias, "abwc")
+    data_a = np.array([[1, 2, 0], [0, 3, 4]])
+    data_b = np.array([[1, 0], [0, 1], [2, 2]])
+    bindings = {a: ft.asarray(data_a), b: ft.asarray(data_b)}
+    capture = LogicCapture()
+    DefaultLogicFormatter(CompilerFormLowerer(capture))(
+        gustavson_plan(a, b, w, c),
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
+    )
+    assert capture.last_bindings[w].ndim == 2
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
+    for var in (w, c):
+        bindings[var] = capture.last_bindings[var].construct((0, 0))
+    (result,) = compiler()(program).main(*bindings.values())
+    np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+def test_nested_fuse_with_scalar_workspaces(compiler):
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, w, z, c, d = map(lgc.HardAlias, "awzcd")
+    fw, fz = lgc.FusedAlias(w, 2), lgc.FusedAlias(z, 2)
+
+    def scaled(factor):
+        return lgc.Aggregate(
+            lgc.Literal(ffuncs.overwrite),
+            lgc.Literal(0.0),
+            lgc.Reorder(
+                lgc.MapJoin(
+                    lgc.Literal(ffuncs.mul), (lgc.Table(a, (i, j)), lgc.Literal(factor))
+                ),
+                (i, j),
+            ),
+            (),
+        )
+
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Fuse(
+                    j,
+                    lgc.Plan(
+                        (
+                            lgc.Query(lgc.Table(fw, (i, j)), scaled(2.0)),
+                            lgc.Query(lgc.Table(fz, (i, j)), scaled(3.0)),
+                            lgc.Query(lgc.Table(c, (i, j)), lgc.Table(fw, (i, j))),
+                            lgc.Query(lgc.Table(d, (i, j)), lgc.Table(fz, (i, j))),
+                        )
+                    ),
+                ),
+            ),
+            lgc.Produces((c, d)),
+        )
+    )
+    data = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])
+    bindings = {
+        a: ft.asarray(data),
+        w: ft.asarray(np.array(0.0)),
+        z: ft.asarray(np.array(0.0)),
+        c: ft.asarray(np.zeros((0, 0))),
+        d: ft.asarray(np.zeros((0, 0))),
+    }
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    result_c, result_d = compiler()(program).main(*bindings.values())
+    np.testing.assert_array_equal(result_c.to_numpy(), 2 * data)
+    np.testing.assert_array_equal(result_d.to_numpy(), 3 * data)
+
+
+def test_workspace_needs_its_fuse():
+    # Without the Fuse, a workspace can't hold every row of the fused alias.
+    a, b, w, c = map(lgc.HardAlias, "abwc")
+    plan = gustavson_plan(a, b, w, c)
+    (fuse, produces) = plan.bodies
+    unfused = lgc.Plan((*fuse.body.bodies, produces))
+    bindings = {
+        a: ft.asarray(np.ones((2, 3))),
+        b: ft.asarray(np.ones((3, 2))),
+        w: ft.asarray(np.zeros(0)),
+        c: ft.asarray(np.zeros((0, 0))),
+    }
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    with pytest.raises(ValueError, match="outside of the Fuse nodes"):
+        NotationGenerator()(unfused, ftypes, {}, None)
+
+
+def test_compiler_form_checks_fuse_bodies():
+    # A Fuse can't both read and write a tensor along its field.
+    i = lgc.Field("i")
+    a, b = lgc.HardAlias("a"), lgc.HardAlias("b")
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Query(lgc.Table(b, (i,)), lgc.Table(a, (i,))),
+                        lgc.Query(lgc.Table(a, (i,)), lgc.Table(b, (i,))),
+                    )
+                ),
+            ),
+            lgc.Produces((a,)),
+        )
+    )
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: ft.asarray(np.ones(2)).ftype for var in (a, b)
+    }
+    with pytest.raises(ValueError, match="cannot occur on both lhs and rhs"):
+        CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())

@@ -83,6 +83,17 @@ class AliasedForm(Form):
         validate(term)
 
 
+def _fused_statements(node: LogicStatement) -> tuple[LogicStatement, ...]:
+    """The statements of `node`, looking through the bodies of Fuse nodes."""
+    match node:
+        case Fuse(_, body):
+            return _fused_statements(body)
+        case Plan(bodies):
+            return tuple(stmt for body in bodies for stmt in _fused_statements(body))
+        case _:
+            return (node,)
+
+
 def _is_init(init: LogicExpression) -> bool:
     # The init of an aggregate is a 0-D expression without aggregates or reorders.
     return init.fields() == () and not any(
@@ -124,6 +135,9 @@ class SingleAggregateForm(AliasedForm):
                         )
                     for body in bodies[:-1]:
                         validate(body, True)
+                case Fuse(_, body):
+                    for stmt in _fused_statements(body):
+                        validate(stmt, True)
                 case Query(Table(), Table()):
                     return None
                 case Query(Table(), Aggregate(_, init, arg, _)) if _is_init(init):
@@ -196,6 +210,9 @@ class LoopOrderedForm(SingleAggregateForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body, loop_order)
+                case Fuse(_, body):
+                    for stmt in _fused_statements(body):
+                        validate(stmt, loop_order)
                 case Query(Table(), Table()) | QueryInto(Table(), _, Literal()):
                     return None
                 case QueryInto(Table(_, lhs_idxs), _, Reorder(Table(), idxs)):
@@ -254,6 +271,9 @@ class FormattedForm(LoopOrderedForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body)
+                case Fuse(_, body):
+                    for stmt in _fused_statements(body):
+                        validate(stmt)
                 case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
@@ -308,6 +328,11 @@ class CompilerForm(FormattedForm):
     from lhs_idxs are reduced with op. Every alias must have a TensorFType in
     the bindings, and a statement can't read the alias it writes. Definitions
     may change dimension sizes but must preserve the allocated tensor's rank.
+
+    A statement may also be a Fuse, whose body is a Plan of these statements
+    and Fuse nodes, without a Produces, in FusedForm. It runs its body once for
+    each value of its field. Within Fuse nodes, a FusedAlias may store only the
+    dimensions after its fused ones, as a workspace for each fused iteration.
     """
 
     @classmethod
@@ -327,7 +352,13 @@ class CompilerForm(FormattedForm):
                 pass
             case _:
                 raise ValueError("The last body of a plan must be a Produces node.")
+        # Deleting a Fuse doesn't change the meaning of a program, so fused
+        # aliases outside of Fuse nodes are views of their whole tensors.
         for body in bodies:
+            if isinstance(body, Fuse):
+                FusedForm.validate_inputs(body, bindings, stats, stats_factory)
+        stmts = tuple(stmt for body in bodies for stmt in _fused_statements(body))
+        for body in stmts:
             match body:
                 case Query(Table(Alias() as lhs, idxs), rhs) | QueryInto(
                     Table(Alias() as lhs, idxs), _, rhs
@@ -335,7 +366,11 @@ class CompilerForm(FormattedForm):
                     pass
                 case _:
                     raise ValueError(f"CompilerForm only allows queries, not {body}")
-            if len(idxs) != bindings[lhs.unfused].ndim:
+            # A fused alias may store only the dimensions after its fused ones.
+            ranks = {len(idxs)}
+            if isinstance(lhs, FusedAlias):
+                ranks.add(len(idxs) - lhs.n)
+            if bindings[lhs.unfused].ndim not in ranks:
                 raise ValueError(f"Cannot change the rank of allocated tensor {lhs}.")
             if any(
                 node.unfused == lhs.unfused

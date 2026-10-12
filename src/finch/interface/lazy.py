@@ -567,7 +567,7 @@ def defer(arr: Any) -> LazyTensor | tuple[Any, ...]:
 
 def full(
     shape: int | tuple[int, ...],
-    fill_value: bool | complex,
+    fill_value: bool | complex | LazyTensor,
     *,
     dtype: Any | None = None,
     device=None,
