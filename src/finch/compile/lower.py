@@ -364,6 +364,7 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
             ctx_transforms = (LowerPackedStructSlots(),)
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
+        self.mode = ctx_lower.mode
 
     def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
@@ -544,6 +545,9 @@ class AssemblyContext(Context):
         node.
         """
         match prgm:
+            case ntn.Assert(exp):
+                self.exec(asm.Assert(self(exp)))
+                return None
             case ntn.Literal(value):
                 return asm.Literal(value)
             case ntn.Value(expr, _):

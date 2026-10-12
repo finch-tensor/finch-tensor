@@ -24,7 +24,7 @@ from finch.finch_logic import (
 )
 from finch.finch_notation import NotationInterpreter
 from finch.finch_notation.stages import NotationLoader
-from finch.symbolic import gensym
+from finch.symbolic import CompilerMode, gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
 
@@ -97,8 +97,11 @@ class NotationContext:
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
         shape_types: dict[lgc.Alias, tuple[FType | None, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
+        *,
+        mode: CompilerMode | None = None,
     ):
         self.bindings = bindings
+        self.mode = mode if mode is not None else CompilerMode()
         self.args = args
         self.slots = slots
         self.shapes = shapes
@@ -164,7 +167,7 @@ class NotationContext:
             zip(rhs.fields(), rhs.dimmap(merge_shapes, self.shapes), strict=True)
         )
         shape = []
-        stmts = []
+        stmts = list(self.check_shapes(rhs))
         for i, (idx, dim_t) in enumerate(
             zip(idxs, self.bindings[var].shape_type, strict=True)
         ):
@@ -176,6 +179,31 @@ class NotationContext:
             stmts.append(ntn.Assign(dim, value))
         self.shapes[var] = tuple(shape)
         return tuple(stmts)
+
+    def check_shapes(
+        self, rhs: lgc.LogicExpression, lhs: lgc.Table | None = None
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Check shared fields before declaring or updating an output."""
+        if not (self.mode.safe or self.mode.debug):
+            return ()
+        checks = []
+
+        def merge(a, b):
+            if a != b:
+                left = a if a is not None else ntn.Literal(b.result_type(1))
+                right = b if b is not None else ntn.Literal(a.result_type(1))
+                check = ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (left, right)))
+                if check not in checks:
+                    checks.append(check)
+            return merge_shapes(a, b)
+
+        dims = rhs.dimmap(merge, self.shapes)
+        if lhs is not None:
+            lhs_dims = dict(zip(lhs.idxs, lhs.dimmap(merge, self.shapes), strict=True))
+            for idx, dim in zip(rhs.fields(), dims, strict=True):
+                if idx in lhs_dims:
+                    merge(lhs_dims[idx], dim)
+        return tuple(checks)
 
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""
@@ -418,13 +446,17 @@ class NotationContext:
                     return ntn.Block((*stmts, body))
                 return ntn.Block(self.declare(lhs, ntn.Literal(init), op))
             case lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, idxs),
+                lgc.Table(lgc.Alias() as lhs, idxs) as table,
                 lgc.Literal(op),
                 lgc.Reorder() as rhs,
             ):
+                # The outer Reorder is loop order, including broadcast fields.
+                checks = self.check_shapes(rhs.arg, table)
                 if op == ffuncs.overwrite:
-                    return self.overwrite(lhs, idxs, rhs)
-                return self.fold(lhs, idxs, op, rhs, None)
+                    body = self.overwrite(lhs, idxs, rhs)
+                else:
+                    body = self.fold(lhs, idxs, op, rhs, None)
+                return ntn.Block((*checks, body)) if checks else body
             case lgc.Produces(args):
                 vars: list[lgc.Alias] = []
                 for var in args:
@@ -470,6 +502,9 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
 
 
 class NotationGenerator(LogicNotationLowerer):
+    def __init__(self, *, mode: CompilerMode | None = None):
+        self.mode = mode if mode is not None else CompilerMode()
+
     def lower(
         self,
         term: lgc.LogicStatement,
@@ -511,6 +546,7 @@ class NotationGenerator(LogicNotationLowerer):
             slots,
             shapes,
             epilogue=epilogue,
+            mode=self.mode,
         )
         body = ctx(term)
         ret_t = None
@@ -538,6 +574,8 @@ class NotationGenerator(LogicNotationLowerer):
 
 
 class LogicCompiler(CompilerForm, LogicLoader):
+    """Compile logic using the notation loader's safety mode for shape checks."""
+
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -546,7 +584,7 @@ class LogicCompiler(CompilerForm, LogicLoader):
         if ctx_load is None:
             ctx_load = NotationInterpreter()
         if ctx_lower is None:
-            ctx_lower = NotationGenerator()
+            ctx_lower = NotationGenerator(mode=ctx_load.mode)
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
