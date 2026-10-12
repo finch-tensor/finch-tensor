@@ -228,15 +228,24 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             julia_buf_args.append(julia_buf)
 
         raw_args = [arg.raw_julia_obj for arg in julia_buf_args]
-        raw_args += [
-            int(args[pos].shape[axis]) for pos, axis in getattr(kernel, "extents", ())
-        ]
-        getattr(jl, func_name)(*raw_args)
+        for pos, axis, casts in getattr(kernel, "extents", ()):
+            size = args[pos].shape[axis]
+            for cast in casts:
+                size = cast(size)
+            raw_args.append(int(size))
+        raw_results = jl.values(getattr(jl, func_name)(*raw_args))
 
-        # Associate returned tensors with their Python ownership handles.
-        return tuple(
-            julia_buf_args[position] for position in metadata.returned_positions
-        )
+        # Finch returns new tensor headers when declarations change dimensions.
+        # Keep the ownership handles and their pooled storage in sync with them.
+        results = []
+        for position, raw in zip(metadata.returned_positions, raw_results, strict=True):
+            result = julia_buf_args[position]
+            result._raw_julia_obj = raw
+            result._shape = tuple(int(dim) for dim in reversed(jl.size(raw)))
+            if result._lease is not None:
+                result._lease.raw = raw
+            results.append(result)
+        return tuple(results)
 
     def _to_julia_owned_tensor(
         self, tensor: Tensor, pin_fill: bool = False

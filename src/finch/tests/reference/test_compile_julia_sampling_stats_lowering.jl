@@ -8,9 +8,9 @@ eval(let
         v5 = 1
     Finch.@finch_kernel function main(v0,v1,v2,v3,v4,v5)
         v3 .= 0
-        for v10 = 1:v4
-            for v11 = 1:v5
-                v3[v11,v10] <<Finch.initwrite(0)>>= ((v0[v11,v10] != 0) * Int64(v1[v10]) * Int64(v2[v11]))
+        for v12 = 1:v4
+            for v13 = 1:v5
+                v3[v13,v12] <<Finch.initwrite(0)>>= ((v0[v13,v12] != 0) * Int64(v1[v12]) * Int64(v2[v13]))
             end
         end
         return v3
@@ -62,17 +62,17 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 empty!(v3_lvl_2_pool)
                 v3_lvl_2_qos_stop = 0
                 resize!(v3_lvl_2_perm, 0)
-                for v10_5 = 1:v0_lvl_stop
+                for v12_5 = 1:v0_lvl_stop
                     if v3_lvl_qos_stop == length(v3_lvl_perm)
                         v3_lvl_q_stop = max(length(v3_lvl_perm) << 1, v3_lvl_qos_stop + 1)
                         Finch.resize_if_smaller!(v3_lvl_perm, v3_lvl_q_stop)
                         v3_lvl_tbl_cap = Finch.sparse_hash_table_capacity(v3_lvl_q_stop, v3_lvl.subtables)
                         Finch.sparse_hash_table_resize!(v3_lvl_tbl_ctrl, v3_lvl_tbl, v3_lvl_tbl_cap, v3_lvl.subtables)
                     end
-                    v3_lvl_tbl_hash = Finch.sparse_hash_hash(1, v10_5)
+                    v3_lvl_tbl_hash = Finch.sparse_hash_hash(1, v12_5)
                     v3_lvl_tbl_ctrl_byte = Finch.sparse_hash_hash_ctrl(v3_lvl_tbl_hash)
                     v3_lvl_tbl_n = length(v3_lvl_tbl)
-                    v3_lvl_tbl_slot = Finch.sparse_hash_table_lookup_insert_slot(v3_lvl_tbl_ctrl, v3_lvl_tbl, 1, v10_5, v3_lvl_tbl_hash, v3_lvl_tbl_ctrl_byte, v3_lvl_tbl_n, v3_lvl.subtables)
+                    v3_lvl_tbl_slot = Finch.sparse_hash_table_lookup_insert_slot(v3_lvl_tbl_ctrl, v3_lvl_tbl, 1, v12_5, v3_lvl_tbl_hash, v3_lvl_tbl_ctrl_byte, v3_lvl_tbl_n, v3_lvl.subtables)
                     v3_lvl_qos = 0
                     v3_lvl_tbl_found = false
                     if v3_lvl_tbl_slot != 0 && @inbounds(v3_lvl_tbl_ctrl[v3_lvl_tbl_slot]) != Finch.SPARSE_HASH_CTRL_EMPTY
@@ -85,8 +85,8 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                         v3_lvl_qos_stop = v3_lvl_qos
                     end
                     v3_lvl_dirty = false
-                    v0_lvl_q = (1 - 1) * v0_lvl_stop + v10_5
-                    if (Finch).randommask_uniform((Finch).randommask_mix(xor((Finch).randommask_mix(seed), (UInt64)(v10_5)))) < p
+                    v0_lvl_q = (1 - 1) * v0_lvl_stop + v12_5
+                    if (Finch).randommask_uniform((Finch).randommask_mix(xor((Finch).randommask_mix(seed), (UInt64)(v12_5)))) < p
                         v0_lvl_2_q = v0_lvl_2_ptr[v0_lvl_q]
                         v0_lvl_2_q_stop = v0_lvl_2_ptr[v0_lvl_q + 1]
                         if v0_lvl_2_q < v0_lvl_2_q_stop
@@ -187,7 +187,7 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                     end
                     if v3_lvl_dirty
                         if !v3_lvl_tbl_found
-                            Finch.sparse_hash_table_insert_at_slot!(v3_lvl_tbl_ctrl, v3_lvl_tbl, v3_lvl_tbl_slot, 1, v10_5, v3_lvl_qos, v3_lvl_tbl_ctrl_byte)
+                            Finch.sparse_hash_table_insert_at_slot!(v3_lvl_tbl_ctrl, v3_lvl_tbl, v3_lvl_tbl_slot, 1, v12_5, v3_lvl_qos, v3_lvl_tbl_ctrl_byte)
                         end
                     end
                 end
