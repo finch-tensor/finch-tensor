@@ -10,6 +10,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     FillTable,
+    Fuse,
     Literal,
     LogicExpression,
     LogicNode,
@@ -31,13 +32,25 @@ def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
     return ex if ex.fields() == idxs else Reorder(ex, idxs)
 
 
+def fuse_loop_order(
+    stmt: LogicStatement, loop_order: tuple[Field, ...]
+) -> LogicStatement:
+    """`stmt` within a Fuse node for each field of `loop_order`, from outermost
+    to innermost, which sets its loop order."""
+    for idx in reversed(loop_order):
+        stmt = Fuse(idx, stmt)
+    return stmt
+
+
 @overload
-def push_fields(root: LogicExpression) -> LogicExpression: ...
+def push_relabels(root: LogicExpression) -> LogicExpression: ...
 @overload
-def push_fields(root: LogicStatement) -> LogicStatement: ...
+def push_relabels(root: LogicStatement) -> LogicStatement: ...
 @overload
-def push_fields(root: LogicNode) -> LogicNode: ...
-def push_fields(root):
+def push_relabels(root: LogicNode) -> LogicNode: ...
+def push_relabels(root):
+    """Push each Relabel down to the Tables and scalars it relabels."""
+
     def rule_1(ex):
         match ex:
             case Relabel(MapJoin(op, args) as mj, idxs):
@@ -71,7 +84,17 @@ def push_fields(root):
             case Relabel(Literal() | FillTable() as scalar, _):
                 return scalar
 
-    root = Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
+    return Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
+
+
+@overload
+def push_fields(root: LogicExpression) -> LogicExpression: ...
+@overload
+def push_fields(root: LogicStatement) -> LogicStatement: ...
+@overload
+def push_fields(root: LogicNode) -> LogicNode: ...
+def push_fields(root):
+    root = push_relabels(root)
 
     def rule_2(ex):
         match ex:

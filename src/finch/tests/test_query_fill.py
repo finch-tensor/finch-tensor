@@ -9,6 +9,7 @@ from finch.algebra import DynamicFill, ffuncs, is_dynamic
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import NotationCompiler
 from finch.tensor import BufferizedNDArray
@@ -38,23 +39,23 @@ def produces(executor, *tables):
 
 @pytest.mark.parametrize("ndim", [0, 1])
 def test_query_fills_flow_through_cached_kernel(executor, monkeypatch, ndim):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     idxs = tuple(lgc.Field(f"i_{i}") for i in range(ndim))
     one = lgc.Literal(np.float64(1))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(b, idxs), lgc.Table(a, idxs)),
-            lgc.Query(
-                lgc.Table(c, idxs),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.overwrite),
-                    lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.FillTable(b), one)),
-                    lgc.Reorder(
+            fuse_loop_order(lgc.Query(lgc.Table(b, idxs), lgc.Table(a, idxs)), idxs),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, idxs),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.overwrite),
+                        lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.FillTable(b), one)),
                         lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.Table(b, idxs), one)),
-                        idxs,
+                        (),
                     ),
-                    (),
                 ),
+                idxs,
             ),
             produces(executor, lgc.Table(b, idxs), lgc.Table(c, idxs)),
         )
@@ -86,11 +87,11 @@ def test_query_fills_flow_through_cached_kernel(executor, monkeypatch, ndim):
     [(np.bool_, (True, False)), (np.complex128, (3.5 + 7j, 1.5 + 2j))],
 )
 def test_query_copies_dynamic_fills(executor, dtype, fills):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i = lgc.Field("i")
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(b, (i,)), lgc.Table(a, (i,))),
+            fuse_loop_order(lgc.Query(lgc.Table(b, (i,)), lgc.Table(a, (i,))), (i,)),
             produces(executor, lgc.Table(b, (i,))),
         )
     )

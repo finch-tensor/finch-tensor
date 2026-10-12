@@ -30,6 +30,7 @@ from finch.autoschedule.loop_orderer.loop_order_bnb import (
 )
 from finch.autoschedule.loop_orderer.loop_order_greedy import GreedyLoopOrderer
 from finch.autoschedule.tensor_stats import DenseStatsFactory, FDStatsFactory
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import NotationCompiler
 
@@ -52,7 +53,7 @@ def executor(request):
 def test_query_redefines_shape(shape):
     i, j = map(lgc.Field, "ij")
     a, b, scratch, before, after = map(
-        lgc.Alias, ("a", "b", "scratch", "before", "after")
+        lgc.HardAlias, ("a", "b", "scratch", "before", "after")
     )
     fields = (i, j)[: len(shape)]
     data_a = np.arange(3)
@@ -78,7 +79,7 @@ def test_query_redefines_shape(shape):
 
 def test_query_reads_previous_shape_before_rebinding():
     i, j = map(lgc.Field, "ij")
-    a = lgc.Alias("a")
+    a = lgc.HardAlias("a")
     data = np.arange(6).reshape(2, 3)
     original = ft.asarray(data)
     bindings = {a: original}
@@ -105,7 +106,7 @@ def test_query_reads_previous_shape_before_rebinding():
 @pytest.mark.parametrize("old_size,new_size", [(3, 5), (0, 1), (1, 0)])
 def test_queryinto_rejects_shape_change(op, old_size, new_size):
     i = lgc.Field("i")
-    a, b = map(lgc.Alias, "ab")
+    a, b = map(lgc.HardAlias, "ab")
     original = ft.asarray(np.arange(old_size))
     bindings = {a: original, b: ft.asarray(np.arange(new_size))}
     query = lgc.QueryInto(lgc.Table(a, (i,)), lgc.Literal(op), lgc.Table(b, (i,)))
@@ -122,7 +123,7 @@ def test_queryinto_rejects_shape_change(op, old_size, new_size):
 @pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
 def test_queryinto_uses_redefined_shape(op):
     i = lgc.Field("i")
-    a, b = map(lgc.Alias, "ab")
+    a, b = map(lgc.HardAlias, "ab")
     original = ft.asarray(np.arange(3))
     bindings = {a: original, b: ft.asarray(np.arange(5))}
     dims: dict[lgc.Alias, tuple[int, ...]] = {a: (3,), b: (5,)}
@@ -152,15 +153,23 @@ def test_queryinto_uses_redefined_shape(op):
 def test_formatters_infer_each_definition(monkeypatch, formatter, factory_cls):
     i, j = map(lgc.Field, "ij")
     a, b, scratch, before, after = map(
-        lgc.Alias, ("a", "b", "scratch", "before", "after")
+        lgc.HardAlias, ("a", "b", "scratch", "before", "after")
     )
     a_tensor, b_tensor = ft.asarray(np.ones(3)), ft.asarray(np.ones((2, 4)))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(scratch, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(before, (i,)), lgc.Table(scratch, (i,))),
-            lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(b, (i, j))),
-            lgc.Query(lgc.Table(after, (i, j)), lgc.Table(scratch, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i,)), lgc.Table(a, (i,))), (i,)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(before, (i,)), lgc.Table(scratch, (i,))), (i,)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(b, (i, j))), (i, j)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(after, (i, j)), lgc.Table(scratch, (i, j))), (i, j)
+            ),
             lgc.Produces((before, after)),
         )
     )
@@ -189,7 +198,9 @@ def test_formatters_infer_each_definition(monkeypatch, formatter, factory_cls):
 )
 def test_loop_orderers_refresh_stats(monkeypatch, orderer, module, search):
     i = lgc.Field("i")
-    a, b, scratch, out, result = map(lgc.Alias, ("a", "b", "scratch", "out", "result"))
+    a, b, scratch, out, result = map(
+        lgc.HardAlias, ("a", "b", "scratch", "out", "result")
+    )
     copy = lgc.Query(lgc.Table(out, (i,)), lgc.Table(scratch, (i,)))
     plan = lgc.Plan(
         (
@@ -234,7 +245,7 @@ def test_loop_orderers_refresh_stats(monkeypatch, orderer, module, search):
 def test_compiled_intermediate_redefinition(scheduler):
     i, j = map(lgc.Field, "ij")
     a, b, scratch, before, after = map(
-        lgc.Alias, ("a", "b", "scratch", "before", "after")
+        lgc.HardAlias, ("a", "b", "scratch", "before", "after")
     )
     data_a, data_b = np.arange(3), np.arange(8).reshape(2, 4)
     plan = lgc.Plan(
@@ -264,16 +275,21 @@ def test_compiled_intermediate_redefinition(scheduler):
 
 def test_allocated_buffer_redefinition(executor):
     i = lgc.Field("i")
-    a, b, out, before = map(lgc.Alias, ("a", "b", "out", "before"))
+    a, b, out, before = map(lgc.HardAlias, ("a", "b", "out", "before"))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(before, (i,)), lgc.Table(out, (i,))),
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(b, (i,))),
-            lgc.QueryInto(
-                lgc.Table(out, (i,)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Table(b, (i,)), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(before, (i,)), lgc.Table(out, (i,))), (i,)
+            ),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(b, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(out, (i,)),
+                    lgc.Literal(ffuncs.add),
+                    lgc.Table(b, (i,)),
+                ),
+                (i,),
             ),
             lgc.Produces((before, out)),
         )
@@ -294,11 +310,13 @@ def test_allocated_buffer_redefinition(executor):
 
 def test_allocated_buffer_rank_change():
     i, j = map(lgc.Field, "ij")
-    a, b, out = map(lgc.Alias, ("a", "b", "out"))
+    a, b, out = map(lgc.HardAlias, ("a", "b", "out"))
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(out, (i, j)), lgc.Table(b, (i, j))),
+            fuse_loop_order(lgc.Query(lgc.Table(out, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out, (i, j)), lgc.Table(b, (i, j))), (i, j)
+            ),
             lgc.Produces((out,)),
         )
     )
@@ -311,10 +329,13 @@ def test_allocated_buffer_rank_change():
 
 def test_redefinition_preserves_query_unit_dimensions(executor):
     i = lgc.Field("i")
-    a, b = map(lgc.Alias, "ab")
+    a, b = map(lgc.HardAlias, "ab")
     original = ft.asarray(np.arange(3))
     plan = lgc.Plan(
-        (lgc.Query(lgc.Table(a, (i,)), lgc.Table(b, ())), lgc.Produces((a,)))
+        (
+            fuse_loop_order(lgc.Query(lgc.Table(a, (i,)), lgc.Table(b, ())), (i,)),
+            lgc.Produces((a,)),
+        )
     )
     assert plan.infer_shape({a: (3,), b: ()})[a] == (None,)
     (result,) = executor(plan, {a: original, b: ft.asarray(np.array(2))})

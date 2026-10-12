@@ -10,6 +10,7 @@ from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.einsum import LogicEinsumLoader
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import NotationCompiler
 from finch.tensor import BufferizedNDArray, BufferizedNDArrayFType
@@ -39,26 +40,39 @@ def executor(request):
 
 
 def test_query_shapes_flow_through_cached_kernel(executor, monkeypatch):
-    a, b, c, d = (lgc.Alias(name) for name in "ABCD")
+    a, b, c, d = (lgc.HardAlias(name) for name in "ABCD")
     i, j, k = (lgc.Field(name) for name in "ijk")
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(b, (j, i, k)), lgc.Table(a, (i, j))),
-            lgc.QueryInto(
-                lgc.Table(b, (j, i, k)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Literal(np.int64(2)), (j, i, k)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(b, (j, i, k)), lgc.Table(a, (i, j))), (j, i, k)
             ),
-            lgc.Query(
-                lgc.Table(c, (j, k)),
-                lgc.Aggregate(
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(b, (j, i, k)),
                     lgc.Literal(ffuncs.add),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(lgc.Table(b, (j, i, k)), (j, i, k)),
-                    (i,),
+                    lgc.MapJoin(
+                        lgc.Literal(ffuncs.add),
+                        (lgc.Literal(np.int64(1)), lgc.Literal(np.int64(1))),
+                    ),
                 ),
+                (j, i, k),
             ),
-            lgc.Query(lgc.Table(d, (k, j)), lgc.Table(c, (j, k))),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, (j, k)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.add),
+                        lgc.Literal(np.int64(0)),
+                        lgc.Table(b, (j, i, k)),
+                        (i,),
+                    ),
+                ),
+                (j, i, k),
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(d, (k, j)), lgc.Table(c, (j, k))), (k, j)
+            ),
             lgc.Produces((b, c, d)),
         )
     )
@@ -87,11 +101,13 @@ def test_query_shapes_flow_through_cached_kernel(executor, monkeypatch):
 
 
 def test_logic_interpreter_sizes_query_outputs():
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(b, (j, i)), lgc.Table(a, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(b, (j, i)), lgc.Table(a, (i, j))), (j, i)
+            ),
             lgc.Produces((lgc.Table(b, (j, i)),)),
         )
     )
@@ -106,10 +122,13 @@ def test_logic_interpreter_sizes_query_outputs():
 
 @pytest.mark.parametrize("ndim", [0, 2])
 def test_query_expands_scalar_dimensions(executor, ndim):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     idxs = tuple(lgc.Field(f"i_{i}") for i in range(ndim))
     plan = lgc.Plan(
-        (lgc.Query(lgc.Table(b, idxs), lgc.Table(a, ())), lgc.Produces((b,)))
+        (
+            fuse_loop_order(lgc.Query(lgc.Table(b, idxs), lgc.Table(a, ())), idxs),
+            lgc.Produces((b,)),
+        )
     )
     for value in (3, 7):
         tensor = BufferizedNDArray.from_numpy(np.array(value, dtype=np.int64))
@@ -120,14 +139,17 @@ def test_query_expands_scalar_dimensions(executor, ndim):
 
 
 def test_query_into_keeps_bound_shape(executor):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.QueryInto(
-                lgc.Table(b, (i, j)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Table(a, (i,)), (i, j)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(b, (i, j)),
+                    lgc.Literal(ffuncs.add),
+                    lgc.Table(a, (i,)),
+                ),
+                (i, j),
             ),
             lgc.Produces((b,)),
         )
@@ -147,10 +169,15 @@ def test_query_into_keeps_bound_shape(executor):
 
 
 def test_query_replaces_bound_shape(executor):
-    a, b = lgc.Alias("A"), lgc.Alias("B")
+    a, b = lgc.HardAlias("A"), lgc.HardAlias("B")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
-        (lgc.Query(lgc.Table(b, (j, i)), lgc.Table(a, (i, j))), lgc.Produces((b,)))
+        (
+            fuse_loop_order(
+                lgc.Query(lgc.Table(b, (j, i)), lgc.Table(a, (i, j))), (j, i)
+            ),
+            lgc.Produces((b,)),
+        )
     )
     output = BufferizedNDArray.from_numpy(np.full((1, 1), 99, dtype=np.int64))
     for shape in ((2, 3), (4, 1), (0, 2)):

@@ -9,6 +9,7 @@ from finch.algebra import ffuncs
 from finch.autoschedule.compiler import LogicCompiler
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
+from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler
 from finch.compile.lower import AssemblyGenerator
@@ -48,19 +49,22 @@ def tensor(values):
 
 
 def pointwise_plan():
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i = lgc.Field("i")
     rhs = lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.Table(a, (i,)), lgc.Table(b, (i,))))
     return lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(c, (i,)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.overwrite),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(rhs, (i,)),
-                    (),
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, (i,)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.overwrite),
+                        lgc.Literal(np.int64(0)),
+                        rhs,
+                        (),
+                    ),
                 ),
+                (i,),
             ),
             lgc.Produces((c,)),
         )
@@ -68,7 +72,7 @@ def pointwise_plan():
 
 
 def test_shared_dimensions_checked_before_declare(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     plan = pointwise_plan()
     output = tensor([99, 99, 99, 99])
     for a_size, b_size in ((2, 3), (3, 2), (0, 1), (1, 0)):
@@ -89,24 +93,24 @@ def test_shared_dimensions_checked_before_declare(executor):
 
 
 def test_reduced_dimensions_checked_even_with_empty_output(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i, j, k = (lgc.Field(name) for name in "ijk")
     plan = lgc.Plan(
         (
-            lgc.Query(
-                lgc.Table(c, (i, j)),
-                lgc.Aggregate(
-                    lgc.Literal(ffuncs.add),
-                    lgc.Literal(np.int64(0)),
-                    lgc.Reorder(
+            fuse_loop_order(
+                lgc.Query(
+                    lgc.Table(c, (i, j)),
+                    lgc.Aggregate(
+                        lgc.Literal(ffuncs.add),
+                        lgc.Literal(np.int64(0)),
                         lgc.MapJoin(
                             lgc.Literal(ffuncs.mul),
                             (lgc.Table(a, (i, k)), lgc.Table(b, (k, j))),
                         ),
-                        (i, k, j),
+                        (k,),
                     ),
-                    (k,),
                 ),
+                (i, k, j),
             ),
             lgc.Produces((c,)),
         )
@@ -127,14 +131,17 @@ def test_reduced_dimensions_checked_even_with_empty_output(executor):
 
 @pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
 def test_query_into_checks_shared_fields_and_allows_broadcast(executor, op):
-    a, c = lgc.Alias("A"), lgc.Alias("C")
+    a, c = lgc.HardAlias("A"), lgc.HardAlias("C")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.QueryInto(
-                lgc.Table(c, (i, j)),
-                lgc.Literal(op),
-                lgc.Reorder(lgc.Table(a, (i,)), (i, j)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i, j)),
+                    lgc.Literal(op),
+                    lgc.Table(a, (i,)),
+                ),
+                (i, j),
             ),
             lgc.Produces((c,)),
         )
@@ -155,14 +162,17 @@ def test_query_into_checks_shared_fields_and_allows_broadcast(executor, op):
 
 
 def test_empty_overwrite_reduction_still_checks_output_shape(executor):
-    a, c = lgc.Alias("A"), lgc.Alias("C")
+    a, c = lgc.HardAlias("A"), lgc.HardAlias("C")
     i, j = lgc.Field("i"), lgc.Field("j")
     plan = lgc.Plan(
         (
-            lgc.QueryInto(
-                lgc.Table(c, (i,)),
-                lgc.Literal(ffuncs.overwrite),
-                lgc.Reorder(lgc.Table(a, (i, j)), (i, j)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i,)),
+                    lgc.Literal(ffuncs.overwrite),
+                    lgc.Table(a, (i, j)),
+                ),
+                (i, j),
             ),
             lgc.Produces((c,)),
         )
@@ -176,16 +186,19 @@ def test_empty_overwrite_reduction_still_checks_output_shape(executor):
 
 
 def test_shape_checks_use_current_definition(executor):
-    a, b, c = (lgc.Alias(name) for name in "ABC")
+    a, b, c = (lgc.HardAlias(name) for name in "ABC")
     i = lgc.Field("i")
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(c, (i,)), lgc.Table(b, (i,))),
-            lgc.QueryInto(
-                lgc.Table(c, (i,)),
-                lgc.Literal(ffuncs.add),
-                lgc.Reorder(lgc.Table(b, (i,)), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))), (i,)),
+            fuse_loop_order(lgc.Query(lgc.Table(c, (i,)), lgc.Table(b, (i,))), (i,)),
+            fuse_loop_order(
+                lgc.QueryInto(
+                    lgc.Table(c, (i,)),
+                    lgc.Literal(ffuncs.add),
+                    lgc.Table(b, (i,)),
+                ),
+                (i,),
             ),
             lgc.Produces((c,)),
         )
@@ -208,7 +221,7 @@ def test_shape_checks_follow_loader_mode(mode):
         assert mode.safe and mode.debug
     else:
         compiler = LogicCompiler(NotationCompiler(asm.AssemblyInterpreter(), mode=mode))
-    bindings = {lgc.Alias(name): tensor([1, 2]).ftype for name in "ABC"}
+    bindings = {lgc.HardAlias(name): tensor([1, 2]).ftype for name in "ABC"}
     program = compiler.ctx_lower(pointwise_plan(), bindings, {}, None)
     checks = [node for node in PostOrderDFS(program) if isinstance(node, ntn.Assert)]
     assert len(checks) == int(mode.safe or mode.debug)

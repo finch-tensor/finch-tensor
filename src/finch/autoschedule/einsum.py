@@ -16,6 +16,9 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
     match node:
         case lgc.Plan(bodies):
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
+        case lgc.Fuse(_, body):
+            # Einsums don't have loop orders.
+            return generate_einsum_stmt(body)
         case lgc.Query(
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
@@ -88,8 +91,6 @@ def generate_einsum_expr(
     ex: lgc.LogicExpression,
 ) -> ein.EinsumExpression:
     match ex:
-        case lgc.Reorder(arg, idxs):
-            return generate_einsum_expr(arg)
         case lgc.MapJoin(lgc.Literal(operation), lgcargs):
             args = tuple([generate_einsum_expr(arg) for arg in lgcargs])
             return ein.Call(ein.Literal(operation), args)
@@ -147,5 +148,7 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
                 case lgc.Query(lgc.Table(lgc.Alias(name), _), _):
                     defined.add(ein.Alias(name))
         mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
-        lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
+        lgc_bindings: dict[lgc.Alias, TensorFType] = {
+            lgc.HardAlias(var.name): val for var, val in ein_bindings.items()
+        }
         return mod, lgc_bindings

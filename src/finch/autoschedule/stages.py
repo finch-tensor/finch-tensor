@@ -9,9 +9,13 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     FillTable,
+    Fuse,
+    FusedAlias,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicStatement,
+    LogicTree,
     MapJoin,
     Plan,
     Produces,
@@ -22,14 +26,17 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
+from finch.symbolic import Form, PostOrderDFS, Stage
 
 
 class AliasedForm(Form):
     """
     AliasedForm requires that all aliases in the input are defined
     in the bindings or in previous queries and that all Tables
-    are wrapping Aliases.
+    are wrapping Aliases. Defining an alias selects its view, which is either
+    the HardAlias or a FusedAlias with some number of fused dimensions, and
+    invalidates every other view of that alias. Statements may only read or
+    update the current view of an alias. Bindings define the HardAlias view.
     """
 
     @classmethod
@@ -40,28 +47,51 @@ class AliasedForm(Form):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> None:
-        defined_aliases = set(bindings.keys())
+        views: dict[Alias, Alias] = {var.unfused: var for var in bindings}
 
         def validate(node):
             match node:
-                case Query(Table(Alias() as lhs, _), _):
-                    defined_aliases.add(lhs)
-                case QueryInto(Table(Alias() as lhs, _), _, _):
-                    if lhs not in defined_aliases:
+                case Query(Table(Alias() as lhs, _), rhs):
+                    # The rhs is read before the lhs is defined.
+                    validate(rhs)
+                    views[lhs.unfused] = lhs
+                case QueryInto(Table(Alias() as lhs, _), _, rhs):
+                    validate(rhs)
+                    if lhs.unfused not in views:
                         raise ValueError(
                             f"QueryInto updates alias {lhs.name}, which is not defined."
                         )
-                case Query(lhs, _) | QueryInto(lhs, _, _):
-                    raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
-                case Alias(name):
-                    if node not in defined_aliases:
-                        raise ValueError(f"Alias {name} is not defined in bindings.")
-                case Table(tns, _):
-                    if not isinstance(tns, Alias):
-                        raise ValueError("Table nodes must wrap an Alias.")
-            return node
+                    validate(lhs)
+                case Alias() as var:
+                    view = views.get(var.unfused)
+                    if view is None:
+                        raise ValueError(
+                            f"Alias {var.name} is not defined in bindings."
+                        )
+                    if view != var:
+                        raise ValueError(
+                            f"{var} was invalidated by the definition of {view}."
+                        )
+                case Table(Alias() as tns, _):
+                    validate(tns)
+                case Table():
+                    raise ValueError("Table nodes must wrap an Alias.")
+                case LogicTree():
+                    for child in node.children:
+                        validate(child)
 
-        Rewrite(PreWalk(validate))(term)
+        validate(term)
+
+
+def _fused_statements(node: LogicStatement) -> tuple[LogicStatement, ...]:
+    """The statements of `node`, looking through the bodies of Fuse nodes."""
+    match node:
+        case Fuse(_, body):
+            return _fused_statements(body)
+        case Plan(bodies):
+            return tuple(stmt for body in bodies for stmt in _fused_statements(body))
+        case _:
+            return (node,)
 
 
 def _is_init(init: LogicExpression) -> bool:
@@ -105,6 +135,9 @@ class SingleAggregateForm(AliasedForm):
                         )
                     for body in bodies[:-1]:
                         validate(body, True)
+                case Fuse(_, body):
+                    for stmt in _fused_statements(body):
+                        validate(stmt, True)
                 case Query(Table(), Table()):
                     return None
                 case Query(Table(), Aggregate(_, init, arg, _)) if _is_init(init):
@@ -142,19 +175,21 @@ class SingleAggregateForm(AliasedForm):
 class LoopOrderedForm(SingleAggregateForm):
     """
     LoopOrderedForm assumes that the input query has had its loop order set.
-    There are four valid forms for a query in LoopOrderedForm:
+    The loop order of a query is the fields of its enclosing Fuse nodes, from
+    outermost to innermost, which include every field of the query. There are
+    four valid forms for a query in LoopOrderedForm:
         1) transpose queries
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
-            Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
+            Query(Table(_, output_order), Aggregate(_, _, arg, _))
         3) in-place queries
-            QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
+            QueryInto(Table(_, lhs_idxs), _, arg)
         4) in-place initializations
             QueryInto(Table(_, _), _, Literal(_))
-    For aggregate and in-place queries, the loop order includes every lhs
-    field and visits those fields in order. The Tables of arg follow the loop
-    order, except that an in-place query of a single Table may read it in
-    another order, representing a transpose.
+    Initializations need no loop order. Otherwise, the loop order visits the
+    lhs fields in order, and the Tables of arg follow the loop order, except
+    that a transpose query, or an in-place query of a single Table, may read
+    its Table in another order. Queries have no Reorder nodes.
     """
 
     @staticmethod
@@ -172,45 +207,59 @@ class LoopOrderedForm(SingleAggregateForm):
     ) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
 
+        def validate_query(lhs_idxs, arg, loop_order):
+            unfused = {*lhs_idxs, *arg.fields()} - set(loop_order)
+            if unfused:
+                names = ", ".join(sorted(idx.name for idx in unfused))
+                raise ValueError(
+                    f"The loop order of a query is given by its enclosing Fuse "
+                    f"nodes, which must include every field, so {names} need "
+                    "Fuse nodes."
+                )
+            if not cls._check_loop_order(lhs_idxs, loop_order):
+                raise ValueError("Table index order does not match loop order.")
+
         def validate(node, loop_order):
             match node:
                 case Plan(bodies):
-                    for body in bodies[:-1]:
+                    for body in bodies:
                         validate(body, loop_order)
-                case Query(Table(), Table()) | QueryInto(Table(), _, Literal()):
-                    return None
-                case QueryInto(Table(_, lhs_idxs), _, Reorder(Table(), idxs)):
-                    if not cls._check_loop_order(lhs_idxs, idxs):
-                        raise ValueError("Table index order does not match loop order.")
-                    return None
-                case Query(
-                    Table(_, lhs_idxs), Aggregate(_, _, Reorder(arg, idxs), _)
-                ) | QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs)):
-                    if not cls._check_loop_order(lhs_idxs, idxs):
-                        raise ValueError("Table index order does not match loop order.")
-                    return validate(arg, idxs)
-                case Query(Table(), Aggregate(_, _, arg, _)):
-                    raise ValueError(
-                        "All aggregates must wrap a Reorder node specifying\
-                             the loop order."
-                    )
-                case QueryInto():
-                    raise ValueError("In-place queries must have a loop order!")
+                case Fuse(idx, body):
+                    if idx in loop_order:
+                        raise ValueError(
+                            f"Fuse({idx}) is nested in another Fuse of {idx}."
+                        )
+                    validate(body, (*loop_order, idx))
+                case Produces() | QueryInto(Table(), _, Literal()):
+                    return
+                case Query(Table(_, lhs_idxs), Table() as arg) | QueryInto(
+                    Table(_, lhs_idxs), _, Table() as arg
+                ):
+                    validate_query(lhs_idxs, arg, loop_order)
+                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+                    Table(_, lhs_idxs), _, arg
+                ):
+                    validate_query(lhs_idxs, arg, loop_order)
+                    validate(arg, loop_order)
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
                 case Table(_, idxs):
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
-                case Reorder(arg, _):
-                    raise ValueError("Reorder nodes should only appear in loop orders!")
+                case Reorder():
+                    raise ValueError(
+                        "Queries with loop orders can't have Reorder nodes, "
+                        "since Fuse nodes give the loop order and the left-hand "
+                        "tables order the results."
+                    )
                 case Literal() | FillTable():
-                    return None
+                    return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
-            return None
+            return
 
-        validate(term, None)
+        validate(term, ())
 
 
 class FormattedForm(LoopOrderedForm):
@@ -235,16 +284,19 @@ class FormattedForm(LoopOrderedForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body)
+                case Fuse(_, body):
+                    for stmt in _fused_statements(body):
+                        validate(stmt)
                 case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
-                case Aggregate(_, _, arg, _) | Reorder(arg, _):
+                case Aggregate(_, _, arg, _):
                     validate(arg)
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg)
-                case Table(tns, _):
-                    if tns not in bindings:
+                case Table(Alias() as tns, _):
+                    if tns.unfused not in bindings:
                         raise ValueError(
                             f"Alias {tns.name} is not defined in bindings. All aliase\
                                  must have TensorFTypes specified at this stage."
@@ -270,8 +322,7 @@ class CompilerForm(FormattedForm):
     equality-constrained loops to read arg in storage order. Fields absent from
     lhs_idxs are reduced by overwriting.)
     2) reductions
-        Query(Table(lhs, lhs_idxs),
-              Aggregate(op, init, Reorder(arg, loop_order), _))
+        Query(Table(lhs, lhs_idxs), Aggregate(op, init, arg, _))
     (lhs is reset to init, a 0-D expression without aggregates or reorders,
     and arg is folded into it with op.)
     There are two valid kinds of update:
@@ -279,16 +330,23 @@ class CompilerForm(FormattedForm):
         QueryInto(Table(lhs, _), overwrite, Literal(init))
     (Every element of lhs is set to init.)
     2) folds
-        QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
+        QueryInto(Table(lhs, lhs_idxs), op, arg)
     (arg is folded into lhs with op. A fold which overwrites lhs resets it to
     its fill value first.)
+    A statement may also be a Fuse, whose body is a Plan of these statements
+    and Fuse nodes, without a Produces, in FusedForm. It runs its body once for
+    each value of its field. Within Fuse nodes, a FusedAlias may store only the
+    dimensions after its fused ones, as a workspace for each fused iteration.
+
     In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
-    loop order contains each field once and visits all fields of lhs_idxs in
-    order. Tables in a MapJoin must also follow loop order, but a single Table
-    argument may have a different storage order, as in a copy. Fields absent
-    from lhs_idxs are reduced with op. Every alias must have a TensorFType in
-    the bindings, and a statement can't read the alias it writes. Definitions
-    may change dimension sizes but must preserve the allocated tensor's rank.
+    loop order of every statement but an initialization is the fields of its
+    enclosing Fuse nodes, as in LoopOrderedForm, which include every field of
+    the statement and visit lhs_idxs in order. Tables in a MapJoin must also
+    follow loop order, but a single Table argument may have a different storage
+    order, as in a copy. Fields absent from lhs_idxs are reduced with op. Every
+    alias must have a TensorFType in the bindings, and a statement can't read
+    the alias it writes. Definitions may change dimension sizes but must
+    preserve the allocated tensor's rank.
     """
 
     @classmethod
@@ -308,7 +366,13 @@ class CompilerForm(FormattedForm):
                 pass
             case _:
                 raise ValueError("The last body of a plan must be a Produces node.")
+        # Deleting a Fuse doesn't change the meaning of a program, so fused
+        # aliases outside of Fuse nodes are views of their whole tensors.
         for body in bodies:
+            if isinstance(body, Fuse):
+                FusedForm.validate_inputs(body, bindings, stats, stats_factory)
+        stmts = tuple(stmt for body in bodies for stmt in _fused_statements(body))
+        for body in stmts:
             match body:
                 case Query(Table(Alias() as lhs, idxs), rhs) | QueryInto(
                     Table(Alias() as lhs, idxs), _, rhs
@@ -316,9 +380,17 @@ class CompilerForm(FormattedForm):
                     pass
                 case _:
                     raise ValueError(f"CompilerForm only allows queries, not {body}")
-            if len(idxs) != bindings[lhs].ndim:
+            # A fused alias may store only the dimensions after its fused ones.
+            ranks = {len(idxs)}
+            if isinstance(lhs, FusedAlias):
+                ranks.add(len(idxs) - lhs.n)
+            if bindings[lhs.unfused].ndim not in ranks:
                 raise ValueError(f"Cannot change the rank of allocated tensor {lhs}.")
-            if lhs in PostOrderDFS(rhs):
+            if any(
+                node.unfused == lhs.unfused
+                for node in PostOrderDFS(rhs)
+                if isinstance(node, Alias)
+            ):
                 raise ValueError(
                     f"{type(body).__name__} can't both read and write {lhs}."
                 )
@@ -328,15 +400,79 @@ class CompilerForm(FormattedForm):
                         f"The init of an aggregate into {lhs} must be a 0-D "
                         "expression without aggregates or reorders."
                     )
-                case Query(_, Aggregate(_, _, Reorder(arg, loop_order), _)) | (
-                    QueryInto(_, _, Reorder(arg, loop_order))
-                ):
-                    if len(set(loop_order)) != len(loop_order):
-                        raise ValueError("Loop order must not repeat fields.")
-                    if not set(arg.fields()).issubset(loop_order):
-                        raise ValueError("Loop order must include every RHS field.")
                 case QueryInto(_, Literal(op), Literal()) if op != ffuncs.overwrite:
                     raise ValueError(f"Initializing {lhs} must overwrite it, not {op}.")
+
+
+class FusedForm(Form):
+    """
+    Each Fuse field occurs in a HardAlias table in its body. The leading n
+    indices of every FusedAlias table match the first n enclosing Fuse fields,
+    from outermost to innermost.
+
+    Within each Fuse body, a tensor accessed by that Fuse's field in a stored
+    dimension cannot occur on both a query lhs and a query rhs, even in separate
+    queries. Different alias views refer to the same tensor for this check.
+    These constraints apply independently of the query's lowering stage.
+    """
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> None:
+        def validate(node, fused_idxs):
+            match node:
+                case Fuse(idx, body):
+                    hard_idxs = set()
+                    stored = set()
+                    reads = set()
+                    writes = set()
+                    for child in PostOrderDFS(body):
+                        match child:
+                            case Table(HardAlias() as tns, idxs):
+                                hard_idxs.update(idxs)
+                                if idx in idxs:
+                                    stored.add(tns)
+                            case Table(FusedAlias(tns, n), idxs):
+                                if idx in idxs[n:]:
+                                    stored.add(tns)
+                            case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
+                                Table(Alias() as lhs, _), _, rhs
+                            ):
+                                writes.add(lhs.unfused)
+                                for arg in PostOrderDFS(rhs):
+                                    match arg:
+                                        case Alias() as tns:
+                                            reads.add(tns.unfused)
+                    if idx not in hard_idxs:
+                        raise ValueError(
+                            f"Fuse field {idx} must occur in a HardAlias table "
+                            "in its body."
+                        )
+                    conflicts = stored & reads & writes
+                    if conflicts:
+                        names = ", ".join(sorted(tns.name for tns in conflicts))
+                        raise ValueError(
+                            f"Fuse field {idx} accesses a non-fused dimension of "
+                            f"{names}, which cannot occur on both lhs and rhs "
+                            "in its body."
+                        )
+                    validate(body, (*fused_idxs, idx))
+                case Table(FusedAlias(tns, n), idxs):
+                    if n > len(fused_idxs) or idxs[:n] != fused_idxs[:n]:
+                        raise ValueError(
+                            f"Fused indices of {tns} must match the enclosing "
+                            "Fuse fields in order."
+                        )
+                case LogicTree():
+                    for child in node.children:
+                        validate(child, fused_idxs)
+
+        validate(term, ())
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):
