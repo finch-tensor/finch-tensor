@@ -1497,6 +1497,39 @@ def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
 
 
 @mlir_backend
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.intp(2), np.intp(3)),
+        (2, 3.5, True),
+        ((np.intp(2), np.intp(3)), np.intp(4)),
+    ],
+)
+def test_mlir_make_tuple_with_indices(values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    result = asm.Call(asm.Literal(ffuncs.make_tuple), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "make_tuple",
+                    asm.AssemblyKernelFType(
+                        "make_tuple",
+                        tuple(arg.result_type for arg in args),
+                        result.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(result),)),
+            ),
+        )
+    )
+    actual = MLIRCompiler()(program).make_tuple(*values)
+    assert actual == values
+    assert ftype(actual) == ftype(values)
+
+
+@mlir_backend
 def test_mlir_setattr_in_while():
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))

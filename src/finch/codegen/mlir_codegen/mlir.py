@@ -729,6 +729,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
             for k, a in enumerate(args):
                 v = ctx(a)
+                if mlir_type(a.result_type) == "index":
+                    cast = ctx.new_ssa()
+                    ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {v} : index to i64")
+                    v = cast
                 nxt = ctx.new_ssa()
                 ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
                 acc = nxt

@@ -214,9 +214,9 @@ class GalleyFormatter(LogicFormatter):
         bindings = bindings.copy()
         stats_bindings: OrderedDict[lgc.Alias, NS] = OrderedDict(stats)
         stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
@@ -228,6 +228,7 @@ class GalleyFormatter(LogicFormatter):
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, rhs
                 ):
+                    node.infer_shape_type(shape_types)
                     # Evaluating the query gives the stats of the stored result,
                     # in the order of its left-hand table.
                     rhs_stats = stats_interpreter(node, stats_bindings)

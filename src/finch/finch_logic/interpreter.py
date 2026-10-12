@@ -7,9 +7,11 @@ from finch.algebra import (
     DynamicFillFType,
     TupleFType,
     as_fill,
+    ffuncs,
     fisinstance,
     fixpoint_type,
     ftype,
+    is_dynamic,
     np_dtype,
     return_type,
 )
@@ -39,7 +41,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader
 from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -189,10 +191,19 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(Table(Alias() as var, idxs), rhs):
                 rhs = self(Reorder(rhs, idxs))
-                if var not in self.bindings:
+                if (
+                    var not in self.bindings
+                    or self.bindings[var].shape != rhs.tns.shape
+                    or not bool(
+                        ffuncs.same(self.bindings[var].fill_value, rhs.tns.fill_value)
+                    )
+                ):
+                    fill = rhs.tns.fill
+                    if var in self.bindings and is_dynamic(self.bindings[var].fill):
+                        fill = fill.as_dynamic()
                     self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
-                        rhs.tns.fill,
+                        fill,
                         dtype=rhs.tns.element_type,
                     )
                 tns = self.bindings[var]
@@ -200,7 +211,13 @@ class LogicMachine:
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case QueryInto() as stmt:
-                return self(stmt.as_query())
+                tns = self(stmt.lhs.tns)
+                rhs = self(Reorder(stmt.as_query().rhs, stmt.lhs.idxs))
+                if tns.shape != rhs.tns.shape:
+                    raise ValueError("QueryInto cannot change the tensor shape.")
+                for crds in product(*[range(dim) for dim in tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (TableValue(tns, stmt.lhs.idxs),)
             case Plan(bodies):
                 res = ()
                 for body in bodies:
@@ -286,8 +303,5 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-        lgc.LogicStatement,
     ]:
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return MockLogicLibrary(prgm, bindings), bindings, shape_vars, prgm
+        return MockLogicLibrary(prgm, bindings), bindings

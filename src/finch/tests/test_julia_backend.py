@@ -29,6 +29,7 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
+from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
 from finch.compile_jl.julia import jl, julia_available
@@ -101,6 +102,82 @@ def test_compile_julia_preserves_definition_type():
     assert ftype(first) != ftype(second)
     for kernel in (first, second):
         np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
+
+
+def test_compile_julia_resolves_shape_bindings():
+    _requires_julia_backend()
+    tensor_type = ft.asarray(np.zeros(0, dtype=np.int64)).ftype
+    source, output = (ntn.Variable(name, tensor_type) for name in ("source", "output"))
+    src, dst = (ntn.Slot(name, tensor_type) for name in ("src", "dst"))
+    dim, stop, idx = (
+        ntn.Variable(name, ftype(np.int64)) for name in ("dim", "stop", "idx")
+    )
+    op = ntn.Literal(ffuncs.overwrite)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (output,))
+    body = ntn.Block(
+        (
+            ntn.Unpack(src, source),
+            ntn.Unpack(dst, output),
+            ntn.Assign(dim, ntn.Dimension(src, ntn.Literal(0))),
+            # This dimension is used through a binding in a nested block.
+            # Its scope must include the loop in the following block.
+            ntn.Block(
+                (
+                    ntn.Block(
+                        (
+                            ntn.Assign(
+                                stop,
+                                ntn.Call(ntn.Literal(ffuncs.astype(ft.int64)), (dim,)),
+                            ),
+                        )
+                    ),
+                )
+            ),
+            ntn.Block(
+                (
+                    ntn.Declare(dst, ntn.Literal(np.int64(0)), op, (stop,)),
+                    ntn.Loop(
+                        idx,
+                        ntn.Call(ntn.Literal(make_extent), (ntn.Literal(0), stop)),
+                        ntn.Increment(
+                            ntn.Access(dst, ntn.Update(op), (idx,)),
+                            ntn.Call(
+                                ntn.Literal(ffuncs.add),
+                                (
+                                    ntn.Unwrap(ntn.Access(src, ntn.Read(), (idx,))),
+                                    ntn.Literal(np.int64(3)),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            ),
+            ntn.Repack(src, source),
+            ntn.Repack(dst, output),
+            ntn.Return(result),
+        )
+    )
+    function = ntn.Function(
+        ntn.Variable(
+            "bound_copy",
+            AssemblyKernelFType(
+                "bound_copy", (tensor_type, tensor_type), result.result_type
+            ),
+        ),
+        (source, output),
+        body,
+    )
+    kernel = FinchJLCompiler()(ntn.Module((function,))).bound_copy
+    assert kernel.extents == ((0, 0, (ffuncs.astype(ft.int64),)),)
+    # Shape bindings must not introduce scopes around declared/returned tensors.
+    for line in kernel.jl_code.splitlines():
+        if ".=" in line or line.lstrip().startswith("return "):
+            assert line.startswith("        ") and not line.startswith("         ")
+    assert "Int64(" not in kernel.jl_code
+    for size in (5, 0, 2):
+        data = np.arange(size, dtype=np.int64)
+        (actual,) = kernel(ft.asarray(data), ft.asarray(np.zeros_like(data)))
+        np.testing.assert_array_equal(actual.to_numpy(), data + 3)
 
 
 @pytest.mark.parametrize(
@@ -239,6 +316,7 @@ def test_compile_julia_pattern_masks(mask):
     with with_default_scheduler(COMPILE_JULIA):
         result = ft.compute(ft.defer(mask) + ft.defer(data))
 
+    assert result.shape == expected.shape
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
