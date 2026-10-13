@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import weakref
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -144,6 +145,18 @@ class JuliaOwnedTensor(OverrideTensor):
                 device=self.device,
             )
         return Scalar(result, fill_value=self.fill_value, device=self.device)
+
+    def __setitem__(self, index, value):
+        lvl = self.raw_julia_obj.lvl
+        for _ in self._shape:
+            if not jl.isa(lvl, jl.Finch.DenseLevel):
+                raise NotImplementedError(
+                    f"Item assignment is not supported for {self.ftype}"
+                )
+            lvl = lvl.lvl
+        # Dense Julia storage, with its axes reversed, is row-major.
+        values = lvl.val.to_numpy(copy=False)[: math.prod(self._shape)]
+        values.reshape(self._shape)[index] = value
 
     def to_numpy(self):
         if not self._shape:
