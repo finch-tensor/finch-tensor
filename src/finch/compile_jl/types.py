@@ -32,6 +32,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    ShortCircuitScalarFType,
     SplitMaskTensor,
     UpperTriangleTensor,
 )
@@ -221,6 +222,15 @@ def scalar_type_str(fill: Any, element_type: Any) -> str:
     return f"Finch.Scalar{{{_julia_literal(fill)}, {_leaf_type_str(element_type)}}}"
 
 
+def short_circuit_scalar_type_str(fill: Any, element_type: Any) -> str:
+    """The Julia type of a Finch short-circuit scalar with the given fill and
+    element type."""
+    return (
+        f"Finch.ShortCircuitScalar{{{_julia_literal(fill)}, "
+        f"{_leaf_type_str(element_type)}}}"
+    )
+
+
 def _leaf_type_str(T: Any) -> str:
     return str(get_jl().string(to_jl_type(T)))
 
@@ -316,6 +326,10 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     if isinstance(ftype, FillTensorFType):
         # Matches interop.py, which passes a fill tensor as a Finch scalar.
         return f"{scalar_type_str(ftype.fill_value, ftype.element_type)}()"
+    if isinstance(ftype, ShortCircuitScalarFType):
+        return (
+            f"{short_circuit_scalar_type_str(ftype.fill_value, ftype.element_type)}()"
+        )
     match ftype:
         case PatternTensorFType():
             shape = (1,) * ftype.ndim

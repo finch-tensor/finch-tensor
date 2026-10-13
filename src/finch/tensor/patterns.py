@@ -227,6 +227,102 @@ class FillTensor(OverrideTensor):
         )
 
 
+@dataclass(frozen=True, eq=False)
+class ShortCircuitScalarFType(TensorFType):
+    """
+    The type of a scalar that lets a loop reducing into it exit early once the
+    value is an annihilator of the reduction. The Julia backend passes it as a
+    Finch.ShortCircuitScalar.
+    """
+
+    _fill_value: AbstractFill
+    _element_type: FType
+
+    @property
+    def fill_value(self) -> AbstractFill:
+        return self._fill_value
+
+    def with_fill(self, fill_value: AbstractFill) -> ShortCircuitScalarFType:
+        return replace(self, _fill_value=fill_value)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self):
+        return ()
+
+    @property
+    def level_format_properties(self) -> list[FormatProperty]:
+        return []
+
+    def from_numpy(self, arr):
+        raise NotImplementedError
+
+    def __eq__(self, other):
+        if not isinstance(other, ShortCircuitScalarFType):
+            return False
+        return (
+            builtins.bool(np.all(ffuncs.same(self._fill_value, other._fill_value)))
+            and self._element_type == other._element_type
+        )
+
+    def __hash__(self):
+        return hash((ffuncs.samehash(self._fill_value), self._element_type))
+
+    def construct(self, shape: tuple) -> ShortCircuitScalar:
+        return ShortCircuitScalar(self.fill_value, self.element_type)
+
+    def __call__(self, val: Any) -> ShortCircuitScalar:
+        raise NotImplementedError(
+            f"Tensor conversion not yet implemented for {type(self).__name__}"
+        )
+
+
+class ShortCircuitScalar(OverrideTensor):
+    """
+    A scalar holding its fill, which a kernel reduces into. See
+    ShortCircuitScalarFType.
+    """
+
+    def __init__(self, fill_value, element_type: FType):
+        self._fill = as_fill(fill_value)
+        self._element_type = element_type
+
+    def with_fill(self, fill_value: AbstractFill) -> ShortCircuitScalar:
+        return ShortCircuitScalar(fill_value, self._element_type)
+
+    def item(self):
+        return self._fill.value
+
+    def to_numpy(self):
+        return np.asarray(self._fill.value, dtype=self._element_type)
+
+    def to_scipy(self):
+        raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
+
+    @property
+    def shape(self):
+        return ()
+
+    @property
+    def fill_value(self) -> Any:
+        return self._fill.value
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    @property
+    def shape_type(self) -> tuple[FType, ...]:
+        return ()
+
+    @property
+    def ftype(self):
+        return ShortCircuitScalarFType(self._fill, self._element_type)
+
+
 class IndexTensor(OverrideTensor):
     """
     A tensor that has a specific shape and returns the linear (flattened) index used

@@ -38,6 +38,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    ShortCircuitScalar,
     SplitMaskTensor,
     UpperTriangleTensor,
 )
@@ -377,6 +378,11 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         # kernels separately, so it is passed as a Finch scalar.
         fill = obj.element_type(0) if pin_fill else obj.fill_value
         scalar_t = jl.seval(jl_dtypes.scalar_type_str(fill, obj.element_type))
+        return scalar_t(_as_julia_scalar(obj.fill_value))
+    if isinstance(obj, ShortCircuitScalar):
+        scalar_t = jl.seval(
+            jl_dtypes.short_circuit_scalar_type_str(obj.fill_value, obj.element_type)
+        )
         return scalar_t(_as_julia_scalar(obj.fill_value))
     if isinstance(obj, np.ndarray):
         fill = np.asarray(0, dtype=obj.dtype)[()]

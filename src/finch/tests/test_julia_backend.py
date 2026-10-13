@@ -49,6 +49,7 @@ from finch.tensor.patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    ShortCircuitScalar,
     SplitMaskTensor,
     UpperTriangleTensor,
 )
@@ -981,3 +982,22 @@ def test_compile_julia_full_reduction_returns_a_scalar(scheduler):
 
     assert result.shape == ()
     np.testing.assert_allclose(np.array(result), data.sum())
+
+
+@pytest.mark.parametrize(
+    "fill, element_type, julia_type",
+    [
+        (False, ft.bool, "Finch.ShortCircuitScalar{false, Bool}"),
+        (np.inf, ft.float64, "Finch.ShortCircuitScalar{Inf, Float64}"),
+    ],
+)
+def test_short_circuit_scalar_converts_to_julia(fill, element_type, julia_type):
+    _requires_julia_backend()
+    from finch.compile_jl.types import ftype_to_jl_constructor_str
+
+    scalar = ShortCircuitScalar(fill, element_type)
+    converted = tensor_to_jl(scalar)
+
+    assert ftype_to_jl_constructor_str(scalar.ftype) == f"{julia_type}()"
+    assert jl.isa(converted, jl.seval(julia_type))
+    assert jl.seval("x -> x.val")(converted) == fill

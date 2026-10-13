@@ -45,6 +45,8 @@ from .patterns import (
     ReshapeMaskTensor,
     ReverseTensor,
     RollTensor,
+    ShortCircuitScalar,
+    ShortCircuitScalarFType,
     SplitMaskTensor,
     UpperTriangleTensor,
 )
@@ -80,6 +82,8 @@ __all__ = [
     "ReshapeMaskTensor",
     "ReverseTensor",
     "RollTensor",
+    "ShortCircuitScalar",
+    "ShortCircuitScalarFType",
     "Scalar",
     "ScalarFType",
     "SparseByteMapLevel",
