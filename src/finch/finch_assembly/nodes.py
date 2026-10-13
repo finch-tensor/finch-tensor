@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, TypeVar
 
 from finch.algebra import CallableFType, ftype, return_type
 from finch.algebra.ftypes import FType, StructFType
@@ -18,6 +18,8 @@ from finch.util import qual_str
 
 from .buffer import BufferFType, length_type
 from .stages import AssemblyKernelFType
+
+T = TypeVar("T")
 
 
 class AssemblyNode(Term):
@@ -71,7 +73,7 @@ class AssemblyExpression(AssemblyNode, ExpressionTerm):
 
     @property
     @abstractmethod
-    def result_type(self) -> FType:
+    def result_type(self) -> BufferFType:
         """Returns the type of the expression."""
         ...
 
@@ -85,7 +87,7 @@ class AssemblyStatement(AssemblyNode):
     """
 
 
-class Literal(AssemblyExpression, LiteralTerm):
+class Literal(AssemblyExpression, LiteralTerm[T]):
     """
     Represents the literal value `val`.
 

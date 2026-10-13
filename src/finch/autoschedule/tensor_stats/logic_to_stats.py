@@ -10,6 +10,7 @@ from finch.finch_logic import (
     LogicNode,
     MapJoin,
     Query,
+    QueryInto,
     Reorder,
     StatsFactory,
     Table,
@@ -54,15 +55,32 @@ def insert_statistics(
             bindings[var] = stats
             cache[node] = stats
             return stats
+        case QueryInto():
+            stats = insert_statistics(
+                stats_factory, node.as_query(), bindings, replace, cache
+            )
+            cache[node] = stats
+            return stats
 
         case Aggregate():
             if not isinstance(node.op, Literal):
                 raise TypeError("Aggregate.op must be Literal(...).")
             op = node.op.val
-            init = node.init.val if isinstance(node.init, Literal) else None
             arg = insert_statistics(stats_factory, node.arg, bindings, replace, cache)
             reduce_indices = list(node.idxs)
-            st = stats_factory.aggregate(op, init, tuple(reduce_indices), arg)
+            if isinstance(node.init, Literal):
+                st = stats_factory.aggregate(
+                    op, node.init.val, tuple(reduce_indices), arg
+                )
+            else:
+                # A tensor init is folded into the reduction of the argument.
+                init = insert_statistics(
+                    stats_factory, node.init, bindings, replace, cache
+                )
+                reduced = stats_factory.aggregate(op, None, tuple(reduce_indices), arg)
+                st = stats_factory.reorder(
+                    stats_factory.mapjoin(op, init, reduced), node.fields()
+                )
             cache[node] = st
             return st
 

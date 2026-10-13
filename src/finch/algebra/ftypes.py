@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections import namedtuple
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, TypeVar, overload
 
 import numpy as np
 
@@ -702,14 +702,17 @@ def _result_type_arg(arg) -> FDType:
     return dtype
 
 
-class FTyped:
+FT = TypeVar("FT", bound=FType)
+
+
+class FTyped(Generic[FT]):
     """
     Abstract base class for objects that can be formatted.
     """
 
     @property
     @abstractmethod
-    def ftype(self):
+    def ftype(self) -> FT:
         """
         The ftype of the object.
         """
@@ -976,9 +979,6 @@ def isdtype(dtype, kind):
     return builtins.bool(dtype == ftype(kind))
 
 
-FT = TypeVar("FT", bound=FType)
-
-
 @overload
 def ftype(x: FinchOperator) -> FinchOperatorFType: ...
 
@@ -1001,6 +1001,10 @@ def ftype(x: np.integer) -> FDTypeInteger: ...
 
 @overload
 def ftype(x: FT) -> FT: ...
+
+
+@overload
+def ftype(x: FTyped[FT]) -> FT: ...
 
 
 @overload

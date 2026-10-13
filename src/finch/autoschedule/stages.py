@@ -15,13 +15,13 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Reorder,
     Table,
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
-from finch.symbolic import Form, PreWalk, Rewrite, Stage
-from finch.tensor.patterns import PatternTensorFType
+from finch.symbolic import Form, PostOrderDFS, PreWalk, Rewrite, Stage
 
 
 class AliasedForm(Form):
@@ -45,7 +45,12 @@ class AliasedForm(Form):
             match node:
                 case Query(Table(Alias() as lhs, _), _):
                     defined_aliases.add(lhs)
-                case Query(lhs, _):
+                case QueryInto(Table(Alias() as lhs, _), _, _):
+                    if lhs not in defined_aliases:
+                        raise ValueError(
+                            f"QueryInto updates alias {lhs.name}, which is not defined."
+                        )
+                case Query(lhs, _) | QueryInto(lhs, _, _):
                     raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
                 case Alias(name):
                     if node not in defined_aliases:
@@ -65,11 +70,11 @@ class SingleAggregateForm(AliasedForm):
     1) transpose queries
         Query(Table(_, output_order), Table(_, _))
     2) aggregate queries
-        Query(Table(_, output_order), Aggregate(_, _, arg, _))
+        Query(Table(_, output_order), Aggregate(_, Literal(), arg, _))
     3) in-place queries
-        Query(Table(lhs, output_order), MapJoin(op1, (Table(lhs, output_order),
-            Aggregate(op2, _, arg, _))))
-    (Here, op2 can be ffunc.overwrite or it can be equal to op1).
+        QueryInto(Table(_, output_order), op, arg)
+    (Here, arg has no aggregates. The fields of arg which are not in
+    output_order are reduced with op.)
     """
 
     @classmethod
@@ -93,28 +98,15 @@ class SingleAggregateForm(AliasedForm):
                         validate(body, True)
                 case Query(Table(), Table()):
                     return None
-                case Query(Table(), Aggregate(_, _, arg, _)):
+                case Query(Table(), Aggregate(_, Literal(), arg, _)):
                     return validate(arg, False)
-                case Query(
-                    Table(lhs1, output_order1),
-                    MapJoin(
-                        op1, (Table(lhs2, output_order2), Aggregate(op2, _, arg, _))
-                    ),
-                ):
-                    if lhs1 != lhs2:
-                        raise ValueError(
-                            "In-place queries must have the same alias on the \
-                                left-hand side and inside the MapJoin."
-                        )
-                    if output_order1 != output_order2:
-                        raise ValueError(
-                            "In-place queries must read and write in the same order."
-                        )
-                    if op2 not in (ffuncs.overwrite, op1):
-                        raise ValueError(
-                            "The aggregate operator in an in-place query must be\
-                            either ffunc.overwrite or the same as the MapJoin operator."
-                        )
+                case Query(Table(), Aggregate(_, init, _, _)):
+                    raise ValueError(
+                        f"Aggregate queries must start from a literal, not {init}. "
+                        "Copy the init into the output and update it with a "
+                        "QueryInto instead."
+                    )
+                case QueryInto(Table(), _, arg):
                     return validate(arg, False)
                 case Query(_, rhs):
                     raise ValueError(f"Unsupported query right-hand side: {rhs}")
@@ -140,14 +132,19 @@ class SingleAggregateForm(AliasedForm):
 class LoopOrderedForm(SingleAggregateForm):
     """
     LoopOrderedForm assumes that the input query has had its loop order set.
-    There are three valid forms for a query in LoopOrderedForm:
+    There are four valid forms for a query in LoopOrderedForm:
         1) transpose queries
             Query(Table(_, output_order), Table(_, _))
         2) aggregate queries
             Query(Table(_, output_order), Aggregate(_, _, Reorder(arg, loop_order), _))
         3) in-place queries
-            Query(Table(lhs, lhs_idxs), MapJoin(_, (Table(lhs, lhs_idxs),
-                Aggregate(_, _, Reorder(agg_arg, loop_order), _))))
+            QueryInto(Table(_, lhs_idxs), _, Reorder(arg, loop_order))
+        4) in-place initializations
+            QueryInto(Table(_, _), _, Literal(_))
+    For aggregate and in-place queries, the loop order includes every lhs
+    field and visits those fields in order. The Tables of arg follow the loop
+    order, except that an in-place query of a single Table may read it in
+    another order, representing a transpose.
     """
 
     @staticmethod
@@ -170,40 +167,29 @@ class LoopOrderedForm(SingleAggregateForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body, loop_order)
-                case Query(Table(), Table()):
+                case Query(Table(), Table()) | QueryInto(Table(), _, Literal()):
                     return None
-                case Query(Table(), Aggregate(_, _, Reorder(arg, idxs), _)):
+                case QueryInto(Table(_, lhs_idxs), _, Reorder(Table(), idxs)):
+                    if not cls._check_loop_order(lhs_idxs, idxs):
+                        raise ValueError("Table index order does not match loop order.")
+                    return None
+                case Query(
+                    Table(_, lhs_idxs), Aggregate(_, _, Reorder(arg, idxs), _)
+                ) | QueryInto(Table(_, lhs_idxs), _, Reorder(arg, idxs)):
+                    if not cls._check_loop_order(lhs_idxs, idxs):
+                        raise ValueError("Table index order does not match loop order.")
                     return validate(arg, idxs)
                 case Query(Table(), Aggregate(_, _, arg, _)):
                     raise ValueError(
                         "All aggregates must wrap a Reorder node specifying\
                              the loop order."
                     )
-                case Query(
-                    Table(),
-                    MapJoin(
-                        _,
-                        (
-                            Table(_, lhs_idxs),
-                            Aggregate(_, _, Reorder(agg_arg, idxs_1), _),
-                        ),
-                    ),
-                ):
-                    if not cls._check_loop_order(lhs_idxs, idxs_1):
-                        raise ValueError("Table index order does not match loop order.")
-                    return validate(agg_arg, idxs_1)
-                case Query(Table(), MapJoin(_, (Table(), Aggregate()))):
-                    raise ValueError(
-                        "In-place queries must have an interior loop order!"
-                    )
+                case QueryInto():
+                    raise ValueError("In-place queries must have a loop order!")
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
-                case Table(tns, idxs):
-                    # Implicit patterns have no row-major storage to preserve.
-                    match bindings.get(tns):
-                        case PatternTensorFType():
-                            return None
+                case Table(_, idxs):
                     if not cls._check_loop_order(idxs, loop_order):
                         raise ValueError("Table index order does not match loop order.")
                 case Reorder(arg, _):
@@ -239,7 +225,7 @@ class FormattedForm(LoopOrderedForm):
                 case Plan(bodies):
                     for body in bodies[:-1]:
                         validate(body)
-                case Query(lhs, rhs):
+                case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
                 case Aggregate(_, _, arg, _) | Reorder(arg, _):
@@ -260,6 +246,67 @@ class FormattedForm(LoopOrderedForm):
             return
 
         validate(term)
+
+
+class CompilerForm(FormattedForm):
+    """
+    CompilerForm is the input of the notation lowerer. It is a FormattedForm
+    where every statement but the final Produces is a QueryInto, and
+    initialization is explicit. There are two valid kinds of statement:
+    1) initializations
+        QueryInto(Table(lhs, _), overwrite, Literal(init))
+    (Every element of lhs is set to init.)
+    2) folds
+        QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
+    (Here, arg is made of Tables, Literals, and MapJoins. The loop order
+    contains each field once and visits all fields of lhs_idxs in order.
+    Tables in a MapJoin must also follow loop order.
+    A single Table argument may have a different storage order, representing a
+    transpose; notation lowering inserts equality-constrained loops to read it
+    in storage order. Fields absent from lhs_idxs are reduced with op.)
+    A transpose or fold which overwrites lhs also initializes it, starting from
+    the init of a preceding initialization, or else the fill value of lhs.
+    Every alias must have a TensorFType in the bindings, and a statement can't
+    read the alias it writes.
+    """
+
+    @classmethod
+    def validate_inputs(
+        cls,
+        term: Plan,
+        bindings: dict[Alias, TensorFType],
+        stats: dict[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> None:
+        super().validate_inputs(term, bindings, stats, stats_factory)
+
+        # FormattedForm has checked the grammar of each fold, its bindings,
+        # and that it visits the lhs and its Tables in loop order.
+        match term:
+            case Plan((*bodies, Produces())):
+                pass
+            case _:
+                raise ValueError("The last body of a plan must be a Produces node.")
+        for body in bodies:
+            match body:
+                case QueryInto(Table(lhs, _), Literal(op), rhs):
+                    if lhs in PostOrderDFS(rhs):
+                        raise ValueError(f"QueryInto can't both read and write {lhs}.")
+                    match rhs:
+                        case Literal():
+                            if op != ffuncs.overwrite:
+                                raise ValueError(
+                                    f"Initializing {lhs} must overwrite it, not {op}."
+                                )
+                        case Reorder(arg, loop_order):
+                            if len(set(loop_order)) != len(loop_order):
+                                raise ValueError("Loop order must not repeat fields.")
+                            if not set(arg.fields()).issubset(loop_order):
+                                raise ValueError(
+                                    "Loop order must include every RHS field."
+                                )
+                case _:
+                    raise ValueError(f"CompilerForm only allows QueryInto, not {body}")
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):
@@ -321,7 +368,7 @@ class LogicFormatter(LoopOrderedForm, LogicLoader):
         """
 
 
-class LogicNotationLowerer(FormattedForm, Stage):
+class LogicNotationLowerer(CompilerForm, Stage):
     @abstractmethod
     def lower(
         self,

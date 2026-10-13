@@ -30,6 +30,7 @@ from .nodes import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     Table,
@@ -120,28 +121,39 @@ class LogicMachine:
                     ]
                     result[*crds] = op(*vals)
                 return TableValue(result, tuple(idxs))
-            case Aggregate(Literal(op), Literal(init), arg, idxs):
+            case Aggregate(Literal(op), init, arg, idxs):
+                init = self(init)
                 arg = self(arg)
-                dtype = fixpoint_type(op.ftype, init, arg.tns.element_type)
-                new_shape = tuple(
-                    int(dim)
-                    for (dim, idx) in zip(arg.tns.shape, arg.idxs, strict=True)
-                    if idx not in node.idxs
+                dtype = fixpoint_type(
+                    op.ftype, init.tns.element_type, arg.tns.element_type
                 )
+                arg_dims = dict(zip(arg.idxs, map(int, arg.tns.shape), strict=True))
+                out_dims = {
+                    idx: dim for idx, dim in arg_dims.items() if idx not in node.idxs
+                }
+                for idx, dim in zip(init.idxs, init.tns.shape, strict=True):
+                    if out_dims.setdefault(idx, dim) != dim or idx in node.idxs:
+                        raise ValueError(
+                            f"The init of an aggregate doesn't broadcast to its "
+                            f"result, since it has field {idx} of size {dim}"
+                        )
+                # The argument is broadcast over the fields only the init has.
+                loop_dims = {**arg_dims, **out_dims}
+                new_shape = tuple(out_dims.values())
                 assert isinstance(dtype, FDTypeNumpy | FDTypeBuiltin | TupleFType)
-                result = self.make_tensor(new_shape, init, dtype=dtype)
-                for crds in product(*[range(dim) for dim in arg.tns.shape]):
-                    out_crds = [
-                        crd
-                        for (crd, idx) in zip(crds, arg.idxs, strict=True)
-                        if idx not in node.idxs
-                    ]
+                result = self.make_tensor(new_shape, init.tns.fill_value, dtype=dtype)
+                for out_crds in product(*[range(dim) for dim in new_shape]):
+                    idx_crds = dict(zip(out_dims, out_crds, strict=True))
+                    init_crds = [idx_crds[idx] for idx in init.idxs]
+                    result[*out_crds] = init.tns[*init_crds].item()
+                for crds in product(*[range(dim) for dim in loop_dims.values()]):
+                    idx_crds = dict(zip(loop_dims, crds, strict=True))
+                    out_crds = [idx_crds[idx] for idx in out_dims]
+                    arg_crds = [idx_crds[idx] for idx in arg.idxs]
                     result[*out_crds] = op(
-                        result[*out_crds].item(), arg.tns[*crds].item()
+                        result[*out_crds].item(), arg.tns[*arg_crds].item()
                     )
-                return TableValue(
-                    result, tuple(idx for idx in arg.idxs if idx not in node.idxs)
-                )
+                return TableValue(result, tuple(out_dims))
             case Relabel(arg, idxs):
                 arg = self(arg)
                 if len(arg.idxs) != len(idxs):
@@ -177,6 +189,8 @@ class LogicMachine:
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
+            case QueryInto() as stmt:
+                return self(stmt.as_query())
             case Plan(bodies):
                 res = ()
                 for body in bodies:

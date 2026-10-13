@@ -6,7 +6,12 @@ import finch.finch_logic as logic
 import finch.finch_notation as ntn
 from finch import ffuncs, ftype
 from finch.algebra import DynamicFill
-from finch.autoschedule import INTERPRET_NOTATION, NotationGenerator
+from finch.autoschedule import (
+    INTERPRET_NOTATION,
+    CompilerFormLowerer,
+    LogicCapture,
+    NotationGenerator,
+)
 from finch.compile import NotationCompiler
 from finch.finch_logic import (
     Aggregate,
@@ -17,6 +22,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Reorder,
     Table,
 )
@@ -52,8 +58,13 @@ def test_generated_init_write(kind, init, compiler):
             reduced,
         )
         if kind == "inplace":
-            rhs = MapJoin(Literal(ffuncs.overwrite), (Table(dst, output_idxs), rhs))
-        query = Query(Table(dst, output_idxs), rhs)
+            query = QueryInto(
+                Table(dst, output_idxs),
+                Literal(ffuncs.overwrite),
+                Reorder(Table(src, (i, j)), (i, j)),
+            )
+        else:
+            query = Query(Table(dst, output_idxs), rhs)
         expected = data[:, -1] if reduced else data
 
     # Static pointwise initialization can differ from the storage format's fill.
@@ -65,9 +76,14 @@ def test_generated_init_write(kind, init, compiler):
         ),
     }
     plan = Plan((query, Produces((dst,))))
-    program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     result = compiler()(program).main(*bindings.values())
     finch_assert_equal(result[0].to_numpy(), expected)
 
@@ -109,9 +125,14 @@ def test_logic_compiler(file_regression):
         Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[0, 0], [0, 0]])),
     }
 
-    program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
 
     file_regression.check(
         reset_name_counts(str(program)),
@@ -133,38 +154,22 @@ def test_logic_compiler(file_regression):
 def test_logic_compiler_inplace(file_regression):
     plan = Plan(
         bodies=(
-            Query(
+            QueryInto(
                 lhs=Table(Alias(name="A2"), (Field(name="i0"), Field(name="i2"))),
-                rhs=MapJoin(
-                    op=Literal(ffuncs.add),
-                    args=(
-                        Table(Alias("A2"), (Field(name="i0"), Field(name="i2"))),
-                        Aggregate(
-                            op=logic.Literal(val=ffuncs.add),
-                            init=logic.Literal(val=0),
-                            arg=Reorder(
-                                arg=MapJoin(
-                                    op=logic.Literal(val=ffuncs.mul),
-                                    args=(
-                                        Table(
-                                            Alias(name="A0"),
-                                            (Field(name="i0"), Field(name="i1")),
-                                        ),
-                                        Table(
-                                            Alias(name="A1"),
-                                            (Field(name="i1"), Field(name="i2")),
-                                        ),
-                                    ),
-                                ),
-                                idxs=(
-                                    Field(name="i0"),
-                                    Field(name="i1"),
-                                    Field(name="i2"),
-                                ),
+                op=Literal(ffuncs.add),
+                rhs=Reorder(
+                    arg=MapJoin(
+                        op=logic.Literal(val=ffuncs.mul),
+                        args=(
+                            Table(
+                                Alias(name="A0"), (Field(name="i0"), Field(name="i1"))
                             ),
-                            idxs=(Field(name="i1"),),
+                            Table(
+                                Alias(name="A1"), (Field(name="i1"), Field(name="i2"))
+                            ),
                         ),
                     ),
+                    idxs=(Field(name="i0"), Field(name="i1"), Field(name="i2")),
                 ),
             ),
             Produces(args=(Alias(name="A2"),)),
@@ -177,9 +182,14 @@ def test_logic_compiler_inplace(file_regression):
         Alias(name="A2"): BufferizedNDArray.from_numpy(np.array([[1, 1], [1, 1]])),
     }
 
-    program = NotationGenerator()(
-        plan, {var: ftype(val) for var, val in bindings.items()}, {}, None
+    capture = LogicCapture()
+    CompilerFormLowerer(capture)(
+        plan,
+        {var: ftype(val) for var, val in bindings.items()},
+        {},
+        None,
     )
+    program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
 
     file_regression.check(
         reset_name_counts(str(program)),

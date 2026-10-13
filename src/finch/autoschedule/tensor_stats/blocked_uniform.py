@@ -39,10 +39,10 @@ def build_grid_uniform(
         Table(
             Literal(
                 fl.SplitMaskTensor(
-                    (int(d.dim_sizes[idx]), blocks_per_dim[idx]), dtype=np.intp
+                    (blocks_per_dim[idx], int(d.dim_sizes[idx])), dtype=np.intp
                 )
             ),
-            (idx, block_idx),
+            (block_idx, idx),
         )
         for idx, block_idx in zip(index_order, block_order, strict=True)
     )

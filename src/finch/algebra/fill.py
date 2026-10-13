@@ -15,7 +15,7 @@ that value:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
 import numpy as np
 
@@ -23,6 +23,8 @@ from .ftypes import FType, FTyped, ftype
 
 if TYPE_CHECKING:
     from .algebra import FinchOperator
+
+FT = TypeVar("FT", bound=FType)
 
 
 class DynamicFillError(Exception):
@@ -33,12 +35,12 @@ class DynamicFillError(Exception):
     """
 
 
-class AbstractFill(FTyped, ABC):
+class AbstractFill(FTyped[FT], ABC):
     """A tensor's fill value, and whether kernels may specialize on it."""
 
     @property
     @abstractmethod
-    def ftype(self) -> FType:
+    def ftype(self) -> FT:
         """The dtype of the fill value, always known."""
         ...
 
@@ -53,21 +55,27 @@ class AbstractFill(FTyped, ABC):
         return DynamicFill(self.value, self.ftype)
 
 
-class StaticFill(AbstractFill):
+class StaticFill(AbstractFill[FT]):
     """
     A fill value which kernels may specialize on. Equality and hashing are by
     value, so ftypes carrying different static fills are distinct and get
     distinct kernels.
     """
 
-    def __init__(self, value: Any):
+    @overload
+    def __init__(self, value: FTyped[FT]) -> None: ...
+
+    @overload
+    def __init__(self, value: Any) -> None: ...
+
+    def __init__(self, value) -> None:
         if isinstance(value, AbstractFill):
             self._value = value.value
         else:
             self._value = value
 
     @property
-    def ftype(self) -> FType:
+    def ftype(self) -> FT:
         return ftype(self._value)
 
     @property
@@ -103,7 +111,7 @@ class StaticFill(AbstractFill):
         return f"StaticFill({self._value!r})"
 
 
-class DynamicFill(AbstractFill):
+class DynamicFill(AbstractFill[FT]):
     """
     A fill value which kernels must not specialize on. The value is known and is
     bound to the kernel at call time.
@@ -112,7 +120,16 @@ class DynamicFill(AbstractFill):
     different `.value`'s.
     """
 
-    def __init__(self, value: Any, dtype: Any = None):
+    @overload
+    def __init__(self, value: AbstractFill[FT], dtype: None = None) -> None: ...
+
+    @overload
+    def __init__(self, value: Any, dtype: FT) -> None: ...
+
+    @overload
+    def __init__(self, value: Any, dtype: Any | None = None) -> None: ...
+
+    def __init__(self, value: Any, dtype=None) -> None:
         if isinstance(value, AbstractFill):
             self._value = value.value
         else:
@@ -149,6 +166,21 @@ class DynamicFill(AbstractFill):
         return f"DynamicFill({self._value!r}, {self._dtype!r})"
 
 
+AF = TypeVar("AF", bound=AbstractFill)
+
+
+@overload
+def as_fill(fill: AF) -> AF: ...
+
+
+@overload
+def as_fill(fill: FTyped[FT]) -> StaticFill[FT]: ...
+
+
+@overload
+def as_fill(fill: Any) -> StaticFill: ...
+
+
 def as_fill(fill: Any) -> AbstractFill:
     """Normalize a raw value to a `StaticFill`, passing an `AbstractFill` through."""
     if isinstance(fill, AbstractFill):
@@ -156,7 +188,7 @@ def as_fill(fill: Any) -> AbstractFill:
     return StaticFill(fill)
 
 
-def is_dynamic(fill: Any) -> bool:
+def is_dynamic(fill: Any) -> TypeGuard[DynamicFill]:
     return isinstance(fill, DynamicFill)
 
 

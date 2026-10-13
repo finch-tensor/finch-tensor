@@ -178,4 +178,4 @@ def test_owning_tensor_cursor():
 
 def test_cursor_is_abstract():
     with pytest.raises(TypeError, match="abstract"):
-        ntn.Cursor()
+        ntn.Cursor()  # ty: ignore[call-non-callable]

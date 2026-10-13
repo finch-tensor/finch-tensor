@@ -4,6 +4,7 @@ from textwrap import dedent
 from typing import Any
 
 import numba
+import numba.core.types
 
 from finch import algebra
 from finch import finch_assembly as asm
@@ -394,7 +395,7 @@ def assembly_struct_numba_type(ftype_: StructFType) -> type:
                 return '{class_name}'
         """
     )
-    ns: dict[str, object] = {}
+    ns: dict[str, type] = {}
     exec(class_src, ns)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[ftype_] = new_struct

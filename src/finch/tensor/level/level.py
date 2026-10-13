@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
 from finch import finch_assembly as asm
 from finch.algebra import (
@@ -12,6 +12,7 @@ from finch.algebra import (
     StructFType,
     ftypes,
 )
+from finch.tensor.traits import FormatProperty
 
 
 @dataclass
@@ -65,7 +66,7 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self):
+    def element_type(self) -> FType:
         """
         Type of elements stored in the fibers.
         """
@@ -178,7 +179,7 @@ class LevelFType(FType, ABC):
         ...
 
     @abstractmethod
-    def level_format_properties(self, n):
+    def level_format_properties(self, n: int) -> list[FormatProperty]:
         """
         Return the format properties contributed by this level type and children.
 
@@ -189,8 +190,11 @@ class LevelFType(FType, ABC):
         ...
 
 
+LT = TypeVar("LT", bound=LevelFType)
+
+
 @dataclass
-class Level(FTyped, ABC):
+class Level(FTyped[LT], ABC):
     """
     An abstract base class representing a fiber allocator that manages fibers in
     a tensor.
@@ -242,6 +246,14 @@ class Level(FTyped, ABC):
     def with_fill(self, fill_value: AbstractFill) -> Self: ...
 
 
+class SingleDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.FDTypeInteger = ftypes.intp
+
+
+class MultiDimensionLevelFType(LevelFType):
+    dimension_type: ftypes.TupleFType
+
+
 class SingleDimensionLevel(Level):
     lvl: Level
 
@@ -256,11 +268,3 @@ class MultiDimensionLevel(Level):
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
-
-
-class SingleDimensionLevelFType(LevelFType):
-    dimension_type: ftypes.FDTypeInteger = ftypes.intp
-
-
-class MultiDimensionLevelFType(LevelFType):
-    dimension_type: ftypes.TupleFType

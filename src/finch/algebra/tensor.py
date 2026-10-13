@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import numpy as np
 import scipy.sparse as sps
@@ -28,7 +28,10 @@ def to_scipy(x):
     raise NotImplementedError(f"{type(x).__name__} does not support to_scipy.")
 
 
-class TensorFType(FType, ABC):
+FT = TypeVar("FT", bound=FType)
+
+
+class TensorFType(FType, ABC, Generic[FT]):
     @property
     def ndim(self) -> int:
         """Number of dimensions of the tensor."""
@@ -58,7 +61,7 @@ class TensorFType(FType, ABC):
 
     @property
     @abstractmethod
-    def element_type(self) -> FType:
+    def element_type(self) -> FT:
         """Data type of the tensor elements."""
         ...
 
@@ -99,7 +102,7 @@ class TensorFType(FType, ABC):
     def from_numpy(self, arr: np.ndarray) -> Tensor: ...
 
 
-class Tensor(FTyped, ABC):
+class Tensor(FTyped[TensorFType[FT]], ABC):
     """
     Abstract base class for tensor-like data structures. Tensors are
     multi-dimensional arrays that can be used to represent data in various
@@ -123,7 +126,7 @@ class Tensor(FTyped, ABC):
 
     @property
     @abstractmethod
-    def ftype(self) -> TensorFType:
+    def ftype(self) -> TensorFType[FT]:
         """FType of the tensor, which may include metadata about the tensor."""
         ...
 
@@ -145,7 +148,7 @@ class Tensor(FTyped, ABC):
         )
 
     @property
-    def element_type(self) -> FType:
+    def element_type(self) -> FT:
         """The element type of the tensor.  The element type is the scalar type of
         the elements in a tensor, which may be different from the data type of the
         tensor.

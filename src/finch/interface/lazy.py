@@ -2546,15 +2546,12 @@ def repeat(x, repeats, /, *, axis: int | None = None) -> LazyTensor:
         )
         if axis_size == 0 or repeat_count == 0:
             return empty(out_shape, dtype=x.element_type, device=x.device)
-        return _select_along_axis(
-            x,
-            axis,
-            RepeatTensor(
-                (axis_size * repeat_count, axis_size),
-                k=repeat_count,
-                dtype=np.bool_,
-            ),
+        # The repeat mask visits each input index and then its repeats, so it
+        # is transposed to select each output from its input.
+        mask = RepeatTensor(
+            (axis_size, axis_size * repeat_count), k=repeat_count, dtype=np.bool_
         )
+        return _select_along_axis(x, axis, permute_dims(mask, (1, 0)))
 
     raise NotImplementedError(
         "repeat with repeat-count arrays has a data-dependent output shape"
