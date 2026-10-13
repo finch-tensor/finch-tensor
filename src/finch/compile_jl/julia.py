@@ -64,6 +64,10 @@ def _start_julia() -> tuple[Any, Any]:
         Main.seval(f"using {pkg}")
 
     Main.seval("first_arg(x, y...) = x")
+    Main.seval(
+        "dense_sparse_list(A) = "
+        "Tensor(Dense(SparseList(Element{fill_value(A), eltype(A)}())), A)"
+    )
 
     return juliacall, Main
 

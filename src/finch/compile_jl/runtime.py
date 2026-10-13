@@ -17,7 +17,11 @@ from finch.tensor.override_tensor import OverrideTensor
 from finch.tensor.scalar import Scalar
 
 from .analyze import reset_argument_positions, returned_argument_positions
-from .interop import jl_tensor_to_python, tensor_to_jl
+from .interop import (
+    _jl_array_to_python_no_copy,
+    jl_tensor_to_python,
+    tensor_to_jl,
+)
 from .julia import jl
 from .types import _zero_value
 
@@ -132,7 +136,7 @@ class JuliaOwnedTensor(OverrideTensor):
             return Scalar(self.item(), fill_value=self.fill_value, device=self.device)[
                 index
             ]
-        result = self._as_tensor().to_numpy()[index]
+        result = self.to_numpy()[index]
         if isinstance(result, np.ndarray):
             return BufferizedNDArray.from_numpy(
                 result,
@@ -142,7 +146,10 @@ class JuliaOwnedTensor(OverrideTensor):
         return Scalar(result, fill_value=self.fill_value, device=self.device)
 
     def to_numpy(self):
-        return self._as_tensor().to_numpy()
+        if not self._shape:
+            return self._as_tensor().to_numpy()
+        # Julia arrays are column-major, so their axes are reversed.
+        return _jl_array_to_python_no_copy(jl.Array(self.raw_julia_obj)).transpose()
 
     def __array__(self, dtype=None, copy=None):
         out = np.asarray(self.to_numpy())
@@ -157,7 +164,10 @@ class JuliaOwnedTensor(OverrideTensor):
         return out
 
     def to_scipy(self):
-        return self._as_tensor().to_scipy()
+        if self.ndim != 2:
+            raise ValueError("SciPy sparse arrays must be two-dimensional.")
+        # Julia's column-major CSC format is a Python CSR format.
+        return jl_tensor_to_python(jl.dense_sparse_list(self.raw_julia_obj)).to_scipy()
 
 
 @dataclass(frozen=True)
