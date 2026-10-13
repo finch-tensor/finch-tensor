@@ -1658,3 +1658,37 @@ def test_numpy_buffer_construct_from_mlir_is_zero_copy():
     assert constructed is buf
     assert constructed.arr is arr
     assert constructed.arr.ctypes.data == arr.ctypes.data
+
+
+# test for scansearch supporting sps.random matrix
+@mlir_backend
+def test_scansearch_sps_rand(rng):
+    matrix = sps.random(8, 5, density=0.4, format="csr", random_state=rng)
+    row = np.argmax(np.diff(matrix.indptr))
+    lo = matrix.indptr[row]
+    hi = matrix.indptr[row + 1] - np.int32(1)
+    x = matrix.indices[lo + (hi - lo) // np.int32(2)]
+    indices = NumpyBuffer(matrix.indices)
+
+    arg = asm.Variable("indices", indices.ftype)
+    slot = asm.Slot("indices_", indices.ftype)
+    call = asm.Call(
+        asm.Literal(ffuncs.scansearch),
+        (slot, asm.Literal(x), asm.Literal(lo), asm.Literal(hi)),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "search",
+                    asm.AssemblyKernelFType("search", (indices.ftype,), finch.int32),
+                ),
+                (arg,),
+                asm.Block((asm.Unpack(slot, arg), asm.Return(call))),
+            ),
+        )
+    )
+
+    result = MLIRCompiler().lower(prgm).search(indices)
+    expected = lo + np.searchsorted(matrix.indices[lo : hi + 1], x)
+    assert result == expected

@@ -28,7 +28,7 @@ from finch.finch_assembly import BufferFType
 from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
-from .scansearch import SCANSEARCH
+from .scansearch import gen_ss
 from .stages import MLIRCode, MLIRLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
@@ -36,9 +36,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_ML
 
 mlir_memrefs: dict[Any, Any] = {}
 mlir_structs: dict[Any, Any] = {}
-mlir_globals: dict[str, str] = {
-    "scansearch": SCANSEARCH,
-}
+mlir_globals: dict[str, str] = {}
 MLIR_PIPELINE = (
     "builtin.module("
     "expand-realloc,"
@@ -765,12 +763,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
         case ffuncs._ScansearchFType():
-            return mlir_call_function_call(
-                mlir_function_name(op_type, _promote_type_helper(args)),
-                op_type.return_type(*(arg.result_type for arg in args)),
-                ctx,
-                *args,
-            )
+            arr, _, _, hi = args
+            name, code = gen_ss(mlir_type(arr.result_type.element_type))
+            mlir_globals.setdefault(name, code)
+            return mlir_call_function_call(name, hi.result_type, ctx, *args)
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
