@@ -90,15 +90,7 @@ from .compile import (
     ExtentFType,
     dimension,
 )
-from .fileio import (
-    BINSPARSE_VERSION,
-    SwizzleTensor,
-    bspread,
-    bspwrite,
-    fread,
-    fwrite,
-    swizzle,
-)
+from .fileio import from_binsparse, to_binsparse
 from .finch_assembly import element_type
 from .finch_fused.jit import jit
 from .interface import (
@@ -308,7 +300,6 @@ newaxis = None
 __array_api_version__ = "2024.12"
 
 __all__ = [
-    "BINSPARSE_VERSION",
     "COMPILE_MLIR",
     "COMPILE_NUMBA",
     "CPU",
@@ -385,7 +376,6 @@ __all__ = [
     "SparseListLevel",
     "SparseListLevelFType",
     "SplitMaskTensor",
-    "SwizzleTensor",
     "TaskFType",
     "Tensor",
     "TensorFType",
@@ -420,8 +410,6 @@ __all__ = [
     "bool_",
     "broadcast_arrays",
     "broadcast_to",
-    "bspread",
-    "bspwrite",
     "can_cast",
     "ceil",
     "clip",
@@ -472,13 +460,12 @@ __all__ = [
     "float_",
     "floor",
     "floor_divide",
-    "fread",
+    "from_binsparse",
     "ftype",
     "full",
     "full_like",
     "fuse",
     "fused",
-    "fwrite",
     "get_default_scheduler",
     "greater",
     "greater_equal",
@@ -570,13 +557,13 @@ __all__ = [
     "str_",
     "subtract",
     "sum",
-    "swizzle",
     "take",
     "take_along_axis",
     "tan",
     "tanh",
     "tensordot",
     "tile",
+    "to_binsparse",
     "to_numpy",
     "to_scipy",
     "trace",

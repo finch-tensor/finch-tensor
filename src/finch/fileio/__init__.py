@@ -1,19 +1,6 @@
-from .binsparse import (
-    BINSPARSE_VERSION,
-    SwizzleTensor,
-    bspread,
-    bspwrite,
-    fread,
-    fwrite,
-    swizzle,
-)
+from .binsparse import from_binsparse, to_binsparse
 
 __all__ = [
-    "BINSPARSE_VERSION",
-    "SwizzleTensor",
-    "bspread",
-    "bspwrite",
-    "fread",
-    "fwrite",
-    "swizzle",
+    "from_binsparse",
+    "to_binsparse",
 ]
