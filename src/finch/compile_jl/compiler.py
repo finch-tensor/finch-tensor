@@ -155,10 +155,7 @@ _JULIA_DEFINITIONS: dict[str, str] = {}
 
 
 class FinchJLGenerator:
-    def __init__(self, fastmath: bool = True):
-        # Finch wraps kernels in @fastmath, whose ninf/nnan flags make Inf and
-        # NaN fills undefined; fastmath=False strips it (keeps @inbounds)
-        self.fastmath = fastmath
+    def __init__(self):
         self.pack_dict = {}
         self.names: dict[str, str] = {}
         self.arg_positions: dict[str, int] = {}
@@ -211,16 +208,13 @@ class FinchJLGenerator:
                     arg_strs.append(extent)
                 arg_str = ",".join(arg_strs)
                 proto_str = "\n".join(proto_lines)
-                kernel = (
-                    "let\n"
+                return (
+                    "eval(let\n"
                     f"{proto_str}\n"
                     f"    Finch.@finch_kernel function {name}({arg_str})\n"
                     f"{body_str}\n    end\n"
-                    "end"
+                    "end)"
                 )
-                if not self.fastmath:
-                    kernel = f"finch_strip_fastmath({kernel})"
-                return f"eval({kernel})"
 
             case ntn.Block(bodies):
                 body_str = ""
@@ -425,12 +419,11 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
 
 
 class FinchJLCompiler(NotationCompiler):
-    def __init__(self, runtime: FinchJLRuntime | None = None, fastmath: bool = True):
+    def __init__(self, runtime: FinchJLRuntime | None = None):
         self.runtime = DefaultFinchJLRuntime() if runtime is None else runtime
-        self.fastmath = fastmath
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
-        generator = FinchJLGenerator(self.fastmath)
+        generator = FinchJLGenerator()
 
         kernel_dict = {}
         for orig_func in prgm.children:

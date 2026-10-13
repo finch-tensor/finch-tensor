@@ -64,15 +64,6 @@ def _start_julia() -> tuple[Any, Any]:
         Main.seval(f"using {pkg}")
 
     Main.seval("first_arg(x, y...) = x")
-    Main.seval("""
-    finch_strip_fastmath(e) = e
-    function finch_strip_fastmath(e::Expr)
-        if e.head == :macrocall && endswith(string(e.args[1]), "@fastmath")
-            return finch_strip_fastmath(e.args[end])
-        end
-        Expr(e.head, map(finch_strip_fastmath, e.args)...)
-    end
-    """)
 
     return juliacall, Main
 

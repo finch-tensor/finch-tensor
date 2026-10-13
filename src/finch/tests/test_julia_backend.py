@@ -1050,33 +1050,6 @@ def test_julia_floor_divide_floors_like_numpy():
     np.testing.assert_array_equal(got, np.floor_divide(a, b))
 
 
-def test_julia_strip_fastmath_keeps_inf_fill_exact():
-    _requires_julia_backend()
-    # row 1 of a is all fill, so a[1, 0] * b[1, 0] = inf * 5
-    a = np.array([[np.inf, 2.0], [np.inf, np.inf]])
-    b = np.array([[0.0, 3.0], [5.0, 0.0]])
-    got = _julia_binary(
-        ffuncs.mul,
-        _float_csr(a, np.inf),
-        _float_csr(b, 0.0),
-        np.float64(np.nan),
-        FinchJLCompiler(fastmath=False),
-    )
-    with np.errstate(invalid="ignore"):
-        np.testing.assert_array_equal(got, a * b)
-
-
-def test_julia_generator_strips_fastmath_only_when_asked():
-    _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLGenerator
-
-    stripped = jl.finch_strip_fastmath(jl.seval(":(@inbounds @fastmath x * y)"))
-    assert "fastmath" not in str(stripped)
-    assert "inbounds" in str(stripped)
-    assert FinchJLGenerator().fastmath
-    assert not FinchJLGenerator(fastmath=False).fastmath
-
-
 def test_julia_coo_round_trip_keeps_python_dim_order():
     _requires_julia_backend()
     dense = np.zeros((2, 3, 4), dtype=DTYPE)
