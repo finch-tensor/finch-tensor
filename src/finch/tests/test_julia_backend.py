@@ -1029,7 +1029,7 @@ def _julia_binary(op, a, b, out_fill, compiler):
         )
     )
     bindings = {A: a, B: b, Y: out_t.construct(a.shape)}
-    lib, *_ = LogicCompiler(compiler)(
+    lib, *_ = CompilerFormLowerer(LogicCompiler(compiler))(
         prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
     )
     (res,) = lib.main(*bindings.values())
@@ -1118,7 +1118,7 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
         sparse_coo(element(0.0, ftype(np.float64), ftype(np.intp)), 2, ftype(np.intp))
     )
     bindings = {A: _float_csr(data, 0.0), Y: out_t.construct(data.shape)}
-    lib, *_ = LogicCompiler(FinchJLCompiler())(
+    lib, *_ = CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))(
         prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
     )
     (res,) = lib.main(*bindings.values())
