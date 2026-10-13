@@ -253,9 +253,9 @@ class FiberTensor(OverrideTensor):
             obj = obj.copy()
             obj.sum_duplicates()
 
-        data = obj.data
-        row = obj.row
-        col = obj.col
+        data = np.ascontiguousarray(obj.data)
+        row = np.ascontiguousarray(obj.row)
+        col = np.ascontiguousarray(obj.col)
         index_type = ftype(row.dtype)
 
         element_lvl = element(

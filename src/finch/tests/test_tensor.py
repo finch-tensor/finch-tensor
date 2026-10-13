@@ -833,6 +833,19 @@ def test_asarray_scipy_coo(coo_type):
     np.testing.assert_array_equal(scipy_tensor.col, coo.col)
 
 
+def test_asarray_scipy_coo_with_strided_values():
+    values = np.array([[1.0, 0.0], [2.0, 0.0], [3.0, 0.0]])[:, 0]
+    coo = scipy.sparse.coo_array(
+        (values, (np.array([0, 0, 1]), np.array([0, 2, 1]))), shape=(2, 3)
+    )
+    coo.has_canonical_format = True
+    assert not coo.data.flags["C_CONTIGUOUS"]
+
+    tensor = asarray(coo)
+
+    np.testing.assert_array_equal(tensor.to_scipy().toarray(), coo.toarray())
+
+
 def test_fiber_tensor_to_csr():
     data = np.array([1.0, 2.0, 3.0])
     indices = np.array([0, 2, 1], dtype=np.int32)
