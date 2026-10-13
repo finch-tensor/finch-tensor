@@ -1,5 +1,47 @@
-# Binsparse symmetry expansion is unsupported by Finch.
-# These test-ID substrings cover symmetric, skew-symmetric, and Hermitian cases.
-# The current upstream suite does not generate these cases yet.
-symmetric
-hermitian
+# Finch has no representation analogous to Binsparse iso-valued storage.
+boolean-iso-
+unsigned-iso-
+signed-iso-
+floating-iso-
+complex-iso-
+
+# Finch fiber tensors cannot represent Binsparse transposed formats.
+-transposed-
+[DMATC-
+[CSC-
+[DCSC-
+[COOC-
+
+# Finch dense levels have rank 1, so a Binsparse dense level of higher rank is
+# written back as nested rank-1 dense levels. Mixed layouts draw such levels at
+# random, so both layouts are skipped above one dimension.
+test_custom_2d[boolean-non-iso-no-transpose-dense-layout-
+test_custom_2d[signed-non-iso-no-transpose-dense-layout-
+test_custom_2d[unsigned-non-iso-no-transpose-dense-layout-
+test_custom_2d[floating-non-iso-no-transpose-dense-layout-
+test_custom_2d[complex-non-iso-no-transpose-dense-layout-
+test_custom_2d[boolean-non-iso-no-transpose-mixed-layout-
+test_custom_2d[signed-non-iso-no-transpose-mixed-layout-
+test_custom_2d[unsigned-non-iso-no-transpose-mixed-layout-
+test_custom_2d[floating-non-iso-no-transpose-mixed-layout-
+test_custom_2d[complex-non-iso-no-transpose-mixed-layout-
+test_custom_3d[boolean-non-iso-no-transpose-dense-layout-
+test_custom_3d[signed-non-iso-no-transpose-dense-layout-
+test_custom_3d[unsigned-non-iso-no-transpose-dense-layout-
+test_custom_3d[floating-non-iso-no-transpose-dense-layout-
+test_custom_3d[complex-non-iso-no-transpose-dense-layout-
+test_custom_3d[boolean-non-iso-no-transpose-mixed-layout-
+test_custom_3d[signed-non-iso-no-transpose-mixed-layout-
+test_custom_3d[unsigned-non-iso-no-transpose-mixed-layout-
+test_custom_3d[floating-non-iso-no-transpose-mixed-layout-
+test_custom_3d[complex-non-iso-no-transpose-mixed-layout-
+test_custom_nd[boolean-non-iso-no-transpose-dense-layout-
+test_custom_nd[signed-non-iso-no-transpose-dense-layout-
+test_custom_nd[unsigned-non-iso-no-transpose-dense-layout-
+test_custom_nd[floating-non-iso-no-transpose-dense-layout-
+test_custom_nd[complex-non-iso-no-transpose-dense-layout-
+test_custom_nd[boolean-non-iso-no-transpose-mixed-layout-
+test_custom_nd[signed-non-iso-no-transpose-mixed-layout-
+test_custom_nd[unsigned-non-iso-no-transpose-mixed-layout-
+test_custom_nd[floating-non-iso-no-transpose-mixed-layout-
+test_custom_nd[complex-non-iso-no-transpose-mixed-layout-
