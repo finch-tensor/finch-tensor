@@ -32,7 +32,8 @@ _JULIA_OPS = {
     ffuncs.mul.ftype: "*",
     ffuncs.sub.ftype: "-",
     ffuncs.truediv.ftype: "/",
-    ffuncs.floordiv.ftype: "div",
+    # fld floors like numpy; div truncates toward zero
+    ffuncs.floordiv.ftype: "fld",
     ffuncs.mod.ftype: "mod",
     ffuncs.pow.ftype: "^",
     ffuncs.neg.ftype: "-",
@@ -142,8 +143,22 @@ class FinchJLLibrary(AssemblyLibrary):
         return self.kernel_dict[name]
 
 
+def register_julia_op(op, julia_name: str, definition: str | None = None) -> None:
+    # generated kernels call op as julia_name; definition (Julia source) runs once
+    if definition is not None and _JULIA_DEFINITIONS.get(julia_name) != definition:
+        jl.seval(definition)
+        _JULIA_DEFINITIONS[julia_name] = definition
+    _JULIA_OPS[op.ftype] = julia_name
+
+
+_JULIA_DEFINITIONS: dict[str, str] = {}
+
+
 class FinchJLGenerator:
-    def __init__(self):
+    def __init__(self, fastmath: bool = True):
+        # Finch wraps kernels in @fastmath, whose ninf/nnan flags make Inf and
+        # NaN fills undefined; fastmath=False strips it (keeps @inbounds)
+        self.fastmath = fastmath
         self.pack_dict = {}
         self.names: dict[str, str] = {}
         self.arg_positions: dict[str, int] = {}
@@ -196,13 +211,16 @@ class FinchJLGenerator:
                     arg_strs.append(extent)
                 arg_str = ",".join(arg_strs)
                 proto_str = "\n".join(proto_lines)
-                return (
-                    "eval(let\n"
+                kernel = (
+                    "let\n"
                     f"{proto_str}\n"
                     f"    Finch.@finch_kernel function {name}({arg_str})\n"
                     f"{body_str}\n    end\n"
-                    "end)"
+                    "end"
                 )
+                if not self.fastmath:
+                    kernel = f"finch_strip_fastmath({kernel})"
+                return f"eval({kernel})"
 
             case ntn.Block(bodies):
                 body_str = ""
@@ -407,11 +425,12 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
 
 
 class FinchJLCompiler(NotationCompiler):
-    def __init__(self, runtime: FinchJLRuntime | None = None):
+    def __init__(self, runtime: FinchJLRuntime | None = None, fastmath: bool = True):
         self.runtime = DefaultFinchJLRuntime() if runtime is None else runtime
+        self.fastmath = fastmath
 
     def __call__(self, prgm: ntn.Module) -> FinchJLLibrary:
-        generator = FinchJLGenerator()
+        generator = FinchJLGenerator(self.fastmath)
 
         kernel_dict = {}
         for orig_func in prgm.children:
