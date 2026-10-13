@@ -34,7 +34,6 @@ nary_ops = {
     ffuncs.rshift: "bitwise_right_shift",
     ffuncs.logical_and: "logical_and",
     ffuncs.logical_or: "logical_or",
-    ffuncs.logical_not: "logical_not",
     ffuncs.min: "minimum",
     ffuncs.max: "maximum",
 }
@@ -42,6 +41,7 @@ unary_ops = {
     ffuncs.pos: "positive",
     ffuncs.neg: "negative",
     ffuncs.invert: "bitwise_invert",
+    ffuncs.logical_not: "logical_not",
     ffuncs.abs: "absolute",
     ffuncs.sqrt: "sqrt",
     ffuncs.exp: "exp",

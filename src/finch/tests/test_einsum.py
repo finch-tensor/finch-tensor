@@ -451,6 +451,25 @@ def test_float_literals(rng):
     finch_assert_allclose(result_small, expected_small)
 
 
+def test_logical_not(rng):
+    A = rng.random((5, 5)) > 0.5
+
+    B = finch.einop("B[i,j] = not A[i,j]", A=A)
+
+    finch_assert_allclose(B, np.logical_not(A))
+
+
+def test_output_aliasing_input(rng):
+    A = rng.random((5, 5))
+    x = rng.random(5)
+    x_ref = x.copy()
+
+    y = finch.einop("x[i] += A[i,j] * x[j]", A=A, x=x)
+
+    finch_assert_allclose(y, A @ x_ref)
+    np.testing.assert_array_equal(x, x_ref)
+
+
 def test_complex_literals(rng):
     """Test that complex literals work correctly"""
     A = rng.random((2, 2)).astype(complex)  # Use complex arrays
