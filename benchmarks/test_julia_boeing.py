@@ -1,9 +1,9 @@
 """
-Julia backend benchmarks: sparse-sparse matmul and statistics construction on
-the Boeing ct20stif matrix, fetched from SuiteSparse via ssgetpy.
+Julia backend benchmarks: sparse-sparse matmul on Boeing ct20stif and statistics
+construction on the full-size datasets shared with the accuracy regression.
 
-Skipped if the Julia backend (juliacall/juliapkg) or ssgetpy aren't
-installed -- both are part of the ``julia`` extra, see pyproject.toml.
+The matmul and sampling scan benchmarks fetch Boeing ct20stif via ssgetpy.
+Statistics construction uses bundled matrices and seeded synthetic inputs.
 
 Run: ``pixi run --environment=benchmark-julia pytest --codspeed
 benchmarks/test_julia_boeing.py``
@@ -23,6 +23,7 @@ import pytest
 
 import numpy as np
 import scipy.io
+import scipy.sparse as sps
 
 import finch as ft
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
@@ -40,25 +41,27 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.compile_jl.julia import julia_available
 from finch.finch_logic import Field
-
-try:
-    import ssgetpy
-except ImportError:
-    ssgetpy = None
+from finch.tests.stats_cases import DATASETS
 
 pytestmark = pytest.mark.skipif(
-    not julia_available() or ssgetpy is None,
-    reason="Julia backend (juliacall/juliapkg) or ssgetpy not installed",
+    not julia_available(),
+    reason="Julia backend (juliacall/juliapkg) not installed",
 )
 
 
 @pytest.fixture(scope="session")
 def boeing_tensor():
+    ssgetpy = pytest.importorskip("ssgetpy")
     matrix_info = ssgetpy.search(name="ct20stif", group="Boeing")[0]
     localdestpath, _ = matrix_info.download(format="MM", extract=True)
     mtx_path = Path(localdestpath) / "ct20stif.mtx"
     matrix = scipy.io.mmread(mtx_path).tocsr()
     return ft.asarray(matrix)
+
+
+@pytest.fixture(scope="session", params=DATASETS)
+def stats_tensor(request):
+    return ft.asarray(sps.csr_array(DATASETS[request.param]()))
 
 
 def test_julia_matmul_ct20stif(boeing_tensor, benchmark):
@@ -86,12 +89,12 @@ def test_julia_matmul_ct20stif(boeing_tensor, benchmark):
         pytest.param(BlockedUniformStatsFactory, id="blocked_uniform"),
     ],
 )
-def test_julia_stats_ct20stif(boeing_tensor, benchmark, factory):
+def test_julia_stats(stats_tensor, benchmark, factory):
     stats_factory = factory()
     fields = (Field("i"), Field("j"))
     with with_default_scheduler(COMPILE_JULIA):
-        stats_factory(boeing_tensor, fields)
-        benchmark(stats_factory, boeing_tensor, fields)
+        stats_factory(stats_tensor, fields)
+        benchmark(stats_factory, stats_tensor, fields)
 
 
 def test_julia_sampling_stats_scan_ct20stif(boeing_tensor, benchmark):

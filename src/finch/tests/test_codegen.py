@@ -33,6 +33,7 @@ from finch.codegen import (
     NumpyBufferFType,
 )
 from finch.codegen.buffers import MallocBuffer
+from finch.codegen.buffers.memref_buffer import MemrefBufferFType
 from finch.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
@@ -1549,3 +1550,111 @@ def test_init_write_returns_rhs(compiler):
     module = compiler(program)
     assert module.write(np.int64(0), np.int64(0)) == 0
     assert module.write(np.int64(0), np.int64(3)) == 3
+
+
+# Test resizing the buffer with NumpyBuffer
+@mlir_backend
+def test_resize_mlir_regression(file_regression):
+    idx_buf = NumpyBuffer(np.empty(0, dtype=np.intp))
+    val_buf = NumpyBuffer(np.empty(0, dtype=np.float64))
+
+    idx_var = asm.Variable("idx", idx_buf.ftype)
+    val_var = asm.Variable("val", val_buf.ftype)
+    idx_slot = asm.Slot("idx_", idx_buf.ftype)
+    val_slot = asm.Slot("val_", val_buf.ftype)
+    new_length = asm.Literal(np.intp(1))
+    zero = asm.Literal(np.intp(0))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "sparse_output",
+                    asm.AssemblyKernelFType(
+                        "sparse_output",
+                        (idx_var.result_type, val_var.result_type),
+                        ftypes.none_,
+                    ),
+                ),
+                (idx_var, val_var),
+                asm.Block(
+                    (
+                        asm.Unpack(idx_slot, idx_var),
+                        asm.Unpack(val_slot, val_var),
+                        asm.Resize(idx_slot, new_length),
+                        asm.Resize(val_slot, new_length),
+                        asm.Store(idx_slot, zero, asm.Literal(np.intp(2))),
+                        asm.Store(val_slot, zero, asm.Literal(np.float64(3.5))),
+                        asm.Repack(idx_slot),
+                        asm.Repack(val_slot),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+    MLIRCompiler()(prgm).sparse_output(idx_buf, val_buf)
+    np.testing.assert_array_equal(idx_buf.arr, np.array([2], dtype=np.intp))
+    np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
+
+
+# Test for resize with MemrefBuffer
+@pytest.mark.mlir_backend
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (MLIRCompiler(), MemrefBufferFType),
+        (asm.AssemblyInterpreter(), MemrefBufferFType),
+    ],
+)
+@pytest.mark.parametrize("new_size", [1, 5, 10])
+def test_memref_resize(compiler, buffer, new_size):
+    values = [1.0, 4.0, 3.0, 4.0]
+    ab = buffer(ftypes.float64)(len(values))
+    for i, value in enumerate(values):
+        ab.store(i, value)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    size = asm.Variable("size", finch.intp)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(min(len(values), new_size)):
+        assert ab.load(i) == values[i]
+
+
+# Test for zero copy construction of MLIR Numpy buffer
+def test_numpy_buffer_construct_from_mlir_is_zero_copy():
+    arr = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+    buf = NumpyBuffer(arr)
+    serialized = serialize_to_mlir(buf.ftype, buf)
+
+    constructed = construct_from_mlir(buf.ftype, serialized)
+
+    assert constructed is buf
+    assert constructed.arr is arr
+    assert constructed.arr.ctypes.data == arr.ctypes.data

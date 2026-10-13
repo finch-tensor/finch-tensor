@@ -21,14 +21,36 @@ from finch.finch_logic import (
 )
 from finch.finch_logic.nodes import LogicExpression
 from finch.finch_logic.tensor_stats import StatsFactory
-from finch.tensor import RandomMaskTensor
+from finch.tensor import (
+    DenseLevel,
+    ElementLevel,
+    FiberTensor,
+    RandomMaskTensor,
+    SparseByteMapLevel,
+    SparseCOOLevel,
+    SparseHashLevel,
+    SparseListLevel,
+)
 
 from .numeric_stats import NumericStats
 from .tensor_stats import BaseTensorStats, BaseTensorStatsFactory
+from .util import get_lp_norms
+
+SAMPLING_ESTIMATORS = ("uj1", "sj1", "uj2", "schlosser", "sh2", "sh3", "good1", "silly")
 
 
 def mask_table(field: Field, mask: RandomMaskTensor) -> Table:
     return Table(Literal(mask), (field,))
+
+
+def compute_sketch(sketch: LogicExpression) -> Table:
+    from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+
+    fields = sketch.fields()
+    out = Alias("sketch_out")
+    prgm = Plan((Query(Table(out, fields), sketch), Produces((out,))))
+    (result,) = NON_RECURSIVE_SCHEDULER(prgm)
+    return Table(Literal(result), fields)
 
 
 def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
@@ -50,12 +72,12 @@ def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
         coef *= (N - n + j) / denom
         f_i = frequencies.get(i, 0.0)
         if f_i:
-            sign = 1.0 if (i % 2) == 0 else -1.0
-            total = sign * coef * f_i
+            sign = 1.0 if (i % 2) == 1 else -1.0
+            total += sign * coef * f_i
         if not math.isfinite(total) or not math.isfinite(coef):
             return d_n
 
-    if not (0.0 <= total <= N):
+    if not (d_n <= total <= N):
         return d_n
     return float(total)
 
@@ -75,7 +97,9 @@ def _duj1(d_n: float, f_1: float, q: float, n: float) -> float:
     """
     if d_n == 0:
         return 0.0
-    denom = 1 - ((1 - q) * f_1) / max(n, 1.0)
+    if q <= 0 or n <= 0:
+        return d_n
+    denom = (n - f_1 + q * f_1) / n
     if denom <= 0:
         return d_n
     return d_n / denom
@@ -87,19 +111,19 @@ def _dsj1(d_n: float, q: float, N: float) -> float:
     D * (1-(1-q)^(N/D)) = d_n
 
     d_n = positions observed in the sample
-    q = sample_prob**2
-    N = total population = prod(dim_size)
+    q = product of reduced-dimension sampling probabilities
+    N = population size (nonzero contributions)
     """
     if d_n == 0:
         return 0.0
-    if q >= 1.0:
+    if q <= 0.0 or q >= 1.0:
         return d_n
 
     def equation(D):
         # D must be >=dn and <=N
         if D <= 0:
             return -d_n
-        return D * (1 - (1 - q) ** (N / D)) - d_n
+        return -D * math.expm1((N / D) * math.log1p(-q)) - d_n
 
     lo = d_n
     hi = N
@@ -109,13 +133,13 @@ def _dsj1(d_n: float, q: float, N: float) -> float:
     if equation(hi) <= 0:
         return hi
 
-    for _ in range(50):
+    for _ in range(100):
         mid = (lo + hi) / 2
         if equation(mid) < 0:
             lo = mid
         else:
             hi = mid
-        if (hi - lo) < 0.01:
+        if math.isclose(lo, hi, rel_tol=1e-12, abs_tol=1e-8):
             break
     return (lo + hi) / 2
 
@@ -124,10 +148,7 @@ def _gamma2(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
     """
     gamma^2 = max(0,D/n^2*sum_i[i*(i-1)*f_i]+ D/N - 1)
 
-    We are supposed to use D here but since we don't have that we use d_n,
-    we could use unsmoothened estimate too ?
-
-    d_n : positions observed in the sample
+    d_n : estimated population distinct count (D_uj1)
     frequencies : {i:f_i} -> historgam of sketch counts
     n : np.sum(sketch) -> total sample size
     N : total population
@@ -153,7 +174,7 @@ def _duj2(
     d_n : positions observed
     f_1 : positions seen once
     frequencies :  {i:f_i} -> historgam of sketch counts
-    q : sample_prob**ndims
+    q : product of reduced-dimension sampling probabilities
     n : np.sum(sketch) -> total sample size
     N : total population size
 
@@ -169,11 +190,10 @@ def _duj2(
     D_uj1 = _duj1(d_n, f_1, q, n)
     gamma2 = _gamma2(D_uj1, frequencies, n, N)
 
-    ln1mq = math.log(1.0 - q)
-    lhs = 1.0 - f_1 * (1.0 - q) / max(n, 1.0)
-    rhs = d_n - f_1 * (1.0 - q) * ln1mq * gamma2 / q
+    ln1mq = math.log1p(-q)
+    rhs = d_n - f_1 * (1.0 - q) * (ln1mq / q) * gamma2
 
-    estimate = rhs / lhs
+    estimate = D_uj1 * (rhs / d_n)
     return max(float(estimate), d_n)
 
 
@@ -191,22 +211,13 @@ def _dsh(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float) -
 
     if d_n == 0:
         return 0.0
-    if q >= 1.0:
-        return d_n
-    if not frequencies:
+    if q <= 0.0 or q >= 1.0 or f_1 == 0 or not frequencies:
         return d_n
     vals = np.array(list(frequencies.keys()), dtype=float)
     cts = np.array(list(frequencies.values()), dtype=float)
-    num = float(np.sum(((1 - q) ** vals) * cts))
-
-    denom = float(np.sum(vals * q * ((1 - q) ** (vals - 1)) * cts))
-
-    if denom == 0:
-        return d_n
-
-    K_Sh = n * num / denom
-
-    return d_n + K_Sh * f_1 / max(n, 1.0)
+    weights = np.exp((vals - vals.min()) * math.log1p(-q)) * cts
+    ratio = float(np.sum(weights) / np.sum(vals * weights))
+    return d_n + f_1 * ((1.0 - q) / q) * ratio
 
 
 def _dsh2(
@@ -222,30 +233,20 @@ def _dsh2(
     """
     if d_n == 0:
         return 0.0
-    if q >= 1.0:
-        return d_n
-    if not frequencies:
+    if q <= 0.0 or q >= 1.0 or f_1 == 0 or not frequencies:
         return d_n
 
-    f_1_val = frequencies.get(1, 0.0)
-    D_uj1 = _duj1(d_n, f_1_val, q, n)
-
+    D_uj1 = _duj1(d_n, f_1, q, n)
     N_bar = N / max(D_uj1, 1.0)
-
-    one_plus_q_neg_Nbar = (1.0 + q) ** (-N_bar)
-    denom = 1.0 - one_plus_q_neg_Nbar
-
-    if denom == 0:
+    denom = -math.expm1(-N_bar * math.log1p(q))
+    if denom <= 0:
         return d_n
 
-    correction = (q / (1.0 + q)) / denom
-
-    K_Sh = _dsh(d_n, f_1, frequencies, q, n)
-    # We did D = d_n + K*f_1/n -> We need just K
-    raw_K = (K_Sh - d_n) * max(n, 1.0) / max(f_1, 1e-10)
-
-    K_star = correction * raw_K
-    return d_n + K_star * f_1 / max(n, 1.0)
+    vals = np.array(list(frequencies.keys()), dtype=float)
+    cts = np.array(list(frequencies.values()), dtype=float)
+    weights = np.exp((vals - vals.min()) * math.log1p(-q)) * cts
+    ratio = float(np.sum(weights) / np.sum(vals * weights))
+    return d_n + f_1 * ((1.0 - q) / (1.0 + q)) * ratio / denom
 
 
 def _dsh3(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float):
@@ -256,57 +257,61 @@ def _dsh3(d_n: float, f_1: float, frequencies: dict | None, q: float, n: float):
     """
     if d_n == 0:
         return 0.0
-    if q >= 1.0:
-        return d_n
-    if not frequencies:
+    if q <= 0.0 or q >= 1.0 or f_1 == 0 or not frequencies:
         return d_n
 
     vals = np.array(list(frequencies.keys()), dtype=float)
     cts = np.array(list(frequencies.values()), dtype=float)
-
-    q2 = q**2
-
-    num1 = float(np.sum(vals * q2 * ((1 - q2) ** (vals - 1)) * cts))
-    denom1 = float(np.sum(((1 - q) ** vals) * (((1 + q) ** vals) - 1) * cts))
-
-    if denom1 == 0:
+    shifted = vals - vals.min()
+    weights = np.exp(shifted * math.log1p(-q)) * cts
+    weights2 = np.exp(shifted * math.log1p(-(q * q))) * cts
+    # (1-q)^i * ((1+q)^i - 1) = (1-q^2)^i * (1-(1+q)^(-i)).
+    denom = float(np.sum(weights2 * -np.expm1(-vals * math.log1p(q))))
+    if denom <= 0:
         return d_n
-
-    ratio1 = num1 / denom1
-
-    num_K = float(np.sum(((1 - q) ** vals) * cts))
-    denom_K = float(np.sum(vals * q * ((1 - q) ** (vals - 1)) * cts))
-
-    K_raw = num_K / denom_K
-
-    return d_n + f_1 * ratio1 * (K_raw**2)
+    ratio = float(np.sum(weights) / np.sum(vals * weights))
+    correction = ((1.0 - q) / (1.0 + q)) * float(np.sum(vals * weights2)) / denom
+    return d_n + f_1 * correction * ratio * ratio
 
 
 class SamplingStatsFactory(
     BaseTensorStatsFactory["SamplingStats"], StatsFactory["SamplingStats"]
 ):
-    def __init__(self, sample_prob: float = 0.5, estimator: str = "uj1"):
+    def __init__(self, sample_nnz: int = 10_000, estimator: str = "sh3"):
         super().__init__(SamplingStats)
-        self.sample_prob = sample_prob
+        if sample_nnz < 1:
+            raise ValueError("sample_nnz must be positive")
+        if estimator not in SAMPLING_ESTIMATORS:
+            raise ValueError(f"Unknown estimator: {estimator!r}")
+        self.sample_nnz = sample_nnz
         self.estimator = estimator
-        self._masks: dict[tuple[Field, int], RandomMaskTensor] = {}
+        self._seeds: dict[tuple[Field, int], int] = {}
         self._rng = np.random.default_rng()
 
-    def _get_mask(self, field: Field, size: int) -> RandomMaskTensor:
-        mask_key = (field, size)
-        if mask_key not in self._masks:
-            self._masks[mask_key] = RandomMaskTensor(
-                size, self.sample_prob, rng=self._rng, dtype=np.intp
-            )
-        return self._masks[mask_key]
+    def _get_mask(self, field: Field, size: int, prob: float) -> RandomMaskTensor:
+        seed_key = (field, size)
+        if seed_key not in self._seeds:
+            self._seeds[seed_key] = int(self._rng.integers(0, 1 << 64, dtype=np.uint64))
+        return RandomMaskTensor(size, prob, seed=self._seeds[seed_key], dtype=np.intp)
 
-    def __call__(self, tensor: Any, fields: tuple[Field, ...]) -> SamplingStats:
+    def __call__(
+        self,
+        tensor: Any,
+        fields: tuple[Field, ...],
+        sample_probs: list[float] | None = None,
+    ) -> SamplingStats:
         base = super().__call__(tensor, fields)
         fill = base.fill_value.value
+        sample_probs = (
+            [1.0] * len(fields) if sample_probs is None else list(sample_probs)
+        )
 
-        # Reuse each field's Bernoulli mask across tensors so joins sample the
-        # same coordinates. An entry survives only if every dimension is kept.
-        masks = [self._get_mask(field, int(base.dim_sizes[field])) for field in fields]
+        # Reuse each field's seed across tensors so joins sample the same
+        # coordinates. An entry survives only if every dimension is kept.
+        masks = [
+            self._get_mask(field, int(base.dim_sizes[field]), prob)
+            for field, prob in zip(fields, sample_probs, strict=True)
+        ]
         non_fill = MapJoin(
             Literal(ffuncs.ne), (Table(Literal(tensor), fields), Literal(fill))
         )
@@ -314,15 +319,75 @@ class SamplingStatsFactory(
             mask_table(field, mask) for field, mask in zip(fields, masks, strict=True)
         ]
 
-        sketch = MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables))
+        sketch = compute_sketch(MapJoin(Literal(ffuncs.mul), (non_fill, *mask_tables)))
 
-        return SamplingStats(
-            base,
-            sketch=sketch,
-            sample_prob=self.sample_prob,
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        return self.remask(
+            SamplingStats(
+                base,
+                sketch=sketch,
+                sample_probs=sample_probs,
+                estimator=self.estimator,
+                seeds_ref=self._seeds,
+            )
         )
+
+    def _mask_sketch(self, stats: SamplingStats, probs: list[float]) -> SamplingStats:
+        result = self.copy(stats)
+        masks = []
+        for field, old_prob, prob in zip(
+            stats.index_order, stats.sample_probs, probs, strict=True
+        ):
+            if prob == old_prob:
+                continue
+            size = int(stats.dim_sizes[field])
+            seed = stats.seeds_ref.get((field, size))
+            if seed is None:
+                mask = self._get_mask(field, size, prob)
+                result.seeds_ref[field, size] = self._seeds[field, size]
+            else:
+                mask = RandomMaskTensor(size, prob, seed=seed, dtype=np.intp)
+            masks.append(mask_table(field, mask))
+        if masks:
+            result.sketch = compute_sketch(
+                MapJoin(Literal(ffuncs.mul), (stats.sketch, *masks))
+            )
+            result.sample_probs = list(probs)
+            result.scan_cache = None
+        return result
+
+    def remask(self, stats: SamplingStats) -> SamplingStats:
+        """Halve the largest nonzero projection until the sketch fits the budget."""
+        if (
+            math.prod(int(stats.dim_sizes[f]) for f in stats.index_order)
+            <= self.sample_nnz
+        ):
+            return stats
+        while stats.scan(needs_freq=False)[1] > self.sample_nnz:
+            match stats.sketch:
+                case Table(Literal(tensor), fields):
+                    norms = get_lp_norms(tensor, fields, (0,))
+                case _:
+                    raise TypeError("remask requires a materialized sketch")
+            dim = max(
+                range(len(stats.index_order)),
+                key=lambda idx: norms[stats.index_order[idx]][0],
+            )
+            probs = list(stats.sample_probs)
+            probs[dim] *= 0.5
+            stats = self._mask_sketch(stats, probs)
+        return stats
+
+    def _align_mapjoin(
+        self, *args: SamplingStats
+    ) -> tuple[tuple[SamplingStats, ...], dict[Field, float]]:
+        probs: dict[Field, float] = {}
+        for arg in args:
+            for field, prob in zip(arg.index_order, arg.sample_probs, strict=True):
+                probs[field] = min(probs.get(field, prob), prob)
+        aligned = tuple(
+            self._mask_sketch(arg, [probs[f] for f in arg.index_order]) for arg in args
+        )
+        return aligned, probs
 
     def _mapjoin_join(
         self, op: FinchOperator, *join_args: SamplingStats
@@ -332,27 +397,24 @@ class SamplingStatsFactory(
         """
 
         if len(join_args) == 1:
-            return self.copy(join_args[0])
+            return self.remask(self.copy(join_args[0]))
 
         base_stats = super()._mapjoin_defs(op, *join_args)
-        result_sketch = MapJoin(
-            Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args)
+        join_args, probs = self._align_mapjoin(*join_args)
+        result_sketch = compute_sketch(
+            MapJoin(Literal(ffuncs.mul), tuple(arg.sketch for arg in join_args))
         )
 
-        new_remainder: set[Field] = set()
-        new_remainder_sizes: dict = {}
-        for arg in join_args:
-            new_remainder |= arg.remainder_dims
-            new_remainder_sizes.update(arg.remainder_dim_sizes)
-
-        return SamplingStats(
-            base_stats,
-            sketch=result_sketch,
-            remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
-            remainder_dim_sizes=new_remainder_sizes,
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        return self.remask(
+            SamplingStats(
+                base_stats,
+                sketch=result_sketch,
+                sample_probs=[probs[f] for f in base_stats.index_order],
+                remainder_size=math.prod(arg.remainder_size for arg in join_args),
+                remainder_prob=math.prod(arg.remainder_prob for arg in join_args),
+                estimator=self.estimator,
+                seeds_ref=self._seeds,
+            )
         )
 
     def _mapjoin_union(self, op: FinchOperator, *union_args: SamplingStats):
@@ -361,13 +423,11 @@ class SamplingStatsFactory(
         N(B)_k *prod_{l in j\\k}n(A)_l ] - N(A)_j*N(B)_k
         """
         base_stats = super()._mapjoin_defs(op, *union_args)
+        union_args, probs = self._align_mapjoin(*union_args)
         output_indices = set(base_stats.index_order)
-        new_remainder: set[Field] = set()
-        new_remainder_sizes: dict = {}
 
         terms = []
         for arg in union_args:
-            new_remainder_sizes.update(arg.remainder_dim_sizes)
             arg_indices = set(arg.index_order)
             other_free_size = 1.0
             for other in union_args:
@@ -376,12 +436,23 @@ class SamplingStatsFactory(
                 for f in other.index_order:
                     if f not in arg_indices and f not in output_indices:
                         other_free_size *= other.dim_sizes.get(f, 1.0)
-                for f in other.remainder_dims:
-                    other_free_size *= other.dim_sizes.get(f, 1.0)
+                other_free_size *= other.remainder_size
+            missing_masks = [
+                mask_table(
+                    field,
+                    self._get_mask(
+                        field, int(base_stats.dim_sizes[field]), probs[field]
+                    ),
+                )
+                for field in base_stats.index_order
+                if field not in arg_indices
+            ]
             terms.append(
-                MapJoin(Literal(ffuncs.mul), (arg.sketch, Literal(other_free_size)))
+                MapJoin(
+                    Literal(ffuncs.mul),
+                    (arg.sketch, Literal(other_free_size), *missing_masks),
+                )
             )
-            new_remainder |= arg.remainder_dims
 
         result = terms[0]
         for term in terms[1:]:
@@ -394,14 +465,16 @@ class SamplingStatsFactory(
 
             result = MapJoin(Literal(ffuncs.sub), (result, inter))
 
-        return SamplingStats(
-            base_stats,
-            sketch=result,
-            remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
-            remainder_dim_sizes=new_remainder_sizes,
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        return self.remask(
+            SamplingStats(
+                base_stats,
+                sketch=compute_sketch(result),
+                sample_probs=[probs[f] for f in base_stats.index_order],
+                remainder_size=math.prod(arg.remainder_size for arg in union_args),
+                remainder_prob=math.prod(arg.remainder_prob for arg in union_args),
+                estimator=self.estimator,
+                seeds_ref=self._seeds,
+            )
         )
 
     def aggregate(
@@ -453,185 +526,152 @@ class SamplingStatsFactory(
                 )
             new_sketch = MapJoin(Literal(ffuncs.mul), (exists, Literal(prod_n)))
 
-        new_remainder = stats.remainder_dims | reduce_set
-        new_remainder_sizes = dict(stats.remainder_dim_sizes)
-        for f in reduce_set:
-            new_remainder_sizes[f] = stats.dim_sizes[f]
+        probs = dict(zip(stats.index_order, stats.sample_probs, strict=True))
 
-        return SamplingStats(
-            base_stats,
-            sketch=new_sketch,
-            remainder_dims=new_remainder,
-            sample_prob=self.sample_prob,
-            remainder_dim_sizes=new_remainder_sizes,
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        return self.remask(
+            SamplingStats(
+                base_stats,
+                sketch=compute_sketch(new_sketch),
+                sample_probs=[probs[f] for f in base_stats.index_order],
+                remainder_size=stats.remainder_size
+                * math.prod(stats.dim_sizes[f] for f in reduce_fields),
+                remainder_prob=stats.remainder_prob
+                * math.prod(probs[f] for f in reduce_fields),
+                estimator=self.estimator,
+                seeds_ref=stats.seeds_ref,
+            )
         )
 
     def relabel(
         self, stats: SamplingStats, relabel_indices: tuple[Field, ...]
     ) -> SamplingStats:
         base_stats = self.relabel_def(stats, relabel_indices)
-        return SamplingStats(
-            base_stats,
-            sketch=Relabel(stats.sketch, relabel_indices),
-            remainder_dims=set(stats.remainder_dims),
-            sample_prob=self.sample_prob,
-            remainder_dim_sizes=dict(stats.remainder_dim_sizes),
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        seeds = dict(stats.seeds_ref)
+        for old, new in zip(stats.index_order, relabel_indices, strict=True):
+            size = int(stats.dim_sizes[old])
+            if (old, size) in stats.seeds_ref:
+                seeds[new, size] = stats.seeds_ref[old, size]
+        return self.remask(
+            SamplingStats(
+                base_stats,
+                sketch=compute_sketch(Relabel(stats.sketch, relabel_indices)),
+                sample_probs=stats.sample_probs,
+                remainder_size=stats.remainder_size,
+                remainder_prob=stats.remainder_prob,
+                estimator=self.estimator,
+                seeds_ref=seeds,
+            )
         )
 
     def reorder(
         self, stats: SamplingStats, reorder_indices: tuple[Field, ...]
     ) -> SamplingStats:
         base_stats = self.reorder_def(stats, reorder_indices)
-        return SamplingStats(
-            base_stats,
-            sketch=Reorder(stats.sketch, reorder_indices),
-            remainder_dims=set(stats.remainder_dims),
-            sample_prob=self.sample_prob,
-            remainder_dim_sizes=dict(stats.remainder_dim_sizes),
-            estimator=self.estimator,
-            masks_ref=self._masks,
+        probs = dict(zip(stats.index_order, stats.sample_probs, strict=True))
+        return self.remask(
+            SamplingStats(
+                base_stats,
+                sketch=compute_sketch(Reorder(stats.sketch, reorder_indices)),
+                sample_probs=[probs.get(f, 1.0) for f in base_stats.index_order],
+                remainder_size=stats.remainder_size,
+                remainder_prob=stats.remainder_prob,
+                estimator=self.estimator,
+                seeds_ref=stats.seeds_ref,
+            )
         )
 
 
 class SamplingStats(NumericStats):
     """
-    sketch : deferred expression over bound dimensions
-    remainder_dims : 'free' dimension -> absent in the output
-    sample_prob : Bernoulli sample prob
+    sketch : materialized table over bound dimensions
+    remainder_size : product of sizes of dimensions aggregated out of the sketch
+    remainder_prob : product of their sampling probabilities
+    sample_probs : per-dimension probabilities in index_order
     """
 
     sketch: LogicExpression
-    remainder_dims: set
-    sample_prob: float
+    remainder_size: float
+    remainder_prob: float
+    sample_probs: list[float]
 
     def __init__(
         self,
         base: BaseTensorStats,
         sketch: LogicExpression,
-        sample_prob: float = 0.5,
+        sample_probs: list[float],
         estimator: str = "uj1",
-        remainder_dims: set | None = None,
-        remainder_dim_sizes: dict | None = None,
-        masks_ref: dict | None = None,
+        remainder_size: float = 1.0,
+        remainder_prob: float = 1.0,
+        seeds_ref: dict[tuple[Field, int], int] | None = None,
     ):
 
         super().__init__(base)
         self.sketch = sketch
-        self.sample_prob = sample_prob
-        self.remainder_dims = set(remainder_dims) if remainder_dims else set()
+        if len(sample_probs) != len(self.index_order):
+            raise ValueError("Expected one sampling probability per dimension")
+        self.sample_probs = list(sample_probs)
+        self.remainder_size = float(remainder_size)
+        self.remainder_prob = float(remainder_prob)
         self.estimator = estimator
-        self.remainder_dim_sizes = (
-            dict(remainder_dim_sizes) if remainder_dim_sizes else {}
-        )
-        self.masks_ref = masks_ref if masks_ref is not None else {}
+        self.seeds_ref = seeds_ref if seeds_ref is not None else {}
         self.scan_cache: tuple[float, float, float, dict | None] | None = None
 
     def scan(self, needs_freq: bool) -> tuple[float, float, float, dict | None]:
-        from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
+        from finch.compile_jl.runtime import JuliaOwnedTensor
 
-        frequencies: dict | None
-
-        if self.scan_cache is not None and (
-            not needs_freq or self.scan_cache[3] is not None
-        ):
-            n, d_n, f_1, frequencies = self.scan_cache
-        else:
-            fields = tuple(self.index_order)
-            n_a, dn_a, f1_a = Alias("n"), Alias("d_n"), Alias("f_1")
-            bodies = [
-                Query(
-                    Table(n_a, ()),
-                    Aggregate(
-                        Literal(ffuncs.add), Literal(np.intp(0)), self.sketch, fields
-                    ),
-                ),
-                Query(
-                    Table(dn_a, ()),
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(np.intp(0)),
-                        MapJoin(Literal(ffuncs.gt), (self.sketch, Literal(0.0))),
-                        fields,
-                    ),
-                ),
-                Query(
-                    Table(f1_a, ()),
-                    Aggregate(
-                        Literal(ffuncs.add),
-                        Literal(np.intp(0)),
-                        MapJoin(Literal(ffuncs.eq), (self.sketch, Literal(1.0))),
-                        fields,
-                    ),
-                ),
-            ]
-
-            outputs = [n_a, dn_a, f1_a]
-            max_a = None
-            if needs_freq:
-                max_a = Alias("max_val")
-                bodies.append(
-                    Query(
-                        Table(max_a, ()),
-                        Aggregate(
-                            Literal(ffuncs.max),
-                            Literal(np.intp(0)),
-                            self.sketch,
-                            fields,
-                        ),
-                    )
-                )
-                outputs.append(max_a)
-
-            prgm = Plan((*bodies, Produces(tuple(outputs))))
-            results = NON_RECURSIVE_SCHEDULER(prgm)
-            n = float(np.asarray(results[0])[()])
-            d_n = float(np.asarray(results[1])[()])
-            f_1 = float(np.asarray(results[2])[()])
-
-            frequencies = None
-            if needs_freq:
-                max_val = int(round(float(np.asarray(results[3])[()])))
-                if max_val >= 1:
-                    freq_alias = [Alias(f"f_{i}") for i in range(1, max_val + 1)]
-                    freq_bodies = [
-                        Query(
-                            Table(a, ()),
-                            Aggregate(
-                                Literal(ffuncs.add),
-                                Literal(np.intp(0)),
-                                MapJoin(
-                                    Literal(ffuncs.eq), (self.sketch, Literal(float(i)))
-                                ),
-                                fields,
-                            ),
-                        )
-                        for i, a in enumerate(freq_alias, start=1)
-                    ]
-                    freq_prgm = Plan((*freq_bodies, Produces(tuple(freq_alias))))
-                    freq_result = NON_RECURSIVE_SCHEDULER(freq_prgm)
-                    frequencies = {
-                        i: float(np.asarray(r)[()])
-                        for i, r in enumerate(freq_result, start=1)
-                        if float(np.asarray(r)[()]) > 0
-                    }
-
-            self.scan_cache = (n, d_n, f_1, frequencies)
-        return n, d_n, f_1, frequencies
+        if self.scan_cache is None or (needs_freq and self.scan_cache[3] is None):
+            match self.sketch:
+                case Table(Literal(tensor), _):
+                    pass
+                case _:
+                    raise TypeError("scan requires a materialized sketch")
+            match tensor:
+                case JuliaOwnedTensor():
+                    tensor = tensor._as_tensor()
+            match tensor:
+                case FiberTensor(lvl=level):
+                    while True:
+                        match level:
+                            case ElementLevel():
+                                values = level.val.arr
+                                break
+                            case (
+                                DenseLevel(lvl=child)
+                                | SparseListLevel(lvl=child)
+                                | SparseCOOLevel(lvl=child)
+                                | SparseHashLevel(lvl=child)
+                                | SparseByteMapLevel(lvl=child)
+                            ):
+                                level = child
+                            case _:
+                                raise TypeError(
+                                    f"Unsupported sketch level: {type(level).__name__}"
+                                )
+                case _:
+                    values = np.asarray(tensor).reshape(-1)
+            vals, cts = np.unique_counts(values)
+            n = float(np.dot(vals.astype(float), cts))
+            d_n = float(cts[vals > 0].sum())
+            f_1 = float(cts[vals == 1].sum())
+            frequencies = (
+                {int(v): float(c) for v, c in zip(vals, cts, strict=True) if v > 0}
+                if needs_freq
+                else None
+            )
+            self.scan_cache = (n, d_n, f_1, frequencies or None)
+        return self.scan_cache
 
     def coverage_correction(self) -> float:
         from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
 
         _, d_n_raw, _, _ = self.scan(needs_freq=False)
         coverage = 1.0
-        for field in self.index_order:
+        for field, prob in zip(self.index_order, self.sample_probs, strict=True):
             size = int(self.dim_sizes[field])
-            mask = self.masks_ref.get((field, size))
-            if mask is None or size == 0:
+            seed = self.seeds_ref.get((field, size))
+            if seed is None or size == 0:
                 continue
+            mask = RandomMaskTensor(size, prob, seed=seed, dtype=np.intp)
             out = Alias("sampled_count")
             query = Query(
                 Table(out, ()),
@@ -652,35 +692,20 @@ class SamplingStats(NumericStats):
         return d_n_raw / coverage
 
     def estimate_non_fill_values(self) -> float:
-        """ "
-        Using un-smoothened first order jackknife estimator
-        D_uj1 = (1-(1-q)*f_1/n)^{-1} * d_n
-
-        d_n : positions with sketch count > 0
-        (distinct positions observed in the sample)
-        f_1 : positions with sketch count = 1 (seen exactly once)
-        n = total sample size
-        N = population size [Total without sampling]
-        q = n/N
-        """
-        needs_freq = self.estimator in ("uj2", "schlosser", "sh2", "sh3", "good1")
+        """Correct reduced-dimension sampling, then scale to all output coordinates."""
+        q_output = math.prod(self.sample_probs)
+        q = self.remainder_prob
+        needs_freq = (
+            self.estimator in ("uj2", "schlosser", "sh2", "sh3", "good1")
+            and 0.0 < q < 1.0
+        )
         n, d_n, f_1, frequencies = self.scan(needs_freq)
-        bound_size = (
-            math.prod(int(self.dim_sizes[f]) for f in self.index_order)
-            if self.index_order
-            else 1
-        )
-        remainder_size = (
-            math.prod(
-                int(self.remainder_dim_sizes.get(f, 1)) for f in self.remainder_dims
-            )
-            if self.remainder_dims
-            else 1
-        )
-        N = bound_size * remainder_size
-        all_dims = list(self.index_order) + list(self.remainder_dims)
-        ndims = len(all_dims)
-        q = self.sample_prob**ndims
+        if d_n == 0 or q_output <= 0:
+            return 0.0
+        bound_size = math.prod(int(self.dim_sizes[f]) for f in self.index_order)
+        # The formulas estimate classes among the retained output coordinates.
+        # Their population consists of nonzero contributions, not all tensor cells.
+        N = n / q if q > 0 else n
 
         if self.estimator == "uj1":
             formula_est = _duj1(d_n, f_1, q, n)
@@ -703,16 +728,15 @@ class SamplingStats(NumericStats):
             formula_est = _dsh3(d_n, f_1, frequencies, q, n)
 
         elif self.estimator == "silly":
-            q_output = self.sample_prob ** len(self.index_order)
-            formula_est = _dsilly(d_n, q_output)
+            formula_est = d_n
 
         else:
             raise ValueError(
                 f"Unknown estimator: {self.estimator!r}."
-                f"Choose from: uj1, sj1, uj2, schlosser, sh2, sh3, good1"
+                f"Choose from: {', '.join(SAMPLING_ESTIMATORS)}"
             )
 
-        return float(formula_est)
+        return float(min(bound_size, max(d_n, formula_est) / q_output))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[f]) for f in self.index_order]
