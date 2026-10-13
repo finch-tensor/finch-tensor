@@ -24,9 +24,6 @@ _table: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
 class HashCons(ABC):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         obj = object.__new__(cls)
-        # Fill the fields so that __hash_keys__ can read them. Python calls
-        # __init__ once more on the object we return; for a frozen dataclass
-        # that only re-assigns equal field values.
         obj.__init__(*args, **kwargs)
         return _table.setdefault((cls, *obj.__hash_keys__()), obj)
 
