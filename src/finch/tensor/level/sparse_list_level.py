@@ -56,8 +56,8 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return 1 + self.lvl_t.ndim
 
     @property
-    def fill_value(self):
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self):
@@ -105,7 +105,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:
             reduced_stats = stats_factory.aggregate(
-                ffuncs.or_, False, reduce_fields, stats
+                ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
             )
         else:
             reduced_stats = stats
@@ -296,8 +296,8 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
         fill = (
             ntn.Value(self.lower_fill(lvl_asm), self.element_type)
-            if is_dynamic(self.fill_value)
-            else ntn.Literal(self.fill_value.value)
+            if is_dynamic(self.fill_type)
+            else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,

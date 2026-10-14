@@ -1,3 +1,4 @@
+import cmath
 import math
 
 import pytest
@@ -7,9 +8,12 @@ import numpy as np
 import finch
 from finch.algebra import (
     DynamicFill,
+    DynamicFillFType,
+    StaticFillFType,
     TupleFType,
     cansplitpush,
     ffuncs,
+    fixpoint_type,
     ftype,
     init_value,
     is_annihilator,
@@ -326,15 +330,33 @@ def test_same_ffunc_dunder_overload():
     assert ffuncs.same(LeftDefers(), RightSame()) is np.True_
 
 
-def test_samehash():
-    class SameHash:
-        def __samehash__(self):
-            return ("samehash", 1)
+def test_same_ffunc_tuples():
+    # Tuples are scalars, so `same` compares them as a whole.
+    assert ffuncs.same((np.float64(np.nan), 1), (np.float64(np.nan), 1)) is True
+    assert ffuncs.same((np.float64(np.nan), 1), (np.float64(np.nan), 2)) is False
+    assert ffuncs.same((1, 2), (1, 2, 3)) is False
 
-    assert ffuncs.samehash(1) == 1
-    assert ffuncs.samehash(np.float64(np.nan)) == ("nan", finch.float64)
-    assert ffuncs.samehash(np.float32(np.nan)) == ("nan", finch.float32)
-    assert ffuncs.samehash(SameHash()) == ("samehash", 1)
+
+def test_canonical():
+    class Canonical:
+        def __canonical__(self):
+            return ("canonical", 1)
+
+    nan64 = np.float64(np.nan)
+    # Each kind of NaN is one object, so NaNs hash alike.
+    assert ffuncs.canonical(nan64) is np.nan
+    assert ffuncs.canonical(np.float32(-np.nan)) is np.nan
+    assert ffuncs.canonical(float("nan")) is math.nan
+    assert ffuncs.canonical(complex(np.nan, 0)) is cmath.nanj
+    complex_nan = ffuncs.canonical(np.complex128(complex(0, np.nan)))
+    assert isinstance(complex_nan, np.complex128)
+    assert ffuncs.canonical(np.complex64(complex(np.nan, 0))) is complex_nan
+    assert np.signbit(ffuncs.canonical(np.float64(-0.0))) == np.False_
+    assert type(ffuncs.canonical(np.float32(1.5))) is np.float32
+    assert ffuncs.canonical(1) == 1
+    assert ffuncs.canonical((nan64, np.float64(-0.0))) == (np.nan, 0.0)
+    assert ffuncs.canonical(Canonical()) == ("canonical", 1)
+    assert ffuncs.canonical.ftype.return_type(finch.float32) == finch.float32
 
 
 @pytest.mark.parametrize("fill", [0, 5, np.nan, finch.algebra.StaticFill(5)])
@@ -384,3 +406,11 @@ def test_function_ftypes_do_not_specialize_runtime_data(factory, first, second):
     )
     field_values = [getattr(right, name) for name in ftype(right).struct_fieldnames]
     assert ftype(left).from_fields(*field_values) == right
+
+
+@pytest.mark.parametrize(
+    "init", [StaticFillFType(np.int8(0)), DynamicFillFType(np.int8)]
+)
+def test_fixpoint_type_starts_from_the_fill_of_the_init(init):
+    # Folding uint8 values into an int8 init promotes the result to int16.
+    assert fixpoint_type(ffuncs.add.ftype, init, ftype(np.uint8)) == ftype(np.int16)

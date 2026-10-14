@@ -54,7 +54,6 @@ def compute_sketch(sketch: LogicExpression) -> Table:
 
 
 def _dgood1(d_n: float, frequencies: dict | None, n: float, N: float) -> float:
-
     if d_n == 0:
         return 0.0
     if not frequencies:
@@ -301,7 +300,7 @@ class SamplingStatsFactory(
         sample_probs: list[float] | None = None,
     ) -> SamplingStats:
         base = super().__call__(tensor, fields)
-        fill = base.fill_value.value
+        fill = tensor.fill_value
         sample_probs = (
             [1.0] * len(fields) if sample_probs is None else list(sample_probs)
         )
@@ -495,7 +494,7 @@ class SamplingStatsFactory(
         reduce_fields = tuple(reduce_set)
 
         # check is_annihilator
-        if is_identity(op.ftype, stats.fill_value):
+        if is_identity(op.ftype, stats.fill_type):
             new_sketch = (
                 Aggregate(
                     Literal(ffuncs.add),
@@ -507,7 +506,7 @@ class SamplingStatsFactory(
                 else stats.sketch
             )
 
-        elif is_annihilator(op.ftype, stats.fill_value):
+        elif is_annihilator(op.ftype, stats.fill_type):
             exists: LogicExpression = MapJoin(
                 Literal(ffuncs.gt), (stats.sketch, Literal(0.0))
             )
@@ -604,7 +603,6 @@ class SamplingStats(NumericStats):
         remainder_prob: float = 1.0,
         seeds_ref: dict[tuple[Field, int], int] | None = None,
     ):
-
         super().__init__(base)
         self.sketch = sketch
         if len(sample_probs) != len(self.index_order):

@@ -1,15 +1,16 @@
 """
-Static/Dynamic fill values.
+Static/Dynamic fills.
 
 Every tensor has a fill value: the background value of a sparse tensor, and the
-value a newly constructed tensor is filled with. A fill is always a real value,
-but a tensor's *ftype* additionally records whether a kernel may specialize on
-that value:
+value a newly constructed tensor is filled with. The fill value belongs to the
+tensor, and the tensor's format records whether a kernel may specialize on it:
 
-* `StaticFill` -- compile against this value. It may be folded into generated
-  code.
-* `DynamicFill` -- do not compile against this value. The value is may change across
-  invocations, so one compiled kernel serves every fill of the same dtype.
+* `StaticFillFType` -- compile against this value, which is part of the format.
+  It may be folded into generated code. Its values are `StaticFill`s.
+* `DynamicFillFType` -- do not compile against the value, so only its element
+  type is part of the format. The value may change across invocations, so one
+  compiled kernel serves every fill of the same element type. Its values are
+  `DynamicFill`s.
 """
 
 from __future__ import annotations
@@ -17,14 +18,10 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar, overload
 
-import numpy as np
-
 from .ftypes import FType, FTyped, ftype
 
 if TYPE_CHECKING:
     from .algebra import FinchOperator
-
-FT = TypeVar("FT", bound=FType)
 
 
 class DynamicFillError(Exception):
@@ -35,14 +32,126 @@ class DynamicFillError(Exception):
     """
 
 
-class AbstractFill(FTyped[FT], ABC):
-    """A tensor's fill value, and whether kernels may specialize on it."""
+class AbstractFillFType(FType, ABC):
+    """
+    The fill of a format: the element type of its fill, and whether kernels may
+    specialize on the value of the fill.
+    """
 
     @property
     @abstractmethod
-    def ftype(self) -> FT:
-        """The dtype of the fill value, always known."""
+    def element_type(self) -> FType:
+        """The element type of the fill, always known."""
         ...
+
+    def as_dynamic(self) -> DynamicFillFType:
+        """This fill, marked so that kernels will not specialize on its value."""
+        return DynamicFillFType(self.element_type)
+
+    @abstractmethod
+    def astype(self, element_type: FType) -> AbstractFillFType:
+        """This fill, with its value converted to `element_type`."""
+        ...
+
+
+class StaticFillFType(AbstractFillFType):
+    """
+    The fill of a format which kernels may specialize on, so its value is part
+    of the format. Equality and hashing are by element type and value, so
+    formats with different static fills are distinct and get distinct kernels.
+    """
+
+    def __init__(self, value: Any) -> None:
+        self._value = value
+
+    @property
+    def value(self) -> Any:
+        return self._value
+
+    @property
+    def element_type(self) -> FType:
+        return ftype(self._value)
+
+    def astype(self, element_type: FType) -> StaticFillFType:
+        return StaticFillFType(element_type(self._value))
+
+    def __call__(self, val: Any) -> StaticFill:
+        fill = StaticFill(self.element_type(val))
+        if fill.ftype != self:
+            raise ValueError(f"{val!r} is not the static fill {self._value!r}")
+        return fill
+
+    def __eq__(self, other):
+        # Values are compared with `same` rather than `==` because of NaN.
+        # ftypes filled with NaN must compare equal or they get separate
+        # kernels and fail each other's type checks. Imported lazily: `ffuncs`
+        # depends on this module.
+        from .ffuncs import same
+
+        return (
+            isinstance(other, StaticFillFType)
+            and self.element_type == other.element_type
+            and bool(same(self._value, other._value))
+        )
+
+    def __hash__(self):
+        from .ffuncs import canonical
+
+        return hash((StaticFillFType, self.element_type, canonical(self._value)))
+
+    def __repr__(self):
+        return f"StaticFillFType({self._value!r})"
+
+
+class DynamicFillFType(AbstractFillFType):
+    """
+    The fill of a format which kernels must not specialize on, so only its
+    element type is part of the format. Each tensor holds its own fill value,
+    which is bound to the kernel at call time.
+    """
+
+    def __init__(self, element_type: Any) -> None:
+        self._element_type = ftype(element_type)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
+
+    def as_dynamic(self) -> DynamicFillFType:
+        return self
+
+    def astype(self, element_type: FType) -> DynamicFillFType:
+        return DynamicFillFType(element_type)
+
+    def __call__(self, val: Any) -> DynamicFill:
+        return DynamicFill(self._element_type(val), self._element_type)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, DynamicFillFType)
+            and self._element_type == other._element_type
+        )
+
+    def __hash__(self):
+        return hash((DynamicFillFType, self._element_type))
+
+    def __repr__(self):
+        return f"DynamicFillFType({self._element_type!r})"
+
+
+class AbstractFill(FTyped[AbstractFillFType], ABC):
+    """A tensor's fill value. Its ftype says whether kernels may specialize on it."""
+
+    @property
+    @abstractmethod
+    def ftype(self) -> AbstractFillFType:
+        """The fill of the format which this fill belongs to."""
+        ...
+
+    @property
+    def element_type(self) -> FType:
+        """The element type of the fill value, always known."""
+        return self.ftype.element_type
 
     @property
     @abstractmethod
@@ -52,51 +161,42 @@ class AbstractFill(FTyped[FT], ABC):
 
     def as_dynamic(self) -> DynamicFill:
         """This fill, marked so that kernels will not specialize on its value."""
-        return DynamicFill(self.value, self.ftype)
+        return DynamicFill(self.value, self.element_type)
+
+    @abstractmethod
+    def astype(self, element_type: FType) -> AbstractFill:
+        """This fill, with its value converted to `element_type`."""
+        ...
 
 
-class StaticFill(AbstractFill[FT]):
+class StaticFill(AbstractFill):
     """
     A fill value which kernels may specialize on. Equality and hashing are by
-    value, so ftypes carrying different static fills are distinct and get
-    distinct kernels.
+    value, matching `StaticFillFType`.
     """
 
-    @overload
-    def __init__(self, value: FTyped[FT]) -> None: ...
-
-    @overload
-    def __init__(self, value: Any) -> None: ...
-
-    def __init__(self, value) -> None:
+    def __init__(self, value: Any) -> None:
         if isinstance(value, AbstractFill):
             self._value = value.value
         else:
             self._value = value
 
     @property
-    def ftype(self) -> FT:
-        return ftype(self._value)
+    def ftype(self) -> StaticFillFType:
+        return StaticFillFType(self._value)
 
     @property
     def value(self) -> Any:
         return self._value
 
-    def __eq__(self, other):
-        # Values are compared with `same` rather than `==` because of NaN.
-        # ftypes filled with NaN must compare equal or they get separate
-        # kernels and fail each other's type checks. Imported lazily: `ffuncs`
-        # depends on this module.
-        from .ffuncs import same
+    def astype(self, element_type: FType) -> StaticFill:
+        return StaticFill(element_type(self._value))
 
-        if not isinstance(other, StaticFill):
-            return False
-        return bool(np.all(same(self._value, other._value)))
+    def __eq__(self, other):
+        return isinstance(other, StaticFill) and self.ftype == other.ftype
 
     def __hash__(self):
-        from .ffuncs import samehash
-
-        return hash((StaticFill, samehash(self._value)))
+        return hash((StaticFill, self.ftype))
 
     def __same__(self, other):
         return self == other
@@ -104,41 +204,35 @@ class StaticFill(AbstractFill[FT]):
     def __rsame__(self, other):
         return self == other
 
-    def __samehash__(self):
-        return self
-
     def __repr__(self):
         return f"StaticFill({self._value!r})"
 
 
-class DynamicFill(AbstractFill[FT]):
+class DynamicFill(AbstractFill):
     """
     A fill value which kernels must not specialize on. The value is known and is
     bound to the kernel at call time.
 
-    Equality and hashing are by dtype *only*, i.e. two equal `DynamicFill`s may have
-    different `.value`'s.
+    Equality and hashing are by element type *only*, i.e. two equal
+    `DynamicFill`s may have different `.value`'s.
     """
 
-    @overload
-    def __init__(self, value: AbstractFill[FT], dtype: None = None) -> None: ...
-
-    @overload
-    def __init__(self, value: Any, dtype: FT) -> None: ...
-
-    @overload
-    def __init__(self, value: Any, dtype: Any | None = None) -> None: ...
-
-    def __init__(self, value: Any, dtype=None) -> None:
+    def __init__(self, value: Any, element_type: Any | None = None) -> None:
         if isinstance(value, AbstractFill):
             self._value = value.value
         else:
             self._value = value
-        self._dtype = ftype(self._value) if dtype is None else ftype(dtype)
+        self._element_type = (
+            ftype(self._value) if element_type is None else ftype(element_type)
+        )
 
     @property
-    def ftype(self) -> FType:
-        return self._dtype
+    def ftype(self) -> DynamicFillFType:
+        return DynamicFillFType(self._element_type)
+
+    @property
+    def element_type(self) -> FType:
+        return self._element_type
 
     @property
     def value(self) -> Any:
@@ -147,11 +241,14 @@ class DynamicFill(AbstractFill[FT]):
     def as_dynamic(self) -> DynamicFill:
         return self
 
+    def astype(self, element_type: FType) -> DynamicFill:
+        return DynamicFill(element_type(self._value), element_type)
+
     def __eq__(self, other):
-        return isinstance(other, DynamicFill) and self._dtype == other._dtype
+        return isinstance(other, DynamicFill) and self.ftype == other.ftype
 
     def __hash__(self):
-        return hash((DynamicFill, self._dtype))
+        return hash((DynamicFill, self.ftype))
 
     def __same__(self, other):
         return self == other
@@ -159,11 +256,8 @@ class DynamicFill(AbstractFill[FT]):
     def __rsame__(self, other):
         return self == other
 
-    def __samehash__(self):
-        return self
-
     def __repr__(self):
-        return f"DynamicFill({self._value!r}, {self._dtype!r})"
+        return f"DynamicFill({self._value!r}, {self._element_type!r})"
 
 
 AF = TypeVar("AF", bound=AbstractFill)
@@ -171,10 +265,6 @@ AF = TypeVar("AF", bound=AbstractFill)
 
 @overload
 def as_fill(fill: AF) -> AF: ...
-
-
-@overload
-def as_fill(fill: FTyped[FT]) -> StaticFill[FT]: ...
 
 
 @overload
@@ -188,11 +278,57 @@ def as_fill(fill: Any) -> AbstractFill:
     return StaticFill(fill)
 
 
-def is_dynamic(fill: Any) -> TypeGuard[DynamicFill]:
-    return isinstance(fill, DynamicFill)
+@overload
+def is_dynamic(fill: AbstractFillFType) -> TypeGuard[DynamicFillFType]: ...
 
 
-def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
+@overload
+def is_dynamic(fill: AbstractFill) -> TypeGuard[DynamicFill]: ...
+
+
+@overload
+def is_dynamic(fill: Any) -> TypeGuard[DynamicFill | DynamicFillFType]: ...
+
+
+def is_dynamic(fill: Any) -> TypeGuard[DynamicFill | DynamicFillFType]:
+    return isinstance(fill, DynamicFill | DynamicFillFType)
+
+
+@overload
+def is_static(fill: AbstractFillFType) -> TypeGuard[StaticFillFType]: ...
+
+
+@overload
+def is_static(fill: AbstractFill) -> TypeGuard[StaticFill]: ...
+
+
+@overload
+def is_static(fill: Any) -> TypeGuard[StaticFill | StaticFillFType]: ...
+
+
+def is_static(fill: Any) -> TypeGuard[StaticFill | StaticFillFType]:
+    return isinstance(fill, StaticFill | StaticFillFType)
+
+
+def resolve_fill(
+    fill_type: AbstractFillFType, fill: AbstractFill | None = None
+) -> AbstractFill:
+    """
+    The fill of a new tensor of a format whose fill is `fill_type`. A given
+    `fill` takes the element type of the format, and decides whether the fill of
+    the new tensor is dynamic. Otherwise the fill of the format must be static.
+    """
+    if fill is None:
+        if is_static(fill_type):
+            return StaticFill(fill_type.value)
+        raise DynamicFillError("A tensor with a dynamic fill needs a fill value")
+    value = fill_type.element_type(fill.value)
+    if is_dynamic(fill):
+        return DynamicFill(value, fill_type.element_type)
+    return StaticFill(value)
+
+
+def apply_fill(op: FinchOperator, *fills: AbstractFill) -> AbstractFill:
     """
     Compute the fill value of mapping `op` over tensors with fills `fills`.
 
@@ -205,7 +341,6 @@ def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
     # Imported lazily: `algebra` depends on this module.
     from .algebra import is_specializable_value
 
-    fills = tuple(as_fill(f) for f in fills)
     values = [f.value for f in fills]
     if not any(is_dynamic(f) for f in fills):
         result = op(*values)
@@ -214,6 +349,29 @@ def apply_fill(op: FinchOperator, *fills: Any) -> AbstractFill:
         return DynamicFill(result)
     for f in fills:
         if not is_dynamic(f) and op.ftype.is_annihilator(f.value):
-            result_type = op.ftype.return_type(*(g.ftype for g in fills))
-            return StaticFill(result_type(f.value))
-    return DynamicFill(op(*values), op.ftype.return_type(*(f.ftype for f in fills)))
+            result_type = op.ftype.return_type(*(g.element_type for g in fills))
+            return f.astype(result_type)
+    element_type = op.ftype.return_type(*(f.element_type for f in fills))
+    return DynamicFill(op(*values), element_type)
+
+
+def apply_fill_type(
+    op: FinchOperator, *fill_types: AbstractFillFType
+) -> AbstractFillFType:
+    """
+    The fill of the format which results from mapping `op` over tensors whose
+    formats have the fills `fill_types`. This is the format of `apply_fill`.
+    """
+    from .algebra import is_specializable_value
+
+    statics = [f for f in fill_types if is_static(f)]
+    if len(statics) == len(fill_types):
+        result = op(*(f.value for f in statics))
+        if is_specializable_value(result):
+            return StaticFillFType(result)
+        return DynamicFillFType(ftype(result))
+    element_type = op.ftype.return_type(*(f.element_type for f in fill_types))
+    for f in statics:
+        if op.ftype.is_annihilator(f.value):
+            return f.astype(element_type)
+    return DynamicFillFType(element_type)

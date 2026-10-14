@@ -83,7 +83,7 @@ def level_to_jl(level: Level, pin_fill: bool = False):
         case ElementLevel():
             fill = level.fill_value
             if pin_fill:
-                fill = ftype(fill)(0)
+                fill = jl_dtypes._zero_value(ftype(fill))
             return jl.ElementLevel(
                 _as_julia_scalar(fill),
                 _buffer_to_jl(level.val),
@@ -115,11 +115,12 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             assert isinstance(tbl, tuple)
+            # Julia's COO lists its dims fastest first, Python's slowest first
             return jl.SparseCOOLevel(
                 level_to_jl(lvl, pin_fill),
-                tuple(int(dim) for dim in coo_shape),
+                tuple(int(dim) for dim in reversed(coo_shape)),
                 _plus_one_buffer_to_jl(ptr),
-                tuple(_plus_one_buffer_to_jl(idx) for idx in tbl),
+                tuple(_plus_one_buffer_to_jl(idx) for idx in reversed(tbl)),
             )
         case SparseHashLevel(
             lvl=lvl,
@@ -239,8 +240,8 @@ def jl_level_to_python(jl_lvl) -> Level:
         )
 
     if jl.isa(jl_lvl, jl.Finch.SparseCOOLevel):
-        coo_shape = tuple(np.intp(int(s)) for s in jl_lvl.shape)
-        tbl = tuple(_jl_index_buffer_to_python(idx) for idx in jl_lvl.tbl)
+        coo_shape = tuple(np.intp(int(s)) for s in reversed(jl_lvl.shape))
+        tbl = tuple(_jl_index_buffer_to_python(idx) for idx in reversed(jl_lvl.tbl))
         return SparseCOOLevel(
             jl_level_to_python(jl_lvl.lvl),
             coo_shape,
@@ -363,10 +364,14 @@ def tensor_to_jl(obj, pin_fill: bool = False):
             raise ValueError("Only root-position FiberTensor objects can use Julia")
         return jl.Tensor(level_to_jl(obj.lvl, pin_fill))
     if isinstance(obj, BufferizedNDArray):
-        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        fill = (
+            jl_dtypes._zero_value(ftype(obj.fill_value)) if pin_fill else obj.fill_value
+        )
         return _ndarray_to_jl_tensor(obj.to_numpy(), fill, copy=False)
     if isinstance(obj, NumPyWrapper):
-        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        fill = (
+            jl_dtypes._zero_value(ftype(obj.fill_value)) if pin_fill else obj.fill_value
+        )
         return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
         return scalar_to_jl(obj.val, pin_fill=pin_fill)
@@ -375,7 +380,7 @@ def tensor_to_jl(obj, pin_fill: bool = False):
     if isinstance(obj, FillTensor):
         # A fill tensor is its fill everywhere, and its extents are passed to
         # kernels separately, so it is passed as a Finch scalar.
-        fill = obj.element_type(0) if pin_fill else obj.fill_value
+        fill = jl_dtypes._zero_value(obj.element_type) if pin_fill else obj.fill_value
         scalar_t = jl.seval(jl_dtypes.scalar_type_str(fill, obj.element_type))
         return scalar_t(_as_julia_scalar(obj.fill_value))
     if isinstance(obj, np.ndarray):
@@ -387,7 +392,7 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 
 
 def scalar_to_jl(val, pin_fill: bool = False):
-    fill = ftype(val)(0) if pin_fill else val
+    fill = jl_dtypes._zero_value(ftype(val)) if pin_fill else val
     buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
 

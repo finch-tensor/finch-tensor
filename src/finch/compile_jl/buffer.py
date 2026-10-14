@@ -118,7 +118,14 @@ class MinusOneBuffer(Buffer, ABC):
 
     @property
     def arr(self):
-        return self.data.arr - 1
+        arr = self.data.arr
+        if arr.dtype.names is None:
+            return arr - 1
+        # a tuple buffer (e.g. a hash table): every field is 1-based
+        out = arr.copy()
+        for name in arr.dtype.names:
+            out[name] -= 1
+        return out
 
     @property
     def length_type(self):

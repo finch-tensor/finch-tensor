@@ -5,12 +5,14 @@ import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     DynamicFillError,
+    DynamicFillFType,
     StaticFill,
+    StaticFillFType,
     is_dynamic,
 )
-from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -22,6 +24,7 @@ from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
     _julia_literal,
     _leaf_type_str,
+    _zero_value,
     ftype_to_jl_constructor_str,
     ftype_to_jl_type_str,
 )
@@ -32,7 +35,8 @@ _JULIA_OPS = {
     ffuncs.mul.ftype: "*",
     ffuncs.sub.ftype: "-",
     ffuncs.truediv.ftype: "/",
-    ffuncs.floordiv.ftype: "div",
+    # fld floors like numpy; div truncates toward zero
+    ffuncs.floordiv.ftype: "fld",
     ffuncs.mod.ftype: "mod",
     ffuncs.pow.ftype: "^",
     ffuncs.neg.ftype: "-",
@@ -140,6 +144,17 @@ class FinchJLLibrary(AssemblyLibrary):
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
+
+def register_julia_op(op, julia_name: str, definition: str | None = None) -> None:
+    # generated kernels call op as julia_name; definition (Julia source) runs once
+    if definition is not None and _JULIA_DEFINITIONS.get(julia_name) != definition:
+        jl.seval(definition)
+        _JULIA_DEFINITIONS[julia_name] = definition
+    _JULIA_OPS[op.ftype] = julia_name
+
+
+_JULIA_DEFINITIONS: dict[str, str] = {}
 
 
 class FinchJLGenerator:
@@ -368,7 +383,7 @@ class FinchJLGenerator:
                 return f"Finch.choose({value})"
 
             case ntn.Literal(val):
-                if isinstance(val, AbstractFill):
+                if isinstance(val, AbstractFill | AbstractFillFType):
                     # str() would silently emit broken source.
                     raise DynamicFillError(
                         "cannot emit a wrapped fill as a Julia literal"
@@ -385,22 +400,29 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
-    which argument positions carried a Dynamic fill. This is a necessary but
-    potentially unsound rewrite which should be removed eventually.
+    """Rewrite every Dynamic fill in `func`, and every read of one, to a zero of
+    its dtype, and report which argument positions carried a Dynamic fill. This
+    is a necessary but potentially unsound rewrite which should be removed
+    eventually.
     """
     dynamic_args = tuple(
         i
         for i, arg in enumerate(func.args)
-        if is_dynamic(getattr(arg.type_, "fill_value", None))
+        if is_dynamic(getattr(arg.type_, "fill_type", None))
     )
 
     def rule(node):
         match node:
-            case ntn.Literal(DynamicFill() as fill):
-                return ntn.Literal(ftype(fill.value)(0))
-            case ntn.Literal(StaticFill() as fill):
+            case ntn.Literal(DynamicFill() | DynamicFillFType() as fill):
+                return ntn.Literal(_zero_value(fill.element_type))
+            case ntn.Literal(StaticFill() | StaticFillFType() as fill):
                 return ntn.Literal(fill.value)
+            case ntn.FillValue(tns):
+                match tns.result_type.fill_type:
+                    case DynamicFillFType() as fill:
+                        return ntn.Literal(_zero_value(fill.element_type))
+                    case StaticFillFType() as fill:
+                        return ntn.Literal(fill.value)
         return None
 
     return Rewrite(PostWalk(rule))(func), dynamic_args

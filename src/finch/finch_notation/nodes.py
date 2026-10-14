@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any, cast
 from finch import tensor
 from finch.algebra import (
     CallableFType,
-    DynamicFill,
+    DynamicFillFType,
     FType,
-    StaticFill,
+    StaticFillFType,
     TensorFType,
     ftype,
     return_type,
@@ -256,6 +256,28 @@ class Dimension(NotationTree, NotationExpression):
 
 
 @dataclass(eq=True, frozen=True)
+class FillValue(NotationTree, NotationExpression):
+    """
+    Notation AST expression representing the fill value of tensor `tns`.
+    """
+
+    tns: NotationExpression
+
+    @property
+    def result_type(self):
+        assert isinstance(self.tns.result_type, TensorFType)
+        return self.tns.result_type.element_type
+
+    @classmethod
+    def from_children(cls, tns):
+        return cls(tns)
+
+    @property
+    def children(self):
+        return [self.tns]
+
+
+@dataclass(eq=True, frozen=True)
 class Access(NotationTree, NotationExpression):
     """
     Notation AST expression representing the value of tensor `tns` at the indices
@@ -292,11 +314,13 @@ class Full(NotationTree, NotationExpression):
     def result_type(self):
         match self.val:
             case Literal(val):
-                fill = StaticFill(val)
+                fill_type = StaticFillFType(val)
             case _:
-                fill = DynamicFill(self.val.result_type(0))
+                fill_type = DynamicFillFType(self.val.result_type)
         return tensor.patterns.FillTensorFType(
-            fill, self.val.result_type, tuple(dim.result_type for dim in self.shape)
+            fill_type,
+            self.val.result_type,
+            tuple(dim.result_type for dim in self.shape),
         )
 
     @classmethod
@@ -624,11 +648,12 @@ class Repack(NotationTree, NotationStatement):
 class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
-    with `op` in the current scope.
+    with `op` in the current scope. A tensor with a dynamic fill takes `init` as
+    its fill.
     """
 
     tns: NotationExpression
-    init: Literal
+    init: NotationExpression
     op: NotationExpression
     shape: tuple[NotationExpression, ...]
 
@@ -816,6 +841,8 @@ class NotationPrinterContext(Context):
                 tns_e = self(tns)
                 r_e = self(r)
                 return f"{tns_e}.shape[{r_e}]"
+            case FillValue(tns):
+                return f"{self(tns)}.fill_value"
             case Access(tns, mode, idxs):
                 tns_e = self(tns)
                 idxs_e = [self(idx) for idx in idxs]
