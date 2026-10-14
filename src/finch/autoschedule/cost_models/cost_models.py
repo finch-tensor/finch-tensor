@@ -447,7 +447,7 @@ class FormatCostModel(CostModel, LoopOrderedForm):
 class FlopsCostModel(CostModel, AliasedForm):
     """
     FlopsCostModel counts the non-fill values in the iteration space of each
-    query, and in the output it materializes. Writes are weighted 10x reads.
+    query, and in the output it materializes. Allocations are weighted 10x iterations.
     """
 
     def __init__(self):
