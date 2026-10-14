@@ -3,7 +3,10 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
+from collections.abc import Sequence
 from typing import TypeVar
+
+import numpy as np
 
 from finch import finch_logic as lgc
 from finch.algebra import (
@@ -14,10 +17,16 @@ from finch.algebra import (
     ftypes,
 )
 from finch.autoschedule.cost_models import (
+    ByKind,
+    CostModel,
     DenseLevelOption,
-    FormatCostModel,
+    Level,
+    LevelCostModel,
+    LevelOption,
+    LinearPredictor,
     SparseHashLevelOption,
 )
+from finch.autoschedule.cost_models.format_cost_models import nnz_after
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -30,11 +39,14 @@ from .formatter import LogicFormatter
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_POST_OPT)
 
 
-# Builders for the level options of a FormatCostModel.
+# The level options CostFormatter chooses from by default, and their builders.
+LEVEL_OPTIONS = (DenseLevelOption(), SparseHashLevelOption())
 LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 
 
-def optimize_format(alias, shape_type, machine, fill_value, cost_model, term):
+def optimize_format(
+    alias, shape_type, machine, fill_value, cost_model, term, options=LEVEL_OPTIONS
+):
     stats = machine(alias)
     fields = stats.index_order
     n = len(fields)
@@ -44,8 +56,8 @@ def optimize_format(alias, shape_type, machine, fill_value, cost_model, term):
     def rec(level, num_pos):
         if level == n:
             return (
-                cost_model.predict_format_cost(
-                    alias, level, num_pos, None, term, machine
+                cost_model.predict_component_cost(
+                    Level(term, alias, level, num_pos, "element"), machine
                 ),
                 leaf,
             )
@@ -55,13 +67,13 @@ def optimize_format(alias, shape_type, machine, fill_value, cost_model, term):
             return memo[key]
 
         n_l = stats.get_dim_size(fields[level])
-        nnz_l = cost_model.nnz_after(stats, machine.stats_factory, level)
+        nnz_l = nnz_after(stats, machine.stats_factory, level)
 
         best_cost = None
         best_format = None
-        for format_key, option in cost_model.formats.items():
-            local = cost_model.predict_format_cost(
-                alias, level, num_pos, format_key, term, machine
+        for option in options:
+            local = cost_model.predict_component_cost(
+                Level(term, alias, level, num_pos, option.kind), machine
             )
             child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
             child_cost, child_fmt = rec(level + 1, child_num_pos)
@@ -69,7 +81,7 @@ def optimize_format(alias, shape_type, machine, fill_value, cost_model, term):
             if best_cost is None or total < best_cost:
                 best_cost, best_format = (
                     total,
-                    LEVEL_BUILDERS[format_key](child_fmt, shape_type[level]),
+                    LEVEL_BUILDERS[option.kind](child_fmt, shape_type[level]),
                 )
 
         memo[key] = (best_cost, best_format)
@@ -188,41 +200,48 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
+def linear_level_model(*coefficients: float) -> LevelCostModel:
+    return LevelCostModel(LinearPredictor(np.array(coefficients, dtype=float)))
+
+
 # Level features are positions, slots, entries, position bytes, index bytes,
 # value bytes, sequential reads, scatter reads, sequential writes, and scatter
 # writes.
-ITER_COST_MODEL = FormatCostModel(
+ITER_COST_MODEL = ByKind(
     {
-        "dense": DenseLevelOption((0, 1, 0, 0, 0, 0, 0, 0, 0, 0)),
-        "sparse_hash": SparseHashLevelOption((1, 0, 1, 0, 0, 0, 0, 0, 0, 0)),
-    },
-    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        "dense": linear_level_model(0, 1, 0, 0, 0, 0, 0, 0, 0, 0),
+        "sparse_hash": linear_level_model(1, 0, 1, 0, 0, 0, 0, 0, 0, 0),
+        "element": linear_level_model(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    }
 )
-STORAGE_COST_MODEL = FormatCostModel(
+STORAGE_COST_MODEL = ByKind(
     {
-        "dense": DenseLevelOption((0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
-        "sparse_hash": SparseHashLevelOption((0, 0, 0, 1, 1, 0, 0, 0, 0, 0)),
-    },
-    (0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
+        "dense": linear_level_model(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        "sparse_hash": linear_level_model(0, 0, 0, 1, 1, 0, 0, 0, 0, 0),
+        "element": linear_level_model(0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
+    }
 )
 
 
 class CostFormatter(LogicFormatter):
     """
-    CostFormatter chooses the format of each alias with the lowest cost under
-    cost_model, memoizing the best format for each depth and input position count.
+    CostFormatter chooses the format of each alias from the level options with
+    the lowest cost under cost_model, memoizing the best format for each depth and
+    input position count.
     """
 
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        cost_model: FormatCostModel = STORAGE_COST_MODEL,
+        cost_model: CostModel[Level] = STORAGE_COST_MODEL,
+        options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         super().__init__()
         if loader is None:
             loader = MockLogicLoader()
         self.ctx = loader
         self.cost_model = cost_model
+        self.options = options
 
     def get_tensor_ftype(
         self,
@@ -233,7 +252,7 @@ class CostFormatter(LogicFormatter):
         shape_type: tuple[FType, ...],
     ) -> FiberTensorFType:
         lvl = optimize_format(
-            alias, shape_type, machine, fill_value, self.cost_model, term
+            alias, shape_type, machine, fill_value, self.cost_model, term, self.options
         )
         return fiber_tensor(lvl)
 

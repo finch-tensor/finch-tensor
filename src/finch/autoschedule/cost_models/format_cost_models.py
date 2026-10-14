@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable, Mapping
+from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -24,72 +25,116 @@ from finch.finch_logic import (
 from finch.symbolic import PostOrderDFS
 from finch.tensor import element
 
-from .cost_models import NS, CostModel, LinearPredictor
-from .loop_cost_models import PigeonCostModel
+from .cost_models import NS, CostModel
+from .loop_cost_models import PigeonCostModel, Prefix
 
 
 class LevelOption(ABC):
     """
-    A level the formatter may choose for a dimension. Its coefficients weigh
-    the level features of a FormatCostModel.
+    A kind of level the formatter may choose for a dimension, and the number
+    of positions it passes to its child.
     """
 
-    def __init__(self, coefficients):
-        self._coefficients = np.array(coefficients, dtype=float)
-
-    @property
-    def coefficients(self) -> np.ndarray:
-        return self._coefficients
+    kind: str
 
     @abstractmethod
     def next_num_pos(self, num_pos, n_l, nnz_l): ...
 
 
 class DenseLevelOption(LevelOption):
+    kind = "dense"
+
     def next_num_pos(self, num_pos, n_l, nnz_l):
         return num_pos * n_l
 
 
 class SparseHashLevelOption(LevelOption):
+    kind = "sparse_hash"
+
     def next_num_pos(self, num_pos, n_l, nnz_l):
         return nnz_l
 
 
-class FormatCostModel(CostModel, LoopOrderedForm):
+@dataclass(frozen=True)
+class Level:
     """
-    Each tensor level contributes an allocation component and an access component
-    for each query loop prefix that uses it. Each entry of formats names a level
-    option, whose coefficients supply the default linear weights for that format.
+    The level at a zero-based depth of alias, with num_pos positions entering
+    it. kind names a level option, or is "element" for the element level at the
+    tensor's rank. term is the program which reads and writes alias.
     """
 
-    def __init__(
+    term: LogicStatement
+    alias: Alias
+    depth: int
+    num_pos: float
+    kind: str
+
+
+def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int):
+    """Return the non-fill entries of the first depth + 1 levels of stats."""
+    reduce_fields = tuple(stats.index_order[depth + 1 :])
+    if reduce_fields:
+        stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+    return stats.estimate_non_fill_values()
+
+
+class FormatCostModel(CostModel[Level]):
+    """
+    A cost model where each level of each formatted alias is a component.
+    bindings names the level options of an alias, outermost first, and the
+    alias is formatted when it is first written.
+    """
+
+    def components(
         self,
-        formats: Mapping[str, LevelOption],
-        element_coefficients,
-        predictor: Callable[[np.ndarray], float] | None = None,
-    ):
-        self.formats = formats
-        self.element_coefficients = np.array(element_coefficients, dtype=float)
-        coefficients = np.concatenate(
-            [
-                *(format.coefficients for format in self.formats.values()),
-                self.element_coefficients,
-            ]
-        )
-        super().__init__(
-            predictor if predictor is not None else LinearPredictor(coefficients)
-        )
+        term: LogicStatement,
+        bindings: Mapping[Alias, Sequence[LevelOption]],
+        machine: StatsMachine[NS],
+    ) -> Iterator[Level]:
+        visited: set[Alias] = set()
+
+        def visit_alias(alias: Alias, options: Sequence[LevelOption]):
+            stats = machine(alias)
+            num_pos = 1.0
+            for depth, option in enumerate(options):
+                yield Level(term, alias, depth, num_pos, option.kind)
+                n_l = stats.get_dim_size(stats.index_order[depth])
+                nnz_l = nnz_after(stats, machine.stats_factory, depth)
+                num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
+            yield Level(term, alias, len(options), num_pos, "element")
+
+        def visit_stmt(stmt: LogicStatement):
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        yield from visit_stmt(body)
+                case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                    Table(Alias() as lhs, _), _, _
+                ):
+                    machine(stmt)
+                    if lhs in bindings and lhs not in visited:
+                        yield from visit_alias(lhs, bindings[lhs])
+                    visited.add(lhs)
+                case Produces():
+                    return
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+        return visit_stmt(term)
+
+
+class LevelCostModel(FormatCostModel, LoopOrderedForm):
+    """
+    Each level contributes an allocation row, and an access row for each query
+    loop prefix that uses it. The features are positions, slots, entries,
+    position bytes, index bytes, and value bytes for the allocation, followed by
+    sequential reads, scatter reads, sequential writes, and scatter writes for
+    the accesses.
+    """
 
     @property
     def n_features(self) -> int:
-        return 10 * (len(self.formats) + 1)
-
-    def nnz_after(self, stats: NS, stats_factory: StatsFactory[NS], level: int):
-        """Return the non-fill entries of the first level + 1 levels of stats."""
-        reduce_fields = tuple(stats.index_order[level + 1 :])
-        if reduce_fields:
-            stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
-        return stats.estimate_non_fill_values()
+        return 10
 
     def get_level_features(self, num_pos, n_l, nnz_l, val_size, pos_size):
         """
@@ -139,9 +184,9 @@ class FormatCostModel(CostModel, LoopOrderedForm):
             depth = min(level, len(idxs) - 1)
             order = tuple(idxs[: depth + 1])
             loops = tuple(loop_order[: loop_order.index(idxs[depth]) + 1])
-            iterations = pigeon.get_prefix_features(
-                loops, rhs, stats_interpreter, lhs_idxs
-            )[0]
+            iterations = pigeon.get_component_features(
+                Prefix(loops, rhs, lhs_idxs), stats_interpreter
+            )[0, 0]
             features = prefixes.setdefault(loops, np.zeros(4))
             if is_write:
                 features[2 if loops == order else 3] += iterations
@@ -185,118 +230,34 @@ class FormatCostModel(CostModel, LoopOrderedForm):
         visit_stmt(term)
         return np.asarray(features, dtype=float).reshape(-1, 4)
 
-    def get_format_features(
+    def get_component_features(
         self,
-        alias: Alias,
-        level: int,
-        num_pos: float,
-        format_key: str | None,
-        term: LogicStatement,
+        component: Level,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        """Return the features at a zero-based depth with num_pos input positions.
-
-        format_key selects a level option; None selects the element level at
-        the tensor's rank. term is the LoopOrderedForm program which reads and
-        writes alias. Each format has a block of ten columns: six allocation
-        features followed by four access features. The first row describes the
-        allocation; subsequent rows describe accesses at individual loop prefixes.
         """
+        Return the allocation row of the level, followed by its access rows.
+        """
+        alias, depth, num_pos = component.alias, component.depth, component.num_pos
         stats = machine(alias)
-        fields = stats.index_order
         fill_ftype = ftype(stats.fill_value)
         leaf = element(stats.fill_value, fill_ftype)
         assert leaf.position_type is not None
         val_size = np_dtype(fill_ftype).itemsize
         pos_size = np_dtype(leaf.position_type).itemsize
 
-        access_features = self.get_access_features(alias, level, term, machine)
+        access_features = self.get_access_features(
+            alias, depth, component.term, machine
+        )
         features = np.zeros((1 + len(access_features), self.n_features))
-        if format_key is None:
+        if component.kind == "element":
             # The element level stores one value for each position.
-            block = len(self.formats)
             n_l, nnz_l = 1, num_pos
         else:
-            block = list(self.formats).index(format_key)
-            n_l = stats.get_dim_size(fields[level])
-            nnz_l = self.nnz_after(stats, machine.stats_factory, level)
-        features[0, 10 * block : 10 * block + 6] = self.get_level_features(
+            n_l = stats.get_dim_size(stats.index_order[depth])
+            nnz_l = nnz_after(stats, machine.stats_factory, depth)
+        features[0, :6] = self.get_level_features(
             num_pos, n_l, nnz_l, val_size, pos_size
         )
-        features[1:, 10 * block + 6 : 10 * block + 10] = access_features
+        features[1:, 6:] = access_features
         return features
-
-    def predict_format_cost(
-        self,
-        alias: Alias,
-        level: int,
-        num_pos: float,
-        format_key: str | None,
-        term: LogicStatement,
-        machine: StatsMachine[NS],
-    ) -> float:
-        features = self.get_format_features(
-            alias, level, num_pos, format_key, term, machine
-        )
-        return self.predictor(features)
-
-    def get_features(
-        self,
-        term: LogicStatement,
-        bindings: dict[Alias, list[str]],
-        stats: Mapping[Alias, NS],
-        stats_factory: StatsFactory[NS],
-    ) -> np.ndarray:
-        """
-        Return the features of the formats in bindings, which name the level
-        option of each level of an alias, outermost first.
-        """
-        features = []
-        stats_interpreter = StatsMachine(stats_factory, dict(stats))
-        visited: set[Alias] = set()
-
-        def visit_stmt(stmt: LogicStatement):
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body)
-                case Query(Table(Alias() as lhs, _), _) | QueryInto(
-                    Table(Alias() as lhs, _), _, _
-                ):
-                    stats_interpreter(stmt)
-                    # Each alias is formatted once, when it is first written.
-                    match bindings.get(lhs):
-                        case list() as format_keys if lhs not in visited:
-                            lhs_stats = stats_interpreter(lhs)
-                            num_pos = 1.0
-                            for level, key in enumerate((*format_keys, None)):
-                                features.append(
-                                    self.get_format_features(
-                                        lhs,
-                                        level,
-                                        num_pos,
-                                        key,
-                                        term,
-                                        stats_interpreter,
-                                    )
-                                )
-                                if key is not None:
-                                    n_l = lhs_stats.get_dim_size(
-                                        lhs_stats.index_order[level]
-                                    )
-                                    nnz_l = self.nnz_after(
-                                        lhs_stats, stats_factory, level
-                                    )
-                                    num_pos = self.formats[key].next_num_pos(
-                                        num_pos, n_l, nnz_l
-                                    )
-                    visited.add(lhs)
-                case Produces():
-                    return
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-        visit_stmt(term)
-        if not features:
-            return np.empty((0, self.n_features))
-        return np.concatenate(features, axis=0)

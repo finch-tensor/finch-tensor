@@ -10,8 +10,9 @@ from finch import ffuncs
 from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
-    MultiLoopCostModel,
     PigeonCostModel,
+    Prefix,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.executor import LogicExecutor
@@ -47,7 +48,7 @@ def test_empty_input_cost_matches_model():
         b: sf(fl.asarray(np.zeros((4, 4))), (j, k)),
     }
 
-    model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+    model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k), (j, k, i)):
         query = Query(
@@ -55,7 +56,7 @@ def test_empty_input_cost_matches_model():
             Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
         )
         assert sum(
-            model.predict_prefix_cost(order[:n], expr, machine)
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         ) == model.predict_cost(query, {}, bindings, sf)
 
@@ -83,7 +84,7 @@ def test_empty_relation_cost_matches_model():
         }
     )
 
-    model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+    model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k, l_, m), (m, l_, k, j, i)):
         query = Query(
@@ -91,7 +92,7 @@ def test_empty_relation_cost_matches_model():
             Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
         )
         assert sum(
-            model.predict_prefix_cost(order[:n], expr, machine)
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         ) == model.predict_cost(query, {}, bindings, sf)
 
@@ -185,9 +186,9 @@ def test_greedy_order_breaks_ties_by_field_order():
     machine = StatsMachine(sf, dict(forward_bindings))
 
     # The chain's endpoints tie, so only the tie-break separates them.
-    assert pigeon.predict_prefix_cost(
-        (i,), forward, machine
-    ) == pigeon.predict_prefix_cost((m,), forward, machine)
+    assert pigeon.predict_component_cost(
+        Prefix((i,), forward), machine
+    ) == pigeon.predict_component_cost(Prefix((m,), forward), machine)
 
     order = greedy_loop_order(forward, sf, forward_bindings)
     assert order[0] == i
@@ -228,20 +229,20 @@ def test_greedy_avoids_transposing_a_sparse_input():
 
     pigeon = PigeonCostModel()
     transpose = TransposeCostModel()
-    model = MultiLoopCostModel(pigeon, transpose)
+    model = Sum(pigeon, transpose)
     machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
     # tie-break would pick j; transposing the sparse B is what makes that order
     # the expensive one.
-    assert pigeon.predict_prefix_cost(
-        (j,), expr, machine
-    ) == pigeon.predict_prefix_cost((i,), expr, machine)
-    assert transpose.predict_prefix_cost(
-        (j,), expr, machine
-    ) > transpose.predict_prefix_cost((i,), expr, machine)
+    assert pigeon.predict_component_cost(
+        Prefix((j,), expr), machine
+    ) == pigeon.predict_component_cost(Prefix((i,), expr), machine)
+    assert transpose.predict_component_cost(
+        Prefix((j,), expr), machine
+    ) > transpose.predict_component_cost(Prefix((i,), expr), machine)
     costs = [
         sum(
-            model.predict_prefix_cost(order[:n], expr, machine)
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         )
         for order in ((i, j), (j, i))
@@ -253,7 +254,7 @@ def test_greedy_avoids_transposing_a_sparse_input():
 
 def test_prefix_totals_match_program_cost():
     sf = DCStatsFactory()
-    model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+    model = Sum(PigeonCostModel(), TransposeCostModel())
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b = Alias("A"), Alias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
@@ -266,7 +267,9 @@ def test_prefix_totals_match_program_cost():
         reduced = tuple(idx for idx in expr.fields() if idx not in out_idxs)
         for order in itertools.permutations((i, j, k)):
             prefix_total = sum(
-                model.predict_prefix_cost(order[:n], expr, machine, output_vars)
+                model.predict_component_cost(
+                    Prefix(order[:n], expr, output_vars), machine
+                )
                 for n in range(len(order) + 1)
             )
             query = Query(

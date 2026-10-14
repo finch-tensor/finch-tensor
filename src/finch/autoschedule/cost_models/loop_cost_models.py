@@ -1,5 +1,5 @@
-from abc import abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -19,109 +19,65 @@ from finch.finch_logic import (
     Query,
     QueryInto,
     Reorder,
-    StatsFactory,
     Table,
 )
 from finch.symbolic import PostOrderDFS
 
-from .cost_models import NS, CostModel, LinearPredictor, MultiCostModel
+from .cost_models import NS, CostModel, LinearPredictor
 
 
-class LoopCostModel(CostModel):
+@dataclass(frozen=True)
+class Prefix:
+    """
+    An outermost-first loop prefix of expr, the right-hand side of a query.
+    output_vars orders the output of the query, when there is one.
+    """
+
+    prefix: tuple[Field, ...]
+    expr: LogicExpression
+    output_vars: tuple[Field, ...] | None = None
+
+
+class LoopCostModel(CostModel[Prefix]):
     """
     A cost model where each loop prefix, including the empty prefix, is a component.
-    get_prefix_features returns one feature vector; get_features stacks these
-    vectors in query order, from the shortest prefix to the longest. Predictors used
-    with branch-and-bound loop search must predict nonnegative component costs.
+    components yields prefixes in query order, from the shortest prefix to the
+    longest, and get_component_features returns one row for each prefix.
+    Predictors used with branch-and-bound loop search must predict nonnegative
+    component costs.
     """
 
-    @abstractmethod
-    def get_prefix_features(
-        self,
-        prefix: tuple[Field, ...],
-        expr: LogicExpression,
-        machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
-    ) -> np.ndarray: ...
-
-    def predict_prefix_cost(
-        self,
-        prefix: tuple[Field, ...],
-        expr: LogicExpression,
-        machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
-    ) -> float:
-        features = self.get_prefix_features(prefix, expr, machine, output_vars)
-        return self.predictor(features[None, :])
-
-    def get_features(
+    def components(
         self,
         term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NS],
-        stats_factory: StatsFactory[NS],
-    ) -> np.ndarray:
-        stats = dict(stats)
-        features = []
-        stats_interpreter = StatsMachine(stats_factory, stats)
-
-        def visit_stmt(stmt: LogicStatement):
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body)
-                    return
-                case QueryInto(Table(), _, Literal()):
-                    stats_interpreter(stmt)
-                    return
-                case Produces():
-                    return
-                case Query(Table(_, lhs_idxs), Table() as out):
-                    idxs = lhs_idxs
-                case Query(
-                    Table(_, lhs_idxs),
-                    Aggregate(_, _, Reorder(_, idxs), _) as out,
-                ):
-                    pass
-                case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
-                    out = stmt.as_query().rhs
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-            features.extend(
-                self.get_prefix_features(idxs[:n], out, stats_interpreter, lhs_idxs)
-                for n in range(len(idxs) + 1)
-            )
-            stats_interpreter(stmt)
-
-        visit_stmt(term)
-        return np.asarray(features, dtype=float).reshape(-1, self.n_features)
-
-
-class MultiLoopCostModel(LoopCostModel, MultiCostModel):
-    """Combine feature columns for matching loop prefixes."""
-
-    def __init__(
-        self,
-        *submodels: LoopCostModel,
-        predictor: Callable[[np.ndarray], float] | None = None,
-    ):
-        super().__init__(*submodels, predictor=predictor)
-        self.submodels: tuple[LoopCostModel, ...] = submodels
-
-    def get_prefix_features(
-        self,
-        prefix: tuple[Field, ...],
-        expr: LogicExpression,
+        bindings: Mapping[Alias, TensorFType],
         machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
-    ) -> np.ndarray:
-        return np.concatenate(
-            [
-                model.get_prefix_features(prefix, expr, machine, output_vars)
-                for model in self.submodels
-            ]
-        )
+    ) -> Iterator[Prefix]:
+        match term:
+            case Plan(bodies):
+                for body in bodies:
+                    yield from self.components(body, bindings, machine)
+                return
+            case QueryInto(Table(), _, Literal()):
+                machine(term)
+                return
+            case Produces():
+                return
+            case Query(Table(_, lhs_idxs), Table() as expr):
+                idxs = lhs_idxs
+            case Query(
+                Table(_, lhs_idxs),
+                Aggregate(_, _, Reorder(_, idxs), _) as expr,
+            ):
+                pass
+            case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
+                expr = term.as_query().rhs
+            case _:
+                raise ValueError(f"Unsupported statement type: {term}")
+
+        for n in range(len(idxs) + 1):
+            yield Prefix(idxs[:n], expr, lhs_idxs)
+        machine(term)
 
 
 class PigeonCostModel(LoopCostModel, LoopOrderedForm):
@@ -141,12 +97,10 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
             else LinearPredictor(np.array([1.0, 1.0, 10.0]))
         )
 
-    def get_prefix_features(
+    def get_component_features(
         self,
-        prefix: tuple[Field, ...],
-        expr: LogicExpression,
+        component: Prefix,
         machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray:
         """Return the incremental features for an outermost-first loop prefix.
 
@@ -155,6 +109,11 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         prefix charges the output's non-fill values once. Summing all prefixes,
         including the empty one, gives the query's features.
         """
+        prefix, expr, output_vars = (
+            component.prefix,
+            component.expr,
+            component.output_vars,
+        )
         stats_factory = machine.stats_factory
         match expr:
             case Aggregate(arg=arg):
@@ -174,7 +133,7 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
                 )
             out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
-            return np.array([0.0, 0.0, out_space.estimate_non_fill_values()])
+            return np.array([[0.0, 0.0, out_space.estimate_non_fill_values()]])
 
         def support(stat: NS) -> NS:
             stat = stats_factory.copy(stat)
@@ -205,9 +164,11 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
             out_cost = project(out_space).estimate_non_fill_values()
         return np.array(
             [
-                iter_space.estimate_non_fill_values(),
-                exec_space.estimate_non_fill_values() * len(inputs),
-                out_cost,
+                [
+                    iter_space.estimate_non_fill_values(),
+                    exec_space.estimate_non_fill_values() * len(inputs),
+                    out_cost,
+                ]
             ]
         )
 
@@ -228,12 +189,10 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
             else LinearPredictor(np.array([0.5, 60.0]))
         )
 
-    def get_prefix_features(
+    def get_component_features(
         self,
-        prefix: tuple[Field, ...],
-        expr: LogicExpression,
+        component: Prefix,
         machine: StatsMachine[NS],
-        output_vars: tuple[Field, ...] | None = None,
     ) -> np.ndarray:
         """Charge only the input transpositions newly forced by this prefix.
 
@@ -241,7 +200,8 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
         prefix avoids charging them again at deeper loop levels. Empty prefixes
         have no transposition cost.
         """
-        features = np.zeros(self.n_features)
+        prefix, expr = component.prefix, component.expr
+        features = np.zeros((1, self.n_features))
         if not prefix:
             return features
 
@@ -262,5 +222,5 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
                 nnz = stat.estimate_non_fill_values()
                 space = stat.get_dim_space_size(order)
                 dense = 0 < space < float("inf") and nnz / space > 0.1
-                features[0 if dense else 1] += nnz
+                features[0, 0 if dense else 1] += nnz
         return features

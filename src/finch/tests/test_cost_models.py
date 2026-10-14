@@ -3,16 +3,20 @@ import itertools
 import pytest
 
 import numpy as np
+from scipy.linalg import block_diag
 
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
+    ByKind,
+    Concat,
     FlopsCostModel,
     LinearPredictor,
-    MultiCostModel,
-    MultiLoopCostModel,
     PigeonCostModel,
+    Prefix,
     QuadraticPredictor,
+    Statement,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
@@ -71,7 +75,7 @@ def test_flops_cost_retains_query_components(factory):
     machine = StatsMachine(sf, dict(stats))
     query_costs = []
     for stmt in plan.bodies[:2]:
-        query_costs.append(cost.predict_statement_cost(stmt, machine))
+        query_costs.append(cost.predict_component_cost(Statement(stmt), machine))
         machine(stmt)
     assert query_costs == [26.0, 22.0]
     nonlinear = FlopsCostModel(QuadraticPredictor(np.array([1.0, 0.0, 0.0, 10.0])))
@@ -85,8 +89,12 @@ def test_flops_cost_retains_query_components(factory):
         FlopsCostModel(),
         PigeonCostModel(),
         TransposeCostModel(),
-        MultiCostModel(PigeonCostModel(), TransposeCostModel()),
-        MultiLoopCostModel(PigeonCostModel(), TransposeCostModel()),
+        Sum(PigeonCostModel(), TransposeCostModel()),
+        Concat(
+            PigeonCostModel(),
+            TransposeCostModel(),
+            predictor=QuadraticPredictor(np.ones(25)),
+        ),
         PigeonCostModel(QuadraticPredictor(np.ones(9))),
     ],
 )
@@ -97,14 +105,13 @@ def test_empty_cost_components(cost, plan):
     assert cost.predict_cost(plan, {}, {}, sf) == 0.0
 
 
-@pytest.mark.parametrize("composite", [MultiCostModel, MultiLoopCostModel])
-def test_multi_cost_uses_joint_nonlinear_predictor(composite):
+def test_concat_uses_joint_nonlinear_predictor():
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
     a, out = Alias("a"), Alias("out")
     stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     plan = Query(Table(out, (j, i)), Table(a, (i, j)))
-    cost = composite(
+    cost = Concat(
         PigeonCostModel(),
         TransposeCostModel(),
         predictor=QuadraticPredictor(np.ones(25)),
@@ -121,11 +128,11 @@ def test_multi_cost_uses_joint_nonlinear_predictor(composite):
     [
         PigeonCostModel(QuadraticPredictor(np.ones(9))),
         TransposeCostModel(QuadraticPredictor(np.ones(4))),
-        MultiLoopCostModel(
+        Sum(
             PigeonCostModel(QuadraticPredictor(np.ones(9))),
             TransposeCostModel(QuadraticPredictor(np.ones(4))),
         ),
-        MultiLoopCostModel(
+        Concat(
             PigeonCostModel(),
             TransposeCostModel(),
             predictor=QuadraticPredictor(np.ones(25)),
@@ -142,7 +149,7 @@ def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
     for order in ((i, j), (j, i)):
         query = Query(Table(out, order), expr)
         expected = sum(
-            cost.predict_prefix_cost(order[:n], expr, machine, order)
+            cost.predict_component_cost(Prefix(order[:n], expr, order), machine)
             for n in range(len(order) + 1)
         )
         assert cost.predict_cost(query, {}, stats, sf) == expected
@@ -295,14 +302,14 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     ):
         out_idxs = tuple(idx for idx in order if idx != j)
         prefixes = [order[:n] for n in range(len(order) + 1)]
-        features = np.stack(
+        features = np.concatenate(
             [
-                model.get_prefix_features(prefix, expr, machine, out_idxs)
+                model.get_component_features(Prefix(prefix, expr, out_idxs), machine)
                 for prefix in prefixes
             ]
         )
         cost = sum(
-            model.predict_prefix_cost(prefix, expr, machine, out_idxs)
+            model.predict_component_cost(Prefix(prefix, expr, out_idxs), machine)
             for prefix in prefixes
         )
         query = Query(
@@ -333,11 +340,11 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     machine = StatsMachine(sf, dict(stats))
 
     np.testing.assert_array_equal(
-        model.get_prefix_features((), scalar, machine), [0, 0, 1]
+        model.get_component_features(Prefix((), scalar), machine), [[0, 0, 1]]
     )
-    assert model.predict_prefix_cost((), scalar, machine) == 10
+    assert model.predict_component_cost(Prefix((), scalar), machine) == 10
     np.testing.assert_array_equal(
-        model.get_prefix_features((i,), broadcast, machine), [1, 0, 1]
+        model.get_component_features(Prefix((i,), broadcast), machine), [[1, 0, 1]]
     )
 
 
@@ -397,7 +404,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
             6 if order.index(k) < order.index(j) else 0
         )
         cost = sum(
-            model.predict_prefix_cost(order[:n], expr, machine)
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         )
         query = Query(
@@ -452,8 +459,7 @@ def test_transpose_cost_model_dependent_queries(factory):
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
-@pytest.mark.parametrize("composite", [MultiCostModel, MultiLoopCostModel])
-def test_multi_cost_model_sums_submodels(factory, composite):
+def test_sum_cost_model_sums_submodels(factory):
     sf = factory()
     i, j = Field("i"), Field("j")
     a, out = Alias("a"), Alias("out")
@@ -462,7 +468,7 @@ def test_multi_cost_model_sums_submodels(factory, composite):
     bindings = {a: tensor.ftype}
     plan = Plan((Query(Table(out, (j, i)), Table(a, (i, j))), Produces((out,))))
     models = (PigeonCostModel(), TransposeCostModel())
-    model = composite(*models)
+    model = Sum(*models)
     model.validate_inputs(plan, bindings, stats, sf)
 
     assert model.n_features == 5
@@ -474,4 +480,31 @@ def test_multi_cost_model_sums_submodels(factory, composite):
     )
     assert model.predict_cost(plan, bindings, stats, sf) == pytest.approx(
         sum(sub.predict_cost(plan, bindings, stats, sf) for sub in models)
+    )
+
+
+def test_by_kind_dispatches_components_by_key():
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    expr = Table(a, (i, j))
+    query = Query(Table(out, (j, i)), expr)
+    models = {0: PigeonCostModel(), 1: TransposeCostModel(), 2: PigeonCostModel()}
+    cost = ByKind(models, key=lambda component: len(component.prefix))
+    machine = StatsMachine(sf, dict(stats))
+    prefixes = [Prefix((j, i)[:n], expr, (j, i)) for n in range(3)]
+
+    np.testing.assert_array_equal(
+        cost.get_features(query, {}, stats, sf),
+        block_diag(
+            *(
+                models[n].get_component_features(prefix, machine)
+                for n, prefix in enumerate(prefixes)
+            )
+        ),
+    )
+    assert cost.predict_cost(query, {}, stats, sf) == sum(
+        models[n].predict_component_cost(prefix, machine)
+        for n, prefix in enumerate(prefixes)
     )

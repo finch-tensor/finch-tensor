@@ -2,9 +2,10 @@ from collections.abc import Mapping, Sequence
 from typing import Generic, TypeVar
 
 from finch.autoschedule.cost_models import (
-    LoopCostModel,
-    MultiLoopCostModel,
+    CostModel,
     PigeonCostModel,
+    Prefix,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
@@ -47,11 +48,11 @@ def greedy_loop_order(
     stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
     *,
-    cost_model: LoopCostModel | None = None,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> tuple[Field, ...]:
     """Build a loop order by appending the cheapest candidate prefix."""
     if cost_model is None:
-        cost_model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -63,8 +64,8 @@ def greedy_loop_order(
     prefix: list[Field] = []
 
     def candidate_cost(field: Field) -> float:
-        return cost_model.predict_prefix_cost(
-            tuple(prefix) + (field,), expr, machine, output_vars
+        return cost_model.predict_component_cost(
+            Prefix((*prefix, field), expr, output_vars), machine
         )
 
     while remaining:
@@ -80,7 +81,7 @@ def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
-    cost_model: LoopCostModel | None = None,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> Plan:
     stats_bindings = dict(stats)
     new_queries = []
@@ -113,13 +114,13 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         self,
         ctx: LogicLoader | None = None,
         *,
-        cost_model: LoopCostModel | None = None,
+        cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
         self.cost_model = (
             cost_model
             if cost_model is not None
-            else MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+            else Sum(PigeonCostModel(), TransposeCostModel())
         )
 
     def set_loop_orders(

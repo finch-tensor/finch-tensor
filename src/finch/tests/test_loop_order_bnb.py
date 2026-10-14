@@ -8,11 +8,13 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
+    Concat,
     LinearPredictor,
     LoopCostModel,
-    MultiLoopCostModel,
     PigeonCostModel,
+    Prefix,
     QuadraticPredictor,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
@@ -149,7 +151,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     }
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
-    model = MultiLoopCostModel(
+    model = Concat(
         PigeonCostModel(),
         TransposeCostModel(),
         predictor=QuadraticPredictor(np.ones(25)),
@@ -181,10 +183,13 @@ class PreferFieldCostModel(LoopCostModel, LoopOrderedForm):
         super().__init__(LinearPredictor(np.array([1.0])))
         self.field = field
 
-    def get_prefix_features(self, prefix, expr, machine, output_vars=None):
+    def get_component_features(self, component, machine):
+        prefix = component.prefix
         if not prefix:
-            return np.array([7.0])
-        return np.array([10.0 if len(prefix) == 1 and prefix[0] != self.field else 0.0])
+            return np.array([[7.0]])
+        return np.array(
+            [[10.0 if len(prefix) == 1 and prefix[0] != self.field else 0.0]]
+        )
 
 
 @pytest.mark.parametrize(
@@ -224,7 +229,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert order == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert isinstance(orderer().cost_model, MultiLoopCostModel)
+    assert isinstance(orderer().cost_model, Sum)
 
 
 @pytest.mark.parametrize(
@@ -259,6 +264,6 @@ def test_prefix_cost_uses_reduction_statistics(op, init):
             Aggregate(Literal(op), Literal(init), Reorder(table, order), (j,)),
         )
         assert sum(
-            model.predict_prefix_cost(order[:n], expr, machine, (i,))
+            model.predict_component_cost(Prefix(order[:n], expr, (i,)), machine)
             for n in range(len(order) + 1)
         ) == pytest.approx(model.predict_cost(query, {}, stats, sf))
