@@ -1144,6 +1144,20 @@ def test_minus_one_buffer_arr_shifts_every_tuple_field():
     np.testing.assert_array_equal(raw["element_1"], [1, 2, 3])
 
 
+def test_compile_julia_eager_eye():
+    # Eager eye computes a kernel that only returns its pattern mask.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    matrix = np.arange(1.0, 10.0).reshape(3, 3)
+    with with_default_scheduler(COMPILE_JULIA):
+        eye = ft.eye(3, k=1)
+        assert isinstance(eye, EyeTensor)
+        result = ft.add(ft.asarray(matrix), eye)
+
+    np.testing.assert_array_equal(result.to_numpy(), matrix + np.eye(3, k=1))
+
+
 def test_register_julia_op_maps_and_defines_once():
     _requires_julia_backend()
     from finch.compile_jl import compiler
