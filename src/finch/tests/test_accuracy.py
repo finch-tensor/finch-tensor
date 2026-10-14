@@ -154,8 +154,10 @@ def accuracy_results():
 @pytest.mark.skipif(
     not julia_available(), reason="accuracy regression requires the Julia backend"
 )
-@pytest.mark.parametrize("model", make_models())
-def test_statistics_accuracy(model, accuracy_results, ndarrays_regression):
-    ndarrays_regression.check(
-        accuracy_results[model], default_tolerance={"rtol": 1e-11, "atol": 1e-6}
-    )
+def test_statistics_accuracy(accuracy_results, ndarrays_regression):
+    for model, results in accuracy_results.items():
+        ndarrays_regression.check(
+            results,
+            basename=f"test_statistics_accuracy_{model}",
+            default_tolerance={"rtol": 1e-11, "atol": 1e-6},
+        )
