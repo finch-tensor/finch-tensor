@@ -35,7 +35,7 @@ def connected_loop_candidates(
     output_vars: tuple[Field, ...] | None = None,
 ) -> list[Field]:
     """Preserve candidate order while respecting the output's index order."""
-    #TODO this could eventually be improved to consider output transpose.
+    # TODO this could eventually be improved to consider output transpose.
     output_vars = output_vars or ()
     next_output = next((idx for idx in output_vars if idx not in prefix), None)
     return [idx for idx in remaining if idx not in output_vars or idx == next_output]

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import TypeVar
 
 import numpy as np
@@ -34,41 +34,45 @@ from finch.tensor import Scalar, element
 
 NS = TypeVar("NS", bound=NumericStats)
 
-class LinearModel:
+
+class LinearPredictor:
     def __init__(self, coefficients: np.ndarray):
         self.coefficients: np.ndarray = coefficients
 
-    def __call__(self, features):
-        return sum(features, axis=0) @ self.coefficients
+    def __call__(self, features: np.ndarray) -> float:
+        return float(features.sum(axis=0) @ self.coefficients)
 
-class QuadraticModel:
+
+class QuadraticPredictor:
+    """Sum row-wise quadratic forms, with flattened row-major coefficients."""
+
     def __init__(self, coefficients: np.ndarray):
         self.coefficients: np.ndarray = coefficients
 
-    def __call__(self, features):
-        x = np.einsum("ij,ik->ijk", features).reshape(features.shape[0], -1)
-        return x @ self.coefficients
+    def __call__(self, features: np.ndarray) -> float:
+        x = np.einsum("ij,ik->ijk", features, features)
+        return float(x.sum(axis=0).ravel() @ self.coefficients)
 
-class QuadraticModel:
-    def __init__(self, coefficients: np.ndarray):
-        self.coefficients: np.ndarray = coefficients
 
-    def __call__(self, features):
-        x = np.einsum("ij,ik->ijk", features)
-        return sum(features, axis=0) @ self.coefficients
-
-class Cost(Form):
+class CostModel(Form):
     """
-    A cost predicts the cost of a logic statement as a sum of modeled pieces:
+    A cost model predicts the cost of a logic statement as a sum of modeled pieces:
 
-        sum_i model(X_i1, ..., X_in)
-    
-    using a matrix X of features for each piece. Like a Stage, a CostModel inherits the form of
-    the statements it accepts.
+        sum_i predictor(X_i1, ..., X_in)
+
+    get_features returns X with shape (n_components, n_features). n_features is
+    independent of the number of predictor parameters. Each CostModel defines its
+    own components. The predictor callable takes the whole matrix and
+    returns a scalar sum of independently modeled rows, including zero for an
+    empty matrix. Like a Stage, a CostModel inherits the form of statements it accepts.
     """
 
-    def __init__(self, model):
-        self.model = model
+    @property
+    @abstractmethod
+    def n_features(self) -> int: ...
+
+    def __init__(self, predictor: Callable[[np.ndarray], float]):
+        self.predictor = predictor
 
     @abstractmethod
     def get_features(
@@ -87,16 +91,39 @@ class Cost(Form):
         stats_factory: StatsFactory,
     ) -> float:
         features = self.get_features(term, bindings, stats, stats_factory)
-        return self.model(features)
+        return self.predictor(features)
 
-class MultiCost(Cost):
+
+class MultiCostModel(CostModel):
     """
     A cost model that composes the observations of its submodels. Note that
-    submodels must have the same number of pieces.
+    submodels must describe the same pieces in the same order. Their feature
+    columns are concatenated. By default, predictions of the submodels are
+    summed; a supplied predictor instead predicts from the combined features.
     """
 
-    def __init__(self, *submodels: CostModel):
+    def __init__(
+        self,
+        *submodels: CostModel,
+        predictor: Callable[[np.ndarray], float] | None = None,
+    ):
+        if not submodels:
+            raise ValueError("MultiCostModel requires at least one submodel")
         self.submodels = submodels
+        super().__init__(predictor if predictor is not None else self._predict)
+
+    @property
+    def n_features(self) -> int:
+        return sum(submodel.n_features for submodel in self.submodels)
+
+    def _predict(self, features: np.ndarray) -> float:
+        cost = 0.0
+        start = 0
+        for submodel in self.submodels:
+            stop = start + submodel.n_features
+            cost += submodel.predictor(features[:, start:stop])
+            start = stop
+        return cost
 
     def validate_inputs(self, *inputs):
         for model in self.submodels:
@@ -113,11 +140,18 @@ class MultiCost(Cost):
             [
                 model.get_features(term, bindings, stats, stats_factory)
                 for model in self.submodels
-            ]
+            ],
+            axis=1,
         )
 
-class LoopCost(Cost):
-    """A cost model where each loop prefix is a piece of the cost."""
+
+class LoopCostModel(CostModel):
+    """
+    A cost model where each loop prefix, including the empty prefix, is a component.
+    get_prefix_features returns one feature vector; get_features stacks these
+    vectors in query order, from the shortest prefix to the longest. Predictors used
+    with branch-and-bound loop search must predict nonnegative component costs.
+    """
 
     @abstractmethod
     def get_prefix_features(
@@ -136,21 +170,20 @@ class LoopCost(Cost):
         output_vars: tuple[Field, ...] | None = None,
     ) -> float:
         features = self.get_prefix_features(prefix, expr, machine, output_vars)
-        return self.model(features)
+        return self.predictor(features[None, :])
 
     def get_features(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NumericStats],
-        stats_factory: StatsFactory[NumericStats],
+        stats: Mapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
     ) -> np.ndarray:
         stats = dict(stats)
         features = []
         stats_interpreter = StatsMachine(stats_factory, stats)
 
         def visit_stmt(stmt: LogicStatement):
-            nonlocal features
             match stmt:
                 case Plan(bodies):
                     for body in bodies:
@@ -173,20 +206,25 @@ class LoopCost(Cost):
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
-            for n in range(len(idxs) + 1):
-                features.append(self.get_prefix_features(
-                    idxs[:n], out, stats_interpreter, lhs_idxs
-                ))
+            features.extend(
+                self.get_prefix_features(idxs[:n], out, stats_interpreter, lhs_idxs)
+                for n in range(len(idxs) + 1)
+            )
             stats_interpreter(stmt)
 
         visit_stmt(term)
-        return np.stack(features)
+        return np.asarray(features, dtype=float).reshape(-1, self.n_features)
 
 
-class MultiLoopCost(LoopCostModel, MultiCostModel):
-    """A loop cost model that sums the costs of its submodels."""
+class MultiLoopCostModel(LoopCostModel, MultiCostModel):
+    """Combine feature columns for matching loop prefixes."""
 
-    def __init__(self, *submodels: LoopCostModel):
+    def __init__(
+        self,
+        *submodels: LoopCostModel,
+        predictor: Callable[[np.ndarray], float] | None = None,
+    ):
+        super().__init__(*submodels, predictor=predictor)
         self.submodels: tuple[LoopCostModel, ...] = submodels
 
     def get_prefix_features(
@@ -233,23 +271,32 @@ class SparseHashLevelOption(LevelOption):
 
 class FormatCostModel(CostModel, LoopOrderedForm):
     """
-    A cost model where each tensor format within each loop prefix is a piece. Each
-    entry of formats names a level option, whose coefficients weigh the level
-    features of the levels which use it.
+    Each tensor level contributes an allocation component and an access component
+    for each query loop prefix that uses it. Each entry of formats names a level
+    option, whose coefficients supply the default linear weights for that format.
     """
 
-    def __init__(self, formats: dict[str, LevelOption], element_coefficients):
+    def __init__(
+        self,
+        formats: Mapping[str, LevelOption],
+        element_coefficients,
+        predictor: Callable[[np.ndarray], float] | None = None,
+    ):
         self.formats = formats
         self.element_coefficients = np.array(element_coefficients, dtype=float)
-
-    @property
-    def coefficients(self) -> np.ndarray:
-        return np.concatenate(
+        coefficients = np.concatenate(
             [
                 *(format.coefficients for format in self.formats.values()),
                 self.element_coefficients,
             ]
         )
+        super().__init__(
+            predictor if predictor is not None else LinearPredictor(coefficients)
+        )
+
+    @property
+    def n_features(self) -> int:
+        return 10 * (len(self.formats) + 1)
 
     def nnz_after(self, stats: NS, stats_factory: StatsFactory[NS], level: int):
         """Return the non-fill entries of the first level + 1 levels of stats."""
@@ -284,7 +331,8 @@ class FormatCostModel(CostModel, LoopOrderedForm):
     ) -> np.ndarray:
         """
         Return the accesses to alias at a zero-based depth in each query of term:
-        sequential reads, scatter reads, sequential writes, and scatter writes.
+        sequential reads, scatter reads, sequential writes, and scatter writes,
+        with one row per loop prefix that accesses the level in each query.
         Each access is counted by the PigeonCostModel iterations of the loops
         from the root to the current level. The element level is accessed with
         its parent.
@@ -293,13 +341,13 @@ class FormatCostModel(CostModel, LoopOrderedForm):
         # level matches the ordering of the access exactly.
         # A sequential read is when the prefix of loops from root to current
         # level is a supersequence of the ordering of the access.
-        features = np.zeros(4)
+        features = []
         stats_interpreter = StatsMachine(
             machine.stats_factory, OrderedDict(machine.bindings)
         )
         pigeon = PigeonCostModel()
 
-        def visit_access(idxs, loop_order, rhs, lhs_idxs, is_write):
+        def visit_access(idxs, loop_order, rhs, lhs_idxs, is_write, prefixes):
             if not idxs:
                 return
             depth = min(level, len(idxs) - 1)
@@ -308,6 +356,7 @@ class FormatCostModel(CostModel, LoopOrderedForm):
             iterations = pigeon.get_prefix_features(
                 loops, rhs, stats_interpreter, lhs_idxs
             )[0]
+            features = prefixes.setdefault(loops, np.zeros(4))
             if is_write:
                 features[2 if loops == order else 3] += iterations
             else:
@@ -337,16 +386,18 @@ class FormatCostModel(CostModel, LoopOrderedForm):
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
+            prefixes = {}
             for node in PostOrderDFS(arg):
                 match node:
                     case Table(tns, idxs) if tns == alias:
-                        visit_access(idxs, loop_order, rhs, lhs_idxs, False)
+                        visit_access(idxs, loop_order, rhs, lhs_idxs, False, prefixes)
             if lhs == alias:
-                visit_access(lhs_idxs, loop_order, rhs, lhs_idxs, True)
+                visit_access(lhs_idxs, loop_order, rhs, lhs_idxs, True, prefixes)
+            features.extend(prefixes.values())
             stats_interpreter(stmt)
 
         visit_stmt(term)
-        return features
+        return np.asarray(features, dtype=float).reshape(-1, 4)
 
     def get_format_features(
         self,
@@ -361,8 +412,9 @@ class FormatCostModel(CostModel, LoopOrderedForm):
 
         format_key selects a level option; None selects the element level at
         the tensor's rank. term is the LoopOrderedForm program which reads and
-        writes alias. The features of a level are its level features, followed
-        by its access features.
+        writes alias. Each format has a block of ten columns: six allocation
+        features followed by four access features. The first row describes the
+        allocation; subsequent rows describe accesses at individual loop prefixes.
         """
         stats = machine(alias)
         fields = stats.index_order
@@ -372,31 +424,21 @@ class FormatCostModel(CostModel, LoopOrderedForm):
         val_size = np_dtype(fill_ftype).itemsize
         pos_size = np_dtype(leaf.position_type).itemsize
 
-        features = {
-            key: np.zeros(len(format.coefficients))
-            for key, format in self.formats.items()
-        }
-        element_features = []
         access_features = self.get_access_features(alias, level, term, machine)
+        features = np.zeros((1 + len(access_features), self.n_features))
         if format_key is None:
             # The element level stores one value for each position.
-            element_features.append(np.concatenate(
-                [
-                    self.get_level_features(num_pos, 1, num_pos, val_size, pos_size),
-                    access_features,
-                ]
-            ))
+            block = len(self.formats)
+            n_l, nnz_l = 1, num_pos
         else:
+            block = list(self.formats).index(format_key)
             n_l = stats.get_dim_size(fields[level])
             nnz_l = self.nnz_after(stats, machine.stats_factory, level)
-            features.append(np.concatenate(
-                [
-                    self.get_level_features(num_pos, n_l, nnz_l, val_size, pos_size),
-                    access_features,
-                ]
-            )
-            )
-        return np.concatenate([*features.values(), element_features])
+        features[0, 10 * block : 10 * block + 6] = self.get_level_features(
+            num_pos, n_l, nnz_l, val_size, pos_size
+        )
+        features[1:, 10 * block + 6 : 10 * block + 10] = access_features
+        return features
 
     def predict_format_cost(
         self,
@@ -410,25 +452,24 @@ class FormatCostModel(CostModel, LoopOrderedForm):
         features = self.get_format_features(
             alias, level, num_pos, format_key, term, machine
         )
-        return float(np.dot(self.coefficients, features))
+        return self.predictor(features)
 
     def get_features(
         self,
         term: LogicStatement,
         bindings: dict[Alias, list[str]],
-        stats: Mapping[Alias, NumericStats],
-        stats_factory: StatsFactory[NumericStats],
+        stats: Mapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
     ) -> np.ndarray:
         """
         Return the features of the formats in bindings, which name the level
         option of each level of an alias, outermost first.
         """
-        features = np.zeros(len(self.coefficients))
+        features = []
         stats_interpreter = StatsMachine(stats_factory, dict(stats))
         visited: set[Alias] = set()
 
         def visit_stmt(stmt: LogicStatement):
-            nonlocal features
             match stmt:
                 case Plan(bodies):
                     for body in bodies:
@@ -443,8 +484,15 @@ class FormatCostModel(CostModel, LoopOrderedForm):
                             lhs_stats = stats_interpreter(lhs)
                             num_pos = 1.0
                             for level, key in enumerate((*format_keys, None)):
-                                features += self.get_format_features(
-                                    lhs, level, num_pos, key, term, stats_interpreter
+                                features.append(
+                                    self.get_format_features(
+                                        lhs,
+                                        level,
+                                        num_pos,
+                                        key,
+                                        term,
+                                        stats_interpreter,
+                                    )
                                 )
                                 if key is not None:
                                     n_l = lhs_stats.get_dim_size(
@@ -463,29 +511,40 @@ class FormatCostModel(CostModel, LoopOrderedForm):
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
         visit_stmt(term)
-        return features
+        if not features:
+            return np.empty((0, self.n_features))
+        return np.concatenate(features, axis=0)
 
 
 class FlopsCostModel(CostModel, AliasedForm):
     """
     FlopsCostModel counts the non-fill values in the iteration space of each
-    query, and in the output it materializes. Allocations are weighted 10x iterations.
+    query, and in the output it materializes. Each query is a component.
+    By default, allocations are weighted 10x iterations.
     """
 
-    def __init__(self):
-        pass
+    @property
+    def n_features(self) -> int:
+        return 2
+
+    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
+        super().__init__(
+            predictor
+            if predictor is not None
+            else LinearPredictor(np.array([1.0, 10.0]))
+        )
 
     def get_features(
         self,
         term: LogicStatement,
         bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NumericStats],
-        stats_factory: StatsFactory[NumericStats],
+        stats: Mapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
     ) -> np.ndarray:
         stats = dict(stats)
         features = []
 
-        def visit_expr(expr: LogicExpression) -> tuple[NumericStats, NumericStats]:
+        def visit_expr(expr: LogicExpression) -> tuple[NS, NS]:
             """Return the stats of the output of expr, and of its iteration space."""
             match expr:
                 case Aggregate(Literal(op), Literal(init), arg, idxs):
@@ -525,7 +584,6 @@ class FlopsCostModel(CostModel, AliasedForm):
                     raise ValueError(f"Unsupported expression type: {expr}")
 
         def visit_stmt(stmt: LogicStatement):
-            nonlocal features
             match stmt:
                 case Plan(bodies):
                     for body in bodies:
@@ -534,8 +592,10 @@ class FlopsCostModel(CostModel, AliasedForm):
                     out_stats, iter_stats = visit_expr(rhs)
                     stats[lhs] = stats_factory.reorder(out_stats, idxs)
                     features.append(
-                        iter_stats.estimate_non_fill_values(),
-                        out_stats.estimate_non_fill_values(),
+                        (
+                            iter_stats.estimate_non_fill_values(),
+                            out_stats.estimate_non_fill_values(),
+                        )
                     )
                 case QueryInto():
                     visit_stmt(stmt.as_query())
@@ -545,21 +605,25 @@ class FlopsCostModel(CostModel, AliasedForm):
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
         visit_stmt(term)
-        return features
+        return np.asarray(features, dtype=float).reshape(-1, self.n_features)
 
 
 class PigeonCostModel(LoopCostModel, LoopOrderedForm):
     """
     PigeonCostModel counts iteration, operation, and output costs across loop
-    prefixes. Writes are weighted 10x reads and operations.
+    prefixes. By default, writes are weighted 10x reads and operations.
     """
 
-    def __init__(self):
-        pass
-
     @property
-    def coefficients(self) -> np.ndarray:
-        return np.array([1.0, 1.0, 10.0])
+    def n_features(self) -> int:
+        return 3
+
+    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
+        super().__init__(
+            predictor
+            if predictor is not None
+            else LinearPredictor(np.array([1.0, 1.0, 10.0]))
+        )
 
     def get_prefix_features(
         self,
@@ -637,12 +701,16 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     Count dense and sparse transposed entries, charging each input once per query.
     """
 
-    def __init__(self):
-        pass
-
     @property
-    def coefficients(self) -> np.ndarray:
-        return np.array([0.5, 60.0])
+    def n_features(self) -> int:
+        return 2
+
+    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
+        super().__init__(
+            predictor
+            if predictor is not None
+            else LinearPredictor(np.array([0.5, 60.0]))
+        )
 
     def get_prefix_features(
         self,
@@ -657,7 +725,7 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
         prefix avoids charging them again at deeper loop levels. Empty prefixes
         have no transposition cost.
         """
-        features = np.zeros(len(self.coefficients))
+        features = np.zeros(self.n_features)
         if not prefix:
             return features
 
