@@ -9,34 +9,36 @@ import finch as fl
 from finch import ffuncs
 from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
+from finch.autoschedule.cost_models import (
+    PigeonCostModel,
+    Prefix,
+    Sum,
+    TransposeCostModel,
+)
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
-from finch.autoschedule.loop_orderer.loop_order_cost import (
-    cost_of_reformat,
-    get_conjunctive_and_disjunctive_inputs,
-    get_prefix_cost,
-    get_reformat_set,
-    loop_order_cost,
-)
 from finch.autoschedule.loop_orderer.loop_order_greedy import (
     GreedyLoopOrderer,
     connected_loop_candidates,
     greedy_loop_order,
-    transpose_penalty,
 )
 from finch.autoschedule.normalize import LogicNormalizer
 from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
+    Aggregate,
     Alias,
     Field,
     Literal,
     MapJoin,
+    Query,
+    Reorder,
     Table,
 )
 from finch.finch_notation.interpreter import NotationInterpreter
 
 
-def test_empty_input_ordered_first_is_cheaper():
+def test_empty_input_cost_matches_model():
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b = Alias("A"), Alias("B")
@@ -46,13 +48,20 @@ def test_empty_input_ordered_first_is_cheaper():
         b: sf(fl.asarray(np.zeros((4, 4))), (j, k)),
     }
 
-    dense_first = loop_order_cost(expr, (i, j, k), sf, bindings)
-    empty_first = loop_order_cost(expr, (j, k, i), sf, bindings)
+    model = Sum(PigeonCostModel(), TransposeCostModel())
+    machine = StatsMachine(sf, dict(bindings))
+    for order in ((i, j, k), (j, k, i)):
+        query = Query(
+            Table(Alias("out"), (i, j, k)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+        )
+        assert sum(
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
+            for n in range(len(order) + 1)
+        ) == model.predict_cost(query, {}, bindings, sf)
 
-    assert empty_first < dense_first
 
-
-def test_empty_relation():
+def test_empty_relation_cost_matches_model():
     sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
@@ -75,9 +84,17 @@ def test_empty_relation():
         }
     )
 
-    forward = loop_order_cost(expr, (i, j, k, l_, m), sf, bindings)
-    reverse = loop_order_cost(expr, (m, l_, k, j, i), sf, bindings)
-    assert forward > reverse
+    model = Sum(PigeonCostModel(), TransposeCostModel())
+    machine = StatsMachine(sf, dict(bindings))
+    for order in ((i, j, k, l_, m), (m, l_, k, j, i)):
+        query = Query(
+            Table(Alias("out"), (i, j, k, l_, m)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+        )
+        assert sum(
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
+            for n in range(len(order) + 1)
+        ) == model.predict_cost(query, {}, bindings, sf)
 
 
 def greedy_scheduler():
@@ -137,19 +154,16 @@ def test_candidates_preserve_remaining_order():
     """Candidates must stay ordered: iterating a set would make tie-breaking
     depend on ``Field`` hashes, which differ between processes.
     """
-    sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    ones = fl.asarray(np.ones((4, 4)))
-    stats = [sf(ones, (i, j)), sf(ones, (j, k))]
 
     remaining = [k, j, i]
-    assert connected_loop_candidates((), remaining, stats, []) == remaining
+    assert connected_loop_candidates((), remaining) == remaining
 
-    candidates = connected_loop_candidates((j,), [k, i], stats, [])
+    candidates = connected_loop_candidates((j,), [k, i])
     assert isinstance(candidates, list)
     assert candidates == [k, i]
-    assert connected_loop_candidates((j,), [i, k], stats, []) == [i, k]
-    assert connected_loop_candidates((i,), [k, j], stats, []) == [k, j]
+    assert connected_loop_candidates((j,), [i, k]) == [i, k]
+    assert connected_loop_candidates((i,), [k, j]) == [k, j]
 
 
 def test_greedy_order_breaks_ties_by_field_order():
@@ -168,12 +182,13 @@ def test_greedy_order_breaks_ties_by_field_order():
         (Table(a, (i, j)), Table(b, (j, k)), Table(c, (k, m))),
     )
     forward_bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k)), c: sf(ones, (k, m))}
-    conjuncts, disjuncts, _ = _dedup_stats(forward, sf, forward_bindings)
+    pigeon = PigeonCostModel()
+    machine = StatsMachine(sf, dict(forward_bindings))
 
     # The chain's endpoints tie, so only the tie-break separates them.
-    assert get_prefix_cost((i,), conjuncts, disjuncts, sf) == get_prefix_cost(
-        (m,), conjuncts, disjuncts, sf
-    )
+    assert pigeon.predict_component_cost(
+        Prefix((i,), forward), machine
+    ) == pigeon.predict_component_cost(Prefix((m,), forward), machine)
 
     order = greedy_loop_order(forward, sf, forward_bindings)
     assert order[0] == i
@@ -190,17 +205,6 @@ def test_greedy_order_breaks_ties_by_field_order():
     assert reverse_order[0] == m
     assert set(reverse_order) == {i, j, k, m}
     assert greedy_loop_order(reverse, sf, reverse_bindings) == reverse_order
-
-
-def _dedup_stats(expr, sf, bindings):
-    conjuncts, disjuncts = get_conjunctive_and_disjunctive_inputs(
-        expr, sf, dict(bindings), {}
-    )
-    input_stats = []
-    for stat in itertools.chain(conjuncts, disjuncts):
-        if not any(stat is seen for seen in input_stats):
-            input_stats.append(stat)
-    return conjuncts, disjuncts, input_stats
 
 
 def test_greedy_avoids_transposing_a_sparse_input():
@@ -223,63 +227,57 @@ def test_greedy_avoids_transposing_a_sparse_input():
     }
     assert tuple(dict.fromkeys(expr.fields())) == (j, i)
 
-    conjuncts, disjuncts, input_stats = _dedup_stats(expr, sf, bindings)
+    pigeon = PigeonCostModel()
+    transpose = TransposeCostModel()
+    model = Sum(pigeon, transpose)
+    machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
     # tie-break would pick j; transposing the sparse B is what makes that order
     # the expensive one.
-    assert get_prefix_cost((j,), conjuncts, disjuncts, sf) == get_prefix_cost(
-        (i,), conjuncts, disjuncts, sf
-    )
-    assert transpose_penalty(input_stats, (j,), frozenset()) > transpose_penalty(
-        input_stats, (i,), frozenset()
-    )
-    assert loop_order_cost(expr, (i, j), sf, dict(bindings)) < loop_order_cost(
-        expr, (j, i), sf, dict(bindings)
-    )
+    assert pigeon.predict_component_cost(
+        Prefix((j,), expr), machine
+    ) == pigeon.predict_component_cost(Prefix((i,), expr), machine)
+    assert transpose.predict_component_cost(
+        Prefix((j,), expr), machine
+    ) > transpose.predict_component_cost(Prefix((i,), expr), machine)
+    costs = [
+        sum(
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
+            for n in range(len(order) + 1)
+        )
+        for order in ((i, j), (j, i))
+    ]
+    assert costs[0] < costs[1]
 
     assert greedy_loop_order(expr, sf, bindings) == (i, j)
 
 
-def test_transpose_penalty_totals_match_loop_order_cost():
-    """Greedy scores one prefix at a time, charging each reformat at the step
-    where it becomes unavoidable. Summed over a full order, that must reproduce
-    the order's ``loop_order_cost`` exactly -- otherwise greedy is minimising
-    something other than the cost model it claims to use.
-    """
+def test_prefix_totals_match_program_cost():
     sf = DCStatsFactory()
+    model = Sum(PigeonCostModel(), TransposeCostModel())
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b = Alias("A"), Alias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     ones = fl.asarray(np.ones((3, 3)))
     bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
-    conjuncts, disjuncts, input_stats = _dedup_stats(expr, sf, bindings)
+    machine = StatsMachine(sf, dict(bindings))
 
-    saw_reformat = False
-    for output_vars in (None, (i, k), (k, i)):
+    for output_vars in (None, (), (i, k), (k, i)):
+        out_idxs = expr.fields() if output_vars is None else output_vars
+        reduced = tuple(idx for idx in expr.fields() if idx not in out_idxs)
         for order in itertools.permutations((i, j, k)):
-            charged: frozenset[int] = frozenset()
-            greedy_score = 0.0
-            reformats = 0.0
-            for n in range(1, len(order) + 1):
-                prefix = order[:n]
-                greedy_score += get_prefix_cost(
-                    prefix, conjuncts, disjuncts, sf, output_vars
+            prefix_total = sum(
+                model.predict_component_cost(
+                    Prefix(order[:n], expr, output_vars), machine
                 )
-                penalty = transpose_penalty(input_stats, prefix, charged)
-                greedy_score += penalty
-                reformats += penalty
-                charged = get_reformat_set(input_stats, prefix)
-
-            assert greedy_score == pytest.approx(
-                loop_order_cost(expr, order, sf, dict(bindings), output_vars)
+                for n in range(len(order) + 1)
             )
-            # The incremental reformat charges add up to the one-shot total.
-            assert reformats == pytest.approx(
-                sum(
-                    cost_of_reformat(input_stats[x])
-                    for x in get_reformat_set(input_stats, order)
-                )
+            query = Query(
+                Table(Alias("out"), out_idxs),
+                Aggregate(
+                    Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), reduced
+                ),
             )
-            saw_reformat |= reformats > 0.0
-
-    assert saw_reformat, "expected at least one order to force a reformat"
+            assert prefix_total == pytest.approx(
+                model.predict_cost(query, {}, bindings, sf)
+            )

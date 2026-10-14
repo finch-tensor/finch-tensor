@@ -1,7 +1,8 @@
 Compiling MLIR code:
 module {
-  func.func @scansearch(
-    %arr: memref<?xindex>, %x: index, %lo: index, %hi: index
+  func.func @scansearch_index(
+    %arr: memref<?xindex>, %x: index,
+    %lo: index, %hi: index
   ) -> index attributes {llvm.emit_c_interface} {
     %1 = arith.constant 1 : index
     %g:2 = scf.while (%d = %1, %p = %lo) : (index, index) -> (index, index) {
@@ -330,7 +331,7 @@ module {
           %v_268 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
           %v_269 = builtin.unrealized_conversion_cast %v_268 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
           %v_270 = arith.subi %v_253, %v_237 : index
-          %v_271 = func.call @scansearch(%v_269, %v_233, %v_249, %v_270) : (memref<?xindex>, index, index, index) -> index
+          %v_271 = func.call @scansearch_index(%v_269, %v_233, %v_249, %v_270) : (memref<?xindex>, index, index, index) -> index
           scf.yield %v_271 : index
         } else {
           scf.yield %v_249 : index
@@ -413,7 +414,7 @@ module {
           %v_330 = llvm.load %v_145 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
           %v_331 = builtin.unrealized_conversion_cast %v_330 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
           %v_332 = arith.subi %v_315, %v_237 : index
-          %v_333 = func.call @scansearch(%v_331, %v_233, %v_311, %v_332) : (memref<?xindex>, index, index, index) -> index
+          %v_333 = func.call @scansearch_index(%v_331, %v_233, %v_311, %v_332) : (memref<?xindex>, index, index, index) -> index
           scf.yield %v_333 : index
         } else {
           scf.yield %v_311 : index
