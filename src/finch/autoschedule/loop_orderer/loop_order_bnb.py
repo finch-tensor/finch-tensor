@@ -5,9 +5,10 @@ from collections.abc import Mapping, MutableMapping
 from typing import Generic, TypeVar
 
 from finch.autoschedule.cost_models import (
-    LoopCostModel,
-    MultiLoopCostModel,
+    CostModel,
     PigeonCostModel,
+    Prefix,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
@@ -40,11 +41,11 @@ def loop_order_bfs(
     output_vars: tuple[Field, ...] | None = None,
     *,
     k: int | None = None,
-    cost_model: LoopCostModel | None = None,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> tuple[Field, ...]:
     """Search prefixes with nonnegative incremental model costs as lower bounds."""
     if cost_model is None:
-        cost_model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -60,10 +61,14 @@ def loop_order_bfs(
         expr, stats_factory, stats_bindings, output_vars, cost_model=cost_model
     )
     best_cost = sum(
-        cost_model.predict_prefix_cost(best_order[:n], expr, machine, output_vars)
+        cost_model.predict_component_cost(
+            Prefix(best_order[:n], expr, output_vars), machine
+        )
         for n in range(len(best_order) + 1)
     )
-    initial_cost = cost_model.predict_prefix_cost((), expr, machine, output_vars)
+    initial_cost = cost_model.predict_component_cost(
+        Prefix((), expr, output_vars), machine
+    )
     prev_new_optimal_orders: list[tuple[tuple[Field, ...], float]] = [
         ((), initial_cost)
     ]
@@ -77,8 +82,8 @@ def loop_order_bfs(
             candidates = connected_loop_candidates(prefix, remaining, output_vars)
             for field in candidates:
                 new_prefix = prefix + (field,)
-                new_cost = prefix_cost + cost_model.predict_prefix_cost(
-                    new_prefix, expr, machine, output_vars
+                new_cost = prefix_cost + cost_model.predict_component_cost(
+                    Prefix(new_prefix, expr, output_vars), machine
                 )
                 if new_cost >= best_cost:
                     continue
@@ -100,11 +105,11 @@ def loop_order_dfs(
     stats_bindings: MutableMapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
     *,
-    cost_model: LoopCostModel | None = None,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> tuple[Field, ...]:
     """Search prefixes with nonnegative incremental model costs as lower bounds."""
     if cost_model is None:
-        cost_model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -120,10 +125,14 @@ def loop_order_dfs(
         expr, stats_factory, stats_bindings, output_vars, cost_model=cost_model
     )
     best_cost = sum(
-        cost_model.predict_prefix_cost(best_order[:n], expr, machine, output_vars)
+        cost_model.predict_component_cost(
+            Prefix(best_order[:n], expr, output_vars), machine
+        )
         for n in range(len(best_order) + 1)
     )
-    initial_cost = cost_model.predict_prefix_cost((), expr, machine, output_vars)
+    initial_cost = cost_model.predict_component_cost(
+        Prefix((), expr, output_vars), machine
+    )
     stack: list[tuple[tuple[Field, ...], float]] = [((), initial_cost)]
 
     while stack:
@@ -136,8 +145,8 @@ def loop_order_dfs(
         candidates = connected_loop_candidates(prefix, remaining, output_vars)
         for field in candidates:
             new_prefix = prefix + (field,)
-            new_cost = prefix_cost + cost_model.predict_prefix_cost(
-                new_prefix, expr, machine, output_vars
+            new_cost = prefix_cost + cost_model.predict_component_cost(
+                Prefix(new_prefix, expr, output_vars), machine
             )
             if new_cost >= best_cost:
                 continue
@@ -158,7 +167,7 @@ def loop_order_brute_force(
     stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
     *,
-    cost_model: LoopCostModel | None = None,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> tuple[Field, ...]:
     """Pick the loop order with the lowest model cost over all permutations.
 
@@ -166,7 +175,7 @@ def loop_order_brute_force(
     number of indices; intended as an oracle for small nests and benchmarks.
     """
     if cost_model is None:
-        cost_model = MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -184,7 +193,9 @@ def loop_order_brute_force(
         ):
             continue
         cost = sum(
-            cost_model.predict_prefix_cost(order[:n], expr, machine, output_vars)
+            cost_model.predict_component_cost(
+                Prefix(order[:n], expr, output_vars), machine
+            )
             for n in range(len(order) + 1)
         )
         if not best_order or cost < best_cost:
@@ -198,13 +209,13 @@ class BFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         ctx: LogicLoader | None = None,
         *,
         k: int | None = None,
-        cost_model: LoopCostModel | None = None,
+        cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
         self.cost_model = (
             cost_model
             if cost_model is not None
-            else MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+            else Sum(PigeonCostModel(), TransposeCostModel())
         )
         self.k = k
 
@@ -253,13 +264,13 @@ class DFSLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         self,
         ctx: LogicLoader | None = None,
         *,
-        cost_model: LoopCostModel | None = None,
+        cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
         self.cost_model = (
             cost_model
             if cost_model is not None
-            else MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+            else Sum(PigeonCostModel(), TransposeCostModel())
         )
 
     def set_loop_orders(
@@ -306,13 +317,13 @@ class BruteForceLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         self,
         ctx: LogicLoader | None = None,
         *,
-        cost_model: LoopCostModel | None = None,
+        cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
         self.cost_model = (
             cost_model
             if cost_model is not None
-            else MultiLoopCostModel(PigeonCostModel(), TransposeCostModel())
+            else Sum(PigeonCostModel(), TransposeCostModel())
         )
 
     def set_loop_orders(

@@ -7,7 +7,16 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
-from finch.autoschedule.cost_models import LoopCostModel, MultiLoopCostModel
+from finch.autoschedule.cost_models import (
+    Concat,
+    LinearPredictor,
+    LoopCostModel,
+    PigeonCostModel,
+    Prefix,
+    QuadraticPredictor,
+    Sum,
+    TransposeCostModel,
+)
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
     BFSLoopOrderer,
     BruteForceLoopOrderer,
@@ -129,18 +138,58 @@ def test_brute_force_is_no_worse_than_heuristics():
     )
 
 
+@pytest.mark.parametrize(
+    "search", [loop_order_bfs, loop_order_dfs, loop_order_brute_force]
+)
+def test_loop_search_minimizes_nonlinear_component_cost(search):
+    sf = DCStatsFactory()
+    i, j, k = (Field(name) for name in "ijk")
+    a, b, out = (Alias(name) for name in ("a", "b", "out"))
+    stats = {
+        a: sf(fl.asarray(np.ones((2, 3))), (i, j)),
+        b: sf(fl.asarray(np.ones((3, 4))), (j, k)),
+    }
+    arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
+    expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
+    model = Concat(
+        PigeonCostModel(),
+        TransposeCostModel(),
+        predictor=QuadraticPredictor(np.ones(25)),
+    )
+
+    def cost(order):
+        query = Query(
+            Table(out, (i, k)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
+        )
+        features = model.get_features(query, {}, stats, sf)
+        return sum(row.sum() ** 2 for row in features)
+
+    chosen = search(expr, sf, stats, (i, k), cost_model=model)
+    expected = min(
+        cost(order)
+        for order in itertools.permutations((i, j, k))
+        if order.index(i) < order.index(k)
+    )
+    assert cost(chosen) == expected
+
+
 class PreferFieldCostModel(LoopCostModel, LoopOrderedForm):
+    @property
+    def n_features(self) -> int:
+        return 1
+
     def __init__(self, field):
+        super().__init__(LinearPredictor(np.array([1.0])))
         self.field = field
 
-    @property
-    def coefficients(self):
-        return np.array([1.0])
-
-    def get_prefix_features(self, prefix, expr, machine, output_vars=None):
+    def get_component_features(self, component, machine):
+        prefix = component.prefix
         if not prefix:
-            return np.array([7.0])
-        return np.array([10.0 if len(prefix) == 1 and prefix[0] != self.field else 0.0])
+            return np.array([[7.0]])
+        return np.array(
+            [[10.0 if len(prefix) == 1 and prefix[0] != self.field else 0.0]]
+        )
 
 
 @pytest.mark.parametrize(
@@ -180,7 +229,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert order == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert isinstance(orderer().cost_model, MultiLoopCostModel)
+    assert isinstance(orderer().cost_model, Sum)
 
 
 @pytest.mark.parametrize(
@@ -215,6 +264,6 @@ def test_prefix_cost_uses_reduction_statistics(op, init):
             Aggregate(Literal(op), Literal(init), Reorder(table, order), (j,)),
         )
         assert sum(
-            model.predict_prefix_cost(order[:n], expr, machine, (i,))
+            model.predict_component_cost(Prefix(order[:n], expr, (i,)), machine)
             for n in range(len(order) + 1)
         ) == pytest.approx(model.predict_cost(query, {}, stats, sf))

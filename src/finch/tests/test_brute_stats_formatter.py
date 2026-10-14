@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 
 import finch as fl
+from finch.autoschedule.cost_models import ElementLevelOption
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_BUILDERS,
     IterCostFormatter,
@@ -27,27 +28,31 @@ def get_stats(matrix, fields):
     return stats, query, machine
 
 
-def format_cost(cost_model, query, format_keys, machine):
+def format_cost(cost_model, query, options, machine):
     prgm = Plan((query, Produces((query.lhs.tns,))))
     M = query.rhs.tns
     return cost_model.predict_cost(
         prgm,
-        {query.lhs.tns: list(format_keys)},
+        {query.lhs.tns: list(options)},
         {M: machine.bindings[M]},
         machine.stats_factory,
     )
 
 
-def brute_force_best(cost_model, query, shape_type, machine, fill_value):
+def brute_force_best(formatter, query, shape_type, machine, fill_value):
     best_cost = None
-    best_keys: tuple[str, ...] = ()
-    for format_keys in itertools.product(cost_model.formats, repeat=len(shape_type)):
-        cost = format_cost(cost_model, query, format_keys, machine)
+    best_options = ()
+    for options in itertools.product(formatter.options, repeat=len(shape_type)):
+        cost = format_cost(
+            formatter.cost_model, query, (*options, ElementLevelOption()), machine
+        )
         if best_cost is None or cost < best_cost:
-            best_cost, best_keys = cost, format_keys
+            best_cost, best_options = cost, options
     lvl = fl.element(fill_value, fl.ftype(fill_value))
-    for key, dim_type in zip(reversed(best_keys), reversed(shape_type), strict=True):
-        lvl = LEVEL_BUILDERS[key](lvl, dim_type)
+    for option, dim_type in zip(
+        reversed(best_options), reversed(shape_type), strict=True
+    ):
+        lvl = LEVEL_BUILDERS[option.kind](lvl, dim_type)
     return lvl
 
 
@@ -80,10 +85,9 @@ def test_search_and_brute(formatter_cls, matrix):
     stats, query, machine = get_stats(matrix, fields)
     shape_type = tuple(fl.ftype(np.intp) for _ in fields)
     formatter = formatter_cls()
-    cost_model = formatter.cost_model
 
     brute_fmt = brute_force_best(
-        cost_model, query, shape_type, machine, stats.fill_value
+        formatter, query, shape_type, machine, stats.fill_value
     )
 
     search_fmt = formatter.get_tensor_ftype(

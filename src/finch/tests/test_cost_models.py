@@ -3,13 +3,20 @@ import itertools
 import pytest
 
 import numpy as np
+from scipy.linalg import block_diag
 
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
-    MultiCostModel,
-    MultiLoopCostModel,
+    ByKind,
+    Concat,
+    FlopsCostModel,
+    LinearPredictor,
     PigeonCostModel,
+    Prefix,
+    QuadraticPredictor,
+    Statement,
+    Sum,
     TransposeCostModel,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
@@ -27,6 +34,125 @@ from finch.finch_logic import (
     Reorder,
     Table,
 )
+
+
+@pytest.mark.parametrize(
+    "predictor, expected",
+    [
+        (LinearPredictor(np.array([2.0, 3.0])), 26.0),
+        (QuadraticPredictor(np.array([1.0, 2.0, 3.0, 4.0])), 160.0),
+    ],
+)
+def test_predictors_sum_component_predictions(predictor, expected):
+    features = np.array([[1.0, 2.0], [3.0, 4.0]])
+    assert predictor(features) == expected
+    assert predictor(features) == sum(predictor(row[None, :]) for row in features)
+    assert predictor(np.empty((0, 2))) == 0.0
+
+
+@pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
+def test_flops_cost_retains_query_components(factory):
+    sf = factory()
+    i, j = Field("i"), Field("j")
+    a, b, out = Alias("a"), Alias("b"), Alias("out")
+    tensor = fl.asarray(np.ones((2, 3)))
+    stats = {a: sf(tensor, (i, j))}
+    plan = Plan(
+        (
+            Query(
+                Table(b, (i,)),
+                Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,)),
+            ),
+            Query(Table(out, (i,)), Table(b, (i,))),
+            Produces((out,)),
+        )
+    )
+    cost = FlopsCostModel()
+    np.testing.assert_array_equal(
+        cost.get_features(plan, {}, stats, sf), [[6, 2], [2, 2]]
+    )
+    assert cost.predict_cost(plan, {}, stats, sf) == 48.0
+    machine = StatsMachine(sf, dict(stats))
+    query_costs = []
+    for stmt in plan.bodies[:2]:
+        query_costs.append(cost.predict_component_cost(Statement(stmt), machine))
+        machine(stmt)
+    assert query_costs == [26.0, 22.0]
+    nonlinear = FlopsCostModel(QuadraticPredictor(np.array([1.0, 0.0, 0.0, 10.0])))
+    assert nonlinear.predict_cost(plan, {}, stats, sf) == 120.0
+    assert set(stats) == {a}
+
+
+@pytest.mark.parametrize(
+    "cost",
+    [
+        FlopsCostModel(),
+        PigeonCostModel(),
+        TransposeCostModel(),
+        Sum(PigeonCostModel(), TransposeCostModel()),
+        Concat(
+            PigeonCostModel(),
+            TransposeCostModel(),
+            predictor=QuadraticPredictor(np.ones(25)),
+        ),
+        PigeonCostModel(QuadraticPredictor(np.ones(9))),
+    ],
+)
+@pytest.mark.parametrize("plan", [Plan(()), Plan((Produces(()),))])
+def test_empty_cost_components(cost, plan):
+    sf = DCStatsFactory()
+    assert cost.get_features(plan, {}, {}, sf).shape == (0, cost.n_features)
+    assert cost.predict_cost(plan, {}, {}, sf) == 0.0
+
+
+def test_concat_uses_joint_nonlinear_predictor():
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    plan = Query(Table(out, (j, i)), Table(a, (i, j)))
+    cost = Concat(
+        PigeonCostModel(),
+        TransposeCostModel(),
+        predictor=QuadraticPredictor(np.ones(25)),
+    )
+    features = cost.get_features(plan, {}, stats, sf)
+    assert features.shape == (3, 5)
+    expected = sum(row.sum() ** 2 for row in features)
+    assert cost.predict_cost(plan, {}, stats, sf) == expected
+    assert expected != features.sum() ** 2
+
+
+@pytest.mark.parametrize(
+    "cost",
+    [
+        PigeonCostModel(QuadraticPredictor(np.ones(9))),
+        TransposeCostModel(QuadraticPredictor(np.ones(4))),
+        Sum(
+            PigeonCostModel(QuadraticPredictor(np.ones(9))),
+            TransposeCostModel(QuadraticPredictor(np.ones(4))),
+        ),
+        Concat(
+            PigeonCostModel(),
+            TransposeCostModel(),
+            predictor=QuadraticPredictor(np.ones(25)),
+        ),
+    ],
+)
+def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    expr = Table(a, (i, j))
+    machine = StatsMachine(sf, dict(stats))
+    for order in ((i, j), (j, i)):
+        query = Query(Table(out, order), expr)
+        expected = sum(
+            cost.predict_component_cost(Prefix(order[:n], expr, order), machine)
+            for n in range(len(order) + 1)
+        )
+        assert cost.predict_cost(query, {}, stats, sf) == expected
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
@@ -63,14 +189,14 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
     model.validate_inputs(plan, bindings, stats, sf)
     features = model.get_features(plan, bindings, stats, sf)
 
-    assert features.shape == model.coefficients.shape == (3,)
+    assert features.shape == (len(idxs) + 1, 3)
     assert np.all(np.isfinite(features))
     assert np.all(features >= 0)
     assert model.predict_cost(plan, bindings, stats, sf) > 0
     if idxs:
-        assert np.all(features > 0)
+        assert np.all(features.sum(axis=0) > 0)
     else:
-        np.testing.assert_array_equal(features[:2], [0, 0])
+        np.testing.assert_array_equal(features[0, :2], [0, 0])
     assert stats == original_stats
     assert all(
         stat.fill_value is original_fills[alias] for alias, stat in stats.items()
@@ -110,14 +236,14 @@ def test_pigeon_cost_model_dependent_queries(factory):
 
     intermediate_stats = dict(stats)
     machine = StatsMachine(sf, intermediate_stats)
-    expected = np.zeros(3)
+    expected = []
     for query in queries:
-        expected += model.get_features(query, bindings, intermediate_stats, sf)
+        expected.append(model.get_features(query, bindings, intermediate_stats, sf))
         machine(query)
 
-    np.testing.assert_allclose(features, expected)
+    np.testing.assert_allclose(features, np.concatenate(expected, axis=0))
     assert model.predict_cost(plan, bindings, stats, sf) == pytest.approx(
-        np.dot(model.coefficients, expected)
+        sum(model.predictor(rows) for rows in expected)
     )
     assert set(stats) == {a}
 
@@ -176,12 +302,14 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     ):
         out_idxs = tuple(idx for idx in order if idx != j)
         prefixes = [order[:n] for n in range(len(order) + 1)]
-        features = sum(
-            model.get_prefix_features(prefix, expr, machine, out_idxs)
-            for prefix in prefixes
+        features = np.concatenate(
+            [
+                model.get_component_features(Prefix(prefix, expr, out_idxs), machine)
+                for prefix in prefixes
+            ]
         )
         cost = sum(
-            model.predict_prefix_cost(prefix, expr, machine, out_idxs)
+            model.predict_component_cost(Prefix(prefix, expr, out_idxs), machine)
             for prefix in prefixes
         )
         query = Query(
@@ -189,7 +317,7 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
             Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
         )
 
-        np.testing.assert_allclose(features, original_features)
+        np.testing.assert_allclose(features.sum(axis=0), original_features)
         np.testing.assert_allclose(model.get_features(query, {}, stats, sf), features)
         assert model.predict_cost(query, {}, stats, sf) == pytest.approx(cost)
 
@@ -212,11 +340,11 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     machine = StatsMachine(sf, dict(stats))
 
     np.testing.assert_array_equal(
-        model.get_prefix_features((), scalar, machine), [0, 0, 1]
+        model.get_component_features(Prefix((), scalar), machine), [[0, 0, 1]]
     )
-    assert model.predict_prefix_cost((), scalar, machine) == 10
+    assert model.predict_component_cost(Prefix((), scalar), machine) == 10
     np.testing.assert_array_equal(
-        model.get_prefix_features((i,), broadcast, machine), [1, 0, 1]
+        model.get_component_features(Prefix((i,), broadcast), machine), [[1, 0, 1]]
     )
 
 
@@ -248,7 +376,8 @@ def test_transpose_cost_model_queries(factory, sparse, transpose, inplace):
 
     model.validate_inputs(plan, bindings, stats, sf)
     np.testing.assert_array_equal(
-        model.get_features(plan, bindings, stats, sf), expected_features
+        model.get_features(plan, bindings, stats, sf),
+        [[0, 0], expected_features, [0, 0]],
     )
     assert model.predict_cost(plan, bindings, stats, sf) == expected
     assert stats == original_stats
@@ -275,7 +404,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
             6 if order.index(k) < order.index(j) else 0
         )
         cost = sum(
-            model.predict_prefix_cost(order[:n], expr, machine)
+            model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         )
         query = Query(
@@ -323,15 +452,14 @@ def test_transpose_cost_model_dependent_queries(factory):
 
     model.validate_inputs(plan, bindings, stats, sf)
     np.testing.assert_array_equal(
-        model.get_features(plan, bindings, stats, sf), [12, 0]
+        model.get_features(plan, bindings, stats, sf).sum(axis=0), [12, 0]
     )
     assert model.predict_cost(plan, bindings, stats, sf) == 6
     assert set(stats) == {a}
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
-@pytest.mark.parametrize("composite", [MultiCostModel, MultiLoopCostModel])
-def test_multi_cost_model_sums_submodels(factory, composite):
+def test_sum_cost_model_sums_submodels(factory):
     sf = factory()
     i, j = Field("i"), Field("j")
     a, out = Alias("a"), Alias("out")
@@ -340,14 +468,43 @@ def test_multi_cost_model_sums_submodels(factory, composite):
     bindings = {a: tensor.ftype}
     plan = Plan((Query(Table(out, (j, i)), Table(a, (i, j))), Produces((out,))))
     models = (PigeonCostModel(), TransposeCostModel())
-    model = composite(*models)
+    model = Sum(*models)
     model.validate_inputs(plan, bindings, stats, sf)
 
-    np.testing.assert_array_equal(model.coefficients, [1, 1, 10, 0.5, 60])
+    assert model.n_features == 5
     np.testing.assert_allclose(
         model.get_features(plan, bindings, stats, sf),
-        np.concatenate([sub.get_features(plan, bindings, stats, sf) for sub in models]),
+        np.concatenate(
+            [sub.get_features(plan, bindings, stats, sf) for sub in models], axis=1
+        ),
     )
     assert model.predict_cost(plan, bindings, stats, sf) == pytest.approx(
         sum(sub.predict_cost(plan, bindings, stats, sf) for sub in models)
+    )
+
+
+def test_by_kind_dispatches_components_by_key():
+    sf = DCStatsFactory()
+    i, j = Field("i"), Field("j")
+    a, out = Alias("a"), Alias("out")
+    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    expr = Table(a, (i, j))
+    query = Query(Table(out, (j, i)), expr)
+    models = {0: PigeonCostModel(), 1: TransposeCostModel(), 2: PigeonCostModel()}
+    cost = ByKind(models, key=lambda component: len(component.prefix))
+    machine = StatsMachine(sf, dict(stats))
+    prefixes = [Prefix((j, i)[:n], expr, (j, i)) for n in range(3)]
+
+    np.testing.assert_array_equal(
+        cost.get_features(query, {}, stats, sf),
+        block_diag(
+            *(
+                models[n].get_component_features(prefix, machine)
+                for n, prefix in enumerate(prefixes)
+            )
+        ),
+    )
+    assert cost.predict_cost(query, {}, stats, sf) == sum(
+        models[n].predict_component_cost(prefix, machine)
+        for n, prefix in enumerate(prefixes)
     )
