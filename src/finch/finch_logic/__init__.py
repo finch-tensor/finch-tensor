@@ -4,6 +4,11 @@ from .interpreter import (
     MockLogicLibrary,
     MockLogicLoader,
 )
+from .local_value_numbering import (
+    LogicDefinition,
+    LogicLocalValueNumberingResult,
+    logic_local_value_numbering,
+)
 from .nodes import (
     Aggregate,
     Alias,
@@ -38,10 +43,12 @@ __all__ = [
     "Alias",
     "Field",
     "Literal",
+    "LogicDefinition",
     "LogicEvaluator",
     "LogicExpression",
     "LogicInterpreter",
     "LogicLoader",
+    "LogicLocalValueNumberingResult",
     "LogicNode",
     "LogicSimplify",
     "LogicStatement",
@@ -63,4 +70,5 @@ __all__ = [
     "TensorStats",
     "Value",
     "compute_shape_vars",
+    "logic_local_value_numbering",
 ]

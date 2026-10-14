@@ -2,6 +2,10 @@ from .cfg_builder import (
     NotationCFGBuilder,
     NumberedStatement,
 )
+from .global_value_numbering import (
+    NotationGlobalValueNumberingTransform,
+    notation_global_value_numbering,
+)
 from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
@@ -72,6 +76,7 @@ __all__ = [
     "Module",
     "NotationCFGBuilder",
     "NotationExpression",
+    "NotationGlobalValueNumberingTransform",
     "NotationInterpreter",
     "NotationLoader",
     "NotationNode",
@@ -90,4 +95,5 @@ __all__ = [
     "Update",
     "Value",
     "Variable",
+    "notation_global_value_numbering",
 ]
