@@ -38,7 +38,7 @@ def from_binsparse(array: bsp.BinsparseTensor) -> FiberTensor:
             values = _element_values(level)
             fill_value = array.fill_value if array.fill is True else 0
             element_format = element(
-                fill_type=StaticFill(values.dtype.type(fill_value)),
+                fill_type=StaticFillFType(values.dtype.type(fill_value)),
                 element_type=ftype(values.dtype),
                 position_type=ftype(_position_dtype(level)),
             )
