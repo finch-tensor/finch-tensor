@@ -90,6 +90,7 @@ from .compile import (
     ExtentFType,
     dimension,
 )
+from .fileio import from_binsparse, to_binsparse
 from .finch_assembly import element_type
 from .finch_fused.jit import jit
 from .interface import (
@@ -459,6 +460,7 @@ __all__ = [
     "float_",
     "floor",
     "floor_divide",
+    "from_binsparse",
     "ftype",
     "full",
     "full_like",
@@ -561,6 +563,7 @@ __all__ = [
     "tanh",
     "tensordot",
     "tile",
+    "to_binsparse",
     "to_numpy",
     "to_scipy",
     "trace",
