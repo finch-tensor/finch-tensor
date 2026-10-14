@@ -56,6 +56,9 @@ def compute_shape_vars(
         dim_bindings[var] = tuple(idxs)
 
     def merge_dim_groups(dim1, dim2):
+        # a field neither side has (a Reorder broadcasting or dropping it)
+        if dim1 is None and dim2 is None:
+            return None
         if dim1 is None:
             groups[dim2].add(None)
             return dim2
