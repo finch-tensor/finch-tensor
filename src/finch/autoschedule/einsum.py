@@ -41,6 +41,20 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                     )
                 )
             return body
+        case lgc.Query(
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Aggregate(lgc.Literal(ffuncs.overwrite), _, arg, _),
+        ):
+            # An overwrite writes every element of the output, so its init only
+            # matters as the fill of the output, which the executor sets when
+            # it constructs the output. Einsum can't read fills, so it can't
+            # start from any other init that isn't a literal.
+            return ein.Einsum(
+                op=ein.Literal(ffuncs.overwrite),
+                tns=ein.Alias(name),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
+                arg=generate_einsum_expr(arg),
+            )
         case lgc.QueryInto(
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Literal(operation),

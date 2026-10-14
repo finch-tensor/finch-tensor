@@ -7,10 +7,12 @@ from typing import Any, Self, TypeVar
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     FType,
     FTyped,
     StructFType,
     ftypes,
+    is_static,
 )
 from finch.tensor.traits import FormatProperty
 
@@ -36,11 +38,11 @@ class LevelFType(FType, ABC):
         self.level_get_child_type(attr)
         return asm.GetAttr(obj, asm.Literal(attr))
 
-    def with_fill(self, fill_value: Any) -> LevelFType:
-        """Rebuild this level ftype with the leaf fill value replaced."""
+    def with_fill(self, fill_type: AbstractFillFType) -> LevelFType:
+        """Rebuild this level ftype with the leaf fill replaced."""
         # Level ftypes are dataclasses with a `_lvl_t` child field; non-
         # dataclass levels must override.
-        return replace(self, _lvl_t=self.lvl_t.with_fill(fill_value))  # type: ignore[type-var]
+        return replace(self, _lvl_t=self.lvl_t.with_fill(fill_type))  # type: ignore[type-var]
 
     def lower_fill(self, lvl_expr):
         """Assembly expression reading the runtime fill from the leaf level's
@@ -57,10 +59,9 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> AbstractFill:
+    def fill_type(self) -> AbstractFillFType:
         """
-        Fill value of the fibers, and whether kernels may specialize on it.
-        Use `.value` for the value itself.
+        Fill of the fibers, and whether kernels may specialize on its value.
         """
         ...
 
@@ -218,9 +219,14 @@ class Level(FTyped[LT], ABC):
 
     @property
     def fill_value(self):
-        """The fill value itself; see `self.ftype.fill_value` for
-        dynamic vs static."""
-        return self.ftype.fill_value.value
+        """The fill value itself; see `self.ftype.fill_type` for
+        dynamic vs static. A level with a dynamic fill holds its own value."""
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return fill_type.value
+        raise NotImplementedError(
+            f"{type(self).__name__} must hold its dynamic fill value"
+        )
 
     @property
     def element_type(self):
@@ -257,6 +263,10 @@ class MultiDimensionLevelFType(LevelFType):
 class SingleDimensionLevel(Level):
     lvl: Level
 
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
@@ -264,6 +274,10 @@ class SingleDimensionLevel(Level):
 
 class MultiDimensionLevel(Level):
     lvl: Level
+
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
 
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""

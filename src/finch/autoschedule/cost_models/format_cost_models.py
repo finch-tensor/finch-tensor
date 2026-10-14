@@ -33,7 +33,9 @@ def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int):
     """Return the non-fill entries of the first depth + 1 levels of stats."""
     reduce_fields = tuple(stats.index_order[depth + 1 :])
     if reduce_fields:
-        stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        stats = stats_factory.aggregate(
+            ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
+        )
     return stats.estimate_non_fill_values()
 
 

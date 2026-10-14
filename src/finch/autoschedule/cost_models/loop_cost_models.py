@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from finch.algebra import StaticFill, ffuncs
+from finch.algebra import ffuncs
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -126,24 +126,17 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
                 idx for idx in out_space.index_order if idx not in output_vars
             )
             if reduce_idxs:
-                out_space = stats_factory.copy(out_space)
-                out_space.fill_value = StaticFill(False)
                 out_space = stats_factory.aggregate(
-                    ffuncs.or_, False, reduce_idxs, out_space
+                    ffuncs.or_, False, reduce_idxs, stats_factory.support(out_space)
                 )
             out_space = stats_factory.reorder(out_space, output_vars)
         if not prefix:
             return np.array([[0.0, 0.0, out_space.estimate_non_fill_values()]])
 
-        def support(stat: NS) -> NS:
-            stat = stats_factory.copy(stat)
-            stat.fill_value = StaticFill(False)
-            return stat
-
         def project(stat: NS) -> NS:
             reduce_idxs = tuple(idx for idx in stat.index_order if idx not in parent)
             return stats_factory.aggregate(
-                ffuncs.or_, False, reduce_idxs, support(stat)
+                ffuncs.or_, False, reduce_idxs, stats_factory.support(stat)
             )
 
         parent = set(prefix[:-1])
@@ -153,7 +146,7 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         for node in PostOrderDFS(arg):
             match node:
                 case Table(_, idxs) if idx in idxs:
-                    inputs.append(support(machine(node)))
+                    inputs.append(stats_factory.support(machine(node)))
         iter_space = exec_space
         if inputs:
             iter_space = stats_factory.mapjoin(

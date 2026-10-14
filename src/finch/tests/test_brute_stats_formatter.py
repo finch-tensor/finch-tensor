@@ -39,7 +39,7 @@ def format_cost(cost_model, query, options, machine):
     )
 
 
-def brute_force_best(formatter, query, shape_type, machine, fill_value):
+def brute_force_best(formatter, query, shape_type, machine, fill_type):
     best_cost = None
     best_options = ()
     for options in itertools.product(formatter.options, repeat=len(shape_type)):
@@ -48,7 +48,7 @@ def brute_force_best(formatter, query, shape_type, machine, fill_value):
         )
         if best_cost is None or cost < best_cost:
             best_cost, best_options = cost, options
-    lvl = fl.element(fill_value, fl.ftype(fill_value))
+    lvl = fl.element(fill_type, fill_type.element_type)
     for option, dim_type in zip(
         reversed(best_options), reversed(shape_type), strict=True
     ):
@@ -86,11 +86,9 @@ def test_search_and_brute(formatter_cls, matrix):
     shape_type = tuple(fl.ftype(np.intp) for _ in fields)
     formatter = formatter_cls()
 
-    brute_fmt = brute_force_best(
-        formatter, query, shape_type, machine, stats.fill_value
-    )
+    brute_fmt = brute_force_best(formatter, query, shape_type, machine, stats.fill_type)
 
     search_fmt = formatter.get_tensor_ftype(
-        query.lhs.tns, query, machine, stats.fill_value, shape_type
+        query.lhs.tns, query, machine, stats.fill_type, shape_type
     ).lvl_t
     assert search_fmt == brute_fmt

@@ -56,7 +56,7 @@ class ExactStatsFactory(
         reduce_indices: tuple[Field, ...],
         stats: ExactStats,
     ) -> ExactStats:
-        f = stats.fill_value
+        f = stats.fill_type
         bool_op: FinchOperator
 
         if is_identity(op.ftype, f):

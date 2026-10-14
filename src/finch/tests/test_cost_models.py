@@ -184,7 +184,7 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
             query = QueryInto(Table(out, out_idxs), Literal(ffuncs.add), arg)
     plan = Plan((query, Produces((out,))))
     original_stats = dict(stats)
-    original_fills = {alias: stat.fill_value for alias, stat in stats.items()}
+    original_fills = {alias: stat.fill_type for alias, stat in stats.items()}
 
     model.validate_inputs(plan, bindings, stats, sf)
     features = model.get_features(plan, bindings, stats, sf)
@@ -198,9 +198,7 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
     else:
         np.testing.assert_array_equal(features[0, :2], [0, 0])
     assert stats == original_stats
-    assert all(
-        stat.fill_value is original_fills[alias] for alias, stat in stats.items()
-    )
+    assert all(stat.fill_type is original_fills[alias] for alias, stat in stats.items())
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
@@ -293,7 +291,7 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
     machine = StatsMachine(sf, dict(stats))
     spaces = list(stats.values())
-    original_fills = [stat.fill_value for stat in spaces]
+    original_fills = [stat.fill_type for stat in spaces]
     original_idxs = [stat.index_order for stat in spaces]
 
     # These totals were captured before extracting the prefix calculation.
@@ -322,7 +320,7 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
         assert model.predict_cost(query, {}, stats, sf) == pytest.approx(cost)
 
     assert all(
-        stat.fill_value is fill
+        stat.fill_type is fill
         for stat, fill in zip(spaces, original_fills, strict=True)
     )
     assert [stat.index_order for stat in spaces] == original_idxs
@@ -397,7 +395,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
     arg = MapJoin(Literal(ffuncs.mul), (a_table, a_table, b_table))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (i, j, k))
     machine = StatsMachine(sf, dict(stats))
-    original_fills = [stat.fill_value for stat in stats.values()]
+    original_fills = [stat.fill_type for stat in stats.values()]
 
     for order in itertools.permutations((i, j, k)):
         expected = (3 if order.index(j) < order.index(i) else 0) + (
@@ -418,7 +416,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
         assert model.predict_cost(query, {}, stats, sf) == expected
 
     assert all(
-        stat.fill_value is fill
+        stat.fill_type is fill
         for stat, fill in zip(stats.values(), original_fills, strict=True)
     )
 

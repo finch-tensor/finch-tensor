@@ -4,6 +4,7 @@ import numpy as np
 
 import finch as fl
 from finch import ffuncs
+from finch.algebra import DynamicFillFType, StaticFillFType
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     ByKind,
@@ -15,13 +16,20 @@ from finch.autoschedule.cost_models import (
     QuadraticPredictor,
     SparseHashLevelOption,
 )
+from finch.autoschedule.cost_models.format_cost_models import nnz_after
+from finch.autoschedule.formatter.galley_formatter import estimate_nnz
 from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
     IterCostFormatter,
     StorageCostFormatter,
 )
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import (
+    BaseTensorStats,
+    DCStatsFactory,
+    UniformStatsFactory,
+)
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -36,7 +44,41 @@ from finch.finch_logic import (
 )
 
 
-def _format_matrix(formatter, matrix, fill_value):
+@pytest.mark.parametrize(
+    "fill_type",
+    [
+        StaticFillFType(np.float64(0)),
+        StaticFillFType(np.float64(1)),
+        StaticFillFType(np.float64(-1)),
+        DynamicFillFType(fl.float64),
+    ],
+)
+@pytest.mark.parametrize(
+    "level_type", [fl.SparseListLevelFType, fl.SparseHashLevelFType]
+)
+def test_sparse_costs_reduce_support(fill_type, level_type):
+    i, j = Field("i"), Field("j")
+    stats = UniformStats(BaseTensorStats((i, j), {i: 4, j: 3}, fill_type), nnz=6)
+    factory = UniformStatsFactory()
+    support = factory.support(stats)
+
+    assert support is not stats
+    assert support.fill_type == StaticFillFType(False)
+    assert support.index_order == stats.index_order
+    assert support.dim_sizes == stats.dim_sizes
+    assert support.nnz == stats.nnz
+    assert nnz_after(stats, factory, 0) == pytest.approx(3.5)
+    assert estimate_nnz(stats, factory, (i,)) == pytest.approx(3.5)
+
+    leaf = fl.element(fill_type, fl.float64)
+    level = level_type(fl.dense(leaf))
+    pos_size = np.dtype(np.intp).itemsize
+    expected = (2 + 3.5) * pos_size + 3.5 * 3 * 8
+    assert level.level_cost((i, j), stats, factory, 1, 0) == pytest.approx(expected)
+    assert stats.fill_type == fill_type
+
+
+def _format_matrix(formatter, matrix, fill_type):
     i, j = Field("i"), Field("j")
     A, M = Alias("A"), Alias("M")
     stats_factory = DCStatsFactory()
@@ -46,7 +88,7 @@ def _format_matrix(formatter, matrix, fill_value):
     )
     machine(query)
     shape_type = tuple(fl.ftype(np.intp) for _ in matrix.shape)
-    return formatter.get_tensor_ftype(A, query, machine, fill_value, shape_type)
+    return formatter.get_tensor_ftype(A, query, machine, fill_type, shape_type)
 
 
 def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
@@ -93,7 +135,9 @@ def test_storage_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
-    ftype = _format_matrix(StorageCostFormatter(), matrix, np.float64(0.0))
+    ftype = _format_matrix(
+        StorageCostFormatter(), matrix, StaticFillFType(np.float64(0.0))
+    )
 
     assert isinstance(ftype, fl.FiberTensorFType)
     assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
@@ -105,14 +149,16 @@ def test_iter_cost_formatter_uses_sparse_hash_for_sparse_matrix():
     matrix = np.zeros((100, 100))
     matrix[0, 0] = 1.0
     matrix[99, 99] = 1.0
-    ftype = _format_matrix(IterCostFormatter(), matrix, np.float64(0.0))
+    ftype = _format_matrix(
+        IterCostFormatter(), matrix, StaticFillFType(np.float64(0.0))
+    )
 
     assert isinstance(ftype, fl.FiberTensorFType)
     assert isinstance(ftype.lvl_t, fl.SparseHashLevelFType)
 
 
 def _cost_output_pattern(formatter_cls, matrix):
-    ftype = _format_matrix(formatter_cls(), matrix, np.float64(0.0))
+    ftype = _format_matrix(formatter_cls(), matrix, StaticFillFType(np.float64(0.0)))
 
     lvl = ftype.lvl_t
     pattern = []
@@ -277,7 +323,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     formatter = CostFormatter(cost_model=cost, options=(DenseLevelOption(),))
     fmt = formatter.get_tensor_ftype(
-        b, plan, machine, tensor.fill_value, (fl.ftype(np.intp),)
+        b, plan, machine, tensor.ftype.fill_type, (fl.ftype(np.intp),)
     )
     assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
 
@@ -303,7 +349,7 @@ def test_format_selection_uses_custom_predictor():
 
     def choose(cost):
         return CostFormatter(cost_model=cost).get_tensor_ftype(
-            a, query, machine, tensor.fill_value, (fl.ftype(np.intp),)
+            a, query, machine, tensor.ftype.fill_type, (fl.ftype(np.intp),)
         )
 
     assert isinstance(choose(linear).lvl_t, fl.DenseLevelFType)

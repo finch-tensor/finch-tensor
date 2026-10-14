@@ -10,7 +10,7 @@ import numpy as np
 
 from finch import finch_logic as lgc
 from finch.algebra import (
-    AbstractFill,
+    AbstractFillFType,
     FType,
     TensorFType,
     ftype,
@@ -46,12 +46,12 @@ LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 
 
 def optimize_format(
-    alias, shape_type, machine, fill_value, cost_model, term, options=LEVEL_OPTIONS
+    alias, shape_type, machine, fill_type, cost_model, term, options=LEVEL_OPTIONS
 ):
     stats = machine(alias)
     n = len(stats.index_order)
     position_type = ftypes.intp
-    leaf = element(fill_value, ftype(fill_value), position_type)
+    leaf = element(fill_type, fill_type.element_type, position_type)
     pos_size = np_dtype(position_type).itemsize
     memo = {}
 
@@ -102,7 +102,7 @@ class SmartFormatter(LogicFormatter):
     @abstractmethod
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> TensorFType: ...
@@ -120,8 +120,8 @@ class SmartFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -145,7 +145,7 @@ class SmartFormatter(LogicFormatter):
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
-                            fill_values[lhs],
+                            fill_types[lhs],
                             shape_type,
                             rhs_stats,
                         )
@@ -168,7 +168,7 @@ class SmartFormatter(LogicFormatter):
 class FDFormatter(SmartFormatter):
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
     ) -> FiberTensorFType:
@@ -180,8 +180,8 @@ class FDFormatter(SmartFormatter):
                 f"{len(stats.index_order)} stats dimensions."
             )
 
-        fill_ftype = ftype(fill_value)
-        lvl = element(fill_value, fill_ftype)
+        fill_ftype = fill_type.element_type
+        lvl = element(fill_type, fill_ftype)
         for dim in reversed(range(len(stats.index_order))):
             field = stats.index_order[dim]
             outer_fields = frozenset(stats.index_order[:dim])
@@ -250,11 +250,11 @@ class CostFormatter(LogicFormatter):
         alias: lgc.Alias,
         term: lgc.LogicStatement,
         machine: StatsMachine,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
     ) -> FiberTensorFType:
         lvl = optimize_format(
-            alias, shape_type, machine, fill_value, self.cost_model, term, self.options
+            alias, shape_type, machine, fill_type, self.cost_model, term, self.options
         )
         return fiber_tensor(lvl)
 
@@ -270,8 +270,8 @@ class CostFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement):
@@ -289,7 +289,7 @@ class CostFormatter(LogicFormatter):
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
-                            lhs, prgm, machine, fill_values[lhs], shape_type
+                            lhs, prgm, machine, fill_types[lhs], shape_type
                         )
                 case lgc.Produces():
                     return

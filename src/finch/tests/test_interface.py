@@ -89,7 +89,7 @@ class TestOverrideTensorFType(finch.TensorFType):
 
     def construct(self, shape: tuple):
         return TestOverrideTensor(
-            np.full(shape, self.fmt.fill_value, dtype=self.fmt.element_type)
+            np.full(shape, self.fmt.fill_type.value, dtype=self.fmt.element_type)
         )
 
     def __call__(self, val):
@@ -109,8 +109,8 @@ class TestOverrideTensorFType(finch.TensorFType):
         return TestOverrideTensor(arr)
 
     @property
-    def fill_value(self):
-        return self.fmt.fill_value
+    def fill_type(self):
+        return self.fmt.fill_type
 
     @property
     def element_type(self):
@@ -154,7 +154,7 @@ class TestOverrideTensor(finch.OverrideTensor):
 
     @property
     def fill_value(self):
-        return self.ftype.fill_value.value
+        return self.array.fill_value
 
     @property
     def element_type(self):

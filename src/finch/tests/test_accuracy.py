@@ -215,7 +215,7 @@ def check_accuracy_results(obtained_filename: Path, expected_filename: Path):
     # Keep integer counts and metadata exact while comparing floats numerically.
     expected = json.loads(
         expected_filename.read_text(),
-        parse_float=lambda value: pytest.approx(float(value), rel=1e-12, abs=1e-6),
+        parse_float=lambda value: pytest.approx(float(value), rel=1e-11, abs=1e-6),
     )
     assert obtained == expected
 
@@ -225,6 +225,7 @@ def check_accuracy_results(obtained_filename: Path, expected_filename: Path):
     [
         ({"estimated_nnz": 133092290.0, "actual_nnz": 3099760}, True),
         ({"estimated_nnz": 133092289.999999, "actual_nnz": 3099760}, True),
+        ({"estimated_nnz": 133092290.01, "actual_nnz": 3099760}, False),
         ({"estimated_nnz": 133092390.0, "actual_nnz": 3099760}, False),
         ({"estimated_nnz": 133092290.0, "actual_nnz": 3099761}, False),
         ({"estimated_nnz": 133092290.0}, False),
@@ -242,6 +243,22 @@ def test_accuracy_results_comparison(tmp_path, result, matches):
     else:
         with pytest.raises(AssertionError):
             check_accuracy_results(obtained, expected)
+
+
+@pytest.mark.parametrize(
+    "reference,estimate",
+    [
+        (8722365.679750, 8722365.679775),
+        (24684524.235374, 24684524.235412),
+    ],
+)
+def test_accuracy_results_platform_roundoff(tmp_path, reference, estimate):
+    # Blocked-Uniform's roadNet-PA estimates observed on macOS and Linux CI.
+    expected = tmp_path / "expected.json"
+    obtained = tmp_path / "obtained.json"
+    expected.write_text(json.dumps({"estimated_nnz": reference}))
+    obtained.write_text(json.dumps({"estimated_nnz": estimate}))
+    check_accuracy_results(obtained, expected)
 
 
 @pytest.mark.slow
