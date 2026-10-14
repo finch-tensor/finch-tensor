@@ -20,7 +20,7 @@ LOG_FLOOR = -64.0
 LOG_CEIL = 64.0
 
 
-class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
+class LogicCacheLRU_Embeddings_Norms(UnvalidatedForm, LogicLoader):
     def __init__(
         self,
         ctx: LogicLoader,
