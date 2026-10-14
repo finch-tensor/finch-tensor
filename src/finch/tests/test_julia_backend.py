@@ -1158,6 +1158,30 @@ def test_compile_julia_eager_eye():
     np.testing.assert_array_equal(result.to_numpy(), matrix + np.eye(3, k=1))
 
 
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda a: ft.argmin(a, axis=0),
+        lambda a: ft.argmin(a, axis=1),
+        lambda a: ft.argmax(a, axis=1),
+        ft.linalg.vector_norm,
+        lambda a: ft.linalg.vector_norm(a, axis=1),
+    ],
+    ids=["argmin_axis0", "argmin_axis1", "argmax_axis1", "norm", "norm_axis1"],
+)
+def test_compile_julia_tuple_reductions_match_interpreter(op):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA, INTERPRET_NOTATION
+
+    arg = np.array([[3.0, 1.0, 1.0], [-2.0, 5.0, -2.0], [0.0, 0.0, 1e200]])
+    with with_default_scheduler(INTERPRET_NOTATION):
+        expected = ft.compute(op(ft.defer(arg))).to_numpy()
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg))).to_numpy()
+
+    np.testing.assert_array_equal(result, expected)
+
+
 def test_register_julia_op_maps_and_defines_once():
     _requires_julia_backend()
     from finch.compile_jl import compiler

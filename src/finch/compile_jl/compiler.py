@@ -80,6 +80,11 @@ _JULIA_OPS = {
     ffuncs.clip.ftype: "clamp",
     ffuncs.truth.ftype: "Bool",
     ffuncs.first_arg.ftype: "first_arg",
+    ffuncs.minby.ftype: "minby",
+    ffuncs.maxby.ftype: "maxby",
+    ffuncs.add_scaled_square.ftype: "add_scaled_square",
+    ffuncs.scaled_square.ftype: "scaled_square",
+    ffuncs.root_scaled_square.ftype: "root_scaled_square",
 }
 
 _JULIA_REDUCTION_OPS = {
@@ -91,6 +96,9 @@ _JULIA_REDUCTION_OPS = {
     ffuncs.or_.ftype: "|",
     ffuncs.logical_and.ftype: "&",
     ffuncs.logical_or.ftype: "|",
+    ffuncs.minby.ftype: "<<minby>>",
+    ffuncs.maxby.ftype: "<<maxby>>",
+    ffuncs.add_scaled_square.ftype: "<<add_scaled_square>>",
 }
 _INFIX_OPS = {
     "+",
