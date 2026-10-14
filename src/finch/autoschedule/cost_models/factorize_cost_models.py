@@ -1,9 +1,11 @@
+from abc import abstractmethod
 from collections.abc import Callable, Mapping
 
 import numpy as np
 
 from finch.algebra.tensor import TensorFType
 from finch.autoschedule.stages import AliasedForm
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -20,12 +22,63 @@ from finch.finch_logic import (
     StatsFactory,
     Table,
 )
-from finch.tensor import Scalar
 
 from .cost_models import NS, CostModel, LinearPredictor
 
 
-class FlopsCostModel(CostModel, AliasedForm):
+class FactorizeCostModel(CostModel):
+    """
+    A cost model where each query statement is a component.
+    get_statement_features returns one feature vector for a Query or QueryInto,
+    given the stats of the aliases defined before it; get_features stacks these
+    vectors in program order.
+    """
+
+    @abstractmethod
+    def get_statement_features(
+        self,
+        stmt: LogicStatement,
+        machine: StatsMachine[NS],
+    ) -> np.ndarray: ...
+
+    def predict_statement_cost(
+        self,
+        stmt: LogicStatement,
+        machine: StatsMachine[NS],
+    ) -> float:
+        features = self.get_statement_features(stmt, machine)
+        return self.predictor(features[None, :])
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, NS],
+        stats_factory: StatsFactory[NS],
+    ) -> np.ndarray:
+        features = []
+        stats_interpreter = StatsMachine(stats_factory, dict(stats))
+
+        def visit_stmt(stmt: LogicStatement):
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        visit_stmt(body)
+                case Query() | QueryInto():
+                    features.append(
+                        self.get_statement_features(stmt, stats_interpreter)
+                    )
+                    stats_interpreter(stmt)
+                case Produces():
+                    return
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
+
+        visit_stmt(term)
+        return np.asarray(features, dtype=float).reshape(-1, self.n_features)
+
+
+class FlopsCostModel(FactorizeCostModel, AliasedForm):
     """
     FlopsCostModel counts the non-fill values in the iteration space of each
     query, and in the output it materializes. Each query is a component.
@@ -43,15 +96,12 @@ class FlopsCostModel(CostModel, AliasedForm):
             else LinearPredictor(np.array([1.0, 10.0]))
         )
 
-    def get_features(
+    def get_statement_features(
         self,
-        term: LogicStatement,
-        bindings: dict[Alias, TensorFType],
-        stats: Mapping[Alias, NS],
-        stats_factory: StatsFactory[NS],
+        stmt: LogicStatement,
+        machine: StatsMachine[NS],
     ) -> np.ndarray:
-        stats = dict(stats)
-        features = []
+        stats_factory = machine.stats_factory
 
         def visit_expr(expr: LogicExpression) -> tuple[NS, NS]:
             """Return the stats of the output of expr, and of its iteration space."""
@@ -80,38 +130,23 @@ class FlopsCostModel(CostModel, AliasedForm):
                 case Relabel(arg, idxs):
                     out_stats, iter_stats = visit_expr(arg)
                     return stats_factory.relabel(out_stats, idxs), iter_stats
-                case Table(Alias() as tns, idxs):
-                    out_stats = stats_factory.relabel(stats[tns], idxs)
-                    return out_stats, out_stats
-                case Table(Literal(tns), idxs):
-                    out_stats = stats_factory(tns, idxs)
-                    return out_stats, out_stats
-                case Literal(val):
-                    out_stats = stats_factory(Scalar(val), ())
+                case Table() | Literal():
+                    out_stats = machine(expr)
                     return out_stats, out_stats
                 case _:
                     raise ValueError(f"Unsupported expression type: {expr}")
 
-        def visit_stmt(stmt: LogicStatement):
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        visit_stmt(body)
-                case Query(Table(Alias() as lhs, idxs), rhs):
-                    out_stats, iter_stats = visit_expr(rhs)
-                    stats[lhs] = stats_factory.reorder(out_stats, idxs)
-                    features.append(
-                        (
-                            iter_stats.estimate_non_fill_values(),
-                            out_stats.estimate_non_fill_values(),
-                        )
-                    )
-                case QueryInto():
-                    visit_stmt(stmt.as_query())
-                case Produces():
-                    return
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
-
-        visit_stmt(term)
-        return np.asarray(features, dtype=float).reshape(-1, self.n_features)
+        match stmt:
+            case Query(Table(Alias()), rhs):
+                out_stats, iter_stats = visit_expr(rhs)
+                return np.array(
+                    [
+                        iter_stats.estimate_non_fill_values(),
+                        out_stats.estimate_non_fill_values(),
+                    ],
+                    dtype=float,
+                )
+            case QueryInto():
+                return self.get_statement_features(stmt.as_query(), machine)
+            case _:
+                raise ValueError(f"Unsupported statement type: {stmt}")

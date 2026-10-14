@@ -68,6 +68,12 @@ def test_flops_cost_retains_query_components(factory):
         cost.get_features(plan, {}, stats, sf), [[6, 2], [2, 2]]
     )
     assert cost.predict_cost(plan, {}, stats, sf) == 48.0
+    machine = StatsMachine(sf, dict(stats))
+    query_costs = []
+    for stmt in plan.bodies[:2]:
+        query_costs.append(cost.predict_statement_cost(stmt, machine))
+        machine(stmt)
+    assert query_costs == [26.0, 22.0]
     nonlinear = FlopsCostModel(QuadraticPredictor(np.array([1.0, 0.0, 0.0, 10.0])))
     assert nonlinear.predict_cost(plan, {}, stats, sf) == 120.0
     assert set(stats) == {a}

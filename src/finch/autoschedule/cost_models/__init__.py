@@ -1,5 +1,5 @@
 from .cost_models import CostModel, LinearPredictor, MultiCostModel, QuadraticPredictor
-from .factorize_cost_models import FlopsCostModel
+from .factorize_cost_models import FactorizeCostModel, FlopsCostModel
 from .format_cost_models import (
     DenseLevelOption,
     FormatCostModel,
@@ -16,6 +16,7 @@ from .loop_cost_models import (
 __all__ = [
     "CostModel",
     "DenseLevelOption",
+    "FactorizeCostModel",
     "FlopsCostModel",
     "FormatCostModel",
     "LevelOption",
