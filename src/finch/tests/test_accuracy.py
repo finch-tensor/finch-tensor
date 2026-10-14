@@ -7,7 +7,7 @@ Regenerate with::
 Bundled Matrix Market inputs retain their full dimensions. Input values are
 normalized to their nonzero pattern to avoid signed cancellation. The uniform
 random matrix and sampling factories are seeded. Array comparisons allow
-floating-point roundoff across platforms while keeping counts and metadata exact.
+floating-point roundoff across platforms while keeping actual counts and labels exact.
 Synthetic inputs exceed the sampling budget. Sampling estimators share sketches.
 """
 
