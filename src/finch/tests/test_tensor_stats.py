@@ -2039,21 +2039,16 @@ def test_defs_propagate_dimension_types():
         (j, k), {j: 3.0, k: 4.0}, np.float64(0.0), {j: ft.int32, k: ft.int64}
     )
     joined = BaseTensorStatsFactory._mapjoin_defs(ffuncs.mul, a, b)
+    reduced = BaseTensorStatsFactory.aggregate_def(ffuncs.add, 0.0, (j,), joined)
+    relabeled = BaseTensorStatsFactory.relabel_def(a, (k, i))
+    reordered = BaseTensorStatsFactory.reorder_def(a, (j, k, i))
 
     assert a.element_type == ft.float64
     assert joined.shape_type == (ft.int32, ft.int64, ft.int64)
-    reduced = BaseTensorStatsFactory.aggregate_def(ffuncs.add, 0.0, (j,), joined)
     assert reduced.shape_type == (ft.int32, ft.int64)
-    assert BaseTensorStatsFactory.relabel_def(a, (k, i)).shape_type == (
-        ft.int32,
-        ft.int64,
-    )
+    assert relabeled.shape_type == (ft.int32, ft.int64)
     # A broadcast dimension has no type.
-    assert BaseTensorStatsFactory.reorder_def(a, (j, k, i)).shape_type == (
-        ft.int64,
-        None,
-        ft.int32,
-    )
+    assert reordered.shape_type == (ft.int64, None, ft.int32)
     tensor = ft.asarray(np.ones((2, 3)))
     assert DCStatsFactory()(tensor, (i, j)).shape_type == ftype(tensor).shape_type
 
