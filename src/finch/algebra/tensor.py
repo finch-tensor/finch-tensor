@@ -8,7 +8,7 @@ import numpy as np
 import scipy.sparse as sps
 
 from .devices import normalize_device, serial
-from .fill import AbstractFill
+from .fill import AbstractFill, AbstractFillFType, DynamicFill, StaticFill, is_static
 from .ftypes import FType, FTyped
 
 
@@ -47,13 +47,13 @@ class TensorFType(FType, ABC, Generic[FT]):
 
     @property
     @abstractmethod
-    def fill_value(self) -> AbstractFill:
-        """AbstractFill value of the tensor, either static or dynamic."""
+    def fill_type(self) -> AbstractFillFType:
+        """The fill of the format, either static or dynamic."""
         ...
 
-    def with_fill(self, fill_value: AbstractFill) -> TensorFType:
+    def with_fill(self, fill_type: AbstractFillFType) -> TensorFType:
         """
-        This ftype carrying `fill_value` as its fill.
+        This ftype carrying `fill_type` as its fill.
         """
         raise NotImplementedError(
             f"{type(self).__name__} cannot replace its fill value"
@@ -135,9 +135,26 @@ class Tensor(FTyped[TensorFType[FT]], ABC):
         """The fill value for the tensor.  The fill value is the
         default value for a tensor when it is created with a given shape and dtype,
         as well as the background value for sparse tensors.
-        Note: this is the raw value NOT the AbstractFill.
+        Note: this is the raw value NOT the AbstractFill. A tensor whose fill is
+        dynamic holds its own fill value.
         """
-        return self.ftype.fill_value.value
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return fill_type.value
+        raise NotImplementedError(
+            f"{type(self).__name__} must hold its dynamic fill value"
+        )
+
+    @property
+    def fill(self) -> AbstractFill:
+        """
+        The fill of the tensor: its fill value, and whether kernels may
+        specialize on it. Its ftype is the fill of the tensor's format.
+        """
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return StaticFill(fill_type.value)
+        return DynamicFill(self.fill_value, fill_type.element_type)
 
     def with_fill(self, fill_value: AbstractFill) -> Tensor:
         """

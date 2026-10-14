@@ -6,7 +6,13 @@ import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import DynamicFill, ffuncs, ftype
+from finch.algebra import (
+    DynamicFill,
+    DynamicFillFType,
+    StaticFillFType,
+    ffuncs,
+    ftype,
+)
 from finch.compile.lower import AssemblyContext
 from finch.symbolic import PostWalk, Rewrite, ScopedDict
 from finch.tensor import (
@@ -160,10 +166,11 @@ def test_ndarray_level_dynamic_fill():
     root = ntn.Literal(tensor)
     level = ntn.Child(ntn.Root(root))
     fiber = ntn.Fiber(level, ntn.Literal(np.intp(0)))
-    changed = fiber.result_type.with_fill(DynamicFill(9.0))
+    changed = fiber.result_type.with_fill(StaticFillFType(np.float64(9.0)))
     assert changed.shape_type == fiber.result_type.shape_type
-    assert changed.fill_value.value == 9.0
-    assert fiber.result_type.fill_value.value == 4.0
+    assert changed.fill_type == StaticFillFType(np.float64(9.0))
+    # The format only says that the fill is dynamic; the value is the tensor's.
+    assert fiber.result_type.fill_type == DynamicFillFType(np.float64)
     ctx = AssemblyContext()
     assert asm.AssemblyInterpreter()(level.result_type.lower_fill(ctx(level))) == 4.0
 

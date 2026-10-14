@@ -11,6 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Literal,
     LogicExpression,
     LogicInterpreter,
@@ -25,12 +26,14 @@ from finch.finch_logic import (
     Reorder,
     StatsFactory,
     Table,
+    is_fill_expression,
 )
 from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
 from .tensor_stats import TensorStats
+from .util import fill_statistics
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -116,6 +119,9 @@ class StatsMachine(Generic[TS]):
                     tensor = self.stats_factory.relabel(base, new_indices)
                 return tensor
 
+            case FillTable(tns):
+                return fill_statistics(self.stats_factory, self(tns).fill_type)
+
             case MapJoin():
                 if not isinstance(node.op, Literal):
                     raise TypeError("MapJoin.op must be Literal(...).")
@@ -135,6 +141,9 @@ class StatsMachine(Generic[TS]):
                     return self.stats_factory.aggregate(
                         op, node.init.val, reduce_indices, arg2
                     )
+                if is_fill_expression(node.init):
+                    # The result starts from the background, as reductions do.
+                    return self.stats_factory.aggregate(op, None, reduce_indices, arg2)
                 # A tensor init is folded into the reduction of the argument.
                 reduced = self.stats_factory.aggregate(op, None, reduce_indices, arg2)
                 return self.stats_factory.reorder(

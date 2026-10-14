@@ -3,9 +3,10 @@ from itertools import product
 
 import numpy as np
 
-import finch
 from finch.algebra import (
+    DynamicFillFType,
     TupleFType,
+    as_fill,
     fisinstance,
     fixpoint_type,
     ftype,
@@ -25,6 +26,7 @@ from .nodes import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Literal,
     MapJoin,
     Plan,
@@ -44,10 +46,12 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_
 
 
 def make_tensor(shape, fill_value, *, dtype=None):
-    dtype = ftype(fill_value) if dtype is None else ftype(dtype)
+    # The fill value may be raw, which is a static fill.
+    fill = as_fill(fill_value)
+    dtype = fill.element_type if dtype is None else ftype(dtype)
     arr = np.empty(shape, dtype=np_dtype(dtype))
-    arr[...] = fill_value
-    return finch.asarray(arr)
+    arr[...] = fill.value
+    return BufferizedNDArray.from_numpy(arr, fill_value=fill)
 
 
 class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
@@ -124,8 +128,11 @@ class LogicMachine:
             case Aggregate(Literal(op), init, arg, idxs):
                 init = self(init)
                 arg = self(arg)
+                # The init is a tensor, so its values aren't compile-time data.
                 dtype = fixpoint_type(
-                    op.ftype, init.tns.element_type, arg.tns.element_type
+                    op.ftype,
+                    DynamicFillFType(init.tns.element_type),
+                    arg.tns.element_type,
                 )
                 arg_dims = dict(zip(arg.idxs, map(int, arg.tns.shape), strict=True))
                 out_dims = {
@@ -154,6 +161,9 @@ class LogicMachine:
                         result[*out_crds].item(), arg.tns[*arg_crds].item()
                     )
                 return TableValue(result, tuple(out_dims))
+            case FillTable(tns):
+                fill = self(tns).fill
+                return TableValue(Scalar(fill.value, fill), ())
             case Relabel(arg, idxs):
                 arg = self(arg)
                 if len(arg.idxs) != len(idxs):
@@ -182,7 +192,7 @@ class LogicMachine:
                 if var not in self.bindings:
                     self.bindings[var] = self.make_tensor(
                         rhs.tns.shape,
-                        rhs.tns.fill_value,
+                        rhs.tns.fill,
                         dtype=rhs.tns.element_type,
                     )
                 tns = self.bindings[var]

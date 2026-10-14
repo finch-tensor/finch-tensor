@@ -1,4 +1,4 @@
-from finch.algebra import DynamicFill, StaticFill, ffuncs
+from finch.algebra import ffuncs
 from finch.algebra.algebra import is_annihilator, is_distributive, is_identity
 from finch.algebra.tensor import TensorFType
 from finch.algebra.utils import setdiff
@@ -17,6 +17,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Literal,
     LogicNode,
     LogicStatement,
@@ -30,7 +31,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
-from finch.finch_logic.nodes import LogicExpression
+from finch.finch_logic.nodes import LogicExpression, fill_expression
 from finch.symbolic import (
     Fixpoint,
     Namespace,
@@ -134,23 +135,14 @@ def with_unique_lhs(
     return (Rewrite(PostWalk(rule_1))(root), bindings)
 
 
-def add_aggregates(
-    root: LogicStatement, bindings: dict[Alias, TensorFType]
-) -> LogicStatement:
-    fill_values = root.infer_fill_value(
-        {var: val.fill_value for var, val in bindings.items()}
-    )
-
+def add_aggregates(root: LogicStatement) -> LogicStatement:
     def rule_0(node):
         match node:
             case Query(_, Aggregate()):
                 return node
-            case Query(Table(Alias() as lhs, _), arg):
-                match fill_values[lhs]:
-                    case DynamicFill() as fill:
-                        init = Literal(fill)
-                    case StaticFill() as fill:
-                        init = Literal(fill.value)
+            case Query(Table(Alias(), _), arg):
+                # The result starts from the fill value of what overwrites it.
+                init = fill_expression(arg)
                 return Query(
                     node.lhs, Aggregate(Literal(ffuncs.overwrite), init, arg, ())
                 )
@@ -178,7 +170,7 @@ def optimize(
         prgm = propagate_transpose_queries(prgm)
         prgm = push_fields(prgm)
         prgm = resugar_query_into(prgm)
-        prgm = add_aggregates(prgm, bindings)
+        prgm = add_aggregates(prgm)
         return prgm, bindings
 
     prgm = split_aggregate_inits(
@@ -215,11 +207,16 @@ def propagate_map_queries(root: LogicStatement) -> LogicStatement:
 
     assert isinstance(root, LogicNode)
     rets = get_productions(root)
+    # A definition whose fill value is read stays, since inlining the fill of
+    # every use would grow the program with each inlined definition.
+    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
     props = {}
 
     def rule_1(node):
         match node:
-            case Query(Table(Alias() as a, idxs), MapJoin() as rhs) if a not in rets:
+            case Query(Table(Alias() as a, idxs), MapJoin() as rhs) if (
+                a not in rets and a not in filled
+            ):
                 props[a] = reorder_to(rhs, idxs)
                 return Plan()
             case Table(a, idxs) if a in props:
@@ -251,13 +248,17 @@ def propagate_map_queries_backward(root: LogicStatement) -> LogicStatement:
                 defs[a] = reorder_to(b, idxs)
 
     rets = get_productions(root)
+    # A definition whose fill value is read stays, as in `propagate_map_queries`.
+    filled = {node.tns for node in PostOrderDFS(root) if isinstance(node, FillTable)}
 
     def rule_1(ex):
         match ex:
-            case Query(Table(Alias() as a, _), _) if uses[a] == 1 and a not in rets:
+            case Query(Table(Alias() as a, _), _) if (
+                uses[a] == 1 and a not in rets and a not in filled
+            ):
                 return Plan()
             case Table(Alias() as a, idxs) if (
-                uses.get(a, 0) == 1 and a not in rets and a in defs
+                uses.get(a, 0) == 1 and a not in rets and a not in filled and a in defs
             ):
                 arg = defs[a]
                 assert isinstance(arg, LogicExpression)
@@ -339,6 +340,8 @@ def propagate_transpose_queries(root: LogicStatement):
         match node:
             case Table(Alias() as a, idxs) if a in props:
                 return Relabel(props[a], idxs)
+            case FillTable(Alias() as a) if a in props:
+                return fill_expression(props[a])
             case Produces(args):
                 bodies = [
                     Query(Table(a, props[a].fields()), props[a])
@@ -350,7 +353,8 @@ def propagate_transpose_queries(root: LogicStatement):
     def rule_0(node):
         match node:
             case Query(
-                Table(lhs, idxs), (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _))
+                Table(lhs, idxs),
+                (Table(Alias(_), _) | Reorder(Table(Alias(_), _), _)),
             ) as q:
                 props[lhs] = Rewrite(PostWalk(rule_1))(reorder_to(q.rhs, idxs))
                 return Plan()

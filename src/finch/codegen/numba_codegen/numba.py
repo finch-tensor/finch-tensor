@@ -18,6 +18,7 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     is_dynamic,
+    is_static,
     np_dtype,
 )
 from finch.algebra.ftypes import FDType
@@ -174,7 +175,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return ctx(args[0])
         case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs._InitWriteFType(fill=fill):
+        case ffuncs._InitWriteFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
@@ -182,14 +183,14 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return ctx(args[1])
         case ffuncs._SameFType():
             return numba_same(ctx, *args)
-        case ffuncs._ChooseFType(fill=fill):
+        case ffuncs._ChooseFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError("Pass a dynamic choose as a runtime operator")
             value = ctx.cache(
                 "fill",
-                asm.GetAttr(op, asm.Literal("fill_value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value),
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value")),
             )
             args = tuple(ctx.cache("choice", arg) for arg in args)
             result = ctx(value)
@@ -511,7 +512,8 @@ def construct_from_numba(fmt: FType, numba_obj: Any) -> Any:
 
 def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
     args = [
-        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
+        serialize_to_numba(field, fmt.struct_getattr(obj, name))
+        for (name, field) in fmt.struct_fields
     ]
     return numba_type(fmt)(*args)
 
@@ -521,9 +523,15 @@ def _deserialize_asm_struct_from_numba(
 ) -> None:
     for i, (name, field) in enumerate(fmt.struct_fields):
         value = getattr(numba_struct, name) if fmt.is_mutable else numba_struct[i]
-        deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
-        if fmt.is_mutable:
-            fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+        match field:
+            case NumbaArgumentFType() | MutableStructFType():
+                # Buffers and mutable structs are updated in place.
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                # Immutable fields of a mutable struct are replaced.
+                fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+            case _:
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
 
 
 def struct_construct_from_numba(fmt: StructFType, numba_struct):
