@@ -198,9 +198,7 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
     else:
         np.testing.assert_array_equal(features[0, :2], [0, 0])
     assert stats == original_stats
-    assert all(
-        stat.fill_type is original_fills[alias] for alias, stat in stats.items()
-    )
+    assert all(stat.fill_type is original_fills[alias] for alias, stat in stats.items())
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
