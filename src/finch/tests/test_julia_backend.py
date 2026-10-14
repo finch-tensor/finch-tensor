@@ -289,6 +289,29 @@ def test_compile_julia_pattern_interface(op, np_op, arg):
     np.testing.assert_array_equal(result.to_numpy(), np_op(arg))
 
 
+@pytest.mark.parametrize(
+    "arg, dtype",
+    [
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.int64),
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.bool_),
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.float32),
+        (np.array([0, 1, 2, -3, 300]), np.bool_),
+        (np.array([0, 1, 2, -3, 300]), np.uint8),
+        (np.array([True, False, True]), np.int64),
+    ],
+)
+def test_compile_julia_astype_matches_numpy(arg, dtype):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.astype(ft.defer(arg), dtype))
+
+    expected = arg.astype(dtype)
+    assert result.to_numpy().dtype == expected.dtype
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
 def test_compile_julia_numeric_pattern_mask():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA

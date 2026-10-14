@@ -300,6 +300,10 @@ class FinchJLGenerator:
                         return f"{elem_t}({access})"
                 return access
 
+            case ntn.Call(ntn.Literal(ffuncs._Cast(dtype=dtype)), (arg,)):
+                arg_str = self.generate_julia(arg, nestingLvl)
+                return f"astype({_leaf_type_str(dtype)}, {arg_str})"
+
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
                 if op.result_type == make_tuple.ftype:
