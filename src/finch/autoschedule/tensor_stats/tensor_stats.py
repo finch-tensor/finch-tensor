@@ -10,15 +10,16 @@ from typing import Any, Generic, Self, TypeVar
 import numpy as np
 
 from finch.algebra import (
-    AbstractFill,
+    AbstractFillFType,
     FinchOperator,
+    FType,
     NAryFinchOperatorFType,
-    apply_fill,
-    as_fill,
+    StaticFillFType,
+    apply_fill_type,
     is_annihilator,
-    is_dynamic,
     is_idempotent,
     is_identity,
+    is_static,
     repeat_operator,
 )
 from finch.finch_logic import (
@@ -29,6 +30,7 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
+from finch.finch_logic.nodes import merge_dim_type, reduce_fill_type
 
 TS = TypeVar("TS", bound="BaseTensorStats")
 
@@ -42,7 +44,8 @@ class BaseTensorStats(TensorStats):
         self,
         index_order: Iterable[Field] | BaseTensorStats,
         dim_sizes: MutableMapping[Field, float] | None = None,
-        fill_value: Any = None,
+        fill_type: AbstractFillFType | None = None,
+        dim_types: MutableMapping[Field, FType | None] | None = None,
     ):
         if isinstance(index_order, BaseTensorStats):
             if dim_sizes is not None:
@@ -50,33 +53,44 @@ class BaseTensorStats(TensorStats):
                     "dim_sizes must be omitted when constructing from BaseTensorStats"
                 )
             self._init_from_fields(
-                index_order.index_order, index_order.dim_sizes, index_order.fill_value
+                index_order.index_order,
+                index_order.dim_sizes,
+                index_order.fill_type,
+                index_order.dim_types,
             )
         else:
-            if dim_sizes is None:
-                raise TypeError("dim_sizes are required when constructing from fields")
-            self._init_from_fields(index_order, dim_sizes, fill_value)
+            if dim_sizes is None or fill_type is None:
+                raise TypeError(
+                    "dim_sizes and fill_type are required when constructing from fields"
+                )
+            self._init_from_fields(index_order, dim_sizes, fill_type, dim_types)
 
     def _init_from_fields(
         self,
         index_order: Iterable[Field],
         dim_sizes: MutableMapping[Field, float],
-        fill_value: Any,
+        fill_type: AbstractFillFType,
+        dim_types: MutableMapping[Field, FType | None] | None = None,
     ):
         self._index_order = tuple(index_order)
         self._dim_sizes: OrderedDict[Field, float] = OrderedDict(dim_sizes)
-        # Stats always carry an AbstractFill: propagation must be able to say
-        # "this fill exists but must not be specialized on".
-        self._fill_value: AbstractFill = as_fill(fill_value)
+        # A dimension type is None when it is unknown, as for a broadcast.
+        self._dim_types: OrderedDict[Field, FType | None] = OrderedDict(
+            dim_types if dim_types is not None else dict.fromkeys(self._dim_sizes)
+        )
+        # Stats inform compilation, so they keep the fill of the format, which
+        # says whether kernels may specialize on the fill value.
+        self._fill_type = fill_type
 
     @classmethod
     def from_fields(
         cls,
         index_order: Iterable[Field],
         dim_sizes: MutableMapping[Field, float],
-        fill_value: Any,
+        fill_type: AbstractFillFType,
+        dim_types: MutableMapping[Field, FType | None] | None = None,
     ) -> Self:
-        return cls(index_order, dim_sizes, fill_value)
+        return cls(index_order, dim_sizes, fill_type, dim_types=dim_types)
 
     def copy(self) -> Self:
         new = object.__new__(type(self))
@@ -95,6 +109,19 @@ class BaseTensorStats(TensorStats):
         return self.dim_sizes[idx]
 
     @property
+    def dim_types(self) -> MutableMapping[Field, FType | None]:
+        return self._dim_types
+
+    @property
+    def shape_type(self) -> tuple[FType | None, ...]:
+        """The type of each dimension in index order, or None when unknown."""
+        return tuple(self.dim_types.get(idx) for idx in self.index_order)
+
+    @property
+    def element_type(self) -> FType:
+        return self.fill_type.element_type
+
+    @property
     def index_order(self) -> tuple[Field, ...]:
         return self._index_order
 
@@ -107,13 +134,13 @@ class BaseTensorStats(TensorStats):
         return self.index_order
 
     @property
-    def fill_value(self) -> AbstractFill:
-        """The fill, and whether kernels may specialize on it."""
-        return self._fill_value
+    def fill_type(self) -> AbstractFillFType:
+        """The fill of the tensor's format, which a kernel may depend on."""
+        return self._fill_type
 
-    @fill_value.setter
-    def fill_value(self, value: Any):
-        self._fill_value = as_fill(value)
+    @fill_type.setter
+    def fill_type(self, value: AbstractFillFType):
+        self._fill_type = value
 
     def get_dim_space_size(self, idx: Iterable[Field]) -> float:
         prod = 1
@@ -133,7 +160,8 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         dim_sizes = OrderedDict(
             (axis, float(shape[i])) for i, axis in enumerate(fields)
         )
-        return BaseTensorStats(fields, dim_sizes, tensor.fill_value)
+        dim_types = OrderedDict(zip(fields, tensor.ftype.shape_type, strict=True))
+        return BaseTensorStats(fields, dim_sizes, tensor.ftype.fill_type, dim_types)
 
     def copy(self, stat: TS) -> TS:
         if not isinstance(stat, self.stats_cls):
@@ -144,7 +172,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         join_args: list[TS] = []
         union_args: list[TS] = []
         for s in args:
-            if is_annihilator(op.ftype, s.fill_value):
+            if is_annihilator(op.ftype, s.fill_type):
                 join_args.append(s)
             else:
                 union_args.append(s)
@@ -184,7 +212,7 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
 
     @staticmethod
     def _mapjoin_defs(op: FinchOperator, *args: BaseTensorStats) -> BaseTensorStats:
-        new_fill_value = apply_fill(op, *(s.fill_value for s in args))
+        new_fill_type = apply_fill_type(op, *(s.fill_type for s in args))
         new_index_order = MapJoin(
             Literal(op),
             tuple(
@@ -198,8 +226,14 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                     new_dim_sizes[index] = s.dim_sizes[index]
                     break
         assert set(new_dim_sizes.keys()) == set(new_index_order)
+        new_dim_types: dict = dict.fromkeys(new_index_order)
+        for s in args:
+            for index in s.index_order:
+                new_dim_types[index] = merge_dim_type(
+                    new_dim_types[index], s.dim_types.get(index)
+                )
         return BaseTensorStats.from_fields(
-            new_index_order, new_dim_sizes, new_fill_value
+            new_index_order, new_dim_sizes, new_fill_type, new_dim_types
         )
 
     @staticmethod
@@ -212,18 +246,17 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         red_set = set(reduce_indices) & set(d.index_order)
         n = math.prod(int(d.dim_sizes[x]) for x in red_set)
 
-        old_fill = d.fill_value.value
-        new_fill = init
-        if init is None:
-            if is_dynamic(d.fill_value):
-                # A dynamic background must stay dynamic through the reduction.
-                # NOTE: the computed d.fill_value.value is not necessarily correct.
-                new_fill = apply_fill(op, d.fill_value, d.fill_value)
-            elif is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):
-                new_fill = as_fill(op(old_fill, old_fill))
+        fill_type = d.fill_type
+        if init is not None:
+            # The init comes from a literal in the logic program.
+            new_fill = reduce_fill_type(op, StaticFillFType(init), fill_type)
+        elif is_static(fill_type):
+            old_fill = fill_type.value
+            if is_identity(op.ftype, old_fill) or is_idempotent(op.ftype):
+                new_fill = StaticFillFType(op(old_fill, old_fill))
             else:
                 try:
-                    new_fill = as_fill(repeat_operator(op.ftype)(old_fill, n))
+                    new_fill = StaticFillFType(repeat_operator(op.ftype)(old_fill, n))
                 except AttributeError:
                     # This is going to be VERY SLOW. Should raise a warning about
                     #  reductions over non-identity fill values. Depending on the
@@ -236,13 +269,19 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                     acc = old_fill
                     for _ in range(max(n - 1, 0)):
                         acc = op(acc, old_fill)
-                    new_fill = as_fill(acc)
+                    new_fill = StaticFillFType(acc)
+        else:
+            # A dynamic fill must stay dynamic through the reduction.
+            new_fill = apply_fill_type(op, fill_type, fill_type)
 
         new_dim_sizes = OrderedDict(
             (ax, d.dim_sizes[ax]) for ax in d.dim_sizes if ax not in red_set
         )
+        new_dim_types = OrderedDict((ax, d.dim_types.get(ax)) for ax in new_dim_sizes)
         new_index_order = tuple(new_dim_sizes)
-        return BaseTensorStats.from_fields(new_index_order, new_dim_sizes, new_fill)
+        return BaseTensorStats.from_fields(
+            new_index_order, new_dim_sizes, new_fill, new_dim_types
+        )
 
     @staticmethod
     def relabel_def(
@@ -257,8 +296,17 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
         new_dim_sizes = OrderedDict(
             zip(relabel_indices, d.dim_sizes.values(), strict=True)
         )
+        new_dim_types = OrderedDict(
+            zip(
+                relabel_indices,
+                (d.dim_types.get(ax) for ax in d.dim_sizes),
+                strict=True,
+            )
+        )
 
-        return BaseTensorStats.from_fields(relabel_indices, new_dim_sizes, d.fill_value)
+        return BaseTensorStats.from_fields(
+            relabel_indices, new_dim_sizes, d.fill_type, new_dim_types
+        )
 
     @staticmethod
     def reorder_def(
@@ -273,10 +321,15 @@ class BaseTensorStatsFactory(ABC, Generic[TS]):
                 )
 
         new_dims: OrderedDict[Field, float] = OrderedDict()
+        new_dim_types: OrderedDict[Field, FType | None] = OrderedDict()
         for idx in reorder_indices:
             if idx in d.index_order:
                 new_dims[idx] = d.get_dim_size(idx)
+                new_dim_types[idx] = d.dim_types.get(idx)
             else:
                 new_dims[idx] = 1
+                new_dim_types[idx] = None
 
-        return BaseTensorStats.from_fields(reorder_indices, new_dims, d.fill_value)
+        return BaseTensorStats.from_fields(
+            reorder_indices, new_dims, d.fill_type, new_dim_types
+        )
