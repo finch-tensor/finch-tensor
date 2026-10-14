@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable
+from typing import cast
 
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
@@ -20,11 +21,10 @@ from finch.finch_logic import (
     LogicLoader,
     StatsFactory,
     TensorStats,
-    compute_shape_vars,
 )
 from finch.finch_notation import NotationInterpreter
 from finch.finch_notation.stages import NotationLoader
-from finch.symbolic import gensym
+from finch.symbolic import CompilerMode, gensym
 from finch.symbolic.traversal import PostOrderDFS
 from finch.util.logging import LOG_NOTATION
 
@@ -97,8 +97,11 @@ class NotationContext:
         shapes: dict[lgc.Alias, tuple[ntn.Variable | None, ...]],
         shape_types: dict[lgc.Alias, tuple[FType | None, ...]] | None = None,
         epilogue: Iterable[ntn.NotationStatement] | None = None,
+        *,
+        mode: CompilerMode | None = None,
     ):
         self.bindings = bindings
+        self.mode = mode if mode is not None else CompilerMode()
         self.args = args
         self.slots = slots
         self.shapes = shapes
@@ -142,7 +145,8 @@ class NotationContext:
         can be updated with `op`."""
         stmts = self.freeze(var)
         self.modes[var] = ntn.Update(op)
-        return (*stmts, ntn.Declare(self.slots[var], init, op, ()))
+        shape = cast(tuple[ntn.NotationExpression, ...], self.shapes[var])
+        return (*stmts, ntn.Declare(self.slots[var], init, op, shape))
 
     def lower_init(self, init: lgc.LogicExpression) -> ntn.NotationExpression:
         """The value of `init`, a zero-dimensional expression. A fill expression
@@ -154,6 +158,52 @@ class NotationContext:
             if is_static(fill):
                 return ntn.Literal(fill.value)
         return PointwiseContext(self)(init, {})
+
+    def query_shape(
+        self, var: lgc.Alias, idxs: tuple[lgc.Field, ...], rhs: lgc.LogicExpression
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Bind the output shape from the RHS at this definition."""
+        dims = dict(
+            zip(rhs.fields(), rhs.dimmap(merge_shapes, self.shapes), strict=True)
+        )
+        shape = []
+        stmts = list(self.check_shapes(rhs))
+        for i, (idx, dim_t) in enumerate(
+            zip(idxs, self.bindings[var].shape_type, strict=True)
+        ):
+            value = dims.get(idx) or ntn.Literal(dim_t(1))
+            if value.result_type != dim_t:
+                value = ntn.Call(ntn.Literal(ffuncs.astype(dim_t)), (value,))
+            dim = ntn.Variable(gensym(f"{var.name}_dim_{i}"), dim_t)
+            shape.append(dim)
+            stmts.append(ntn.Assign(dim, value))
+        self.shapes[var] = tuple(shape)
+        return tuple(stmts)
+
+    def check_shapes(
+        self, rhs: lgc.LogicExpression, lhs: lgc.Table | None = None
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Check shared fields before declaring or updating an output."""
+        if not (self.mode.safe or self.mode.debug):
+            return ()
+        checks = []
+
+        def merge(a, b):
+            if a != b:
+                left = a if a is not None else ntn.Literal(b.result_type(1))
+                right = b if b is not None else ntn.Literal(a.result_type(1))
+                check = ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (left, right)))
+                if check not in checks:
+                    checks.append(check)
+            return merge_shapes(a, b)
+
+        dims = rhs.dimmap(merge, self.shapes)
+        if lhs is not None:
+            lhs_dims = dict(zip(lhs.idxs, lhs.dimmap(merge, self.shapes), strict=True))
+            for idx, dim in zip(rhs.fields(), dims, strict=True):
+                if idx in lhs_dims:
+                    merge(lhs_dims[idx], dim)
+        return tuple(checks)
 
     def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
         """Statements which leave every tensor that `expr` reads frozen."""
@@ -362,18 +412,20 @@ class NotationContext:
                 # A copy starts from the fill value of arg, and the fields of
                 # arg which lhs lacks are reduced by overwriting.
                 loop_order = (*idxs, *(idx for idx in arg.idxs if idx not in idxs))
-                return self.fold(
+                stmts = self.query_shape(lhs, idxs, arg)
+                body = self.fold(
                     lhs,
                     idxs,
                     ffuncs.overwrite,
                     lgc.Reorder(arg, loop_order),
                     self.lower_init(lgc.fill_expression(arg)),
                 )
+                return ntn.Block((*stmts, body))
             case lgc.Query(
                 lgc.Table(lgc.Alias() as lhs, idxs),
                 lgc.Aggregate(lgc.Literal(op), init, lgc.Reorder() as arg, _),
             ):
-                stmts = self.freeze_reads(init)
+                stmts = self.query_shape(lhs, idxs, prgm.rhs) + self.freeze_reads(init)
                 body = self.fold(lhs, idxs, op, arg, self.lower_init(init))
                 return ntn.Block((*stmts, body))
             case lgc.QueryInto(
@@ -394,13 +446,17 @@ class NotationContext:
                     return ntn.Block((*stmts, body))
                 return ntn.Block(self.declare(lhs, ntn.Literal(init), op))
             case lgc.QueryInto(
-                lgc.Table(lgc.Alias() as lhs, idxs),
+                lgc.Table(lgc.Alias() as lhs, idxs) as table,
                 lgc.Literal(op),
                 lgc.Reorder() as rhs,
             ):
+                # The outer Reorder is loop order, including broadcast fields.
+                checks = self.check_shapes(rhs.arg, table)
                 if op == ffuncs.overwrite:
-                    return self.overwrite(lhs, idxs, rhs)
-                return self.fold(lhs, idxs, op, rhs, None)
+                    body = self.overwrite(lhs, idxs, rhs)
+                else:
+                    body = self.fold(lhs, idxs, op, rhs, None)
+                return ntn.Block((*checks, body)) if checks else body
             case lgc.Produces(args):
                 vars: list[lgc.Alias] = []
                 for var in args:
@@ -441,13 +497,14 @@ class CompilerFormLowerer(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-        lgc.LogicStatement,
     ]:
         return self.ctx(prgm, bindings, stats, stats_factory)
 
 
 class NotationGenerator(LogicNotationLowerer):
+    def __init__(self, *, mode: CompilerMode | None = None):
+        self.mode = mode if mode is not None else CompilerMode()
+
     def lower(
         self,
         term: lgc.LogicStatement,
@@ -489,6 +546,7 @@ class NotationGenerator(LogicNotationLowerer):
             slots,
             shapes,
             epilogue=epilogue,
+            mode=self.mode,
         )
         body = ctx(term)
         ret_t = None
@@ -516,6 +574,8 @@ class NotationGenerator(LogicNotationLowerer):
 
 
 class LogicCompiler(CompilerForm, LogicLoader):
+    """Compile logic using the notation loader's safety mode for shape checks."""
+
     def __init__(
         self,
         ctx_load: NotationLoader | None = None,
@@ -524,7 +584,7 @@ class LogicCompiler(CompilerForm, LogicLoader):
         if ctx_load is None:
             ctx_load = NotationInterpreter()
         if ctx_lower is None:
-            ctx_lower = NotationGenerator()
+            ctx_lower = NotationGenerator(mode=ctx_load.mode)
         self.ctx_load: NotationLoader = ctx_load
         self.ctx_lower: LogicNotationLowerer = ctx_lower
 
@@ -537,11 +597,8 @@ class LogicCompiler(CompilerForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-        lgc.LogicStatement,
     ]:
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return lib, bindings, shape_vars, prgm
+        return lib, bindings

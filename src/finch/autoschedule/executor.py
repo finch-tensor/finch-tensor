@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, is_dynamic
+from finch.algebra import is_dynamic, np_dtype
 from finch.algebra.tensor import Tensor, TensorFType
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.finch_logic import LogicEvaluator, LogicLoader, LogicNode, StatsFactory
@@ -91,42 +91,18 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         arg_ftypes: dict[lgc.Alias, TensorFType] = {
             var: val.ftype for var, val in bindings.items()
         }
-        mod, binding_ftypes, binding_idxs, final_prgm = self._load_cached(
-            stmt, arg_ftypes, bindings
-        )
+        mod, binding_ftypes = self._load_cached(stmt, arg_ftypes, bindings)
 
-        input_bindings = dict(
-            zip(binding_ftypes.keys(), bindings.values(), strict=False)
-        )
-        bindings = input_bindings.copy()
-
-        binding_shapes = dict[lgc.Field | None, np.intp]()
-        for var, tns in bindings.items():
-            for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
-                if idx is not None:
-                    binding_shapes[idx] = dim
-
-        # Dynamic output fills resolve at bind time against the actual
-        # argument fills, mirroring the shape resolution above.
-        fill_map: dict[lgc.Alias, AbstractFill] | None = None
-        if any(
-            is_dynamic(tns_ftype.fill_type)
-            for var, tns_ftype in binding_ftypes.items()
-            if var not in bindings
-        ):
-            fill_map = final_prgm.infer_fill_value(
-                {var: tns.fill for var, tns in input_bindings.items()}
-            )
+        bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
 
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
-                shape = tuple(binding_shapes.get(idx, 1) for idx in binding_idxs[var])
+                shape = (0,) * tns_ftype.ndim
                 if is_dynamic(tns_ftype.fill_type):
-                    assert fill_map is not None
-                    # We preserve the dynamic fill value in the ftype so that
-                    # later kernels won't compile against it.
+                    # Declare replaces this typed placeholder inside the kernel.
+                    value = np.zeros((), dtype=np_dtype(tns_ftype.element_type))[()]
                     bindings[var] = tns_ftype.construct(
-                        shape, fill_value=fill_map[var].as_dynamic()
+                        shape, fill_value=tns_ftype.fill_type(value)
                     )
                 else:
                     bindings[var] = tns_ftype.construct(shape)

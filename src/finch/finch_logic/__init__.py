@@ -32,7 +32,6 @@ from .simplification import LogicSimplify
 from .stages import (
     LogicEvaluator,
     LogicLoader,
-    compute_shape_vars,
 )
 from .tensor_stats import StatsFactory, TensorStats
 
@@ -66,7 +65,6 @@ __all__ = [
     "TableValueFType",
     "TensorStats",
     "Value",
-    "compute_shape_vars",
     "fill_expression",
     "is_fill_expression",
 ]

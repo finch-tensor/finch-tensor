@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class CompilerMode:
-    """Safe mode checks tensor extents; debug also checks buffer accesses."""
+    """Safe mode checks shared dimensions and tensor extents; debug also checks
+    buffer accesses."""
 
     safe: bool = False
     debug: bool = False

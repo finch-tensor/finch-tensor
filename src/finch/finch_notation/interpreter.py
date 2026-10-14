@@ -13,7 +13,7 @@ from finch.algebra import (
     fisinstance,
     ftype,
 )
-from finch.symbolic import ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, ScopedDict, UnvalidatedForm
 
 from . import nodes as ntn
 from .stages import NotationLoader
@@ -349,6 +349,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
     An interpreter for FinchNotation.
     """
 
+    mode = CompilerMode(safe=True, debug=True)
+
     def __init__(
         self,
         bindings: ScopedDict | None = None,
@@ -418,6 +420,10 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
 
     def _dispatch(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         match prgm:
+            case ntn.Assert(exp):
+                if not self(exp):
+                    raise AssertionError(f"Finch assertion failed: {exp}")
+                return None
             case ntn.Literal(val) | asm.Literal(val):
                 return val
             case ntn.Value(val, val_t):

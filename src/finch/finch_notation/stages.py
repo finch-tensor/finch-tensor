@@ -1,12 +1,14 @@
 from abc import abstractmethod
 
 from finch import finch_assembly as asm
-from finch.symbolic import Stage
+from finch.symbolic import CompilerMode, Stage
 
 from . import nodes as ntn
 
 
 class NotationLoader(Stage):
+    mode = CompilerMode()
+
     @abstractmethod
     def lower(self, term: ntn.Module) -> asm.AssemblyLibrary:
         """
