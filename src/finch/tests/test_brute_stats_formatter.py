@@ -6,6 +6,7 @@ import pytest
 import numpy as np
 
 import finch as fl
+from finch.autoschedule.cost_models import ElementLevelOption
 from finch.autoschedule.formatter.smart_formatter import (
     LEVEL_BUILDERS,
     IterCostFormatter,
@@ -42,7 +43,9 @@ def brute_force_best(formatter, query, shape_type, machine, fill_value):
     best_cost = None
     best_options = ()
     for options in itertools.product(formatter.options, repeat=len(shape_type)):
-        cost = format_cost(formatter.cost_model, query, options, machine)
+        cost = format_cost(
+            formatter.cost_model, query, (*options, ElementLevelOption()), machine
+        )
         if best_cost is None or cost < best_cost:
             best_cost, best_options = cost, options
     lvl = fl.element(fill_value, fl.ftype(fill_value))

@@ -15,6 +15,7 @@ from finch.algebra import (
     TensorFType,
     ftype,
     ftypes,
+    np_dtype,
 )
 from finch.autoschedule.cost_models import (
     ByKind,
@@ -49,18 +50,18 @@ def optimize_format(
 ):
     stats = machine(alias)
     n = len(stats.index_order)
-    leaf = element(fill_value, ftype(fill_value))
+    position_type = ftypes.intp
+    leaf = element(fill_value, ftype(fill_value), position_type)
+    pos_size = np_dtype(position_type).itemsize
     memo = {}
+
+    def cost(level, num_pos, option):
+        choice = LevelChoice(term, alias, level, num_pos, option, pos_size)
+        return cost_model.predict_component_cost(choice, machine)
 
     def rec(level, num_pos):
         if level == n:
-            return (
-                cost_model.predict_component_cost(
-                    LevelChoice(term, alias, level, num_pos, ElementLevelOption()),
-                    machine,
-                ),
-                leaf,
-            )
+            return cost(level, num_pos, ElementLevelOption()), leaf
 
         key = (level, num_pos)
         if key in memo:
@@ -69,9 +70,7 @@ def optimize_format(
         best_cost = None
         best_format = None
         for option in options:
-            local = cost_model.predict_component_cost(
-                LevelChoice(term, alias, level, num_pos, option), machine
-            )
+            local = cost(level, num_pos, option)
             child_num_pos = option.next_num_pos(
                 stats, machine.stats_factory, level, num_pos
             )
@@ -200,28 +199,28 @@ class FDFormatter(SmartFormatter):
 
 
 def linear_level_model(
-    option: LevelOption,
+    option_type: type[LevelOption],
     storage: Sequence[float],
     access: Sequence[float] = (0, 0, 0, 0),
 ) -> LevelCostModel:
     coefficients = np.array([*storage, *access], dtype=float)
-    return LevelCostModel(option, LinearPredictor(coefficients))
+    return LevelCostModel(option_type, LinearPredictor(coefficients))
 
 
 # Each level option lists its storage features. The access features are
 # sequential reads, scatter reads, sequential writes, and scatter writes.
 ITER_COST_MODEL = ByKind(
     {
-        "dense": linear_level_model(DenseLevelOption(), (0, 1)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption(), (1, 1, 0, 0)),
-        "element": linear_level_model(ElementLevelOption(), (0, 0)),
+        "dense": linear_level_model(DenseLevelOption, (0, 1)),
+        "sparse_hash": linear_level_model(SparseHashLevelOption, (1, 1, 0, 0)),
+        "element": linear_level_model(ElementLevelOption, (0, 0)),
     }
 )
 STORAGE_COST_MODEL = ByKind(
     {
-        "dense": linear_level_model(DenseLevelOption(), (0, 0)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption(), (0, 0, 1, 1)),
-        "element": linear_level_model(ElementLevelOption(), (0, 1)),
+        "dense": linear_level_model(DenseLevelOption, (0, 0)),
+        "sparse_hash": linear_level_model(SparseHashLevelOption, (0, 0, 1, 1)),
+        "element": linear_level_model(ElementLevelOption, (0, 1)),
     }
 )
 
