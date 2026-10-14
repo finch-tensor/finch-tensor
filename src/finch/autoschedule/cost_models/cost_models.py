@@ -1,36 +1,13 @@
-from abc import ABC, abstractmethod
-from collections import OrderedDict
+from abc import abstractmethod
 from collections.abc import Callable, Mapping
 from typing import TypeVar
 
 import numpy as np
 
-from finch.algebra import StaticFill, ffuncs, ftype, np_dtype
 from finch.algebra.tensor import TensorFType
-from finch.algebra.utils import is_subsequence
-from finch.autoschedule.stages import AliasedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
-from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
-from finch.finch_logic import (
-    Aggregate,
-    Alias,
-    Field,
-    Literal,
-    LogicExpression,
-    LogicStatement,
-    MapJoin,
-    Plan,
-    Produces,
-    Query,
-    QueryInto,
-    Relabel,
-    Reorder,
-    StatsFactory,
-    Table,
-    TensorStats,
-)
-from finch.symbolic import Form, PostOrderDFS
-from finch.tensor import Scalar, element
+from finch.finch_logic import Alias, LogicStatement, StatsFactory, TensorStats
+from finch.symbolic import Form
 
 NS = TypeVar("NS", bound=NumericStats)
 
@@ -94,5 +71,52 @@ class CostModel(Form):
         return self.predictor(features)
 
 
+class MultiCostModel(CostModel):
+    """
+    A cost model that composes the observations of its submodels. Note that
+    submodels must describe the same pieces in the same order. Their feature
+    columns are concatenated. By default, predictions of the submodels are
+    summed; a supplied predictor instead predicts from the combined features.
+    """
 
+    def __init__(
+        self,
+        *submodels: CostModel,
+        predictor: Callable[[np.ndarray], float] | None = None,
+    ):
+        if not submodels:
+            raise ValueError("MultiCostModel requires at least one submodel")
+        self.submodels = submodels
+        super().__init__(predictor if predictor is not None else self._predict)
 
+    @property
+    def n_features(self) -> int:
+        return sum(submodel.n_features for submodel in self.submodels)
+
+    def _predict(self, features: np.ndarray) -> float:
+        cost = 0.0
+        start = 0
+        for submodel in self.submodels:
+            stop = start + submodel.n_features
+            cost += submodel.predictor(features[:, start:stop])
+            start = stop
+        return cost
+
+    def validate_inputs(self, *inputs):
+        for model in self.submodels:
+            model.validate_inputs(*inputs)
+
+    def get_features(
+        self,
+        term: LogicStatement,
+        bindings: dict[Alias, TensorFType],
+        stats: Mapping[Alias, TensorStats],
+        stats_factory: StatsFactory,
+    ) -> np.ndarray:
+        return np.concatenate(
+            [
+                model.get_features(term, bindings, stats, stats_factory)
+                for model in self.submodels
+            ],
+            axis=1,
+        )
