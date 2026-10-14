@@ -16,6 +16,7 @@ from finch.autoschedule import (
 from finch.autoschedule.stages import CompilerForm, FormattedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.compile import NotationCompiler
+from finch.compile_jl.analyze import reset_argument_positions
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -80,11 +81,15 @@ def run(program, binds):
     return ntn.NotationInterpreter()(program).main(*binds.values())[0].to_numpy()
 
 
+def sum_rows(lhs, arg, init=0.0):
+    rhs = Reorder(Table(arg, (i, j)), (i, j))
+    return Query(Table(lhs, (i,)), Aggregate(ADD, Literal(init), rhs, (j,)))
+
+
 def test_folds_with_the_same_op_share_a_declaration():
     plan = Plan(
         (
-            QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)),
-            QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j))),
+            sum_rows(C, A),
             QueryInto(Table(C, (i,)), ADD, Reorder(Table(B, (i, j)), (i, j))),
             Produces((C,)),
         )
@@ -101,8 +106,7 @@ def test_folds_with_the_same_op_share_a_declaration():
 def test_tensor_is_frozen_before_it_is_read():
     plan = Plan(
         (
-            QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)),
-            QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j))),
+            sum_rows(C, A),
             QueryInto(
                 Table(D, (i,)),
                 OVERWRITE,
@@ -116,8 +120,8 @@ def test_tensor_is_frozen_before_it_is_read():
     assert lifecycle(program) == [
         ("C", "Declare", ffuncs.add),
         ("C", "Freeze", ffuncs.add),
-        ("D", "Declare", ffuncs.init_write(0.0)),
-        ("D", "Freeze", ffuncs.init_write(0.0)),
+        ("D", "Declare", ffuncs.init_write(np.float64(0.0))),
+        ("D", "Freeze", ffuncs.init_write(np.float64(0.0))),
     ]
     finch_assert_equal(run(program, binds), 2 * A_DATA.sum(axis=1))
 
@@ -125,13 +129,14 @@ def test_tensor_is_frozen_before_it_is_read():
 def test_changing_op_refreezes_and_thaws():
     plan = Plan(
         (
-            QueryInto(Table(C, (i,)), OVERWRITE, Literal(1.0)),
-            QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j))),
+            sum_rows(C, A, init=1.0),
             QueryInto(Table(C, (i,)), MUL, Reorder(Table(B, (i, j)), (i, j))),
             Produces((C,)),
         )
     )
     binds = bindings()
+    # A declaration can't change a static fill, so C starts from the init.
+    binds[C] = BufferizedNDArray.from_numpy(np.zeros(2), fill_value=1.0)
     program = lower(plan, binds)
     assert lifecycle(program) == [
         ("C", "Declare", ffuncs.add),
@@ -144,7 +149,7 @@ def test_changing_op_refreezes_and_thaws():
     )
 
 
-def test_unused_initialization_is_declared_when_produced():
+def test_initialization_is_declared_by_overwriting():
     plan = Plan((QueryInto(Table(C, (i,)), OVERWRITE, Literal(3.0)), Produces((C,))))
     binds = bindings()
     program = lower(plan, binds)
@@ -186,11 +191,13 @@ def test_folding_into_a_tensor_without_initializing_it_thaws_it():
         # Fields cannot be omitted or revisited by the explicit loop order.
         (QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i,))), False),
         (QueryInto(Table(C, (i,)), ADD, Reorder(Table(A, (i, j)), (i, j, j))), False),
-        # Queries must be split into an initialization and a fold.
+        # Definitions are queries, which copy a table or reduce from a literal.
+        (sum_rows(C, A), True),
+        (Query(Table(D, (j, i)), Table(A, (i, j))), True),
         (
             Query(
                 Table(C, (i,)),
-                Aggregate(ADD, Literal(0.0), Reorder(Table(A, (i, j)), (i, j)), (j,)),
+                Aggregate(ADD, Table(C, (i,)), Reorder(Table(A, (i, j)), (i, j)), (j,)),
             ),
             False,
         ),
@@ -202,6 +209,18 @@ def test_folding_into_a_tensor_without_initializing_it_thaws_it():
                 Table(C, (i,)),
                 ADD,
                 Reorder(MapJoin(ADD, (Table(C, (i,)), Table(A, (i, j)))), (i, j)),
+            ),
+            False,
+        ),
+        (
+            Query(
+                Table(C, (i,)),
+                Aggregate(
+                    ADD,
+                    Literal(0.0),
+                    Reorder(MapJoin(ADD, (Table(C, (i,)), Table(A, (i, j)))), (i, j)),
+                    (j,),
+                ),
             ),
             False,
         ),
@@ -242,14 +261,9 @@ def test_loop_ordered_form_accepts_compiler_form(form, stmt):
     form.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
-def test_compiler_form_lowerer():
-    arg = Reorder(Table(A, (i, j)), (i, j))
+def test_compiler_form_lowerer_keeps_definitions():
     plan = Plan(
-        (
-            Query(Table(C, (i,)), Aggregate(ADD, Literal(0.0), arg, (j,))),
-            Query(Table(D, (j, i)), Table(A, (i, j))),
-            Produces((C, D)),
-        )
+        (sum_rows(C, A), Query(Table(D, (j, i)), Table(A, (i, j))), Produces((C, D)))
     )
     capture = LogicCapture()
     binds = bindings(d=np.zeros((2, 2)))
@@ -257,14 +271,7 @@ def test_compiler_form_lowerer():
         plan, {var: tns.ftype for var, tns in binds.items()}, {}, DenseStatsFactory()
     )
     assert original == plan
-    assert capture.last_prgm == Plan(
-        (
-            QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)),
-            QueryInto(Table(C, (i,)), ADD, arg),
-            QueryInto(Table(D, (j, i)), OVERWRITE, Reorder(Table(A, (i, j)), (j, i))),
-            Produces((C, D)),
-        )
-    )
+    assert capture.last_prgm == plan
 
 
 @pytest.mark.parametrize("axes", list(permutations(range(3))))
@@ -282,11 +289,6 @@ def test_transpose_keeps_output_in_loop_order(axes, compiler):
     CompilerFormLowerer(capture)(
         plan, {A: source.ftype, C: output.ftype}, {}, DenseStatsFactory()
     )
-    match capture.last_prgm:
-        case Plan((QueryInto(Table(_, idxs), _, Reorder(_, loop_order)), Produces())):
-            assert tuple(idx for idx in loop_order if idx in idxs) == idxs
-        case _:
-            pytest.fail("Expected a fold with an explicit loop order")
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     result = compiler()(program).main(source, output)
     finch_assert_equal(result[0].to_numpy(), expected)
@@ -309,6 +311,38 @@ def test_transposed_fold_broadcasts_and_reduces(compiler):
     finch_assert_equal(
         result[0].to_numpy(), 1 + np.broadcast_to(data.sum(axis=0)[:, None], (3, 4))
     )
+
+
+@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+@pytest.mark.parametrize("n", [0, 3])
+def test_overwriting_with_an_empty_reduction_keeps_values(compiler, n):
+    data = np.arange(2.0 * n).reshape(2, n)
+    source = BufferizedNDArray.from_numpy(data)
+    output = BufferizedNDArray.from_numpy(np.array([1.0, 2.0]))
+    plan = Plan(
+        (
+            QueryInto(Table(C, (i,)), OVERWRITE, Reorder(Table(A, (i, j)), (i, j))),
+            Produces((C,)),
+        )
+    )
+    program = lower(plan, {A: source, C: output})
+    result = compiler()(program).main(source, output)
+    # Overwriting along j keeps the last value, and an empty j writes nothing.
+    expected = data[:, -1] if n else np.array([1.0, 2.0])
+    finch_assert_equal(result[0].to_numpy(), expected)
+
+
+def test_guarded_overwrite_keeps_previous_values_for_julia():
+    def resets(rhs):
+        plan = Plan((QueryInto(Table(C, (i,)), OVERWRITE, rhs), Produces((C,))))
+        func = lower(plan, bindings()).funcs[0]
+        positions = reset_argument_positions(func)
+        return {func.args[pos].name.split("#")[1] for pos in positions}
+
+    # Overwriting without a reduction resets C, so the Julia runtime needn't
+    # pass its previous values, but a reduction which may be empty might not.
+    assert resets(Reorder(Table(D, (i,)), (i,))) == {"C"}
+    assert resets(Reorder(Table(A, (i, j)), (i, j))) == set()
 
 
 def test_sparse_transpose():

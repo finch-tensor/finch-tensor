@@ -17,6 +17,7 @@ from finch.algebra import (
     TensorFType,
     ffuncs,
     ftype,
+    is_static,
 )
 from finch.algebra.algebra import FinchOperator, SingletonOperatorFType
 from finch.codegen.numba_codegen import NumbaNAryOperator
@@ -80,8 +81,14 @@ class FinchTensorFType(TensorFType[FT], ABC):
     @abstractmethod
     def lower_declare(self, ctx, tns, init, op, shape):
         """
-        Declare a tensor.
+        Declare a tensor. A tensor with a dynamic fill takes `init` as its fill.
         """
+
+    def lower_fill(self, ctx, obj):
+        """
+        Lower the fill value of a tensor.
+        """
+        raise NotImplementedError(f"Cannot lower the fill value of a {self}")
 
     @abstractmethod
     def lower_freeze(self, ctx, tns, op):
@@ -623,11 +630,24 @@ class AssemblyContext(Context):
                 assert isinstance(r, int)
                 tns = self.resolve(tns)
                 return tns.result_type.lower_dim(self, tns, r)
+            case ntn.FillValue(tns):
+                tns = self.resolve(tns)
+                return tns.result_type.lower_fill(self, tns)
             case ntn.Cached(arg, _):
                 return self(arg)
             case ntn.Declare(tns, init, op, shape):
                 self._thaw_tensor(tns.name, op)
                 tns = self.resolve(tns)
+                # A declaration may change a dynamic fill, but not a static one.
+                fill = tns.result_type.fill_type
+                if is_static(fill) and not (
+                    isinstance(init, ntn.Literal)
+                    and bool(ffuncs.same(init.val, fill.value))
+                ):
+                    raise ValueError(
+                        f"Declaring {tns} with {init} would change its static "
+                        f"fill {fill.value!r}"
+                    )
                 init_e = self(init)
                 op_e = self(op)
                 shape_e = [self(s) for s in shape]

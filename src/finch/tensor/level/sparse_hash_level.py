@@ -46,8 +46,8 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         return 1 + self.lvl_t.ndim
 
     @property
-    def fill_value(self) -> Any:
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self) -> FType:
@@ -105,7 +105,7 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:
             reduced_stats = stats_factory.aggregate(
-                ffuncs.or_, False, reduce_fields, stats
+                ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
             )
         else:
             reduced_stats = stats
