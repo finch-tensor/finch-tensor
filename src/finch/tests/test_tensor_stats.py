@@ -855,6 +855,7 @@ def test_fd_stats_records_dense_projections_without_chasing():
             DenseProperty((0, 1)),
             DenseProperty((1,)),
         ]
+        shape_type = (ft.int64, ft.int64)
 
     class Tensor:
         shape = (2, 3)
@@ -2027,6 +2028,29 @@ def test_copy_and_getters():
     assert td_copy.dim_sizes == {Field("i"): 2.0, Field("j"): 3.0}
     assert td_copy.get_dim_size(Field("j")) == 3.0
     assert td_copy.fill_value.value == 42
+
+
+def test_defs_propagate_dimension_types():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a = BaseTensorStats.from_fields(
+        (i, j), {i: 2.0, j: 3.0}, np.float64(0.0), {i: ft.int32, j: ft.int64}
+    )
+    b = BaseTensorStats.from_fields(
+        (j, k), {j: 3.0, k: 4.0}, np.float64(0.0), {j: ft.int32, k: ft.int64}
+    )
+    joined = BaseTensorStatsFactory._mapjoin_defs(ffuncs.mul, a, b)
+    reduced = BaseTensorStatsFactory.aggregate_def(ffuncs.add, 0.0, (j,), joined)
+    relabeled = BaseTensorStatsFactory.relabel_def(a, (k, i))
+    reordered = BaseTensorStatsFactory.reorder_def(a, (j, k, i))
+
+    assert a.element_type == ft.float64
+    assert joined.shape_type == (ft.int32, ft.int64, ft.int64)
+    assert reduced.shape_type == (ft.int32, ft.int64)
+    assert relabeled.shape_type == (ft.int32, ft.int64)
+    # A broadcast dimension has no type.
+    assert reordered.shape_type == (ft.int64, None, ft.int32)
+    tensor = ft.asarray(np.ones((2, 3)))
+    assert DCStatsFactory()(tensor, (i, j)).shape_type == ftype(tensor).shape_type
 
 
 @pytest.mark.parametrize(

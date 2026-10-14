@@ -14,8 +14,8 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
+from finch.autoschedule.cost_models import CostModel, FlopsCostModel
 from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
-from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -57,12 +57,14 @@ class AnnotatedQuery(Generic[TS]):
     connected_idxs: OrderedDict[Field, set[Field]]
     bindings: OrderedDict[Alias, TS]
     output_order: list[Field]
+    cost_model: CostModel
 
     def __init__(
         self,
         stats_factory: StatsFactory[TS],
         q: Query,
         bindings: OrderedDict[Alias, TS] | None = None,
+        cost_model: CostModel | None = None,
     ):
         """
         Build an `AnnotatedQuery` from a logical `Query`, extracting reduction
@@ -77,12 +79,16 @@ class AnnotatedQuery(Generic[TS]):
             `rhs` may contain `Aggregate` nodes.
         bindings : OrderedDict[Alias, TensorStats], optional
             Existing alias→stats environment to seed the analysis.
+        cost_model : CostModel, optional
+            Cost model used to estimate the cost of each reduction. Defaults
+            to `FlopsCostModel`.
         """
         assert isinstance(q, Query), (
             "Annotated Queries can only be built from queries of the form: "
             "Query(Table(lhs, idxs), rhs)"
         )
         self.stats_factory = stats_factory
+        self.cost_model = cost_model if cost_model is not None else FlopsCostModel()
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings
@@ -259,6 +265,7 @@ class AnnotatedQuery(Generic[TS]):
         """
         new = object.__new__(AnnotatedQuery)
         new.stats_factory = self.stats_factory
+        new.cost_model = self.cost_model
         new.output_name = self.output_name
         new.point_expr = self.point_expr
         new.reduce_idxs = list(self.reduce_idxs)
@@ -869,26 +876,6 @@ class AnnotatedQuery(Generic[TS]):
             in the current state of `aq`.
         """
         query, _, _, _ = self.get_reduce_query(reduce_idx)
-        stats_cache = self.cache_point
-        insert_statistics(
-            self.stats_factory,
-            query.rhs,
-            self.bindings,
-            replace=False,
-            cache=stats_cache,
-        )
-        match query.rhs:
-            case Aggregate() as agg:
-                mat_stats = stats_cache[agg]
-                comp_stats = stats_cache[agg.arg]
-                if isinstance(mat_stats, NumericStats) and isinstance(
-                    comp_stats, NumericStats
-                ):
-                    return (
-                        10 * mat_stats.estimate_non_fill_values()
-                        + comp_stats.estimate_non_fill_values()
-                    )
-                raise TypeError("Stats Class must be inherit from NumericStats")
-        raise ValueError(
-            "The root of the reduction query should always be an Aggregate node."
+        return self.cost_model.predict_cost(
+            query, {}, self.bindings, self.stats_factory
         )
