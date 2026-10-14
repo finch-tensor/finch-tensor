@@ -13,6 +13,7 @@ from finch.algebra.fill import (
     StaticFillFType,
     is_dynamic,
 )
+from finch.algebra.ftypes import FDTypeBoolean
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -92,6 +93,9 @@ _JULIA_REDUCTION_OPS = {
     ffuncs.logical_and.ftype: "&",
     ffuncs.logical_or.ftype: "|",
 }
+# Julia promotes Bool arithmetic to Int, but Finch keeps it Bool.
+_JULIA_BOOL_OPS = {"+": "|", "*": "&"}
+
 _INFIX_OPS = {
     "+",
     "*",
@@ -311,6 +315,10 @@ class FinchJLGenerator:
                 julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
                     op, nestingLvl
                 )
+                if julia_op in _JULIA_BOOL_OPS and all(
+                    isinstance(arg.result_type, FDTypeBoolean) for arg in args
+                ):
+                    julia_op = _JULIA_BOOL_OPS[julia_op]
                 if len(arg_strs) > 1 and julia_op in _INFIX_OPS:
                     return "(" + f" {julia_op} ".join(arg_strs) + ")"
                 return f"{julia_op}(" + ",".join(arg_strs) + ")"
@@ -343,6 +351,9 @@ class FinchJLGenerator:
                         stmt = f"{lhs_str} := {rhs_str}"
                     case _:
                         op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
+                        elem_t = getattr(lhs.result_type, "element_type", None)
+                        if isinstance(elem_t, FDTypeBoolean):
+                            op = _JULIA_BOOL_OPS.get(op, op)
                         stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 

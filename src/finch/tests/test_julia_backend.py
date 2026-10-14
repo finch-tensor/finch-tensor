@@ -312,6 +312,33 @@ def test_compile_julia_astype_matches_numpy(arg, dtype):
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
+@pytest.mark.parametrize(
+    "op",
+    [
+        ft.sum,
+        lambda a: ft.sum(a, axis=1),
+        lambda a: ft.sum(a, axis=1, dtype=np.int64),
+        lambda a: ft.prod(a, axis=0),
+        lambda a: ft.matmul(a, ft.permute_dims(a, (1, 0))),
+        lambda a: a + a,
+        lambda a: a * a,
+    ],
+    ids=["sum", "sum_axis", "sum_int", "prod_axis", "matmul", "add", "mul"],
+)
+def test_compile_julia_bool_arithmetic_matches_interpreter(op):
+    # Julia promotes Bool arithmetic to Int, but Finch keeps it Bool.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA, INTERPRET_NOTATION
+
+    arg = np.array([[True, True, False], [True, True, True]])
+    with with_default_scheduler(INTERPRET_NOTATION):
+        expected = ft.compute(op(ft.defer(arg))).to_numpy()
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg))).to_numpy()
+
+    np.testing.assert_array_equal(result, expected)
+
+
 def test_compile_julia_numeric_pattern_mask():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA
