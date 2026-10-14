@@ -17,7 +17,7 @@ from finch.algebra import (
     is_dynamic,
     np_dtype,
 )
-from finch.codegen import NumpyBufferFType
+from finch.codegen import NumpyBuffer, NumpyBufferFType
 from finch.compile.lower import AssemblyContext
 from finch.finch_assembly import parse_assembly
 
@@ -86,6 +86,13 @@ class ElementLevelFType(LevelFType, ImmutableStructFType):
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         val = self.buffer_type(len=pos)
+        # Values hold the fill until they are written.
+        fill = self.fill_value.value
+        if isinstance(val, NumpyBuffer):
+            val.arr.fill(fill)
+        else:
+            for i in range(pos):
+                val.store(i, fill)
         return ElementLevel(self, val)
 
     def __call__(self, val: Any) -> "ElementLevel":
