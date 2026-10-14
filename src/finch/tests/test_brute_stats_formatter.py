@@ -6,49 +6,54 @@ import pytest
 import numpy as np
 
 import finch as fl
-from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
+from finch.autoschedule.cost_models import ElementLevelOption
 from finch.autoschedule.formatter.smart_formatter import (
+    LEVEL_BUILDERS,
     IterCostFormatter,
     StorageCostFormatter,
-    total_tree_cost,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
-from finch.finch_logic import Field, Literal, Table
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.finch_logic import Alias, Field, Plan, Produces, Query, Table
 
 
 def get_stats(matrix, fields):
     factory = DCStatsFactory()
-    node = Table(Literal(fl.asarray(matrix)), fields)
-    stats = insert_statistics(
-        stats_factory=factory,
-        node=node,
-        bindings=OrderedDict(),
-        replace=False,
-        cache={},
+    M = Alias("M")
+    query = Query(Table(Alias("A"), fields), Table(M, fields))
+    machine = StatsMachine(
+        factory, OrderedDict({M: factory(fl.asarray(matrix), fields)})
+    )
+    stats = machine(query)
+    return stats, query, machine
+
+
+def format_cost(cost_model, query, options, machine):
+    prgm = Plan((query, Produces((query.lhs.tns,))))
+    M = query.rhs.tns
+    return cost_model.predict_cost(
+        prgm,
+        {query.lhs.tns: list(options)},
+        {M: machine.bindings[M]},
+        machine.stats_factory,
     )
 
-    return stats, factory
 
-
-def brute_force_best(
-    fields, shape_type, stats, factory, fill_type, candidates, leaf_cost_fn
-):
-    fill_ftype = fill_type.element_type
-    leaf_lvl = fl.element(fill_type, fill_ftype)
+def brute_force_best(formatter, query, shape_type, machine, fill_type):
     best_cost = None
-    best_fmt = None
-    for combination in itertools.product(candidates, repeat=len(fields)):
-        lvl = leaf_lvl
-        for option, dim_type in zip(
-            reversed(combination), reversed(shape_type), strict=True
-        ):
-            lvl = option.build(lvl, dim_type)
-        cost = total_tree_cost(
-            lvl, fields, stats, factory, 1.0, 0, candidates, leaf_cost_fn
+    best_options = ()
+    for options in itertools.product(formatter.options, repeat=len(shape_type)):
+        cost = format_cost(
+            formatter.cost_model, query, (*options, ElementLevelOption()), machine
         )
         if best_cost is None or cost < best_cost:
-            best_cost, best_fmt = cost, lvl
-    return best_cost, best_fmt
+            best_cost, best_options = cost, options
+    lvl = fl.element(fill_type, fill_type.element_type)
+    for option, dim_type in zip(
+        reversed(best_options), reversed(shape_type), strict=True
+    ):
+        lvl = LEVEL_BUILDERS[option.kind](lvl, dim_type)
+    return lvl
 
 
 @pytest.fixture(
@@ -65,79 +70,25 @@ def brute_force_best(
         np.ones((4, 4), dtype=np.float64),
         np.zeros((6, 5), dtype=np.float64),
         np.eye(5, dtype=np.float64),
+        np.array(3.0),
+        np.array([0.0, 1.0, 0.0, 2.0]),
+        np.arange(24, dtype=np.float64).reshape(2, 3, 4) % 5,
     ]
 )
 def matrix(request):
     return request.param
 
 
-@pytest.fixture
-def fields_2d():
-    return (Field("i"), Field("j"))
+@pytest.mark.parametrize("formatter_cls", [StorageCostFormatter, IterCostFormatter])
+def test_search_and_brute(formatter_cls, matrix):
+    fields = tuple(Field(f"i{n}") for n in range(matrix.ndim))
+    stats, query, machine = get_stats(matrix, fields)
+    shape_type = tuple(fl.ftype(np.intp) for _ in fields)
+    formatter = formatter_cls()
 
+    brute_fmt = brute_force_best(formatter, query, shape_type, machine, stats.fill_type)
 
-def test_storage_dp_and_brute(matrix, fields_2d):
-    stats, factory = get_stats(matrix, fields_2d)
-    shape_type = tuple(fl.ftype(np.intp) for _ in fields_2d)
-    formatter = StorageCostFormatter()
-    formatter._stats_factory = factory
-
-    brute_cost, brute_fmt = brute_force_best(
-        fields_2d,
-        shape_type,
-        stats,
-        factory,
-        stats.fill_type,
-        formatter.candidates,
-        formatter.leaf_cost_fn,
-    )
-
-    dp_fmt = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats).lvl_t
-    dp_cost = total_tree_cost(
-        dp_fmt,
-        fields_2d,
-        stats,
-        factory,
-        1,
-        0,
-        formatter.candidates,
-        formatter.leaf_cost_fn,
-    )
-    # print(f"Matrix : {matrix}, \nFormat by brute : {
-    # brute_fmt}, \nFormat by dp : {dp_fmt}")
-    assert dp_cost == pytest.approx(brute_cost)
-    assert dp_fmt == brute_fmt
-
-
-def test_iter_dp_and_brute(matrix, fields_2d):
-    stats, factory = get_stats(matrix, fields_2d)
-    shape_type = tuple(fl.ftype(np.intp) for _ in fields_2d)
-    formatter = IterCostFormatter()
-    formatter._stats_factory = factory
-
-    brute_cost, brute_fmt = brute_force_best(
-        fields_2d,
-        shape_type,
-        stats,
-        factory,
-        stats.fill_type,
-        formatter.candidates,
-        formatter.leaf_cost_fn,
-    )
-
-    dp_fmt = formatter.get_tensor_ftype(stats.fill_type, shape_type, stats).lvl_t
-    dp_cost = total_tree_cost(
-        dp_fmt,
-        fields_2d,
-        stats,
-        factory,
-        1,
-        0,
-        formatter.candidates,
-        formatter.leaf_cost_fn,
-    )
-
-    # print(f"Matrix : {matrix}, \nFormat by brute : {
-    # brute_fmt}, \nFormat by dp : {dp_fmt}")
-    assert dp_cost == pytest.approx(brute_cost)
-    assert dp_fmt == brute_fmt
+    search_fmt = formatter.get_tensor_ftype(
+        query.lhs.tns, query, machine, stats.fill_type, shape_type
+    ).lvl_t
+    assert search_fmt == brute_fmt
