@@ -34,9 +34,7 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         ]
 
     def struct_setattr(self, obj, attr, value):
-        # The stride is derived from the dimensions of the inner levels.
-        if attr != "stride":
-            setattr(obj, attr, value)
+        setattr(obj, attr, value)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         n = stats.get_dim_size(fields[lvl])
