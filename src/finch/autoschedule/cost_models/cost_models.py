@@ -611,7 +611,7 @@ class FlopsCostModel(CostModel, AliasedForm):
 class PigeonCostModel(LoopCostModel, LoopOrderedForm):
     """
     PigeonCostModel counts iteration, operation, and output costs across loop
-    prefixes. By default, writes are weighted 10x reads and operations.
+    prefixes. By default, allocations are weighted 10x reads and operations.
     """
 
     @property
