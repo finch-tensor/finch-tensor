@@ -1,17 +1,20 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Self
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs, is_dynamic
+from finch.algebra import AbstractFill, ImmutableStructFType, ffuncs, is_dynamic
 from finch.compile import looplets as lplt
+from finch.tensor.traits import FormatProperty
 
 from .fiber_tensor import FiberTensor
 from .level.level import (
     Level,
     LevelFType,
+    MultiDimensionLevel,
     MultiDimensionLevelFType,
+    SingleDimensionLevel,
     SingleDimensionLevelFType,
 )
 
@@ -33,8 +36,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         return self.body.position_type
 
     @property
-    def fill_value(self):
-        return self.body.fill_value
+    def fill_type(self):
+        return self.body.fill_type
 
     @property
     def shape_type(self):
@@ -126,8 +129,8 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
         lvl = asm.GetAttr(ctx(tns.lvl), asm.Literal("body"))
         fill = (
             ntn.Value(self.body.lower_fill(lvl), self.element_type)
-            if is_dynamic(self.fill_value)
-            else ntn.Literal(self.fill_value.value)
+            if is_dynamic(self.fill_type)
+            else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,
@@ -162,6 +165,9 @@ class LoTriMaskFType(LevelFType, ImmutableStructFType):
     def struct_fields(self):
         return [("body", self.body)]
 
+    def level_format_properties(self, n: int) -> list[FormatProperty]:
+        raise NotImplementedError
+
 
 @dataclass
 class LoTriMask(Level):
@@ -169,11 +175,13 @@ class LoTriMask(Level):
     Lower triangular mask level.
     """
 
-    lvl: Level
+    lvl: SingleDimensionLevel | MultiDimensionLevel
 
     @property
     def ftype(self) -> LoTriMaskFType:
-        return LoTriMaskFType(self.lvl.ftype)  # type: ignore[abstract]
+        ftype = self.lvl.ftype
+        assert isinstance(ftype, SingleDimensionLevelFType | MultiDimensionLevelFType)
+        return LoTriMaskFType(ftype)
 
     @property
     def val(self) -> Any:
@@ -186,6 +194,9 @@ class LoTriMask(Level):
     @property
     def body(self):
         return self.lvl
+
+    def with_fill(self, fill_value: AbstractFill) -> Self:
+        return type(self)(self.lvl.with_fill(fill_value))
 
 
 def tril(x, /, *, k: int = 0):

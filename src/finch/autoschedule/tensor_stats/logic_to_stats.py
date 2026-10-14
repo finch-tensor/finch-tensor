@@ -6,16 +6,21 @@ from typing import TypeVar
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Literal,
     LogicNode,
     MapJoin,
     Query,
+    QueryInto,
     Reorder,
     StatsFactory,
     Table,
     TensorStats,
+    is_fill_expression,
 )
 from finch.tensor import Scalar
+
+from .util import fill_statistics
 
 TS = TypeVar("TS", bound=TensorStats)
 
@@ -47,10 +52,17 @@ def insert_statistics(
             st = stats_factory.mapjoin(op, *args)
             cache[node] = st
             return st
-        case Query():
-            stats = insert_statistics(stats_factory, node.rhs, bindings, replace, cache)
-            if isinstance(node.lhs, Alias):
-                bindings[node.lhs] = stats
+        case Query(Table(Alias() as var, idxs), rhs):
+            if rhs.fields() != idxs:
+                rhs = Reorder(rhs, idxs)
+            stats = insert_statistics(stats_factory, rhs, bindings, replace, cache)
+            bindings[var] = stats
+            cache[node] = stats
+            return stats
+        case QueryInto():
+            stats = insert_statistics(
+                stats_factory, node.as_query(), bindings, replace, cache
+            )
             cache[node] = stats
             return stats
 
@@ -58,10 +70,24 @@ def insert_statistics(
             if not isinstance(node.op, Literal):
                 raise TypeError("Aggregate.op must be Literal(...).")
             op = node.op.val
-            init = node.init.val if isinstance(node.init, Literal) else None
             arg = insert_statistics(stats_factory, node.arg, bindings, replace, cache)
             reduce_indices = list(node.idxs)
-            st = stats_factory.aggregate(op, init, tuple(reduce_indices), arg)
+            if isinstance(node.init, Literal):
+                st = stats_factory.aggregate(
+                    op, node.init.val, tuple(reduce_indices), arg
+                )
+            elif is_fill_expression(node.init):
+                # The result starts from the background, as reductions do.
+                st = stats_factory.aggregate(op, None, tuple(reduce_indices), arg)
+            else:
+                # A tensor init is folded into the reduction of the argument.
+                init = insert_statistics(
+                    stats_factory, node.init, bindings, replace, cache
+                )
+                reduced = stats_factory.aggregate(op, None, tuple(reduce_indices), arg)
+                st = stats_factory.reorder(
+                    stats_factory.mapjoin(op, init, reduced), node.fields()
+                )
             cache[node] = st
             return st
 
@@ -86,6 +112,14 @@ def insert_statistics(
             if (node not in cache) or replace:
                 cache[node] = tensor
             return cache[node]
+
+        case FillTable(tns):
+            base = bindings.get(tns)
+            if base is None:
+                raise ValueError(f"No TensorStats bound to alias {tns}")
+            st = fill_statistics(stats_factory, base.fill_type)
+            cache[node] = st
+            return st
 
         case Literal(val):
             # A literal is a zero-dimensional constant, so its statistics are

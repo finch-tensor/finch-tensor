@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
 
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
-from finch.algebra import ImmutableStructFType, ffuncs, ftype, ftypes
+from finch.algebra import MutableStructFType, ffuncs, ftype, ftypes
 from finch.compile import AssemblyContext, LoopletContext
 from finch.compile import looplets as lplt
 from finch.compile.lower import SymbolicExtent
@@ -17,7 +17,7 @@ from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevel
 
 
 @dataclass(unsafe_hash=True)
-class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
+class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
 
@@ -32,6 +32,9 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ("dimension", self.dimension_type),
             ("stride", self.dimension_type),
         ]
+
+    def struct_setattr(self, obj, attr, value):
+        setattr(obj, attr, value)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         n = stats.get_dim_size(fields[lvl])
@@ -77,8 +80,8 @@ class DenseLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         return 1 + self.lvl_t.ndim
 
     @property
-    def fill_value(self):
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self):
@@ -233,19 +236,21 @@ class DenseLevel(SingleDimensionLevel):
 
     lvl: Level
     dimension: np.integer
+    stride: np.integer = field(init=False)
+
+    def __post_init__(self):
+        # The stride is stored so that kernels can write it back; it must be
+        # recomputed whenever the dimensions of the dense levels below change.
+        dim_t = ftype(self.dimension)
+        match self.lvl:
+            case DenseLevel():
+                self.stride = dim_t(self.lvl.dimension * self.lvl.stride)
+            case _:
+                self.stride = dim_t(1)
 
     @property
     def shape(self) -> tuple:
         return (self.dimension, *self.lvl.shape)
-
-    @property
-    def stride(self) -> np.integer:
-        dim_t = ftype(self.dimension)
-        match self.lvl:
-            case DenseLevel():
-                return dim_t(self.lvl.dimension * self.lvl.stride)
-            case _:
-                return dim_t(1)
 
     @property
     def ftype(self) -> DenseLevelFType:

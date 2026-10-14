@@ -11,6 +11,7 @@ from finch.algebra.tensor import TensorFType
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    FillTable,
     Literal,
     LogicExpression,
     LogicInterpreter,
@@ -20,16 +21,19 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Relabel,
     Reorder,
     StatsFactory,
     Table,
+    is_fill_expression,
 )
 from finch.tensor import Scalar
 from finch.util.logging import LOG_LOGIC_PRE_OPT
 
 from .numeric_stats import NumericStats
 from .tensor_stats import TensorStats
+from .util import fill_statistics
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
 
@@ -87,10 +91,15 @@ class StatsMachine(Generic[TS]):
                     last_result = self(body)
                 return last_result
 
-            case Query():
-                rhs_stats = self(node.rhs)
-                self.bindings[node.lhs] = rhs_stats
+            case Query(Table(Alias() as var, idxs), rhs):
+                if rhs.fields() != idxs:
+                    rhs = Reorder(rhs, idxs)
+                rhs_stats = self(rhs)
+                self.bindings[var] = rhs_stats
                 return rhs_stats
+
+            case QueryInto():
+                return self(node.as_query())
 
             case Alias():
                 stats = self.bindings.get(node)
@@ -110,6 +119,9 @@ class StatsMachine(Generic[TS]):
                     tensor = self.stats_factory.relabel(base, new_indices)
                 return tensor
 
+            case FillTable(tns):
+                return fill_statistics(self.stats_factory, self(tns).fill_type)
+
             case MapJoin():
                 if not isinstance(node.op, Literal):
                     raise TypeError("MapJoin.op must be Literal(...).")
@@ -123,10 +135,21 @@ class StatsMachine(Generic[TS]):
                 if not isinstance(node.op, Literal):
                     raise TypeError("Aggregate.op must be Literal(...).")
                 op = node.op.val
-                init = node.init.val if isinstance(node.init, Literal) else None
                 arg2 = self(node.arg)
                 reduce_indices = node.idxs
-                return self.stats_factory.aggregate(op, init, reduce_indices, arg2)
+                if isinstance(node.init, Literal):
+                    return self.stats_factory.aggregate(
+                        op, node.init.val, reduce_indices, arg2
+                    )
+                if is_fill_expression(node.init):
+                    # The result starts from the background, as reductions do.
+                    return self.stats_factory.aggregate(op, None, reduce_indices, arg2)
+                # A tensor init is folded into the reduction of the argument.
+                reduced = self.stats_factory.aggregate(op, None, reduce_indices, arg2)
+                return self.stats_factory.reorder(
+                    self.stats_factory.mapjoin(op, self(node.init), reduced),
+                    node.fields(),
+                )
 
             case Literal(val):
                 return self.stats_factory(Scalar(val), ())

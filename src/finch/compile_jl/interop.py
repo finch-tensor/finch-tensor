@@ -78,14 +78,12 @@ def _plus_one_buffer_to_jl(buffer: Buffer):
 
 
 def level_to_jl(level: Level, pin_fill: bool = False):
-    """Convert a level to its Julia counterpart. With `pin_fill`, the leaf
-    fill is forced to a zero of its dtype -- see `zero_dynamic_fills` in
-    `compile_jl.compiler` for why this backend does that."""
+    """Convert a level to its Julia counterpart, optionally pinning its fill."""
     match level:
         case ElementLevel():
             fill = level.fill_value
             if pin_fill:
-                fill = ftype(fill)(0)
+                fill = jl_dtypes._zero_value(ftype(fill))
             return jl.ElementLevel(
                 _as_julia_scalar(fill),
                 _buffer_to_jl(level.val),
@@ -287,36 +285,40 @@ def _ndarray_to_jl_tensor(
 
 
 def _pattern_tensor_to_jl(obj: PatternTensor):
-    reverse_axes = True
+    # Python masks are row-major and Finch's are column-major, so each mask is
+    # the Finch mask whose axes are reversed, like other interop tensors. The
+    # row-major traversal of a Python mask then visits each Finch column first,
+    # which is the efficient traversal of Finch's masks. Offsets shift the
+    # second Julia axis, `offset(mask, 0, k)[i, j] = mask[i, j + k]`.
+    swizzle = False
     match obj:
         case EyeTensor():
-            # The diagonal is symmetric. In Julia's reversed axis order,
-            # shifting the column by +k avoids a non-concordant transpose.
             mask = jl.Finch.diagmask
             if obj._k:
                 mask = jl.Finch.offset(mask, 0, int(obj._k))
-            reverse_axes = False
         case UpperTriangleTensor():
-            mask = jl.Finch.offset(jl.Finch.uptrimask, 0, -int(obj._k))
+            mask = jl.Finch.offset(jl.Finch.lotrimask, 0, int(obj._k))
         case LowerTriangleTensor():
-            mask = jl.Finch.offset(jl.Finch.lotrimask, 0, -int(obj._k))
+            mask = jl.Finch.offset(jl.Finch.uptrimask, 0, int(obj._k))
         case PairSumTensor():
-            mask = jl.Finch.pairsummask
+            mask = jl.Finch.repeatmask(2)
         case PairCarryTensor():
-            mask = jl.Finch.paircarrymask
+            mask = jl.Finch.offset(jl.Finch.pairsummask, 0, -1)
         case ReverseTensor():
             mask = jl.Finch.reversemask(int(obj.shape[1]))
         case RollTensor():
-            mask = jl.Finch.rollmask(int(obj.shape[1]), int(obj._k))
+            mask = jl.Finch.rollmask(int(obj.shape[1]), -int(obj._k))
         case RepeatTensor():
             mask = jl.Finch.repeatmask(int(obj._k))
         case ChunkMaskTensor():
-            mask = jl.Finch.chunkmask(int(obj.shape[0]), int(obj._b))
+            mask = jl.Finch.chunkmask(int(obj.shape[1]), int(obj._b))
         case SplitMaskTensor():
-            mask = jl.Finch.splitmask(int(obj.shape[0]), int(obj.shape[1]))
+            mask = jl.Finch.splitmask(int(obj.shape[1]), int(obj.shape[0]))
         case RandomMaskTensor():
             mask = jl.Finch.randommask(
-                tuple(int(dim) for dim in obj.shape), obj._p, seed=jl.UInt64(obj._seed)
+                tuple(int(dim) for dim in reversed(obj.shape)),
+                obj._p,
+                seed=jl.UInt64(obj._seed),
             )
         case OddEvenMergeSortPartnerMaskTensor():
             mask = jl.Finch.oddevenmergesortpartnermask(
@@ -331,25 +333,29 @@ def _pattern_tensor_to_jl(obj: PatternTensor):
         case ParityMaskTensor():
             mask = jl.Finch.paritymask(int(obj._parity))
         case ReshapeMaskTensor():
+            # Reshape masks have no preferred traversal, but reversing their
+            # axes would flatten them in column-major order, so they are
+            # swizzled instead.
             mask = jl.Finch.reshapemask(
                 tuple(int(dim) for dim in obj._old_shape),
                 tuple(int(dim) for dim in obj._new_shape),
             )
+            swizzle = True
         case _:
             raise ValueError(f"Unsupported Julia pattern tensor type: {type(obj)}")
     # Masks infer extents by default; retain the Python shape even when the
-    # mask is the only input, then reverse axes like other interop tensors.
-    shape = obj.shape if reverse_axes else tuple(reversed(obj.shape))
+    # mask is the only input.
+    shape = obj.shape if swizzle else tuple(reversed(obj.shape))
     mask = jl.Finch.window(mask, *(jl.Finch.Extent(1, int(dim)) for dim in shape))
-    if reverse_axes and obj.ndim > 1:
+    if swizzle and obj.ndim > 1:
         mask = jl.Finch.swizzle(mask, *reversed(range(1, obj.ndim + 1)))
     return mask
 
 
 def tensor_to_jl(obj, pin_fill: bool = False):
-    """Convert a tensor to its Julia counterpart. With `pin_fill`, fills are
-    forced to a zero of their dtype so the argument types line up with a
-    kernel compiled under `zero_dynamic_fills`."""
+    """Convert a tensor to its Julia counterpart, optionally pinning its fill."""
+    if hasattr(obj, "raw_julia_obj"):
+        return obj.raw_julia_obj
     if is_julia_obj(obj) and jl.isa(obj, jl.Finch.Tensor):
         return obj
     if isinstance(obj, FiberTensor):
@@ -357,20 +363,25 @@ def tensor_to_jl(obj, pin_fill: bool = False):
             raise ValueError("Only root-position FiberTensor objects can use Julia")
         return jl.Tensor(level_to_jl(obj.lvl, pin_fill))
     if isinstance(obj, BufferizedNDArray):
-        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        fill = (
+            jl_dtypes._zero_value(ftype(obj.fill_value)) if pin_fill else obj.fill_value
+        )
         return _ndarray_to_jl_tensor(obj.to_numpy(), fill, copy=False)
     if isinstance(obj, NumPyWrapper):
-        fill = ftype(obj.fill_value)(0) if pin_fill else obj.fill_value
+        fill = (
+            jl_dtypes._zero_value(ftype(obj.fill_value)) if pin_fill else obj.fill_value
+        )
         return _ndarray_to_jl_tensor(obj._data, fill, copy=False)
     if isinstance(obj, Scalar):
         return scalar_to_jl(obj.val, pin_fill=pin_fill)
     if isinstance(obj, PatternTensor):
         return _pattern_tensor_to_jl(obj)
     if isinstance(obj, FillTensor):
-        lvl = jl.PatternLevel()
-        for dim in reversed(obj.shape):
-            lvl = jl.DenseLevel(lvl, int(dim))
-        return jl.Tensor(lvl)
+        # A fill tensor is its fill everywhere, and its extents are passed to
+        # kernels separately, so it is passed as a Finch scalar.
+        fill = jl_dtypes._zero_value(obj.element_type) if pin_fill else obj.fill_value
+        scalar_t = jl.seval(jl_dtypes.scalar_type_str(fill, obj.element_type))
+        return scalar_t(_as_julia_scalar(obj.fill_value))
     if isinstance(obj, np.ndarray):
         fill = np.asarray(0, dtype=obj.dtype)[()]
         return _ndarray_to_jl_tensor(obj, fill, copy=False)
@@ -380,7 +391,7 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 
 
 def scalar_to_jl(val, pin_fill: bool = False):
-    fill = ftype(val)(0) if pin_fill else val
+    fill = jl_dtypes._zero_value(ftype(val)) if pin_fill else val
     buf = np.asarray([val])
     return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
 
@@ -422,7 +433,7 @@ class JuliaBufferContext:
         return ("object", id(obj))
 
     def tensor_to_jl(self, obj, *, pin_fill: bool = False):
-        key = self._cache_key(obj)
+        key = (self._cache_key(obj), pin_fill)
         cached = self._tensors.get(key)
         if cached is not None:
             return cached[1]

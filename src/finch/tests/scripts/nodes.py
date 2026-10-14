@@ -123,11 +123,17 @@ def create_log_simple_node():
 
     return log.Plan(
         (
-            log.Query(log.Alias("S"), log.Table(log.Literal(s), (i, j))),
-            log.Query(log.Alias("A"), log.Table(log.Literal(a), (i, k))),
-            log.Query(log.Alias("B"), log.Table(log.Literal(b), (k, j))),
             log.Query(
-                log.Alias("AB"),
+                log.Table(log.Alias("S"), (i, j)), log.Table(log.Literal(s), (i, j))
+            ),
+            log.Query(
+                log.Table(log.Alias("A"), (i, k)), log.Table(log.Literal(a), (i, k))
+            ),
+            log.Query(
+                log.Table(log.Alias("B"), (k, j)), log.Table(log.Literal(b), (k, j))
+            ),
+            log.Query(
+                log.Table(log.Alias("AB"), (i, j, k)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (
@@ -138,7 +144,7 @@ def create_log_simple_node():
             ),
             # matmul
             log.Query(
-                log.Alias("C"),
+                log.Table(log.Alias("C"), (i, j)),
                 log.Aggregate(
                     log.Literal(ffuncs.add),
                     log.Literal(0),
@@ -148,7 +154,7 @@ def create_log_simple_node():
             ),
             # elemwise
             log.Query(
-                log.Alias("RES"),
+                log.Table(log.Alias("RES"), (i, j)),
                 log.MapJoin(
                     log.Literal(ffuncs.mul),
                     (

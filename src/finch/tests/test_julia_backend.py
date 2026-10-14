@@ -17,7 +17,9 @@ from finch import (
     ffuncs,
     ftype,
 )
+from finch.algebra import DynamicFill, DynamicFillError, DynamicFillFType
 from finch.autoschedule import (
+    CompilerFormLowerer,
     DefaultLogicFactorizer,
     DefaultLoopOrderer,
     FDFormatter,
@@ -27,7 +29,11 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
-from finch.compile_jl.julia import julia_available
+from finch.compile_jl.compiler import FinchJLCompiler
+from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
+from finch.compile_jl.julia import jl, julia_available
+from finch.finch_assembly import AssemblyKernelFType
+from finch.tensor import BufferizedNDArray
 from finch.tensor.patterns import (
     ChunkMaskTensor,
     EyeTensor,
@@ -61,10 +67,16 @@ def _requires_julia_backend():
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
 
 
+@pytest.mark.parametrize("fill_wrapper", [DynamicFill, DynamicFillFType])
+def test_julia_nested_tuple_fill_placeholder(fill_wrapper):
+    from finch.compile_jl.types import _julia_literal
+
+    value = (np.float64(3), (np.intp(2), np.bool_(True)))
+    assert _julia_literal(fill_wrapper(value)) == "(0.0, (0, false))"
+
+
 def test_compile_julia_preserves_definition_type():
     _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLCompiler
-    from finch.finch_assembly import AssemblyKernelFType
 
     tensor = ft.asarray(np.arange(6, dtype=np.int64).reshape(2, 3))
     arg = ntn.Variable("tensor", tensor.ftype)
@@ -104,10 +116,8 @@ def test_compile_julia_preserves_definition_type():
 )
 def test_compile_julia_init_write(fill, value):
     _requires_julia_backend()
-    from finch.compile_jl.compiler import FinchJLCompiler, FinchJLGenerator
+    from finch.compile_jl.compiler import FinchJLGenerator
     from finch.compile_jl.julia import jl
-    from finch.finch_assembly import AssemblyKernelFType
-    from finch.tensor import BufferizedNDArray
 
     tensor = BufferizedNDArray.from_numpy(np.array(fill), fill_value=fill)
     arg = ntn.Variable("output", tensor.ftype)
@@ -149,7 +159,6 @@ def test_compile_julia_init_write(fill, value):
 
 
 def test_compile_julia_init_write_rejects_dynamic_fill():
-    from finch.algebra.fill import DynamicFill, DynamicFillError
     from finch.compile_jl.compiler import FinchJLGenerator
 
     tensor = ft.asarray(np.zeros((), dtype=np.int64))
@@ -158,7 +167,7 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         ntn.Access(ntn.Variable("output", tensor.ftype), ntn.Update(op), ()),
         ntn.Literal(np.int64(3)),
     )
-    with pytest.raises(DynamicFillError, match="static fill"):
+    with pytest.raises(DynamicFillError, match="requires a static fill"):
         FinchJLGenerator().generate_julia(update)
 
 
@@ -174,17 +183,18 @@ def test_compile_julia_init_write_rejects_dynamic_fill():
         PairCarryTensor((5, 3)),
         ReverseTensor((3, 5)),
         *(RollTensor((7, 3), k=k) for k in (-4, 0, 5)),
-        *(RepeatTensor((7, 3), k=k) for k in (-1, 0, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        ChunkMaskTensor((6, 3), b=2, dtype=np.int32),
+        *(RepeatTensor((3, 7), k=k) for k in (-1, 0, 2)),
+        ChunkMaskTensor((4, 10), b=3),
+        ChunkMaskTensor((3, 6), b=2, dtype=np.int32),
         ChunkMaskTensor((3, 3), b=1),
-        ChunkMaskTensor((2, 1), b=5),
+        ChunkMaskTensor((1, 2), b=5),
         ChunkMaskTensor((0, 0), b=3),
-        SplitMaskTensor((10, 3)),
-        SplitMaskTensor((6, 3), dtype=np.float64),
-        SplitMaskTensor((3, 5)),
-        SplitMaskTensor((3, 1)),
-        SplitMaskTensor((0, 3)),
+        SplitMaskTensor((3, 10)),
+        SplitMaskTensor((3, 10), dtype=np.intp),
+        SplitMaskTensor((3, 6), dtype=np.float64),
+        SplitMaskTensor((5, 3)),
+        SplitMaskTensor((1, 3)),
+        SplitMaskTensor((3, 0)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor((), 0.5, seed=1 << 63),
         RandomMaskTensor((0,), 0.5, seed=42),
@@ -232,6 +242,53 @@ def test_compile_julia_pattern_masks(mask):
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
+_MATRIX = np.arange(1.0, 13.0).reshape(3, 4)
+_VECTOR = np.array([3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0])
+
+
+@pytest.mark.parametrize(
+    "op, np_op, arg",
+    [
+        (lambda a: ft.flip(a, axis=1), lambda a: np.flip(a, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, 2, axis=1), lambda a: np.roll(a, 2, axis=1), _MATRIX),
+        (lambda a: ft.roll(a, -1, axis=0), lambda a: np.roll(a, -1, axis=0), _MATRIX),
+        (
+            lambda a: ft.repeat(a, 3, axis=1),
+            lambda a: np.repeat(a, 3, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, axis=1),
+            lambda a: np.cumsum(a, axis=1),
+            _MATRIX,
+        ),
+        (
+            lambda a: ft.cumulative_sum(a, include_initial=True),
+            lambda a: np.concatenate([[0.0], np.cumsum(a)]),
+            _VECTOR,
+        ),
+        (ft.sort, np.sort, _VECTOR),
+        (
+            lambda a: ft.argsort(a, stable=True),
+            lambda a: np.argsort(a, kind="stable"),
+            _VECTOR,
+        ),
+        (lambda a: ft.triu(a, k=1), lambda a: np.triu(a, k=1), _MATRIX),
+        (lambda a: ft.tril(a, k=-1), lambda a: np.tril(a, k=-1), _MATRIX),
+    ],
+)
+def test_compile_julia_pattern_interface(op, np_op, arg):
+    # These functions select, reduce, and fill through pattern masks, fill
+    # tensors, and choose, which all lower specially on the Julia backend.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg)))
+
+    np.testing.assert_array_equal(result.to_numpy(), np_op(arg))
+
+
 def test_compile_julia_numeric_pattern_mask():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA
@@ -272,8 +329,9 @@ def test_random_mask_matches_julia(shape):
     for seed in (0, 1, 42, (1 << 63) - 1, 1 << 63, (1 << 64) - 1):
         for p in (0.0, np.nextafter(0.0, 1.0), 0.4, 0.5, np.nextafter(1.0, 0.0), 1.0):
             mask = RandomMaskTensor(shape, p, seed=seed)
-            native = jl.Finch.randommask(shape, p, seed=jl.UInt64(seed))
-            expected = materialize(native).to_numpy()
+            # Julia masks have the reversed axes of Python masks.
+            native = jl.Finch.randommask(shape[::-1], p, seed=jl.UInt64(seed))
+            expected = np.transpose(materialize(native).to_numpy())
             actual = np.array([mask[idx].item() for idx in np.ndindex(shape)])
             np.testing.assert_array_equal(actual.reshape(shape), expected)
 
@@ -286,13 +344,13 @@ def test_random_mask_large_coordinates_match_julia():
     large_index = (shape[0] + 1) // 2
     for seed in (42, (1 << 64) - 1):
         mask = RandomMaskTensor(shape, 0.5, seed=seed)
-        native = jl.Finch.randommask(shape, 0.5, seed=jl.UInt64(seed))
+        native = jl.Finch.randommask(shape[::-1], 0.5, seed=jl.UInt64(seed))
         for idx in (
             (2, 3, 1),
             tuple(dim - 1 for dim in shape),
             (large_index, large_index, 7),
         ):
-            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx))
+            assert mask[idx].item() == jl.getindex(native, *(i + 1 for i in idx[::-1]))
 
 
 def test_compile_julia_pattern_lowering(file_regression):
@@ -305,6 +363,7 @@ def test_compile_julia_pattern_lowering(file_regression):
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -314,7 +373,9 @@ def test_compile_julia_pattern_lowering(file_regression):
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     for mask in (
         EyeTensor((3, 5), k=1),
         UpperTriangleTensor((3, 5), k=-1),
@@ -322,8 +383,8 @@ def test_compile_julia_pattern_lowering(file_regression):
         RollTensor((7, 3), k=-4),
         OneHotMaskTensor(5, index=2),
         ReshapeMaskTensor((2, 3), (3, 2)),
-        ChunkMaskTensor((10, 4), b=3),
-        SplitMaskTensor((10, 3)),
+        ChunkMaskTensor((4, 10), b=3),
+        SplitMaskTensor((3, 10)),
         RandomMaskTensor((), 0.4, seed=42),
         RandomMaskTensor(7, 0.25, seed=42),
         RandomMaskTensor((3, 5), 0.5, seed=(1 << 64) - 1, dtype=np.intp),
@@ -350,6 +411,7 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -367,7 +429,11 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     scheduler = LogicNormalizer(
         LogicExecutor(
             DefaultLogicFactorizer(
-                LogicSimplify(DefaultLoopOrderer(FDFormatter(LogicCompiler(compiler))))
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+                    )
+                )
             ),
             stats_factory=FDStatsFactory(),
         )
@@ -375,11 +441,13 @@ def test_compile_julia_sampling_stats_lowering(monkeypatch, file_regression):
     monkeypatch.setattr(default_schedulers, "NON_RECURSIVE_SCHEDULER", scheduler)
     i, j = Field("i"), Field("j")
     data = np.arange(35, dtype=DTYPE).reshape(5, 7) % 3
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(_csr_tensor(data), (i, j))
+    stats = factory(_csr_tensor(data), (i, j), [0.5, 0.5])
     rows, cols = (
-        np.array([factory._get_mask(field, size)[idx].item() for idx in range(size)])
+        np.array(
+            [factory._get_mask(field, size, 0.5)[idx].item() for idx in range(size)]
+        )
         for field, size in zip((i, j), data.shape, strict=True)
     )
     expected = np.count_nonzero((data != 0) * rows[:, None] * cols[None, :])
@@ -402,6 +470,7 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -418,7 +487,9 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     compiler = RecordingJLCompiler()
     scheduler = LogicNormalizer(
         LogicExecutor(
-            LogicSimplify(DefaultLogicFormatter(LogicCompiler(compiler))),
+            LogicSimplify(
+                DefaultLogicFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+            ),
             stats_factory=FDStatsFactory(),
         )
     )
@@ -575,9 +646,6 @@ def _compile_julia_fd(formatter):
 def _to_csr(fbr: FiberTensor) -> FiberTensor:
     """Reformat any 2D FiberTensor into CSR (Dense-over-SparseList) via Finch.jl's
     own reformat, regardless of its current level structure (e.g. SparseHash)."""
-    from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
-    from finch.compile_jl.julia import jl
-
     jl_obj = tensor_to_jl(fbr)
     csr_level = jl.Dense(jl.SparseList(jl.Element(fbr.fill_value)))
     return jl_tensor_to_python(jl.Tensor(csr_level, jl_obj))
@@ -626,6 +694,7 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
 
     class RecordingJLCompiler(FinchJLCompiler):
         def __init__(self):
+            super().__init__()
             self.sources = []
 
         def __call__(self, prgm):
@@ -639,7 +708,9 @@ def test_compile_julia_sparse_diagonal_lowering(sparse_diagonal_data, file_regre
             return super().__call__(prgm)
 
     compiler = RecordingJLCompiler()
-    scheduler = _compile_julia_fd(FDFormatter(LogicCompiler(compiler)))
+    scheduler = _compile_julia_fd(
+        FDFormatter(CompilerFormLowerer(LogicCompiler(compiler)))
+    )
     data = sparse_diagonal_data
     mask = EyeTensor(data.shape, dtype=DTYPE)
     with with_default_scheduler(scheduler):
@@ -663,6 +734,28 @@ def test_compile_julia_sums_sparse_list_level():
     result = _compute_sparse_axis_sum(level)
 
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.int32, np.float64, np.int64])
+@pytest.mark.parametrize("scheduler", ["COMPILE_JULIA", "COMPILE_JULIA_GALLEY"])
+def test_compile_julia_sparse_fill_value_dtypes(dtype, scheduler):
+    """Kernel prototypes must carry the fill type of non-default-width dtypes."""
+    _requires_julia_backend()
+    from finch import autoschedule
+
+    elem_ftype = element(dtype(0), ftype(dtype), ftype(np.intp), NumpyBufferFType)
+    level = SparseListLevel(
+        ElementLevel(elem_ftype, NumpyBuffer(STORED_VALUES.astype(dtype))),
+        COLS,
+        ROW_PTR,
+        COL_IDX,
+    )
+    arg = ft.defer(FiberTensor(DenseLevel(level, ROWS)))
+
+    with with_default_scheduler(getattr(autoschedule, scheduler)):
+        result = ft.compute(ft.sum(arg + arg, axis=1))
+
+    np.testing.assert_array_equal(result.to_numpy(), 2 * EXPECTED_ROW_SUMS)
 
 
 def test_compile_julia_sums_sparse_coo_level():
@@ -721,7 +814,9 @@ def test_compile_julia_with_fd_formatter_uses_dense_output_levels():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLCompiler
 
-    formatter = RecordingFDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = RecordingFDFormatter(
+        CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
+    )
     scheduler = _compile_julia_fd(formatter)
     data = np.array([[1, 0, 2], [0, 3, 4]], dtype=DTYPE)
     arg = ft.asarray(data)
@@ -769,7 +864,7 @@ def test_compile_julia_fd_formatter_sparse_end_to_end(
         case _:
             raise ValueError(f"Unknown sparse end-to-end op: {op_name}")
 
-    formatter = FDFormatter(LogicCompiler(FinchJLCompiler()))
+    formatter = FDFormatter(CompilerFormLowerer(LogicCompiler(FinchJLCompiler())))
     scheduler = _compile_julia_fd(formatter)
     left_data = sparse_a
     right_data = sparse_b if op_name == "matmul" else sparse_a

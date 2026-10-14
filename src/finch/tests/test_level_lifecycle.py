@@ -190,7 +190,7 @@ def test_mlir_freeze_checks_resize():
         AssemblyGenerator()(lifecycle_program(tensor, "freeze"))
     )
     code = MLIRGenerator()(program).code
-    assert "cf.assert" in code
+    assert "llvm.call" in code
     assert "memref.realloc" not in code
 
 

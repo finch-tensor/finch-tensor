@@ -79,7 +79,7 @@ def get_blocks_subtensor(
 
         expr = build_block_expr(arr, fields, starts, ends, coord)
         out = Alias(f"block_{'_'.join(str(c) for c in coord)}")
-        prgm = Plan((Query(out, expr), Produces((out,))))
+        prgm = Plan((Query(Table(out, expr.fields()), expr), Produces((out,))))
         (result,) = NON_RECURSIVE_SCHEDULER(prgm)
         blocks[coord] = result
 

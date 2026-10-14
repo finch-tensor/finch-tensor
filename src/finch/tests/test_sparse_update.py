@@ -5,7 +5,7 @@ import numpy as np
 from finch import finch_assembly as asm
 from finch import finch_notation as ntn
 from finch.algebra import DynamicFill, ffuncs, ftype, is_dynamic
-from finch.codegen import CCompiler, NumbaCompiler
+from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler, make_extent
 from finch.compile.lower import AssemblyGenerator
 from finch.tensor import (
@@ -63,11 +63,10 @@ def copy_program(
         stmts.append(
             ntn.Declare(
                 dst_slot,
-                ntn.Literal(
-                    target.ftype.fill_value
-                    if is_dynamic(target.ftype.fill_value)
-                    else target.fill_value
-                ),
+                # A static fill can't change, so it is declared with itself.
+                ntn.FillValue(dst_slot)
+                if is_dynamic(target.ftype.fill_type)
+                else ntn.Literal(target.fill_value),
                 op,
                 tuple(ntn.Literal(dim) for dim in target.shape),
             )
@@ -137,7 +136,8 @@ def tensors(format_, data, position_type=np.intp, fill=0):
         position_type=ftype(position_type),
     )
     dst_fmt = element(
-        fill if is_dynamic(fill) else np.int64(fill), position_type=ftype(position_type)
+        fill.ftype if isinstance(fill, DynamicFill) else np.int64(fill),
+        position_type=ftype(position_type),
     )
     for char in reversed(format_):
         src_fmt = dense(src_fmt)
@@ -150,6 +150,15 @@ def tensors(format_, data, position_type=np.intp, fill=0):
 
 
 @pytest.mark.parametrize("position_type", [np.int32, np.int64])
+@pytest.mark.parametrize(
+    "loader",
+    [
+        asm.AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
 @pytest.mark.parametrize(
     "format_,data",
     [

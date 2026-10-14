@@ -27,6 +27,7 @@ import pytest
 import numpy as np
 
 import finch as fl
+from finch.algebra import StaticFillFType
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import Field, Literal, Table
@@ -69,7 +70,7 @@ def dc_stats(matrix_4x4, fields_2d):
 
 @pytest.fixture
 def elem_ftype():
-    return ElementLevelFType(fill_value=np.float64(0.0))
+    return ElementLevelFType(fill_type=StaticFillFType(np.float64(0.0)))
 
 
 def test_dense_dense_element(dc_stats, fields_2d, elem_ftype):

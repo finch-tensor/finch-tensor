@@ -16,11 +16,8 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
         case lgc.Plan(bodies):
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
         case lgc.Query(
-            lgc.Alias(name),
-            lgc.Reorder(
-                lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
-                output_idxs,
-            ),
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
         ):
             einidxs = tuple(ein.Index(field.name) for field in output_idxs)
             body = ein.Einsum(
@@ -44,13 +41,38 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
                     )
                 )
             return body
-        case lgc.Query(lgc.Alias(name), rhs):
+        case lgc.Query(
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Aggregate(lgc.Literal(ffuncs.overwrite), _, arg, _),
+        ):
+            # An overwrite writes every element of the output, so its init only
+            # matters as the fill of the output, which the executor sets when
+            # it constructs the output. Einsum can't read fills, so it can't
+            # start from any other init that isn't a literal.
+            return ein.Einsum(
+                op=ein.Literal(ffuncs.overwrite),
+                tns=ein.Alias(name),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
+                arg=generate_einsum_expr(arg),
+            )
+        case lgc.QueryInto(
+            lgc.Table(lgc.Alias(name), output_idxs),
+            lgc.Literal(operation),
+            rhs,
+        ):
+            return ein.Einsum(
+                op=ein.Literal(operation),
+                tns=ein.Alias(name),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
+                arg=generate_einsum_expr(rhs),
+            )
+        case lgc.Query(lgc.Table(lgc.Alias(name), output_idxs), rhs):
             assert isinstance(rhs, lgc.LogicExpression)
             einarg = generate_einsum_expr(rhs)
             return ein.Einsum(
                 op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
-                idxs=tuple(ein.Index(field.name) for field in rhs.fields()),
+                idxs=tuple(ein.Index(field.name) for field in output_idxs),
                 arg=einarg,
             )
         case lgc.Produces(args):

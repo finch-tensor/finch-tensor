@@ -8,9 +8,16 @@ from __future__ import annotations
 import logging
 
 from finch.algebra.tensor import TensorFType
+from finch.autoschedule.cost_models import CostModel
+from finch.autoschedule.factorizer.optimize import with_unique_lhs
 from finch.autoschedule.stages import LogicFactorizer
 from finch.autoschedule.tensor_stats.logic_to_stats import (
     insert_statistics,
+)
+from finch.autoschedule.util import (
+    desugar_query_into,
+    flatten_plans,
+    split_aggregate_inits,
 )
 from finch.finch_logic import (
     Alias,
@@ -45,10 +52,11 @@ def optimize_query(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "dfs",
+    cost_model: CostModel | None = None,
 ):
     """Rewrite a single logical Query using ``optimizer``:
     greedy, bfs, or dfs."""
-    annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings)
+    annotated_query = AnnotatedQuery(stats_factory, query, stats_bindings, cost_model)
     new_queries, _ = pruned_query_to_plan(
         annotated_query,
         use_components=use_components,
@@ -64,6 +72,7 @@ def optimize_plan(
     use_components: bool = True,
     *,
     optimizer: GalleyOptimizer = "greedy",
+    cost_model: CostModel | None = None,
 ):
     """
     Optimize a full Plan: run the Galley optimizer on each Query body,
@@ -80,6 +89,7 @@ def optimize_plan(
                 stats_bindings,
                 use_components=use_components,
                 optimizer=optimizer,
+                cost_model=cost_model,
             )
             for new_query in new_queries:
                 insert_statistics(
@@ -103,7 +113,8 @@ class GalleyLogicFactorizer(LogicFactorizer):
 
     Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
     DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
-    inside ``branch_and_bound_dfs``.
+    inside ``branch_and_bound_dfs``. ``cost_model`` estimates the cost of each
+    reduction, and defaults to ``FlopsCostModel``.
     """
 
     def __init__(
@@ -112,10 +123,12 @@ class GalleyLogicFactorizer(LogicFactorizer):
         use_components: bool = True,
         *,
         optimizer: GalleyOptimizer = "bfs",
+        cost_model: CostModel | None = None,
     ):
         self.ctx = ctx
         self.use_components = use_components
         self.optimizer = optimizer
+        self.cost_model = cost_model
 
     def lower(
         self,
@@ -127,11 +140,24 @@ class GalleyLogicFactorizer(LogicFactorizer):
         if not isinstance(term, Plan):
             raise ValueError(f"Unsupported program type: {type(term)}")
         logger.debug("Optimizing plan: %s", term)
-        term = optimize_plan(
-            term,
-            stats_factory,
-            stats,
-            use_components=self.use_components,
-            optimizer=self.optimizer,
-        )
-        return self.ctx(term, bindings, stats, stats_factory)
+
+        def transform(prgm, bindings):
+            prgm = optimize_plan(
+                prgm,
+                stats_factory,
+                stats,
+                use_components=self.use_components,
+                optimizer=self.optimizer,
+                cost_model=self.cost_model,
+            )
+            return prgm, bindings
+
+        # Galley only keeps the queries that compute produced aliases, so each
+        # write to a bound tensor, including an in-place update, is renamed and
+        # produced, then copied back to the tensor it updates. Galley only
+        # reduces from literals, so aggregates which start from a tensor are
+        # split first.
+        term = split_aggregate_inits(desugar_query_into(term), bindings)
+        term, bindings = with_unique_lhs(transform, term, bindings)
+        assert isinstance(term, Plan)
+        return self.ctx(flatten_plans(term), bindings, stats, stats_factory)

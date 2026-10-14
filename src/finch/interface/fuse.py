@@ -102,20 +102,11 @@ def compute(arg, ctx=None):
     if lazy_args:
         vars = tuple(Alias(gensym("A")) for _ in lazy_args)
         ctx_2 = lazy_args[0].ctx.join(*[x.ctx for x in lazy_args[1:]])
-        bodies = tuple(
-            map(
-                lambda arg, var: Query(
-                    var,
-                    Table(
-                        arg.data,
-                        tuple(Field(gensym("i")) for _ in range(len(arg.shape))),
-                    ),
-                ),
-                lazy_args,
-                vars,
-            )
-        )
-        prgm = Plan(ctx_2.trace() + bodies + (Produces(vars),))
+        bodies = []
+        for arg_i, var in zip(lazy_args, vars, strict=True):
+            idxs = tuple(Field(gensym("i")) for _ in range(len(arg_i.shape)))
+            bodies.append(Query(Table(var, idxs), Table(arg_i.data, idxs)))
+        prgm = Plan((*ctx_2.trace(), *bodies, Produces(vars)))
         res = ctx(prgm)
         for lazy_idx, out_idx in enumerate(lazy_arg_idxs):
             device = lazy_args[lazy_idx].device

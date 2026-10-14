@@ -21,7 +21,7 @@ from finch import (
     ftype,
     sparse_list,
 )
-from finch.algebra import ftypes
+from finch.algebra import DynamicFill, ftypes
 from finch.codegen import (
     CCompiler,
     CGenerator,
@@ -33,6 +33,7 @@ from finch.codegen import (
     NumpyBufferFType,
 )
 from finch.codegen.buffers import MallocBuffer
+from finch.codegen.buffers.memref_buffer import MemrefBufferFType
 from finch.codegen.c_codegen import (
     construct_from_c,
     deserialize_from_c,
@@ -190,6 +191,45 @@ def test_codegen(compiler, buffer):
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        NumbaCompiler(),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_kernels_write_tensor_fields_back(compiler):
+    # A kernel which changes a dimension or a dynamic fill of a tensor it was
+    # given updates the tensor, so that kernels can redefine shapes and fills.
+    fill = DynamicFill(np.float64(0.0))
+    fiber = fiber_tensor(dense(element(fill.ftype))).from_numpy(np.zeros(3), fill)
+    array = finch.BufferizedNDArray.from_numpy(np.zeros(3), fill_value=fill)
+    formats = (fiber.ftype, array.ftype)
+    t, a = asm.Variable("t", fiber.ftype), asm.Variable("a", array.ftype)
+    alias = asm.Variable("alias", array.ftype)
+    dense_lvl = asm.GetAttr(t, asm.Literal("lvl"))
+    element_lvl = asm.GetAttr(dense_lvl, asm.Literal("lvl"))
+    body = asm.Block(
+        (
+            asm.Assign(alias, a),
+            asm.SetAttr(dense_lvl, asm.Literal("dimension"), asm.Literal(np.intp(5))),
+            asm.SetAttr(element_lvl, asm.Literal("fill"), asm.Literal(np.float64(7))),
+            asm.SetAttr(alias, asm.Literal("fill"), asm.Literal(np.float64(8))),
+            asm.Return(asm.Literal(np.intp(0))),
+        )
+    )
+    kernel_t = asm.AssemblyKernelFType("f", (fiber.ftype, array.ftype), finch.intp)
+    prgm = asm.Module((asm.Function(asm.Variable("f", kernel_t), (t, a), body),))
+    compiler(prgm).f(fiber, array)
+    assert fiber.shape == (5,)
+    assert fiber.fill_value == 7.0
+    assert array.fill_value == 8.0
+    # The tensors keep their formats, so later calls reuse the same kernels.
+    assert (fiber.ftype, array.ftype) == formats
 
 
 @pytest.mark.c_backend
@@ -1350,6 +1390,113 @@ def test_mlir_ifelse_branch_local_var():
 
 
 @mlir_backend
+@pytest.mark.parametrize(
+    "fill,values,expected",
+    [
+        (np.int8(0), (np.int8(0), np.int16(5), np.int32(7)), np.int32(5)),
+        (np.int8(0), (np.int8(0), np.float32(5), np.float64(7)), np.float64(5)),
+    ],
+)
+def test_mlir_choose(fill, values, expected):
+    operator = ffuncs.choose(DynamicFill(fill))
+    op = asm.Variable("op", ftype(operator))
+    args = tuple(
+        asm.Variable(name, ftype(value))
+        for name, value in zip(("x", "y", "z"), values, strict=True)
+    )
+    call = asm.Call(op, args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "choose_mixed",
+                    asm.AssemblyKernelFType(
+                        "choose_mixed",
+                        (op.result_type, *(arg.result_type for arg in args)),
+                        call.result_type,
+                    ),
+                ),
+                (op, *args),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).choose_mixed(operator, *values)
+    assert result == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "condition,expected",
+    [
+        (True, np.int32(1)),
+        (False, np.int32(2)),
+    ],
+)
+def test_mlir_where(condition, expected):
+    cond = asm.Variable("cond", ftype(np.bool_))
+    x = asm.Variable("x", ftype(np.int8))
+    y = asm.Variable("y", ftype(np.int32))
+    call = asm.Call(asm.Literal(ffuncs.where), (cond, x, y))
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "where_mixed",
+                    asm.AssemblyKernelFType(
+                        "where_mixed",
+                        (cond.result_type, x.result_type, y.result_type),
+                        call.result_type,
+                    ),
+                ),
+                (cond, x, y),
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = MLIRCompiler()(program).where_mixed(
+        np.bool_(condition), np.int8(1), np.int32(2)
+    )
+    assert result == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "operator,values,expected",
+    [
+        (ffuncs.add, (np.int8(1), np.int16(2), np.int32(3)), np.int32(6)),
+        (ffuncs.mul, (np.int8(1), np.float32(2.5)), np.float32(2.5)),
+        (ffuncs.lt, (np.int8(1), np.int32(2)), np.bool_(True)),
+    ],
+)
+def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
+    args = tuple(
+        asm.Variable(f"arg{i}", ftype(value)) for i, value in enumerate(values)
+    )
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "apply_mixed",
+                    asm.AssemblyKernelFType(
+                        "apply_mixed",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    assert MLIRCompiler()(program).apply_mixed(*values) == expected
+
+
+@mlir_backend
 def test_mlir_setattr_in_while():
     Point = namedtuple("Point", ["x", "y"])
     p = Point(np.float64(1.0), np.float64(2.0))
@@ -1442,3 +1589,145 @@ def test_init_write_returns_rhs(compiler):
     module = compiler(program)
     assert module.write(np.int64(0), np.int64(0)) == 0
     assert module.write(np.int64(0), np.int64(3)) == 3
+
+
+# Test resizing the buffer with NumpyBuffer
+@mlir_backend
+def test_resize_mlir_regression(file_regression):
+    idx_buf = NumpyBuffer(np.empty(0, dtype=np.intp))
+    val_buf = NumpyBuffer(np.empty(0, dtype=np.float64))
+
+    idx_var = asm.Variable("idx", idx_buf.ftype)
+    val_var = asm.Variable("val", val_buf.ftype)
+    idx_slot = asm.Slot("idx_", idx_buf.ftype)
+    val_slot = asm.Slot("val_", val_buf.ftype)
+    new_length = asm.Literal(np.intp(1))
+    zero = asm.Literal(np.intp(0))
+
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "sparse_output",
+                    asm.AssemblyKernelFType(
+                        "sparse_output",
+                        (idx_var.result_type, val_var.result_type),
+                        ftypes.none_,
+                    ),
+                ),
+                (idx_var, val_var),
+                asm.Block(
+                    (
+                        asm.Unpack(idx_slot, idx_var),
+                        asm.Unpack(val_slot, val_var),
+                        asm.Resize(idx_slot, new_length),
+                        asm.Resize(val_slot, new_length),
+                        asm.Store(idx_slot, zero, asm.Literal(np.intp(2))),
+                        asm.Store(val_slot, zero, asm.Literal(np.float64(3.5))),
+                        asm.Repack(idx_slot),
+                        asm.Repack(val_slot),
+                        asm.Return(asm.Literal(None)),
+                    )
+                ),
+            ),
+        )
+    )
+
+    file_regression.check(str(MLIRGenerator()(prgm)), extension=".mlir")
+    MLIRCompiler()(prgm).sparse_output(idx_buf, val_buf)
+    np.testing.assert_array_equal(idx_buf.arr, np.array([2], dtype=np.intp))
+    np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
+
+
+# Test for resize with MemrefBuffer
+@pytest.mark.mlir_backend
+@pytest.mark.parametrize(
+    ["compiler", "buffer"],
+    [
+        (MLIRCompiler(), MemrefBufferFType),
+        (asm.AssemblyInterpreter(), MemrefBufferFType),
+    ],
+)
+@pytest.mark.parametrize("new_size", [1, 5, 10])
+def test_memref_resize(compiler, buffer, new_size):
+    values = [1.0, 4.0, 3.0, 4.0]
+    ab = buffer(ftypes.float64)(len(values))
+    for i, value in enumerate(values):
+        ab.store(i, value)
+
+    ab_v = asm.Variable("a", ab.ftype)
+    ab_slt = asm.Slot("a_", ab.ftype)
+    size = asm.Variable("size", finch.intp)
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "length",
+                    asm.AssemblyKernelFType("length", (ab_v.result_type,), finch.intp),
+                ),
+                (ab_v,),
+                asm.Block(
+                    (
+                        asm.Unpack(ab_slt, ab_v),
+                        asm.Resize(ab_slt, asm.Literal(new_size)),
+                        asm.Repack(ab_slt),
+                        asm.Assign(size, asm.Length(ab_slt)),
+                        asm.Return(size),
+                    )
+                ),
+            ),
+        )
+    )
+
+    mod = compiler(prgm)
+    assert mod.length(ab) == new_size
+    assert ab.length() == new_size
+    for i in range(min(len(values), new_size)):
+        assert ab.load(i) == values[i]
+
+
+# Test for zero copy construction of MLIR Numpy buffer
+def test_numpy_buffer_construct_from_mlir_is_zero_copy():
+    arr = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+    buf = NumpyBuffer(arr)
+    serialized = serialize_to_mlir(buf.ftype, buf)
+
+    constructed = construct_from_mlir(buf.ftype, serialized)
+
+    assert constructed is buf
+    assert constructed.arr is arr
+    assert constructed.arr.ctypes.data == arr.ctypes.data
+
+
+# test for scansearch supporting sps.random matrix
+@mlir_backend
+def test_scansearch_sps_rand(rng):
+    matrix = sps.random(8, 5, density=0.4, format="csr", random_state=rng)
+    row = np.argmax(np.diff(matrix.indptr))
+    lo = matrix.indptr[row]
+    hi = matrix.indptr[row + 1] - np.int32(1)
+    x = matrix.indices[lo + (hi - lo) // np.int32(2)]
+    indices = NumpyBuffer(matrix.indices)
+
+    arg = asm.Variable("indices", indices.ftype)
+    slot = asm.Slot("indices_", indices.ftype)
+    call = asm.Call(
+        asm.Literal(ffuncs.scansearch),
+        (slot, asm.Literal(x), asm.Literal(lo), asm.Literal(hi)),
+    )
+    prgm = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "search",
+                    asm.AssemblyKernelFType("search", (indices.ftype,), finch.int32),
+                ),
+                (arg,),
+                asm.Block((asm.Unpack(slot, arg), asm.Return(call))),
+            ),
+        )
+    )
+
+    result = MLIRCompiler().lower(prgm).search(indices)
+    expected = lo + np.searchsorted(matrix.indices[lo : hi + 1], x)
+    assert result == expected
