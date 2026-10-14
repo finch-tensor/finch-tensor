@@ -6,7 +6,7 @@ import numpy as np
 
 import binsparse as bsp
 
-from finch.algebra import StaticFill, ftype
+from finch.algebra import StaticFillFType, ftype
 from finch.codegen import NumpyBuffer
 from finch.tensor import (
     DenseLevel,
