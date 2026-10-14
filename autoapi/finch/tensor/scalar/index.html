@@ -5816,19 +5816,21 @@ specialize on the value (and recompile per distinct value), unlike plain
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ConstantScalar</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ConstantScalar</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A scalar whose value is treated as a compile-time constant. Kernels may</span>
 <span class="sd">    specialize on the value (and recompile per distinct value), unlike plain</span>
@@ -5840,7 +5842,9 @@ specialize on the value (and recompile per distinct value), unlike plain
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">),</span> <span class="n">StaticFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span>
+            <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">),</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
+        <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5891,21 +5895,7 @@ specialize on the value (and recompile per distinct value), unlike plain
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
@@ -5967,7 +5957,19 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
-<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Scalar</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Scalar</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">fill_value</span> <span class="o">=</span> <span class="n">val</span>
@@ -5978,9 +5980,7 @@ specialize on the value (and recompile per distinct value), unlike plain
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span>
-            <span class="n">elem_t</span><span class="p">,</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">elem_t</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="n">elem_t</span><span class="p">,</span> <span class="n">DynamicFillFType</span><span class="p">(</span><span class="n">elem_t</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5998,7 +5998,7 @@ specialize on the value (and recompile per distinct value), unlike plain
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">))):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)):</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                 <span class="s2">"a ConstantScalar's fill is its value, so a scalar of "</span>
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="si">!r}</span><span class="s2"> cannot take the static fill </span><span class="si">{</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
@@ -6160,10 +6160,7 @@ specialize on the value (and recompile per distinct value), unlike plain
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 26</span>
-<span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 29</span>
 <span class="normal"> 30</span>
 <span class="normal"> 31</span>
 <span class="normal"> 32</span>
@@ -6245,30 +6242,44 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScalarFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_element_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">,</span> <span class="n">_fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScalarFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">_element_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">,</span> <span class="n">_fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span> <span class="n">_device</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span> <span class="o">=</span> <span class="n">_element_type</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">_fill_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">=</span> <span class="n">_fill_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_element_type</span>
-                <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)))</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_fill_type</span>
                 <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">device</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span>
-            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">samehash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">shape</span> <span class="o">!=</span> <span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"ScalarFType can only be called with empty shape ()"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">(</span><span class="n">resolve_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
@@ -6287,8 +6298,8 @@ specialize on the value (and recompile per distinct value), unlike plain
         <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">device</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -6311,17 +6322,28 @@ specialize on the value (and recompile per distinct value), unlike plain
         <span class="k">return</span> <span class="p">[(</span><span class="s2">"val"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">)]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">):</span>
+            <span class="c1"># A scalar's fill defaults to its value.</span>
+            <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span>
+            <span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">resolve_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
+        <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScalarFType</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScalarFType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other_t</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other_t</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
             <span class="c1"># A dynamic-fill ftype accepts any fill value of matching dtype.</span>
-            <span class="n">other_t</span> <span class="o">=</span> <span class="n">other_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)</span>
+            <span class="n">other_t</span> <span class="o">=</span> <span class="n">other_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">other_t</span> <span class="o">==</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="c1"># The dynamic fill of a scalar is its value.</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_unwrap</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">obj</span><span class="p">:</span>
@@ -6396,10 +6418,7 @@ specialize on the value (and recompile per distinct value), unlike plain
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
@@ -6407,7 +6426,10 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a tensor to this scalar tensor type.</span>
 

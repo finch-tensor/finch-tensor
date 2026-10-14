@@ -641,6 +641,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.algebra.tensor.Tensor.fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.algebra.tensor.Tensor.fill_value" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -768,10 +779,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#finch.algebra.tensor.TensorFType.fill_value" class="md-nav__link">
+  <a href="#finch.algebra.tensor.TensorFType.fill_type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fill_value
+        fill_type
       
     </span>
   </a>
@@ -5794,6 +5805,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.algebra.tensor.Tensor.fill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.algebra.tensor.Tensor.fill_value" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5921,10 +5943,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#finch.algebra.tensor.TensorFType.fill_value" class="md-nav__link">
+  <a href="#finch.algebra.tensor.TensorFType.fill_type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fill_value
+        fill_type
       
     </span>
   </a>
@@ -6168,7 +6190,24 @@ advanced interfaces may be required for different backends.</p>
 <span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
-<span class="normal">212</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Tensor</span><span class="p">(</span><span class="n">FTyped</span><span class="p">[</span><span class="n">TensorFType</span><span class="p">[</span><span class="n">FT</span><span class="p">]],</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Tensor</span><span class="p">(</span><span class="n">FTyped</span><span class="p">[</span><span class="n">TensorFType</span><span class="p">[</span><span class="n">FT</span><span class="p">]],</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for tensor-like data structures. Tensors are</span>
 <span class="sd">    multi-dimensional arrays that can be used to represent data in various</span>
@@ -6201,9 +6240,26 @@ advanced interfaces may be required for different backends.</p>
 <span class="w">        </span><span class="sd">"""The fill value for the tensor.  The fill value is the</span>
 <span class="sd">        default value for a tensor when it is created with a given shape and dtype,</span>
 <span class="sd">        as well as the background value for sparse tensors.</span>
-<span class="sd">        Note: this is the raw value NOT the AbstractFill.</span>
+<span class="sd">        Note: this is the raw value NOT the AbstractFill. A tensor whose fill is</span>
+<span class="sd">        dynamic holds its own fill value.</span>
 <span class="sd">        """</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
+        <span class="n">fill_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_type</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill_type</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">fill_type</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> must hold its dynamic fill value"</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        The fill of the tensor: its fill value, and whether kernels may</span>
+<span class="sd">        specialize on it. Its ftype is the fill of the tensor's format.</span>
+<span class="sd">        """</span>
+        <span class="n">fill_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_type</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill_type</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="n">fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">fill_type</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
@@ -6317,6 +6373,29 @@ tensor.</p>
 
 
 
+<h3 id="finch.algebra.tensor.Tensor.fill" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fill</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The fill of the tensor: its fill value, and whether kernels may
+specialize on it. Its ftype is the fill of the tensor's format.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
 <h3 id="finch.algebra.tensor.Tensor.fill_value" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">fill_value</span></code>
 
@@ -6332,7 +6411,8 @@ tensor.</p>
         <p>The fill value for the tensor.  The fill value is the
 default value for a tensor when it is created with a given shape and dtype,
 as well as the background value for sparse tensors.
-Note: this is the raw value NOT the AbstractFill.</p>
+Note: this is the raw value NOT the AbstractFill. A tensor whose fill is
+dynamic holds its own fill value.</p>
 
     </div>
 
@@ -6458,17 +6538,17 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">item</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the Python scalar stored in a zero-dimensional tensor.</span>
@@ -6505,10 +6585,10 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Convert the tensor to a NumPy representation."""</span>
     <span class="o">...</span>
@@ -6538,10 +6618,10 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Convert the tensor to a SciPy sparse representation."""</span>
     <span class="o">...</span>
@@ -6567,13 +6647,13 @@ needs the underlying Python scalar value. Implementations should raise
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/tensor.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tensor</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An equivalent tensor carrying `fill_value` as its fill.</span>
 <span class="sd">    """</span>
@@ -6704,13 +6784,13 @@ needs the underlying Python scalar value. Implementations should raise
 
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""AbstractFill value of the tensor, either static or dynamic."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The fill of the format, either static or dynamic."""</span>
         <span class="o">...</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        This ftype carrying `fill_value` as its fill.</span>
+<span class="sd">        This ftype carrying `fill_type` as its fill.</span>
 <span class="sd">        """</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>
@@ -6797,8 +6877,8 @@ needs the underlying Python scalar value. Implementations should raise
 
 
 
-<h3 id="finch.algebra.tensor.TensorFType.fill_value" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fill_value</span></code>
+<h3 id="finch.algebra.tensor.TensorFType.fill_type" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fill_type</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -6810,7 +6890,7 @@ needs the underlying Python scalar value. Implementations should raise
 
     <div class="doc doc-contents ">
 
-        <p>AbstractFill value of the tensor, either static or dynamic.</p>
+        <p>The fill of the format, either static or dynamic.</p>
 
     </div>
 
@@ -6951,14 +7031,14 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 
 
 <h3 id="finch.algebra.tensor.TensorFType.with_fill" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_type</span><span class="p">)</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>This ftype carrying <code>fill_value</code> as its fill.</p>
+        <p>This ftype carrying <code>fill_type</code> as its fill.</p>
 
 
             <details class="mkdocstrings-source">
@@ -6969,9 +7049,9 @@ e.g. dtypes, formats, or types, and so that we can easily index it.</p>
 <span class="normal">57</span>
 <span class="normal">58</span>
 <span class="normal">59</span>
-<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    This ftype carrying `fill_value` as its fill.</span>
+<span class="sd">    This ftype carrying `fill_type` as its fill.</span>
 <span class="sd">    """</span>
     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
         <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> cannot replace its fill value"</span>

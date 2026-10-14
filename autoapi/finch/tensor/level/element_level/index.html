@@ -5021,23 +5021,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="ElementLevel">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.tensor.level.element_level.ElementLevel.fill" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        fill
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5649,23 +5632,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="ElementLevel">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.tensor.level.element_level.ElementLevel.fill" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        fill
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -5803,28 +5769,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">310</span>
 <span class="normal">311</span>
 <span class="normal">312</span>
 <span class="normal">313</span>
@@ -5838,7 +5783,37 @@
 <span class="normal">321</span>
 <span class="normal">322</span>
 <span class="normal">323</span>
-<span class="normal">324</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span>
+<span class="normal">333</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ElementLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing the leaf level of Finch tensors.</span>
@@ -5846,10 +5821,17 @@
 
     <span class="n">_format</span><span class="p">:</span> <span class="n">ElementLevelFType</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="nb">repr</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">_val</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># The fill belongs to the level, so that a dynamic fill may change without</span>
+    <span class="c1"># changing the format. Only a static fill can default to that of the format.</span>
+    <span class="n">_fill</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">buffer_type</span><span class="p">(</span><span class="nb">len</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">fill_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">fill_type</span>
+            <span class="k">assert</span> <span class="n">fill_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_fill</span> <span class="o">=</span> <span class="n">resolve_fill</span><span class="p">(</span><span class="n">fill_type</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
@@ -5860,17 +5842,19 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_format</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">replace</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">_format</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="o">.</span><span class="n">ftype</span><span class="p">),</span>
+            <span class="n">_fill</span><span class="o">=</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">val</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_val</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""The fill value as a struct field, for marshaling to kernels</span>
-<span class="sd">        compiled against a dynamic fill."""</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_format</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevel(val=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_val</span><span class="si">}</span><span class="s2">)"</span>
@@ -5886,29 +5870,6 @@
 
 
 
-
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="finch.tensor.level.element_level.ElementLevel.fill" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fill</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>The fill value as a struct field, for marshaling to kernels
-compiled against a dynamic fill.</p>
-
-    </div>
-
-</div>
 
 
 
@@ -5943,7 +5904,7 @@ compiled against a dynamic fill.</p>
 
   
       dataclass
-   (finch.tensor.level.level.LevelFType)" href="../level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
+   (finch.tensor.level.level.LevelFType)" href="../level/#finch.tensor.level.level.LevelFType">LevelFType</a></code>, <code><span title="finch.algebra.MutableStructFType">MutableStructFType</span></code></p>
 
 
 
@@ -5956,8 +5917,7 @@ compiled against a dynamic fill.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 27</span>
-<span class="normal"> 28</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 28</span>
 <span class="normal"> 29</span>
 <span class="normal"> 30</span>
 <span class="normal"> 31</span>
@@ -6186,9 +6146,22 @@ compiled against a dynamic fill.</p>
 <span class="normal">254</span>
 <span class="normal">255</span>
 <span class="normal">256</span>
-<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">ElementLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
-    <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ElementLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
+    <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">element_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">position_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">buffer_factory</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">NumpyBufferFType</span>
@@ -6203,10 +6176,23 @@ compiled against a dynamic fill.</p>
         <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span>
             <span class="p">(</span><span class="s2">"val"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="p">),</span>
         <span class="p">]</span>
-        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">):</span>
             <span class="c1"># The fill value is bound at call time through a struct field.</span>
             <span class="n">fields</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"fill"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">fields</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">struct_getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+        <span class="c1"># A dynamic fill is bound at call time through the "fill" field.</span>
+        <span class="k">if</span> <span class="n">attr</span> <span class="o">==</span> <span class="s2">"fill"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">fill_value</span>
+        <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">struct_setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">match</span> <span class="n">attr</span><span class="p">:</span>
+            <span class="k">case</span> <span class="s2">"val"</span><span class="p">:</span>
+                <span class="n">obj</span><span class="o">.</span><span class="n">_val</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="k">case</span> <span class="s2">"fill"</span><span class="p">:</span>
+                <span class="n">obj</span><span class="o">.</span><span class="n">_fill</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="c1"># no inner level</span>
@@ -6218,10 +6204,10 @@ compiled against a dynamic fill.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># Ensure element_type is an FType</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
-                <span class="s2">"Must provide either element_type or fill_value."</span>
+            <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="p">(</span>
+                <span class="s2">"Must provide either element_type or fill_type."</span>
             <span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">element_type</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">FType</span><span class="p">),</span> <span class="p">(</span>
             <span class="s2">"element_type must be an instance of FType"</span>
         <span class="p">)</span>
@@ -6231,10 +6217,11 @@ compiled against a dynamic fill.</p>
             <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="o">.</span><span class="n">element_type</span>
-        <span class="n">fill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">fill</span> <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span> <span class="k">else</span> <span class="n">StaticFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">))</span>
-        <span class="p">)</span>
+        <span class="c1"># The fill defaults to a static zero, and takes the buffer's element type.</span>
+        <span class="n">fill_type</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span>
+        <span class="k">if</span> <span class="n">fill_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">fill_type</span> <span class="o">=</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span> <span class="o">=</span> <span class="n">fill_type</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
@@ -6264,13 +6251,11 @@ compiled against a dynamic fill.</p>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">DynamicFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">:</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevelFType(fv=</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">)"</span>
-            <span class="k">case</span> <span class="n">StaticFill</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill</span><span class="p">:</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevelFType(fv=</span><span class="si">{</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">)"</span>
-            <span class="k">case</span> <span class="n">fill</span><span class="p">:</span>
-                <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevelFType(fv=</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">)"</span>
+        <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">StaticFillFType</span><span class="p">()</span> <span class="k">as</span> <span class="n">fill_type</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevelFType(fv=</span><span class="si">{</span><span class="n">fill_type</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">)"</span>
+            <span class="k">case</span> <span class="n">fill_type</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">"ElementLevelFType(fv=</span><span class="si">{</span><span class="n">fill_type</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ndim</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -6287,9 +6272,9 @@ compiled against a dynamic fill.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">level_format_properties</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevelFType"</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevelFType"</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">ElementLevelFType</span><span class="p">(</span>
-            <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span>
+            <span class="n">fill_type</span><span class="o">=</span><span class="n">fill_type</span><span class="p">,</span>
             <span class="n">element_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span>
             <span class="n">position_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">,</span>
             <span class="n">buffer_factory</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_factory</span><span class="p">,</span>
@@ -6305,19 +6290,19 @@ compiled against a dynamic fill.</p>
             <span class="kn">from</span><span class="w"> </span><span class="nn">finch.codegen</span><span class="w"> </span><span class="kn">import</span> <span class="n">NumpyBuffer</span>
 
             <span class="n">val</span> <span class="o">=</span> <span class="n">NumpyBuffer</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
-        <span class="n">fmt</span> <span class="o">=</span> <span class="bp">self</span> <span class="k">if</span> <span class="n">fill</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">ElementLevel</span><span class="p">(</span><span class="n">_format</span><span class="o">=</span><span class="n">fmt</span><span class="p">,</span> <span class="n">_val</span><span class="o">=</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ElementLevel</span><span class="p">(</span><span class="n">_format</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">_val</span><span class="o">=</span><span class="n">val</span><span class="p">,</span> <span class="n">_fill</span><span class="o">=</span><span class="n">fill</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">):</span>
+            <span class="c1"># The init becomes the fill of the tensor.</span>
+            <span class="n">elem_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">element_type</span>
+            <span class="k">if</span> <span class="n">init</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="n">elem_t</span><span class="p">:</span>
+                <span class="n">init</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">elem_t</span><span class="p">)),</span> <span class="p">(</span><span class="n">init</span><span class="p">,))</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">),</span> <span class="n">init</span><span class="p">))</span>
+            <span class="n">init</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">))</span>
         <span class="n">buf</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
         <span class="n">i_var</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"i"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="o">.</span><span class="n">length_type</span><span class="p">)</span>
-        <span class="n">init_e</span><span class="p">:</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyExpression</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="c1"># The init value arrives at bind time through the fill field.</span>
-            <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">))</span>
-            <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="s2">"val"</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span>
-            <span class="k">else</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
-        <span class="p">)</span>
-        <span class="n">body</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Store</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">i_var</span><span class="p">,</span> <span class="n">init_e</span><span class="p">)</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Store</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">i_var</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">ForLoop</span><span class="p">(</span><span class="n">i_var</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Length</span><span class="p">(</span><span class="n">buf</span><span class="p">),</span> <span class="n">body</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
@@ -6352,9 +6337,9 @@ compiled against a dynamic fill.</p>
         <span class="k">match</span> <span class="n">obj</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">HollowFiber</span><span class="p">(</span><span class="n">dirty</span><span class="o">=</span><span class="n">dirty</span><span class="p">):</span>
                 <span class="n">fill</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="p">))</span>
-                    <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-                    <span class="k">else</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+                    <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">lvl</span><span class="p">))</span>
                 <span class="p">)</span>
                 <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
                     <span class="n">asm</span><span class="o">.</span><span class="n">If</span><span class="p">(</span>
@@ -6380,9 +6365,9 @@ compiled against a dynamic fill.</p>
         <span class="n">p_stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"p_stop"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
         <span class="n">length</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Length</span><span class="p">(</span><span class="n">buf</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-            <span class="k">else</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span>
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="s2">"""finch</span>
 <span class="s2">        p_start = to_size(start)</span>
@@ -6482,18 +6467,18 @@ compiled against a dynamic fill.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
-<span class="normal"> 92</span>
-<span class="normal"> 93</span>
-<span class="normal"> 94</span>
-<span class="normal"> 95</span>
-<span class="normal"> 96</span>
-<span class="normal"> 97</span>
-<span class="normal"> 98</span>
-<span class="normal"> 99</span>
-<span class="normal">100</span>
-<span class="normal">101</span>
-<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this element level type.</span>
 
@@ -6560,19 +6545,19 @@ compiled against a dynamic fill.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"ElementLevel"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of ElementLevel with the given ftype.</span>
 
@@ -6604,7 +6589,7 @@ compiled against a dynamic fill.</p>
 
 
 <h2 id="finch.tensor.level.element_level.element" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">element</span><span class="p">(</span><span class="n">fill_value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">element_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">position_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">buffer_factory</span><span class="o">=</span><span class="n">NumpyBufferFType</span><span class="p">,</span> <span class="n">buffer_type</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">element</span><span class="p">(</span><span class="n">fill_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">element_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">position_type</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">buffer_factory</span><span class="o">=</span><span class="n">NumpyBufferFType</span><span class="p">,</span> <span class="n">buffer_type</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -6627,14 +6612,15 @@ compiled against a dynamic fill.</p>
       <tbody>
           <tr class="doc-section-item">
             <td>
-                <code>fill_value</code>
+                <code>fill_type</code>
             </td>
             <td>
                   <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The value to be used as the fill value for the level.</p>
+                <p>The fill of the level's format, or the value of a static
+fill.</p>
               </div>
             </td>
             <td>
@@ -6739,20 +6725,7 @@ compiled against a dynamic fill.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">273</span>
 <span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span>
@@ -6765,8 +6738,29 @@ compiled against a dynamic fill.</p>
 <span class="normal">283</span>
 <span class="normal">284</span>
 <span class="normal">285</span>
-<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span>
-    <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="normal">286</span>
+<span class="normal">287</span>
+<span class="normal">288</span>
+<span class="normal">289</span>
+<span class="normal">290</span>
+<span class="normal">291</span>
+<span class="normal">292</span>
+<span class="normal">293</span>
+<span class="normal">294</span>
+<span class="normal">295</span>
+<span class="normal">296</span>
+<span class="normal">297</span>
+<span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span>
+    <span class="n">fill_type</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">element_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">position_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">buffer_factory</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">NumpyBufferFType</span><span class="p">,</span>
@@ -6776,7 +6770,8 @@ compiled against a dynamic fill.</p>
 <span class="sd">    Creates an ElementLevelFType with the given parameters.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        fill_value: The value to be used as the fill value for the level.</span>
+<span class="sd">        fill_type: The fill of the level's format, or the value of a static</span>
+<span class="sd">            fill.</span>
 <span class="sd">        element_type: The type of elements stored in the level.</span>
 <span class="sd">        position_type: The type of positions within the level.</span>
 <span class="sd">        buffer_factory: The factory used to create buffers for the level.</span>
@@ -6785,8 +6780,15 @@ compiled against a dynamic fill.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        An instance of ElementLevelFType.</span>
 <span class="sd">    """</span>
+    <span class="k">match</span> <span class="n">fill_type</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">AbstractFillFType</span><span class="p">()</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">case</span> <span class="n">AbstractFill</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"element takes the fill of a format, not </span><span class="si">{</span><span class="n">fill_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+            <span class="n">fill_type</span> <span class="o">=</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="n">fill_type</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ElementLevelFType</span><span class="p">(</span>
-        <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="o">=</span><span class="n">fill_type</span><span class="p">,</span>
         <span class="n">element_type</span><span class="o">=</span><span class="n">element_type</span><span class="p">,</span>
         <span class="n">position_type</span><span class="o">=</span><span class="n">position_type</span><span class="p">,</span>
         <span class="n">buffer_factory</span><span class="o">=</span><span class="n">buffer_factory</span><span class="p">,</span>

@@ -5870,9 +5870,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
 <span class="normal">75</span>
@@ -5884,7 +5882,9 @@
 <span class="normal">81</span>
 <span class="normal">82</span>
 <span class="normal">83</span>
-<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
+<span class="normal">84</span>
+<span class="normal">85</span>
+<span class="normal">86</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Storage features are positions and slots."""</span>
 
     <span class="n">kind</span> <span class="o">=</span> <span class="s2">"dense"</span>
@@ -5952,9 +5952,7 @@ position. Storage features are values and value bytes.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
 <span class="normal">108</span>
@@ -5968,7 +5966,9 @@ position. Storage features are values and value bytes.</p>
 <span class="normal">116</span>
 <span class="normal">117</span>
 <span class="normal">118</span>
-<span class="normal">119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ElementLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ElementLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The element level at the rank of a tensor stores one value for each</span>
 <span class="sd">    position. Storage features are values and value bytes.</span>
@@ -6044,9 +6044,7 @@ with its element level, and the alias is formatted when it is first written.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
 <span class="normal">147</span>
@@ -6087,7 +6085,9 @@ with its element level, and the alias is formatted when it is first written.</p>
 <span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
-<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormatCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">LevelChoice</span><span class="p">]):</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FormatCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">LevelChoice</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A cost model where each level of each formatted alias is a component.</span>
 <span class="sd">    bindings lists the level options of an alias, outermost first and ending</span>
@@ -6187,9 +6187,7 @@ term is the program which reads and writes alias.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
@@ -6204,7 +6202,9 @@ term is the program which reads and writes alias.</p>
 <span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
-<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">LevelChoice</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The choice of a level option at a zero-based depth of alias, with num_pos</span>
@@ -6278,9 +6278,7 @@ and scatter writes for the accesses.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
 <span class="normal">193</span>
@@ -6405,7 +6403,9 @@ and scatter writes for the accesses.</p>
 <span class="normal">312</span>
 <span class="normal">313</span>
 <span class="normal">314</span>
-<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelCostModel</span><span class="p">(</span><span class="n">FormatCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelCostModel</span><span class="p">(</span><span class="n">FormatCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The cost model of the levels of one type of option. Each level contributes</span>
 <span class="sd">    an allocation row, and an access row for each query loop prefix that uses</span>
@@ -6570,9 +6570,7 @@ its parent.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">211</span>
 <span class="normal">212</span>
 <span class="normal">213</span>
 <span class="normal">214</span>
@@ -6645,7 +6643,9 @@ its parent.</p>
 <span class="normal">281</span>
 <span class="normal">282</span>
 <span class="normal">283</span>
-<span class="normal">284</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_access_features</span><span class="p">(</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_access_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">alias</span><span class="p">:</span> <span class="n">Alias</span><span class="p">,</span>
     <span class="n">level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -6743,9 +6743,7 @@ its parent.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">288</span>
 <span class="normal">289</span>
 <span class="normal">290</span>
 <span class="normal">291</span>
@@ -6772,7 +6770,9 @@ its parent.</p>
 <span class="normal">312</span>
 <span class="normal">313</span>
 <span class="normal">314</span>
-<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="n">LevelChoice</span><span class="p">,</span>
     <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
@@ -6848,9 +6848,7 @@ bytes of an index of the level, and of a position and a value of the tensor.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
@@ -6875,7 +6873,9 @@ bytes of an index of the level, and of a position and a value of the tensor.</p>
 <span class="normal">64</span>
 <span class="normal">65</span>
 <span class="normal">66</span>
-<span class="normal">67</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelOption</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LevelOption</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A kind of level, which describes the storage of a level with n_features</span>
 <span class="sd">    storage features, and the number of positions it passes to its child. Both</span>
@@ -6955,9 +6955,7 @@ bytes of an index of the level, and of a position and a value of the tensor.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/format_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
-<span class="normal"> 88</span>
-<span class="normal"> 89</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 89</span>
 <span class="normal"> 90</span>
 <span class="normal"> 91</span>
 <span class="normal"> 92</span>
@@ -6968,7 +6966,9 @@ bytes of an index of the level, and of a position and a value of the tensor.</p>
 <span class="normal"> 97</span>
 <span class="normal"> 98</span>
 <span class="normal"> 99</span>
-<span class="normal">100</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SparseHashLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SparseHashLevelOption</span><span class="p">(</span><span class="n">LevelOption</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Storage features are positions, entries, position bytes, and index bytes."""</span>
 
     <span class="n">kind</span> <span class="o">=</span> <span class="s2">"sparse_hash"</span>
@@ -7028,11 +7028,15 @@ bytes of an index of the level, and of a position and a value of the tensor.</p>
 <span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
-<span class="normal">37</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">nnz_after</span><span class="p">(</span><span class="n">stats</span><span class="p">:</span> <span class="n">NS</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">nnz_after</span><span class="p">(</span><span class="n">stats</span><span class="p">:</span> <span class="n">NS</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Return the non-fill entries of the first depth + 1 levels of stats."""</span>
     <span class="n">reduce_fields</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">[</span><span class="n">depth</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:])</span>
     <span class="k">if</span> <span class="n">reduce_fields</span><span class="p">:</span>
-        <span class="n">stats</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">)</span>
+        <span class="n">stats</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
+            <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_fields</span><span class="p">,</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">stats</span><span class="p">)</span>
+        <span class="p">)</span>
     <span class="k">return</span> <span class="n">stats</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>

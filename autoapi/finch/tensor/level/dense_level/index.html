@@ -5835,10 +5835,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/dense_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
 <span class="normal">234</span>
@@ -5866,7 +5863,12 @@
 <span class="normal">256</span>
 <span class="normal">257</span>
 <span class="normal">258</span>
-<span class="normal">259</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DenseLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing dense level.</span>
@@ -5874,19 +5876,21 @@
 
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
     <span class="n">dimension</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span>
+    <span class="n">stride</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># The stride is stored so that kernels can write it back; it must be</span>
+        <span class="c1"># recomputed whenever the dimensions of the dense levels below change.</span>
+        <span class="n">dim_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">)</span>
+        <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">DenseLevel</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">stride</span> <span class="o">=</span> <span class="n">dim_t</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">dimension</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">stride</span><span class="p">)</span>
+            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">stride</span> <span class="o">=</span> <span class="n">dim_t</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">stride</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">integer</span><span class="p">:</span>
-        <span class="n">dim_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension</span><span class="p">)</span>
-        <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="p">:</span>
-            <span class="k">case</span> <span class="n">DenseLevel</span><span class="p">():</span>
-                <span class="k">return</span> <span class="n">dim_t</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">dimension</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">stride</span><span class="p">)</span>
-            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">dim_t</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevelFType</span><span class="p">:</span>
@@ -5939,7 +5943,7 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="finch.tensor.level.level.SingleDimensionLevelFType">SingleDimensionLevelFType</span></code>, <code><span title="finch.algebra.ImmutableStructFType">ImmutableStructFType</span></code></p>
+              Bases: <code><span title="finch.tensor.level.level.SingleDimensionLevelFType">SingleDimensionLevelFType</span></code>, <code><span title="finch.algebra.MutableStructFType">MutableStructFType</span></code></p>
 
 
 
@@ -6154,8 +6158,11 @@
 <span class="normal">218</span>
 <span class="normal">219</span>
 <span class="normal">220</span>
-<span class="normal">221</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
     <span class="n">dimension_type</span><span class="p">:</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeInteger</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
 
@@ -6170,6 +6177,9 @@
             <span class="p">(</span><span class="s2">"dimension"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
             <span class="p">(</span><span class="s2">"stride"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">),</span>
         <span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">struct_setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_cost</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fields</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">,</span> <span class="n">num_pos</span><span class="p">,</span> <span class="n">lvl</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">get_dim_size</span><span class="p">(</span><span class="n">fields</span><span class="p">[</span><span class="n">lvl</span><span class="p">])</span>
@@ -6215,8 +6225,8 @@
         <span class="k">return</span> <span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">ndim</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">fill_value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">fill_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -6510,10 +6520,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/dense_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">62</span>
 <span class="normal">63</span>
 <span class="normal">64</span>
 <span class="normal">65</span>
@@ -6521,7 +6528,10 @@
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span>
-<span class="normal">70</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a level to this dense level type.</span>
 
@@ -6588,10 +6598,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/dense_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
 <span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
@@ -6602,7 +6609,10 @@
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DenseLevel</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Creates an instance of DenseLevel with the given ftype.</span>
 

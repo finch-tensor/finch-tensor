@@ -5792,13 +5792,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">60</span>
 <span class="normal">61</span>
 <span class="normal">62</span>
 <span class="normal">63</span>
@@ -5813,7 +5807,13 @@
 <span class="normal">72</span>
 <span class="normal">73</span>
 <span class="normal">74</span>
-<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingletonOperatorFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FinchOperatorFType</span><span class="p">):</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SingletonOperatorFType</span><span class="p">(</span><span class="n">ImmutableStructFType</span><span class="p">,</span> <span class="n">FinchOperatorFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A stateless callable type with one canonical operator value."""</span>
 
     <span class="nd">@property</span>
@@ -5876,9 +5876,9 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cansplitpush</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperatorFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cansplitpush</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperatorFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Whether a reduction can split-push through the same operator expression."""</span>
     <span class="k">return</span> <span class="n">repeat_operator</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">is_commutative</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="ow">and</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5933,11 +5933,11 @@
                 <code>z</code>
             </td>
             <td>
-                  <code><a class="autorefs autorefs-external" title="typing.Any" href="https://docs.python.org/3/library/typing.html#typing.Any">Any</a></code>
+                  <code><a class="autorefs autorefs-internal" title="AbstractFillFType (finch.algebra.fill.AbstractFillFType)" href="../fill/#finch.algebra.fill.AbstractFillFType">AbstractFillFType</a></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The initial value.</p>
+                <p>The fill format of the initial value.</p>
               </div>
             </td>
             <td>
@@ -5989,42 +5989,40 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
 <span class="normal">153</span>
-<span class="normal">154</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fixpoint_type</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">CallableFType</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fixpoint_type</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">CallableFType</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Determines the fixpoint type after repeated calling the given operation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        op: The operation to evaluate.</span>
-<span class="sd">        z: The initial value.</span>
+<span class="sd">        z: The fill format of the initial value.</span>
 <span class="sd">        t: The type to evaluate against.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        The fixpoint type.</span>
 <span class="sd">    """</span>
     <span class="n">s</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="n">z_type</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
-    <span class="n">r</span> <span class="o">=</span> <span class="n">z_type</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">element_type</span>
     <span class="k">while</span> <span class="n">r</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">s</span><span class="p">:</span>
         <span class="n">s</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
-        <span class="n">r</span> <span class="o">=</span> <span class="n">return_type</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">z_type</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">return_type</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">r</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6049,15 +6047,15 @@ annihilator rule can fire against it; see <code>SPECIALIZABLE_VALUES</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_specializable_value</span><span class="p">(</span><span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_specializable_value</span><span class="p">(</span><span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A constant is only worth specializing on if some operator's identity or</span>
 <span class="sd">    annihilator rule can fire against it; see `SPECIALIZABLE_VALUES`.</span>
@@ -6090,13 +6088,13 @@ then return g.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">repeat_operator</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperatorFType</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">repeat_operator</span><span class="p">(</span><span class="n">op</span><span class="p">:</span> <span class="n">FinchOperatorFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    If there exists an operator g such that</span>
 <span class="sd">    f(x, x, ..., x)  (n times)  is equal to g(x, n),</span>
@@ -6202,20 +6200,20 @@ then return g.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">183</span>
 <span class="normal">184</span>
 <span class="normal">185</span>
-<span class="normal">186</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">type_max</span><span class="p">(</span><span class="n">type_</span><span class="p">:</span> <span class="n">FDTypeOrdered</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">type_max</span><span class="p">(</span><span class="n">type_</span><span class="p">:</span> <span class="n">FDTypeOrdered</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Returns the maximum value of the given type.</span>
 
@@ -6328,20 +6326,20 @@ then return g.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/algebra/algebra.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
 <span class="normal">168</span>
 <span class="normal">169</span>
-<span class="normal">170</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">type_min</span><span class="p">(</span><span class="n">type_</span><span class="p">:</span> <span class="n">FDTypeOrdered</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">type_min</span><span class="p">(</span><span class="n">type_</span><span class="p">:</span> <span class="n">FDTypeOrdered</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Returns the minimum value of the given type.</span>
 

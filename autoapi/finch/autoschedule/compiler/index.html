@@ -858,10 +858,54 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.autoschedule.compiler.NotationContext.freeze" class="md-nav__link">
     <span class="md-ellipsis">
       
         freeze
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.freeze_reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        freeze_reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.lower_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lower_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.overwrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        overwrite
       
     </span>
   </a>
@@ -5678,10 +5722,54 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.fold" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fold
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.autoschedule.compiler.NotationContext.freeze" class="md-nav__link">
     <span class="md-ellipsis">
       
         freeze
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.freeze_reads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        freeze_reads
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.lower_init" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        lower_init
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.compiler.NotationContext.overwrite" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        overwrite
       
     </span>
   </a>
@@ -5769,10 +5857,9 @@
 
 
 
-        <p>Rewrite a program in FormattedForm into CompilerForm, which makes the
-initialization of each output and the loop over each of its fields
-explicit. Transposes follow the output's storage order; aggregates retain
-their validated loop order.</p>
+        <p>Pass a program in FormattedForm to a loader which expects CompilerForm.
+CompilerForm keeps the definitions and updates of FormattedForm, so the
+program is unchanged.</p>
 
 
 
@@ -5783,59 +5870,33 @@ their validated loop order.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">363</span>
-<span class="normal">364</span>
-<span class="normal">365</span>
-<span class="normal">366</span>
-<span class="normal">367</span>
-<span class="normal">368</span>
-<span class="normal">369</span>
-<span class="normal">370</span>
-<span class="normal">371</span>
-<span class="normal">372</span>
-<span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span>
-<span class="normal">378</span>
-<span class="normal">379</span>
-<span class="normal">380</span>
-<span class="normal">381</span>
-<span class="normal">382</span>
-<span class="normal">383</span>
-<span class="normal">384</span>
-<span class="normal">385</span>
-<span class="normal">386</span>
-<span class="normal">387</span>
-<span class="normal">388</span>
-<span class="normal">389</span>
-<span class="normal">390</span>
-<span class="normal">391</span>
-<span class="normal">392</span>
-<span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
-<span class="normal">401</span>
-<span class="normal">402</span>
-<span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompilerFormLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CompilerFormLowerer</span><span class="p">(</span><span class="n">FormattedForm</span><span class="p">,</span> <span class="n">LogicLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Rewrite a program in FormattedForm into CompilerForm, which makes the</span>
-<span class="sd">    initialization of each output and the loop over each of its fields</span>
-<span class="sd">    explicit. Transposes follow the output's storage order; aggregates retain</span>
-<span class="sd">    their validated loop order.</span>
+<span class="sd">    Pass a program in FormattedForm to a loader which expects CompilerForm.</span>
+<span class="sd">    CompilerForm keeps the definitions and updates of FormattedForm, so the</span>
+<span class="sd">    program is unchanged.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">LogicLoader</span><span class="p">):</span>
@@ -5853,31 +5914,7 @@ their validated loop order.</p>
         <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]],</span>
         <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
     <span class="p">]:</span>
-        <span class="k">def</span><span class="w"> </span><span class="nf">rule</span><span class="p">(</span><span class="n">stmt</span><span class="p">):</span>
-            <span class="k">match</span> <span class="n">stmt</span><span class="p">:</span>
-                <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">):</span>
-                    <span class="n">loop_order</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">idxs</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">arg</span><span class="o">.</span><span class="n">idxs</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">))</span>
-                    <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
-                        <span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
-                    <span class="p">)</span>
-                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
-                    <span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span> <span class="n">_</span><span class="p">)</span>
-                <span class="p">):</span>
-                    <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span>
-                        <span class="p">(</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">),</span> <span class="n">init</span><span class="p">),</span>
-                            <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)),</span>
-                        <span class="p">)</span>
-                    <span class="p">)</span>
-
-        <span class="n">root</span> <span class="o">=</span> <span class="n">Rewrite</span><span class="p">(</span><span class="n">PostWalk</span><span class="p">(</span><span class="n">rule</span><span class="p">))(</span><span class="n">prgm</span><span class="p">)</span>
-        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">)</span>
-        <span class="n">root</span> <span class="o">=</span> <span class="n">flatten_plans</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
-        <span class="n">lib</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">shape_vars</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
-        <span class="c1"># Bind-time inference starts from the inputs alone, but CompilerForm</span>
-        <span class="c1"># initializes an intermediate before any query defines it, so the</span>
-        <span class="c1"># program this pass received is returned instead.</span>
-        <span class="k">return</span> <span class="n">lib</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">shape_vars</span><span class="p">,</span> <span class="n">prgm</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5929,8 +5966,7 @@ compilation process.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 85</span>
-<span class="normal"> 86</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 86</span>
 <span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
@@ -6204,7 +6240,69 @@ compilation process.</p>
 <span class="normal">357</span>
 <span class="normal">358</span>
 <span class="normal">359</span>
-<span class="normal">360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationContext</span><span class="p">:</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationContext</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compiles Finch Logic to Finch Notation. Holds the state of the</span>
 <span class="sd">    compilation process.</span>
@@ -6232,23 +6330,13 @@ compilation process.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">epilogue</span> <span class="o">=</span> <span class="n">epilogue</span>
         <span class="c1"># The mode of each tensor at the current statement: frozen tensors are</span>
         <span class="c1"># Read, and thawed tensors are Updated with the op they were thawed</span>
-        <span class="c1"># with. Initializations are only declared once we know how the tensor</span>
-        <span class="c1"># is used next, so their inits are held here until then.</span>
+        <span class="c1"># with.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">AccessMode</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">var</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Read</span><span class="p">()</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">bindings</span>
         <span class="p">}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Statements which leave `var` frozen, so that it can be read."""</span>
-        <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">:</span>
-            <span class="c1"># Nothing was folded into the init, so it is declared as it is.</span>
-            <span class="n">op</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">)</span>
-            <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
-            <span class="k">return</span> <span class="p">(</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="p">()),</span>
-                <span class="n">ntn</span><span class="o">.</span><span class="n">Freeze</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">op</span><span class="p">),</span>
-            <span class="p">)</span>
         <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]:</span>
             <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Read</span><span class="p">()</span>
@@ -6260,9 +6348,6 @@ compilation process.</p>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Statements which leave `var` thawed, so that it can be updated with</span>
 <span class="sd">        `op`."""</span>
-        <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
-            <span class="k">return</span> <span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">),</span> <span class="n">op</span><span class="p">,</span> <span class="p">()),)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">==</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">()</span>
         <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
@@ -6270,18 +6355,90 @@ compilation process.</p>
         <span class="k">return</span> <span class="p">(</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Thaw</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">op</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Statements which reset `var` to `init`, leaving it thawed, so that it</span>
 <span class="sd">        can be updated with `op`."""</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="p">()))</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_literal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">:</span>
-        <span class="n">fill</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">var</span><span class="p">]</span><span class="o">.</span><span class="n">fill_value</span>
-        <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span> <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span> <span class="k">else</span> <span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The value of `init`, a zero-dimensional expression. A fill expression</span>
+<span class="sd">        whose fill is static is a literal, so that kernels may specialize on it."""</span>
+        <span class="k">if</span> <span class="n">lgc</span><span class="o">.</span><span class="n">is_fill_expression</span><span class="p">(</span><span class="n">init</span><span class="p">):</span>
+            <span class="n">fill</span> <span class="o">=</span> <span class="n">init</span><span class="o">.</span><span class="n">fill_type</span><span class="p">(</span>
+                <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">PointwiseContext</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="n">init</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">freeze_reads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Statements which leave every tensor that `expr` reads frozen."""</span>
+        <span class="n">reads</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
+            <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stmt</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">reads</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">overwrite</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Overwrite `var` with `rhs`, reducing the fields `var` lacks."""</span>
+        <span class="c1"># Every element of var is written, so var is reset to its fill value</span>
+        <span class="c1"># first. An empty reduction writes nothing and leaves var as it was, so</span>
+        <span class="c1"># var is only reset when every reduced extent is nonzero.</span>
+        <span class="n">arg_dims</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">dimmap</span><span class="p">(</span><span class="n">merge_shapes</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">)</span>
+        <span class="n">dims</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">rhs</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">fields</span><span class="p">(),</span> <span class="n">arg_dims</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="n">reduced</span> <span class="o">=</span> <span class="p">[</span><span class="n">dims</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">idxs</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">]</span>
+        <span class="n">nonempty</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">gt</span><span class="p">),</span> <span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">dim</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="mi">0</span><span class="p">))))</span>
+            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">reduced</span>
+            <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="c1"># An overwrite keeps the static fill of var, and otherwise gives var the</span>
+        <span class="c1"># fill of rhs.</span>
+        <span class="n">fill</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">var</span><span class="p">]</span><span class="o">.</span><span class="n">fill_type</span>
+        <span class="n">init</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
+            <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">fill_expression</span><span class="p">(</span><span class="n">rhs</span><span class="p">))</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">nonempty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
+        <span class="c1"># Each branch must leave every tensor in the same mode.</span>
+        <span class="n">stmts</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">rhs</span><span class="p">),</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+        <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">nonempty</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonempty</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">cond</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">and_</span><span class="p">),</span> <span class="n">nonempty</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">If</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="n">body</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))))))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fold</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span>
+        <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
+        <span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">,</span>
+        <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Fold `rhs` into `var` with `op`, after resetting `var` to `init`</span>
+<span class="sd">        unless it is None."""</span>
+        <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">thaw</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">reduced</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
+            <span class="k">match</span> <span class="n">init</span><span class="p">:</span>
+                <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">reduced</span><span class="p">:</span>
+                    <span class="n">op</span> <span class="o">=</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">init_write</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+            <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+        <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
+                <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_reorder</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
+            <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
+                <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_lower_query_of_reorder</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -6418,49 +6575,51 @@ compilation process.</p>
 <span class="sd">        """</span>
         <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
-                <span class="c1"># Initializations lower to nothing until the tensor is used.</span>
                 <span class="n">stmts</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">stmts</span> <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(())))</span>
+            <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">):</span>
+                <span class="c1"># A copy starts from the fill value of arg, and the fields of</span>
+                <span class="c1"># arg which lhs lacks are reduced by overwriting.</span>
+                <span class="n">loop_order</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">idxs</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">arg</span><span class="o">.</span><span class="n">idxs</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">))</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span>
+                    <span class="n">lhs</span><span class="p">,</span>
+                    <span class="n">idxs</span><span class="p">,</span>
+                    <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">fill_expression</span><span class="p">(</span><span class="n">arg</span><span class="p">)),</span>
+                <span class="p">)</span>
+            <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">init</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span>
+            <span class="p">):</span>
+                <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
+                <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">init</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
                 <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">),</span>
                 <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
             <span class="p">):</span>
-                <span class="c1"># An initialization is declared by the statement which next</span>
-                <span class="c1"># uses the tensor, since the declaration needs to know the op</span>
-                <span class="c1"># the tensor will be updated with. An earlier init which is still</span>
-                <span class="c1"># pending is overwritten, so it is dropped.</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-                <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
-                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="n">stmts</span><span class="p">)</span>
+                <span class="n">op</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">)</span>
+                <span class="n">fill</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span><span class="o">.</span><span class="n">fill_type</span>
+                <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)):</span>
+                    <span class="c1"># A static fill can't change, so lhs is declared with its</span>
+                    <span class="c1"># fill, and then every element is overwritten with init.</span>
+                    <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="n">op</span><span class="p">)</span>
+                    <span class="n">arg</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)</span>
+                    <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span>
+                        <span class="n">lhs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span> <span class="n">op</span><span class="p">))</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
-                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">rhs</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">rhs</span><span class="p">,</span>
             <span class="p">):</span>
-                <span class="n">reads</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
-                    <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span>
-                <span class="p">)</span>
-                <span class="n">stmts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stmt</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">reads</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
                 <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">:</span>
-                    <span class="c1"># Overwriting every element of lhs resets it, so it is</span>
-                    <span class="c1"># declared, starting from its init or else its fill value.</span>
-                    <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                        <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_literal</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
-                    <span class="n">reduced</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="n">reduced</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">init</span><span class="o">.</span><span class="n">val</span><span class="p">):</span>
-                        <span class="n">op</span> <span class="o">=</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">init_write</span><span class="p">(</span><span class="n">init</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
-                    <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">thaw</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
-                <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
-                    <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
-                        <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_reorder</span><span class="p">(</span>
-                            <span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span>
-                        <span class="p">)</span>
-                    <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
-                        <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
-                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
+                    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
                 <span class="nb">vars</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
@@ -6514,67 +6673,7 @@ node.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span>
-<span class="normal">346</span>
-<span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">351</span>
 <span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
@@ -6583,7 +6682,69 @@ node.</p>
 <span class="normal">357</span>
 <span class="normal">358</span>
 <span class="normal">359</span>
-<span class="normal">360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span>
+<span class="normal">373</span>
+<span class="normal">374</span>
+<span class="normal">375</span>
+<span class="normal">376</span>
+<span class="normal">377</span>
+<span class="normal">378</span>
+<span class="normal">379</span>
+<span class="normal">380</span>
+<span class="normal">381</span>
+<span class="normal">382</span>
+<span class="normal">383</span>
+<span class="normal">384</span>
+<span class="normal">385</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower Finch Logic to Finch Notation. First we check for early</span>
 <span class="sd">    simplifications, then we call the normal lowering for the outermost</span>
@@ -6591,49 +6752,51 @@ node.</p>
 <span class="sd">    """</span>
     <span class="k">match</span> <span class="n">prgm</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
-            <span class="c1"># Initializations lower to nothing until the tensor is used.</span>
             <span class="n">stmts</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">stmts</span> <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(())))</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">):</span>
+            <span class="c1"># A copy starts from the fill value of arg, and the fields of</span>
+            <span class="c1"># arg which lhs lacks are reduced by overwriting.</span>
+            <span class="n">loop_order</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">idxs</span><span class="p">,</span> <span class="o">*</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">arg</span><span class="o">.</span><span class="n">idxs</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span>
+                <span class="n">lhs</span><span class="p">,</span>
+                <span class="n">idxs</span><span class="p">,</span>
+                <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span>
+                <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">fill_expression</span><span class="p">(</span><span class="n">arg</span><span class="p">)),</span>
+            <span class="p">)</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Aggregate</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">init</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span>
+        <span class="p">):</span>
+            <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">init</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
-            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
             <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">),</span>
             <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span>
         <span class="p">):</span>
-            <span class="c1"># An initialization is declared by the statement which next</span>
-            <span class="c1"># uses the tensor, since the declaration needs to know the op</span>
-            <span class="c1"># the tensor will be updated with. An earlier init which is still</span>
-            <span class="c1"># pending is overwritten, so it is dropped.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-            <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="n">stmts</span><span class="p">)</span>
+            <span class="n">op</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">)</span>
+            <span class="n">fill</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span><span class="o">.</span><span class="n">fill_type</span>
+            <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">init</span><span class="p">,</span> <span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)):</span>
+                <span class="c1"># A static fill can't change, so lhs is declared with its</span>
+                <span class="c1"># fill, and then every element is overwritten with init.</span>
+                <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="n">op</span><span class="p">)</span>
+                <span class="n">arg</span> <span class="o">=</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)</span>
+                <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span>
+                    <span class="n">lhs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">init</span><span class="p">),</span> <span class="n">op</span><span class="p">))</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
-            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span> <span class="n">rhs</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">),</span>
+            <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">()</span> <span class="k">as</span> <span class="n">rhs</span><span class="p">,</span>
         <span class="p">):</span>
-            <span class="n">reads</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
-                <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span>
-            <span class="p">)</span>
-            <span class="n">stmts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stmt</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">reads</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">:</span>
-                <span class="c1"># Overwriting every element of lhs resets it, so it is</span>
-                <span class="c1"># declared, starting from its init or else its fill value.</span>
-                <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_literal</span><span class="p">(</span><span class="n">lhs</span><span class="p">)</span>
-                <span class="n">reduced</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">reduced</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">init</span><span class="o">.</span><span class="n">val</span><span class="p">):</span>
-                    <span class="n">op</span> <span class="o">=</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">init_write</span><span class="p">(</span><span class="n">init</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
-                <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">thaw</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
-            <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
-                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
-                    <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_reorder</span><span class="p">(</span>
-                        <span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span>
-                    <span class="p">)</span>
-                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
-                    <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">lhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
             <span class="nb">vars</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
@@ -6676,23 +6839,93 @@ can be updated with <code>op</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Statements which reset `var` to `init`, leaving it thawed, so that it</span>
 <span class="sd">    can be updated with `op`."""</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">(</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="p">()))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.autoschedule.compiler.NotationContext.fold" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fold</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Fold <code>rhs</code> into <code>var</code> with <code>op</code>, after resetting <code>var</code> to <code>init</code>
+unless it is None.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fold</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span>
+    <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
+    <span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">,</span>
+    <span class="n">init</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Fold `rhs` into `var` with `op`, after resetting `var` to `init`</span>
+<span class="sd">    unless it is None."""</span>
+    <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">rhs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">init</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">thaw</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">reduced</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">fields</span><span class="p">())</span>
+        <span class="k">match</span> <span class="n">init</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="k">if</span> <span class="n">op</span> <span class="o">==</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">reduced</span><span class="p">:</span>
+                <span class="n">op</span> <span class="o">=</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">init_write</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="n">stmts</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">declare</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+    <span class="k">match</span> <span class="n">rhs</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">arg</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">):</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_reorder</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
+        <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span><span class="p">():</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lower_query_of_aggregate</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">body</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6715,35 +6948,179 @@ can be updated with <code>op</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">120</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">119</span>
+<span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Statements which leave `var` frozen, so that it can be read."""</span>
-    <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">:</span>
-        <span class="c1"># Nothing was folded into the init, so it is declared as it is.</span>
-        <span class="n">op</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">)</span>
-        <span class="n">init</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">(</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="p">()),</span>
-            <span class="n">ntn</span><span class="o">.</span><span class="n">Freeze</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">op</span><span class="p">),</span>
-        <span class="p">)</span>
     <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]:</span>
         <span class="k">case</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Read</span><span class="p">()</span>
             <span class="k">return</span> <span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Freeze</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="n">op</span><span class="p">),)</span>
     <span class="k">return</span> <span class="p">()</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.autoschedule.compiler.NotationContext.freeze_reads" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">freeze_reads</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Statements which leave every tensor that <code>expr</code> reads frozen.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">freeze_reads</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Statements which leave every tensor that `expr` reads frozen."""</span>
+    <span class="n">reads</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span>
+        <span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">stmt</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">reads</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.autoschedule.compiler.NotationContext.lower_init" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">lower_init</span><span class="p">(</span><span class="n">init</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The value of <code>init</code>, a zero-dimensional expression. A fill expression
+whose fill is static is a literal, so that kernels may specialize on it.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">lower_init</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicExpression</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationExpression</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The value of `init`, a zero-dimensional expression. A fill expression</span>
+<span class="sd">    whose fill is static is a literal, so that kernels may specialize on it."""</span>
+    <span class="k">if</span> <span class="n">lgc</span><span class="o">.</span><span class="n">is_fill_expression</span><span class="p">(</span><span class="n">init</span><span class="p">):</span>
+        <span class="n">fill</span> <span class="o">=</span> <span class="n">init</span><span class="o">.</span><span class="n">fill_type</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">PointwiseContext</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="n">init</span><span class="p">,</span> <span class="p">{})</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.autoschedule.compiler.NotationContext.overwrite" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">overwrite</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Overwrite <code>var</code> with <code>rhs</code>, reducing the fields <code>var</code> lacks.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">overwrite</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span> <span class="n">rhs</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Reorder</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Overwrite `var` with `rhs`, reducing the fields `var` lacks."""</span>
+    <span class="c1"># Every element of var is written, so var is reset to its fill value</span>
+    <span class="c1"># first. An empty reduction writes nothing and leaves var as it was, so</span>
+    <span class="c1"># var is only reset when every reduced extent is nonzero.</span>
+    <span class="n">arg_dims</span> <span class="o">=</span> <span class="n">rhs</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">dimmap</span><span class="p">(</span><span class="n">merge_shapes</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shapes</span><span class="p">)</span>
+    <span class="n">dims</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">rhs</span><span class="o">.</span><span class="n">arg</span><span class="o">.</span><span class="n">fields</span><span class="p">(),</span> <span class="n">arg_dims</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+    <span class="n">reduced</span> <span class="o">=</span> <span class="p">[</span><span class="n">dims</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">rhs</span><span class="o">.</span><span class="n">idxs</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">]</span>
+    <span class="n">nonempty</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">gt</span><span class="p">),</span> <span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">dim</span><span class="o">.</span><span class="n">result_type</span><span class="p">(</span><span class="mi">0</span><span class="p">))))</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">reduced</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="c1"># An overwrite keeps the static fill of var, and otherwise gives var the</span>
+    <span class="c1"># fill of rhs.</span>
+    <span class="n">fill</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">var</span><span class="p">]</span><span class="o">.</span><span class="n">fill_type</span>
+    <span class="n">init</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">fill</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span>
+        <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_init</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">fill_expression</span><span class="p">(</span><span class="n">rhs</span><span class="p">))</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">nonempty</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
+    <span class="c1"># Each branch must leave every tensor in the same mode.</span>
+    <span class="n">stmts</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze_reads</span><span class="p">(</span><span class="n">rhs</span><span class="p">),</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))</span>
+    <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fold</span><span class="p">(</span><span class="n">var</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">rhs</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
+    <span class="n">cond</span> <span class="o">=</span> <span class="n">nonempty</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nonempty</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">cond</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">and_</span><span class="p">),</span> <span class="n">nonempty</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="o">*</span><span class="n">stmts</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">If</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Block</span><span class="p">((</span><span class="n">body</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">))))))</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6767,26 +7144,20 @@ can be updated with <code>op</code>.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/compiler.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">thaw</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">var</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ntn</span><span class="o">.</span><span class="n">NotationStatement</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Statements which leave `var` thawed, so that it can be updated with</span>
 <span class="sd">    `op`."""</span>
-    <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">(</span><span class="n">ntn</span><span class="o">.</span><span class="n">Declare</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slots</span><span class="p">[</span><span class="n">var</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">inits</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">var</span><span class="p">),</span> <span class="n">op</span><span class="p">,</span> <span class="p">()),)</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">modes</span><span class="p">[</span><span class="n">var</span><span class="p">]</span> <span class="o">==</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Update</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">()</span>
     <span class="n">stmts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">freeze</span><span class="p">(</span><span class="n">var</span><span class="p">)</span>

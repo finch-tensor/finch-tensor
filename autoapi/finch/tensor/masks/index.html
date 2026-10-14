@@ -6001,8 +6001,8 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">position_type</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">fill_value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">fill_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -6094,8 +6094,8 @@
         <span class="n">lvl</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">ctx</span><span class="p">(</span><span class="n">tns</span><span class="o">.</span><span class="n">lvl</span><span class="p">),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"body"</span><span class="p">))</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">ntn</span><span class="o">.</span><span class="n">Value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">lower_fill</span><span class="p">(</span><span class="n">lvl</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
-            <span class="k">else</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span>
+            <span class="k">else</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="n">full</span> <span class="o">=</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Full</span><span class="p">(</span>
             <span class="n">fill</span><span class="p">,</span>

@@ -6115,37 +6115,37 @@ the data in an Buffer is organized and accessed.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1033</span>
-<span class="normal">1034</span>
-<span class="normal">1035</span>
-<span class="normal">1036</span>
-<span class="normal">1037</span>
-<span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
-<span class="normal">1043</span>
-<span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span>
-<span class="normal">1050</span>
-<span class="normal">1051</span>
-<span class="normal">1052</span>
-<span class="normal">1053</span>
-<span class="normal">1054</span>
-<span class="normal">1055</span>
-<span class="normal">1056</span>
-<span class="normal">1057</span>
-<span class="normal">1058</span>
-<span class="normal">1059</span>
-<span class="normal">1060</span>
-<span class="normal">1061</span>
-<span class="normal">1062</span>
-<span class="normal">1063</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRBufferFType</span><span class="p">(</span><span class="n">BufferFType</span><span class="p">,</span> <span class="n">MLIRArgumentFType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1080</span>
+<span class="normal">1081</span>
+<span class="normal">1082</span>
+<span class="normal">1083</span>
+<span class="normal">1084</span>
+<span class="normal">1085</span>
+<span class="normal">1086</span>
+<span class="normal">1087</span>
+<span class="normal">1088</span>
+<span class="normal">1089</span>
+<span class="normal">1090</span>
+<span class="normal">1091</span>
+<span class="normal">1092</span>
+<span class="normal">1093</span>
+<span class="normal">1094</span>
+<span class="normal">1095</span>
+<span class="normal">1096</span>
+<span class="normal">1097</span>
+<span class="normal">1098</span>
+<span class="normal">1099</span>
+<span class="normal">1100</span>
+<span class="normal">1101</span>
+<span class="normal">1102</span>
+<span class="normal">1103</span>
+<span class="normal">1104</span>
+<span class="normal">1105</span>
+<span class="normal">1106</span>
+<span class="normal">1107</span>
+<span class="normal">1108</span>
+<span class="normal">1109</span>
+<span class="normal">1110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRBufferFType</span><span class="p">(</span><span class="n">BufferFType</span><span class="p">,</span> <span class="n">MLIRArgumentFType</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for the ftype of datastructures. The ftype defines how</span>
 <span class="sd">    the data in an Buffer is organized and accessed.</span>
@@ -6212,12 +6212,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
-<span class="normal">1043</span>
-<span class="normal">1044</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1086</span>
+<span class="normal">1087</span>
+<span class="normal">1088</span>
+<span class="normal">1089</span>
+<span class="normal">1090</span>
+<span class="normal">1091</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_length</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return MLIR code which loads a named buffer at the given index.</span>
@@ -6249,12 +6249,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
-<span class="normal">1049</span>
-<span class="normal">1050</span>
-<span class="normal">1051</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1093</span>
+<span class="normal">1094</span>
+<span class="normal">1095</span>
+<span class="normal">1096</span>
+<span class="normal">1097</span>
+<span class="normal">1098</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_load</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return MLIR code which loads a named buffer at the given index.</span>
@@ -6286,10 +6286,10 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1060</span>
-<span class="normal">1061</span>
-<span class="normal">1062</span>
-<span class="normal">1063</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1107</span>
+<span class="normal">1108</span>
+<span class="normal">1109</span>
+<span class="normal">1110</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_resize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="n">new_length</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Resize a buffer and store its updated descriptor in the slot box."""</span>
     <span class="o">...</span>
@@ -6319,12 +6319,12 @@ the data in an Buffer is organized and accessed.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1053</span>
-<span class="normal">1054</span>
-<span class="normal">1055</span>
-<span class="normal">1056</span>
-<span class="normal">1057</span>
-<span class="normal">1058</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1100</span>
+<span class="normal">1101</span>
+<span class="normal">1102</span>
+<span class="normal">1103</span>
+<span class="normal">1104</span>
+<span class="normal">1105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">MLIRContext</span><span class="p">,</span> <span class="n">buffer</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return MLIR code which stores a named buffer to the given index.</span>
@@ -6372,9 +6372,7 @@ the data in an Buffer is organized and accessed.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">273</span>
-<span class="normal">274</span>
-<span class="normal">275</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
 <span class="normal">278</span>
@@ -6405,7 +6403,9 @@ the data in an Buffer is organized and accessed.</p>
 <span class="normal">303</span>
 <span class="normal">304</span>
 <span class="normal">305</span>
-<span class="normal">306</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRCompiler</span><span class="p">(</span><span class="n">MLIRForm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLoader</span><span class="p">):</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRCompiler</span><span class="p">(</span><span class="n">MLIRForm</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to compile and run FinchAssembly.</span>
 
@@ -6493,54 +6493,7 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1116</span>
-<span class="normal">1117</span>
-<span class="normal">1118</span>
-<span class="normal">1119</span>
-<span class="normal">1120</span>
-<span class="normal">1121</span>
-<span class="normal">1122</span>
-<span class="normal">1123</span>
-<span class="normal">1124</span>
-<span class="normal">1125</span>
-<span class="normal">1126</span>
-<span class="normal">1127</span>
-<span class="normal">1128</span>
-<span class="normal">1129</span>
-<span class="normal">1130</span>
-<span class="normal">1131</span>
-<span class="normal">1132</span>
-<span class="normal">1133</span>
-<span class="normal">1134</span>
-<span class="normal">1135</span>
-<span class="normal">1136</span>
-<span class="normal">1137</span>
-<span class="normal">1138</span>
-<span class="normal">1139</span>
-<span class="normal">1140</span>
-<span class="normal">1141</span>
-<span class="normal">1142</span>
-<span class="normal">1143</span>
-<span class="normal">1144</span>
-<span class="normal">1145</span>
-<span class="normal">1146</span>
-<span class="normal">1147</span>
-<span class="normal">1148</span>
-<span class="normal">1149</span>
-<span class="normal">1150</span>
-<span class="normal">1151</span>
-<span class="normal">1152</span>
-<span class="normal">1153</span>
-<span class="normal">1154</span>
-<span class="normal">1155</span>
-<span class="normal">1156</span>
-<span class="normal">1157</span>
-<span class="normal">1158</span>
-<span class="normal">1159</span>
-<span class="normal">1160</span>
-<span class="normal">1161</span>
-<span class="normal">1162</span>
-<span class="normal">1163</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1163</span>
 <span class="normal">1164</span>
 <span class="normal">1165</span>
 <span class="normal">1166</span>
@@ -7264,7 +7217,84 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
 <span class="normal">1884</span>
 <span class="normal">1885</span>
 <span class="normal">1886</span>
-<span class="normal">1887</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
+<span class="normal">1887</span>
+<span class="normal">1888</span>
+<span class="normal">1889</span>
+<span class="normal">1890</span>
+<span class="normal">1891</span>
+<span class="normal">1892</span>
+<span class="normal">1893</span>
+<span class="normal">1894</span>
+<span class="normal">1895</span>
+<span class="normal">1896</span>
+<span class="normal">1897</span>
+<span class="normal">1898</span>
+<span class="normal">1899</span>
+<span class="normal">1900</span>
+<span class="normal">1901</span>
+<span class="normal">1902</span>
+<span class="normal">1903</span>
+<span class="normal">1904</span>
+<span class="normal">1905</span>
+<span class="normal">1906</span>
+<span class="normal">1907</span>
+<span class="normal">1908</span>
+<span class="normal">1909</span>
+<span class="normal">1910</span>
+<span class="normal">1911</span>
+<span class="normal">1912</span>
+<span class="normal">1913</span>
+<span class="normal">1914</span>
+<span class="normal">1915</span>
+<span class="normal">1916</span>
+<span class="normal">1917</span>
+<span class="normal">1918</span>
+<span class="normal">1919</span>
+<span class="normal">1920</span>
+<span class="normal">1921</span>
+<span class="normal">1922</span>
+<span class="normal">1923</span>
+<span class="normal">1924</span>
+<span class="normal">1925</span>
+<span class="normal">1926</span>
+<span class="normal">1927</span>
+<span class="normal">1928</span>
+<span class="normal">1929</span>
+<span class="normal">1930</span>
+<span class="normal">1931</span>
+<span class="normal">1932</span>
+<span class="normal">1933</span>
+<span class="normal">1934</span>
+<span class="normal">1935</span>
+<span class="normal">1936</span>
+<span class="normal">1937</span>
+<span class="normal">1938</span>
+<span class="normal">1939</span>
+<span class="normal">1940</span>
+<span class="normal">1941</span>
+<span class="normal">1942</span>
+<span class="normal">1943</span>
+<span class="normal">1944</span>
+<span class="normal">1945</span>
+<span class="normal">1946</span>
+<span class="normal">1947</span>
+<span class="normal">1948</span>
+<span class="normal">1949</span>
+<span class="normal">1950</span>
+<span class="normal">1951</span>
+<span class="normal">1952</span>
+<span class="normal">1953</span>
+<span class="normal">1954</span>
+<span class="normal">1955</span>
+<span class="normal">1956</span>
+<span class="normal">1957</span>
+<span class="normal">1958</span>
+<span class="normal">1959</span>
+<span class="normal">1960</span>
+<span class="normal">1961</span>
+<span class="normal">1962</span>
+<span class="normal">1963</span>
+<span class="normal">1964</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRContext</span><span class="p">(</span><span class="n">Context</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A context for generating MLIR code.</span>
 
@@ -7509,6 +7539,36 @@ nested blocks, constants, and operations emitted into the MLIR module.</p>
                 <span class="k">return</span> <span class="n">mlir_getattr</span><span class="p">(</span><span class="n">obj_t</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="p">(</span><span class="n">base</span><span class="p">),</span> <span class="n">attrs</span><span class="p">)</span>
 
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">attr</span><span class="p">),</span> <span class="n">value</span><span class="p">):</span>
+                <span class="k">match</span> <span class="n">obj</span><span class="o">.</span><span class="n">result_type</span><span class="p">:</span>
+                    <span class="k">case</span> <span class="n">MutableStructFType</span><span class="p">()</span> <span class="k">as</span> <span class="n">obj_t</span><span class="p">:</span>
+                        <span class="n">obj_value</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+                        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                        <span class="n">value_t</span> <span class="o">=</span> <span class="n">mlir_type</span><span class="p">(</span><span class="n">obj_t</span><span class="o">.</span><span class="n">struct_attrtype</span><span class="p">(</span><span class="n">attr</span><span class="p">))</span>
+                        <span class="n">stored_t</span> <span class="o">=</span> <span class="n">llvm_type</span><span class="p">(</span><span class="n">value_t</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">stored_t</span> <span class="o">!=</span> <span class="n">value_t</span><span class="p">:</span>
+                            <span class="n">cast</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+                            <span class="k">if</span> <span class="n">value_t</span> <span class="o">==</span> <span class="s2">"index"</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">feed</span><span class="si">}{</span><span class="n">cast</span><span class="si">}</span><span class="s2"> = arith.index_cast </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2"> "</span>
+                                    <span class="s2">": index to i64"</span>
+                                <span class="p">)</span>
+                            <span class="k">else</span><span class="p">:</span>
+                                <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+                                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">feed</span><span class="si">}{</span><span class="n">cast</span><span class="si">}</span><span class="s2"> = "</span>
+                                    <span class="s2">"builtin.unrealized_conversion_cast "</span>
+                                    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">value_t</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">stored_t</span><span class="si">}</span><span class="s2">"</span>
+                                <span class="p">)</span>
+                            <span class="n">val</span> <span class="o">=</span> <span class="n">cast</span>
+                        <span class="n">ptr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">new_ssa</span><span class="p">()</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">feed</span><span class="si">}{</span><span class="n">ptr</span><span class="si">}</span><span class="s2"> = llvm.getelementptr </span><span class="si">{</span><span class="n">obj_value</span><span class="si">}</span><span class="s2">"</span>
+                            <span class="sa">f</span><span class="s2">"[0, </span><span class="si">{</span><span class="n">obj_t</span><span class="o">.</span><span class="n">struct_fieldnames</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span><span class="si">}</span><span class="s2">] "</span>
+                            <span class="sa">f</span><span class="s2">": (!llvm.ptr) -&gt; !llvm.ptr, </span><span class="si">{</span><span class="n">mlir_struct_type</span><span class="p">(</span><span class="n">obj_t</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+                        <span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">feed</span><span class="si">}</span><span class="s2">llvm.store </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">ptr</span><span class="si">}</span><span class="s2"> : </span><span class="si">{</span><span class="n">stored_t</span><span class="si">}</span><span class="s2">, !llvm.ptr"</span>
+                        <span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">None</span>
                 <span class="n">attrs</span> <span class="o">=</span> <span class="p">[</span><span class="n">attr</span><span class="p">]</span>
                 <span class="n">base</span> <span class="o">=</span> <span class="n">obj</span>
                 <span class="k">while</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">):</span>
@@ -8090,9 +8150,7 @@ instead of failing deep inside code generation.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
@@ -8182,7 +8240,9 @@ instead of failing deep inside code generation.</p>
 <span class="normal">267</span>
 <span class="normal">268</span>
 <span class="normal">269</span>
-<span class="normal">270</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Validates that a FinchAssembly program only uses constructs the MLIR</span>
 <span class="sd">    backend can lower, raising a named error for each known limitation</span>
@@ -8328,9 +8388,7 @@ invokes the compiled function, and reconstructs the result.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
@@ -8378,7 +8436,9 @@ invokes the compiled function, and reconstructs the result.</p>
 <span class="normal">132</span>
 <span class="normal">133</span>
 <span class="normal">134</span>
-<span class="normal">135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRKernel</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent MLIR kernel. It validates and serializes arguments,</span>
 <span class="sd">    invokes the compiled function, and reconstructs the result.</span>
@@ -8481,9 +8541,7 @@ invokes the compiled function, and reconstructs the result.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
 <span class="normal">143</span>
@@ -8496,7 +8554,9 @@ invokes the compiled function, and reconstructs the result.</p>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
-<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRLibrary</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent MLIR module.</span>
 
@@ -8565,29 +8625,29 @@ support other functions with symbolic inputs in addition to variable ones.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1066</span>
-<span class="normal">1067</span>
-<span class="normal">1068</span>
-<span class="normal">1069</span>
-<span class="normal">1070</span>
-<span class="normal">1071</span>
-<span class="normal">1072</span>
-<span class="normal">1073</span>
-<span class="normal">1074</span>
-<span class="normal">1075</span>
-<span class="normal">1076</span>
-<span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span>
-<span class="normal">1080</span>
-<span class="normal">1081</span>
-<span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRStackFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1113</span>
+<span class="normal">1114</span>
+<span class="normal">1115</span>
+<span class="normal">1116</span>
+<span class="normal">1117</span>
+<span class="normal">1118</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span>
+<span class="normal">1123</span>
+<span class="normal">1124</span>
+<span class="normal">1125</span>
+<span class="normal">1126</span>
+<span class="normal">1127</span>
+<span class="normal">1128</span>
+<span class="normal">1129</span>
+<span class="normal">1130</span>
+<span class="normal">1131</span>
+<span class="normal">1132</span>
+<span class="normal">1133</span>
+<span class="normal">1134</span>
+<span class="normal">1135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRStackFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for symbolic formats in MLIR. Stack formats must also</span>
 <span class="sd">    support other functions with symbolic inputs in addition to variable ones.</span>
@@ -8648,14 +8708,14 @@ to the original object to update.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1081</span>
-<span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1128</span>
+<span class="normal">1129</span>
+<span class="normal">1130</span>
+<span class="normal">1131</span>
+<span class="normal">1132</span>
+<span class="normal">1133</span>
+<span class="normal">1134</span>
+<span class="normal">1135</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Update an object based on a symbolic representation. The `rhs` is the</span>
@@ -8691,14 +8751,14 @@ assign to.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1072</span>
-<span class="normal">1073</span>
-<span class="normal">1074</span>
-<span class="normal">1075</span>
-<span class="normal">1076</span>
-<span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span>
+<span class="normal">1123</span>
+<span class="normal">1124</span>
+<span class="normal">1125</span>
+<span class="normal">1126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a value to a symbolic representation in MLIR. Returns a NamedTuple</span>
@@ -8749,29 +8809,29 @@ support other functions with unpacked inputs in addition to variable ones.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1091</span>
-<span class="normal">1092</span>
-<span class="normal">1093</span>
-<span class="normal">1094</span>
-<span class="normal">1095</span>
-<span class="normal">1096</span>
-<span class="normal">1097</span>
-<span class="normal">1098</span>
-<span class="normal">1099</span>
-<span class="normal">1100</span>
-<span class="normal">1101</span>
-<span class="normal">1102</span>
-<span class="normal">1103</span>
-<span class="normal">1104</span>
-<span class="normal">1105</span>
-<span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
-<span class="normal">1110</span>
-<span class="normal">1111</span>
-<span class="normal">1112</span>
-<span class="normal">1113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRUnpackableFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1138</span>
+<span class="normal">1139</span>
+<span class="normal">1140</span>
+<span class="normal">1141</span>
+<span class="normal">1142</span>
+<span class="normal">1143</span>
+<span class="normal">1144</span>
+<span class="normal">1145</span>
+<span class="normal">1146</span>
+<span class="normal">1147</span>
+<span class="normal">1148</span>
+<span class="normal">1149</span>
+<span class="normal">1150</span>
+<span class="normal">1151</span>
+<span class="normal">1152</span>
+<span class="normal">1153</span>
+<span class="normal">1154</span>
+<span class="normal">1155</span>
+<span class="normal">1156</span>
+<span class="normal">1157</span>
+<span class="normal">1158</span>
+<span class="normal">1159</span>
+<span class="normal">1160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MLIRUnpackableFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Abstract base class for unpackable formats in MLIR. Unpackable formats must also</span>
 <span class="sd">    support other functions with unpacked inputs in addition to variable ones.</span>
@@ -8832,14 +8892,14 @@ to the original object to update.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1106</span>
-<span class="normal">1107</span>
-<span class="normal">1108</span>
-<span class="normal">1109</span>
-<span class="normal">1110</span>
-<span class="normal">1111</span>
-<span class="normal">1112</span>
-<span class="normal">1113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1153</span>
+<span class="normal">1154</span>
+<span class="normal">1155</span>
+<span class="normal">1156</span>
+<span class="normal">1157</span>
+<span class="normal">1158</span>
+<span class="normal">1159</span>
+<span class="normal">1160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_repack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Update an object based on an unpacked representation. The `rhs` is the</span>
@@ -8875,14 +8935,14 @@ assign to.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1097</span>
-<span class="normal">1098</span>
-<span class="normal">1099</span>
-<span class="normal">1100</span>
-<span class="normal">1101</span>
-<span class="normal">1102</span>
-<span class="normal">1103</span>
-<span class="normal">1104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1144</span>
+<span class="normal">1145</span>
+<span class="normal">1146</span>
+<span class="normal">1147</span>
+<span class="normal">1148</span>
+<span class="normal">1149</span>
+<span class="normal">1150</span>
+<span class="normal">1151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">mlir_unpack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a value to an unpacked representation in MLIR. Returns a NamedTuple</span>
@@ -8921,21 +8981,21 @@ assign to.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">887</span>
-<span class="normal">888</span>
-<span class="normal">889</span>
-<span class="normal">890</span>
-<span class="normal">891</span>
-<span class="normal">892</span>
-<span class="normal">893</span>
-<span class="normal">894</span>
-<span class="normal">895</span>
-<span class="normal">896</span>
-<span class="normal">897</span>
-<span class="normal">898</span>
-<span class="normal">899</span>
-<span class="normal">900</span>
-<span class="normal">901</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">llvm_type</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">922</span>
+<span class="normal">923</span>
+<span class="normal">924</span>
+<span class="normal">925</span>
+<span class="normal">926</span>
+<span class="normal">927</span>
+<span class="normal">928</span>
+<span class="normal">929</span>
+<span class="normal">930</span>
+<span class="normal">931</span>
+<span class="normal">932</span>
+<span class="normal">933</span>
+<span class="normal">934</span>
+<span class="normal">935</span>
+<span class="normal">936</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">llvm_type</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Rewrite a MLIR type string into the LLVM dialect type</span>
 <span class="sd">    """</span>
@@ -8973,42 +9033,7 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">904</span>
-<span class="normal">905</span>
-<span class="normal">906</span>
-<span class="normal">907</span>
-<span class="normal">908</span>
-<span class="normal">909</span>
-<span class="normal">910</span>
-<span class="normal">911</span>
-<span class="normal">912</span>
-<span class="normal">913</span>
-<span class="normal">914</span>
-<span class="normal">915</span>
-<span class="normal">916</span>
-<span class="normal">917</span>
-<span class="normal">918</span>
-<span class="normal">919</span>
-<span class="normal">920</span>
-<span class="normal">921</span>
-<span class="normal">922</span>
-<span class="normal">923</span>
-<span class="normal">924</span>
-<span class="normal">925</span>
-<span class="normal">926</span>
-<span class="normal">927</span>
-<span class="normal">928</span>
-<span class="normal">929</span>
-<span class="normal">930</span>
-<span class="normal">931</span>
-<span class="normal">932</span>
-<span class="normal">933</span>
-<span class="normal">934</span>
-<span class="normal">935</span>
-<span class="normal">936</span>
-<span class="normal">937</span>
-<span class="normal">938</span>
-<span class="normal">939</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">939</span>
 <span class="normal">940</span>
 <span class="normal">941</span>
 <span class="normal">942</span>
@@ -9016,12 +9041,51 @@ can pass arguments to and read results from a compiled MLIR kernel.</p>
 <span class="normal">944</span>
 <span class="normal">945</span>
 <span class="normal">946</span>
-<span class="normal">947</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="nb">str</span><span class="p">):</span>
+<span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span>
+<span class="normal">950</span>
+<span class="normal">951</span>
+<span class="normal">952</span>
+<span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span>
+<span class="normal">956</span>
+<span class="normal">957</span>
+<span class="normal">958</span>
+<span class="normal">959</span>
+<span class="normal">960</span>
+<span class="normal">961</span>
+<span class="normal">962</span>
+<span class="normal">963</span>
+<span class="normal">964</span>
+<span class="normal">965</span>
+<span class="normal">966</span>
+<span class="normal">967</span>
+<span class="normal">968</span>
+<span class="normal">969</span>
+<span class="normal">970</span>
+<span class="normal">971</span>
+<span class="normal">972</span>
+<span class="normal">973</span>
+<span class="normal">974</span>
+<span class="normal">975</span>
+<span class="normal">976</span>
+<span class="normal">977</span>
+<span class="normal">978</span>
+<span class="normal">979</span>
+<span class="normal">980</span>
+<span class="normal">981</span>
+<span class="normal">982</span>
+<span class="normal">983</span>
+<span class="normal">984</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="nb">str</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the ctypes equivalent of an FType or MLIR type string, so Python</span>
 <span class="sd">    can pass arguments to and read results from a compiled MLIR kernel.</span>
 <span class="sd">    """</span>
     <span class="k">match</span> <span class="n">s</span><span class="p">:</span>
+        <span class="k">case</span> <span class="n">MutableStructFType</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">mlir_struct_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">))</span>
         <span class="k">case</span> <span class="n">StructFType</span><span class="p">():</span>
             <span class="k">return</span> <span class="n">mlir_struct_ctype</span><span class="p">(</span><span class="n">s</span><span class="p">)</span>
         <span class="k">case</span> <span class="n">FType</span><span class="p">():</span>
@@ -9083,17 +9147,17 @@ the fields of a StructFType, converting each field through mlir_ctype.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">950</span>
-<span class="normal">951</span>
-<span class="normal">952</span>
-<span class="normal">953</span>
-<span class="normal">954</span>
-<span class="normal">955</span>
-<span class="normal">956</span>
-<span class="normal">957</span>
-<span class="normal">958</span>
-<span class="normal">959</span>
-<span class="normal">960</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_struct_ctype</span><span class="p">(</span><span class="n">fmt</span><span class="p">:</span> <span class="n">StructFType</span><span class="p">):</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">987</span>
+<span class="normal">988</span>
+<span class="normal">989</span>
+<span class="normal">990</span>
+<span class="normal">991</span>
+<span class="normal">992</span>
+<span class="normal">993</span>
+<span class="normal">994</span>
+<span class="normal">995</span>
+<span class="normal">996</span>
+<span class="normal">997</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_struct_ctype</span><span class="p">(</span><span class="n">fmt</span><span class="p">:</span> <span class="n">StructFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build a ctypes.Structure subclass named "MLIR&lt;struct_name&gt;" following</span>
 <span class="sd">    the fields of a StructFType, converting each field through mlir_ctype.</span>
@@ -9126,38 +9190,7 @@ the fields of a StructFType, converting each field through mlir_ctype.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/codegen/mlir_codegen/mlir.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">840</span>
-<span class="normal">841</span>
-<span class="normal">842</span>
-<span class="normal">843</span>
-<span class="normal">844</span>
-<span class="normal">845</span>
-<span class="normal">846</span>
-<span class="normal">847</span>
-<span class="normal">848</span>
-<span class="normal">849</span>
-<span class="normal">850</span>
-<span class="normal">851</span>
-<span class="normal">852</span>
-<span class="normal">853</span>
-<span class="normal">854</span>
-<span class="normal">855</span>
-<span class="normal">856</span>
-<span class="normal">857</span>
-<span class="normal">858</span>
-<span class="normal">859</span>
-<span class="normal">860</span>
-<span class="normal">861</span>
-<span class="normal">862</span>
-<span class="normal">863</span>
-<span class="normal">864</span>
-<span class="normal">865</span>
-<span class="normal">866</span>
-<span class="normal">867</span>
-<span class="normal">868</span>
-<span class="normal">869</span>
-<span class="normal">870</span>
-<span class="normal">871</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">871</span>
 <span class="normal">872</span>
 <span class="normal">873</span>
 <span class="normal">874</span>
@@ -9170,7 +9203,37 @@ the fields of a StructFType, converting each field through mlir_ctype.</p>
 <span class="normal">881</span>
 <span class="normal">882</span>
 <span class="normal">883</span>
-<span class="normal">884</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_type</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
+<span class="normal">884</span>
+<span class="normal">885</span>
+<span class="normal">886</span>
+<span class="normal">887</span>
+<span class="normal">888</span>
+<span class="normal">889</span>
+<span class="normal">890</span>
+<span class="normal">891</span>
+<span class="normal">892</span>
+<span class="normal">893</span>
+<span class="normal">894</span>
+<span class="normal">895</span>
+<span class="normal">896</span>
+<span class="normal">897</span>
+<span class="normal">898</span>
+<span class="normal">899</span>
+<span class="normal">900</span>
+<span class="normal">901</span>
+<span class="normal">902</span>
+<span class="normal">903</span>
+<span class="normal">904</span>
+<span class="normal">905</span>
+<span class="normal">906</span>
+<span class="normal">907</span>
+<span class="normal">908</span>
+<span class="normal">909</span>
+<span class="normal">910</span>
+<span class="normal">911</span>
+<span class="normal">912</span>
+<span class="normal">913</span>
+<span class="normal">914</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">mlir_type</span><span class="p">(</span><span class="n">t</span><span class="p">:</span> <span class="n">FType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert an FType into the MLIR type string</span>
 <span class="sd">    """</span>
@@ -9208,11 +9271,10 @@ the fields of a StructFType, converting each field through mlir_ctype.</p>
                     <span class="k">return</span> <span class="sa">f</span><span class="s2">"f</span><span class="si">{</span><span class="n">dt</span><span class="o">.</span><span class="n">itemsize</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">8</span><span class="si">}</span><span class="s2">"</span>
                 <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No MLIR type for numpy dtype </span><span class="si">{</span><span class="n">dt</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">case</span> <span class="n">MutableStructFType</span><span class="p">():</span>
+            <span class="k">return</span> <span class="s2">"!llvm.ptr"</span>
         <span class="k">case</span> <span class="n">StructFType</span><span class="p">():</span>
-            <span class="n">fields</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">llvm_type</span><span class="p">(</span><span class="n">mlir_type</span><span class="p">(</span><span class="n">field_type</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">field_type</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">struct_fields</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="sa">f</span><span class="s2">"!llvm.struct&lt;(</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">fields</span><span class="p">)</span><span class="si">}</span><span class="s2">)&gt;"</span>
+            <span class="k">return</span> <span class="n">mlir_struct_type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No MLIR type mapping for </span><span class="si">{</span><span class="n">t</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>

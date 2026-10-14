@@ -2073,10 +2073,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_value" class="md-nav__link">
+  <a href="#finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fill_value
+        fill_type
       
     </span>
   </a>
@@ -5614,10 +5614,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_value" class="md-nav__link">
+  <a href="#finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_type" class="md-nav__link">
     <span class="md-ellipsis">
       
-        fill_value
+        fill_type
       
     </span>
   </a>
@@ -5701,7 +5701,7 @@
 
     <div class="doc doc-contents ">
             <p class="doc doc-class-bases">
-              Bases: <code><span title="finch.finch_logic.TensorStats">TensorStats</span></code></p>
+              Bases: <code><a class="autorefs autorefs-internal" title="TensorStats (finch.finch_logic.TensorStats)" href="../../../finch_logic/#finch.finch_logic.TensorStats">TensorStats</a></code></p>
 
 
 
@@ -5716,7 +5716,8 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/tensor_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 39</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 38</span>
+<span class="normal"> 39</span>
 <span class="normal"> 40</span>
 <span class="normal"> 41</span>
 <span class="normal"> 42</span>
@@ -5827,7 +5828,8 @@
 <span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
-<span class="normal">150</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
+<span class="normal">150</span>
+<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BaseTensorStats</span><span class="p">(</span><span class="n">TensorStats</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base class for tensor statistics.</span>
 <span class="sd">    """</span>
@@ -5836,7 +5838,7 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">|</span> <span class="n">BaseTensorStats</span><span class="p">,</span>
         <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">dim_types</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">BaseTensorStats</span><span class="p">):</span>
@@ -5847,19 +5849,21 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span>
                 <span class="n">index_order</span><span class="o">.</span><span class="n">index_order</span><span class="p">,</span>
                 <span class="n">index_order</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">,</span>
-                <span class="n">index_order</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span>
+                <span class="n">index_order</span><span class="o">.</span><span class="n">fill_type</span><span class="p">,</span>
                 <span class="n">index_order</span><span class="o">.</span><span class="n">dim_types</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"dim_sizes are required when constructing from fields"</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="n">dim_types</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dim_sizes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">fill_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                    <span class="s2">"dim_sizes and fill_type are required when constructing from fields"</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_init_from_fields</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">,</span> <span class="n">dim_types</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_init_from_fields</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
         <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
-        <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span>
         <span class="n">dim_types</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_index_order</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index_order</span><span class="p">)</span>
@@ -5868,19 +5872,19 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_dim_types</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span>
             <span class="n">dim_types</span> <span class="k">if</span> <span class="n">dim_types</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dim_sizes</span><span class="p">)</span>
         <span class="p">)</span>
-        <span class="c1"># Stats always carry an AbstractFill: propagation must be able to say</span>
-        <span class="c1"># "this fill exists but must not be specialized on".</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="c1"># Stats inform compilation, so they keep the fill of the format, which</span>
+        <span class="c1"># says whether kernels may specialize on the fill value.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">=</span> <span class="n">fill_type</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span>
         <span class="n">index_order</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">],</span>
         <span class="n">dim_sizes</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span>
-        <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span>
         <span class="n">dim_types</span><span class="p">:</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="n">dim_types</span><span class="o">=</span><span class="n">dim_types</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">index_order</span><span class="p">,</span> <span class="n">dim_sizes</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">,</span> <span class="n">dim_types</span><span class="o">=</span><span class="n">dim_types</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
         <span class="n">new</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
@@ -5909,7 +5913,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="o">.</span><span class="n">element_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">index_order</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
@@ -5924,13 +5928,13 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_order</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""The fill, and whether kernels may specialize on it."""</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The fill of the tensor's format, which a kernel may depend on."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span>
 
-    <span class="nd">@fill_value</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="nd">@fill_type</span><span class="o">.</span><span class="n">setter</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">=</span> <span class="n">value</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_dim_space_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="n">prod</span> <span class="o">=</span> <span class="mi">1</span>
@@ -5956,8 +5960,8 @@
 
 
 
-<h3 id="finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_value" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">fill_value</span></code>
+<h3 id="finch.autoschedule.tensor_stats.tensor_stats.BaseTensorStats.fill_type" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fill_type</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
@@ -5969,7 +5973,7 @@
 
     <div class="doc doc-contents ">
 
-        <p>The fill, and whether kernels may specialize on it.</p>
+        <p>The fill of the tensor's format, which a kernel may depend on.</p>
 
     </div>
 

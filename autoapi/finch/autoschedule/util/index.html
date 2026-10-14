@@ -5736,8 +5736,7 @@ the previous value of its left-hand side explicitly.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
-<span class="normal">147</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">147</span>
 <span class="normal">148</span>
 <span class="normal">149</span>
 <span class="normal">150</span>
@@ -5747,7 +5746,8 @@ the previous value of its left-hand side explicitly.</p>
 <span class="normal">154</span>
 <span class="normal">155</span>
 <span class="normal">156</span>
-<span class="normal">157</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">desugar_query_into</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span><span class="p">:</span>
+<span class="normal">157</span>
+<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">desugar_query_into</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Replace each in-place `QueryInto` with the equivalent `Query`, which reads</span>
 <span class="sd">    the previous value of its left-hand side explicitly.</span>
@@ -5786,8 +5786,7 @@ the left-hand side of a query already fixes the order of its result.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">130</span>
-<span class="normal">131</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">131</span>
 <span class="normal">132</span>
 <span class="normal">133</span>
 <span class="normal">134</span>
@@ -5799,7 +5798,8 @@ the left-hand side of a query already fixes the order of its result.</p>
 <span class="normal">140</span>
 <span class="normal">141</span>
 <span class="normal">142</span>
-<span class="normal">143</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">):</span>
+<span class="normal">143</span>
+<span class="normal">144</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_query_reorders</span><span class="p">(</span><span class="n">root</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Remove a Reorder at the root of each query's right-hand side. The table on</span>
 <span class="sd">    the left-hand side of a query already fixes the order of its result.</span>
@@ -5835,9 +5835,9 @@ the left-hand side of a query already fixes the order of its result.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reorder_to</span><span class="p">(</span><span class="n">ex</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">LogicExpression</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reorder_to</span><span class="p">(</span><span class="n">ex</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">idxs</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">LogicExpression</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""`ex` with its fields in the order `idxs`."""</span>
     <span class="k">return</span> <span class="n">ex</span> <span class="k">if</span> <span class="n">ex</span><span class="o">.</span><span class="n">fields</span><span class="p">()</span> <span class="o">==</span> <span class="n">idxs</span> <span class="k">else</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">ex</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5866,8 +5866,7 @@ are left as they are.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
-<span class="normal">161</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">161</span>
 <span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span>
@@ -5890,7 +5889,8 @@ are left as they are.</p>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
-<span class="normal">184</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">resugar_query_into</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span><span class="p">:</span>
+<span class="normal">184</span>
+<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">resugar_query_into</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicStatement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Replace each query of an aggregate which starts from a tensor with an</span>
 <span class="sd">    in-place `QueryInto`. The aggregate folds its argument into a copy of its</span>
@@ -5940,8 +5940,7 @@ of the aggregate are split.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/util.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">187</span>
-<span class="normal">188</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
@@ -5971,7 +5970,8 @@ of the aggregate are split.</p>
 <span class="normal">215</span>
 <span class="normal">216</span>
 <span class="normal">217</span>
-<span class="normal">218</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split_aggregate_inits</span><span class="p">(</span>
+<span class="normal">218</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">split_aggregate_inits</span><span class="p">(</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
     <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
     <span class="n">broadcast_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>

@@ -6146,13 +6146,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">243</span>
 <span class="normal">244</span>
 <span class="normal">245</span>
 <span class="normal">246</span>
@@ -6275,13 +6269,19 @@
 <span class="normal">363</span>
 <span class="normal">364</span>
 <span class="normal">365</span>
-<span class="normal">366</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LazyTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span>
+<span class="normal">370</span>
+<span class="normal">371</span>
+<span class="normal">372</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LazyTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">data</span><span class="p">:</span> <span class="n">Alias</span><span class="p">,</span>
         <span class="n">ctx</span><span class="p">:</span> <span class="n">EffectBlob</span><span class="p">,</span>
         <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span>
-        <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span>
         <span class="n">element_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">,</span>
         <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
@@ -6289,7 +6289,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="n">shape</span>
         <span class="c1"># Held as an AbstractFill so a dynamic fill survives ftype round trips.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">fill_value</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span> <span class="o">=</span> <span class="n">element_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
@@ -6299,7 +6299,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">LazyTensorFType</span><span class="p">(</span>
-            <span class="n">_fill_value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span>
+            <span class="n">_fill_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">ftype</span><span class="p">,</span>
             <span class="n">_element_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span>
             <span class="n">_shape_type</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">),</span>
             <span class="n">_device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">,</span>
@@ -6527,14 +6527,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">362</span>
+<span class="normal">363</span>
+<span class="normal">364</span>
+<span class="normal">365</span>
+<span class="normal">366</span>
+<span class="normal">367</span>
+<span class="normal">368</span>
+<span class="normal">369</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a bool.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -6565,14 +6565,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__complex__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__complex__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">complex</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a complex number.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -6603,14 +6603,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">338</span>
-<span class="normal">339</span>
-<span class="normal">340</span>
-<span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
-<span class="normal">345</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__float__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span>
+<span class="normal">350</span>
+<span class="normal">351</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__float__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to a float.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -6641,14 +6641,14 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">347</span>
-<span class="normal">348</span>
-<span class="normal">349</span>
-<span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
-<span class="normal">354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__int__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__int__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Converts the LazyTensor to an int.</span>
 <span class="sd">    This is a no-op for LazyTensors, as they are symbolic representations.</span>
@@ -6696,8 +6696,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/np_wrapper.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
-<span class="normal">17</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
@@ -6748,15 +6747,16 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">65</span>
 <span class="normal">66</span>
 <span class="normal">67</span>
-<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumPyFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">):</span>
+<span class="normal">68</span>
+<span class="normal">69</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumPyFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dtype</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">ndim</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">dtype</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ndim</span> <span class="o">=</span> <span class="n">ndim</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">StaticFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span><span class="o">.</span><span class="n">type</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
@@ -6866,8 +6866,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/np_wrapper.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
-<span class="normal">43</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
 <span class="normal">46</span>
@@ -6877,7 +6876,8 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="s2">"NumPyWrapper"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"NumPyWrapper"</span><span class="p">:</span>
+<span class="normal">53</span>
+<span class="normal">54</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="s2">"NumPyWrapper"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"NumPyWrapper"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a tensor to this numpy tensor type.</span>
 
@@ -6929,8 +6929,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/np_wrapper.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
-<span class="normal"> 72</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
 <span class="normal"> 75</span>
@@ -6978,7 +6977,8 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
-<span class="normal">120</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumPyWrapper</span><span class="p">(</span><span class="n">Tensor</span><span class="p">):</span>
+<span class="normal">120</span>
+<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumPyWrapper</span><span class="p">(</span><span class="n">Tensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
@@ -6994,7 +6994,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Default fill value."""</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">return</span> <span class="n">resolve_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">element_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
@@ -7144,21 +7144,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
 <span class="normal">131</span>
@@ -7220,7 +7206,19 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
-<span class="normal">190</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Scalar</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Scalar</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">fill_value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">fill_value</span> <span class="o">=</span> <span class="n">val</span>
@@ -7231,9 +7229,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">ftype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span>
-            <span class="n">elem_t</span><span class="p">,</span> <span class="n">DynamicFill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">elem_t</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="n">elem_t</span><span class="p">,</span> <span class="n">DynamicFillFType</span><span class="p">(</span><span class="n">elem_t</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -7251,7 +7247,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="n">fill_value</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">))):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="p">)):</span>
             <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
                 <span class="s2">"a ConstantScalar's fill is its value, so a scalar of "</span>
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="si">!r}</span><span class="s2"> cannot take the static fill </span><span class="si">{</span><span class="n">fill_value</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
@@ -7413,10 +7409,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 26</span>
-<span class="normal"> 27</span>
-<span class="normal"> 28</span>
-<span class="normal"> 29</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 29</span>
 <span class="normal"> 30</span>
 <span class="normal"> 31</span>
 <span class="normal"> 32</span>
@@ -7498,30 +7491,44 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">108</span>
 <span class="normal">109</span>
 <span class="normal">110</span>
-<span class="normal">111</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScalarFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_element_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">,</span> <span class="n">_fill_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_device</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ScalarFType</span><span class="p">(</span><span class="n">TensorFType</span><span class="p">,</span> <span class="n">ImmutableStructFType</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">_element_type</span><span class="p">:</span> <span class="n">FType</span><span class="p">,</span> <span class="n">_fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span> <span class="n">_device</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span> <span class="o">=</span> <span class="n">_element_type</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span> <span class="o">=</span> <span class="n">as_fill</span><span class="p">(</span><span class="n">_fill_value</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">=</span> <span class="n">_fill_type</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_device</span> <span class="o">=</span> <span class="n">normalize_device</span><span class="p">(</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_element_type</span>
-                <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">same</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)))</span>
+                <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_fill_type</span>
                 <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">device</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="kc">False</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span>
-            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">samehash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
-        <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">shape</span> <span class="o">!=</span> <span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"ScalarFType can only be called with empty shape ()"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">(</span><span class="n">resolve_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
@@ -7540,8 +7547,8 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
         <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">fill_value</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFill</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">device</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -7564,17 +7571,28 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
         <span class="k">return</span> <span class="p">[(</span><span class="s2">"val"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">)]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">from_fields</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">):</span>
+            <span class="c1"># A scalar's fill defaults to its value.</span>
+            <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Scalar</span><span class="p">(</span>
+            <span class="n">val</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">resolve_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">),</span> <span class="n">device</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_device</span>
+        <span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScalarFType</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ScalarFType</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ScalarFType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element_type</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_device</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fisinstance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other_t</span> <span class="o">=</span> <span class="n">ftype</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other_t</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other_t</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
             <span class="c1"># A dynamic-fill ftype accepts any fill value of matching dtype.</span>
-            <span class="n">other_t</span> <span class="o">=</span> <span class="n">other_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="p">)</span>
+            <span class="n">other_t</span> <span class="o">=</span> <span class="n">other_t</span><span class="o">.</span><span class="n">with_fill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">other_t</span> <span class="o">==</span> <span class="bp">self</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower_fill</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">is_static</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_type</span><span class="o">.</span><span class="n">value</span><span class="p">)</span>
+        <span class="c1"># The dynamic fill of a scalar is its value.</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lower_unwrap</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_unwrap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">obj</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">obj</span><span class="p">:</span>
@@ -7649,10 +7667,7 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/scalar.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
@@ -7660,7 +7675,10 @@ This is a no-op for LazyTensors, as they are symbolic representations.</p>
 <span class="normal">59</span>
 <span class="normal">60</span>
 <span class="normal">61</span>
-<span class="normal">62</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Scalar</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Convert a tensor to this scalar tensor type.</span>
 
@@ -7752,13 +7770,7 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">435</span>
 <span class="normal">436</span>
 <span class="normal">437</span>
 <span class="normal">438</span>
@@ -7844,7 +7856,13 @@ https://data-apis.org/array-api/latest/API_specification/generated/array_api.asa
 <span class="normal">518</span>
 <span class="normal">519</span>
 <span class="normal">520</span>
-<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">asarray</span><span class="p">(</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">asarray</span><span class="p">(</span>
     <span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="o">/</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
@@ -8233,13 +8251,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/interface/lazy.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
-<span class="normal">536</span>
-<span class="normal">537</span>
-<span class="normal">538</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">538</span>
 <span class="normal">539</span>
 <span class="normal">540</span>
 <span class="normal">541</span>
@@ -8261,7 +8273,11 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
 <span class="normal">557</span>
 <span class="normal">558</span>
 <span class="normal">559</span>
-<span class="normal">560</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">defer</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LazyTensor</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    - defer(arr) -&gt; LazyTensor:</span>
 <span class="sd">    Converts an array into a LazyTensor. If the input is already a LazyTensor, it is</span>
@@ -8287,9 +8303,7 @@ Otherwise, it creates a LazyTensor representation of the input array.</li>
     <span class="n">idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Field</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"i"</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
     <span class="n">ctx</span> <span class="o">=</span> <span class="n">EffectBlob</span><span class="p">(</span><span class="n">stmt</span><span class="o">=</span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">Table</span><span class="p">(</span><span class="n">Literal</span><span class="p">(</span><span class="n">arr</span><span class="p">),</span> <span class="n">idxs</span><span class="p">)))</span>
-    <span class="k">return</span> <span class="n">LazyTensor</span><span class="p">(</span>
-        <span class="n">tns</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_value</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">device</span>
-    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">LazyTensor</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">fill</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">element_type</span><span class="p">,</span> <span class="n">arr</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

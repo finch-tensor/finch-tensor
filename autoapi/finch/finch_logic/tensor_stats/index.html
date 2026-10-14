@@ -4099,6 +4099,62 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.StatsFactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StatsFactory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StatsFactory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.StatsFactory.support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.TensorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TensorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TensorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.TensorStats.fill_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill_type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5560,6 +5616,62 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.StatsFactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        StatsFactory
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StatsFactory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.StatsFactory.support" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        support
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.TensorStats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TensorStats
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TensorStats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.finch_logic.tensor_stats.TensorStats.fill_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fill_type
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5607,6 +5719,265 @@
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.finch_logic.tensor_stats.StatsFactory" class="doc doc-heading">
+            <code>StatsFactory</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code>, <code><a class="autorefs autorefs-external" title="typing.Generic" href="https://docs.python.org/3/library/typing.html#typing.Generic">Generic</a>[<span title="finch.finch_logic.tensor_stats.TS">TS</span>]</code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/finch_logic/tensor_stats.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatsFactory</span><span class="p">(</span><span class="n">ABC</span><span class="p">,</span> <span class="n">Generic</span><span class="p">[</span><span class="n">TS</span><span class="p">]):</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tensor</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">fields</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stat</span><span class="p">:</span> <span class="n">TS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">support</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stat</span><span class="p">:</span> <span class="n">TS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Statistics of the boolean indicator of non-fill entries."""</span>
+        <span class="c1"># Support preserves the non-fill structure, even for dynamic fills.</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">fill_type</span> <span class="o">=</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapjoin</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">TS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
+        <span class="n">init</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">reduce_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="n">TS</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">relabel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats</span><span class="p">:</span> <span class="n">TS</span><span class="p">,</span> <span class="n">relabel_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reorder</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats</span><span class="p">:</span> <span class="n">TS</span><span class="p">,</span> <span class="n">reorder_indices</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.finch_logic.tensor_stats.StatsFactory.support" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">support</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Statistics of the boolean indicator of non-fill entries.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/finch_logic/tensor_stats.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">support</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stat</span><span class="p">:</span> <span class="n">TS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TS</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Statistics of the boolean indicator of non-fill entries."""</span>
+    <span class="c1"># Support preserves the non-fill structure, even for dynamic fills.</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
+    <span class="n">result</span><span class="o">.</span><span class="n">fill_type</span> <span class="o">=</span> <span class="n">StaticFillFType</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.finch_logic.tensor_stats.TensorStats" class="doc doc-heading">
+            <code>TensorStats</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/finch_logic/tensor_stats.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TensorStats</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span> <span class="o">...</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">index_order</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">idxs</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dim_sizes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MutableMapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span> <span class="o">...</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AbstractFillFType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The fill of the tensor's format, which a kernel may depend on."""</span>
+
+    <span class="nd">@fill_type</span><span class="o">.</span><span class="n">setter</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fill_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="o">...</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="finch.finch_logic.tensor_stats.TensorStats.fill_type" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">fill_type</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+      <small class="doc doc-label doc-label-writable"><code>writable</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The fill of the tensor's format, which a kernel may depend on.</p>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 

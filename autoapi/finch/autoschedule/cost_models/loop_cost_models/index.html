@@ -6018,14 +6018,7 @@ prefixes. By default, allocations are weighted 10x reads and operations.</p>
 <span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PigeonCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PigeonCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    PigeonCostModel counts iteration, operation, and output costs across loop</span>
 <span class="sd">    prefixes. By default, allocations are weighted 10x reads and operations.</span>
@@ -6071,24 +6064,17 @@ prefixes. By default, allocations are weighted 10x reads and operations.</p>
                 <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">out_space</span><span class="o">.</span><span class="n">index_order</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">output_vars</span>
             <span class="p">)</span>
             <span class="k">if</span> <span class="n">reduce_idxs</span><span class="p">:</span>
-                <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">out_space</span><span class="p">)</span>
-                <span class="n">out_space</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">=</span> <span class="n">StaticFill</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
                 <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
-                    <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">out_space</span>
+                    <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">out_space</span><span class="p">)</span>
                 <span class="p">)</span>
             <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">reorder</span><span class="p">(</span><span class="n">out_space</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">out_space</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()]])</span>
 
-        <span class="k">def</span><span class="w"> </span><span class="nf">support</span><span class="p">(</span><span class="n">stat</span><span class="p">:</span> <span class="n">NS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NS</span><span class="p">:</span>
-            <span class="n">stat</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
-            <span class="n">stat</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">=</span> <span class="n">StaticFill</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">stat</span>
-
         <span class="k">def</span><span class="w"> </span><span class="nf">project</span><span class="p">(</span><span class="n">stat</span><span class="p">:</span> <span class="n">NS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NS</span><span class="p">:</span>
             <span class="n">reduce_idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">stat</span><span class="o">.</span><span class="n">index_order</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">parent</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
-                <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">support</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
+                <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
             <span class="p">)</span>
 
         <span class="n">parent</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">prefix</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
@@ -6098,7 +6084,7 @@ prefixes. By default, allocations are weighted 10x reads and operations.</p>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">:</span>
-                    <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">support</span><span class="p">(</span><span class="n">machine</span><span class="p">(</span><span class="n">node</span><span class="p">)))</span>
+                    <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">machine</span><span class="p">(</span><span class="n">node</span><span class="p">)))</span>
         <span class="n">iter_space</span> <span class="o">=</span> <span class="n">exec_space</span>
         <span class="k">if</span> <span class="n">inputs</span><span class="p">:</span>
             <span class="n">iter_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">mapjoin</span><span class="p">(</span>
@@ -6218,14 +6204,7 @@ including the empty one, gives the query's features.</p>
 <span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
+<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="n">Prefix</span><span class="p">,</span>
     <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
@@ -6254,24 +6233,17 @@ including the empty one, gives the query's features.</p>
             <span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">out_space</span><span class="o">.</span><span class="n">index_order</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">output_vars</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="n">reduce_idxs</span><span class="p">:</span>
-            <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">out_space</span><span class="p">)</span>
-            <span class="n">out_space</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">=</span> <span class="n">StaticFill</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
             <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
-                <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">out_space</span>
+                <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">out_space</span><span class="p">)</span>
             <span class="p">)</span>
         <span class="n">out_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">reorder</span><span class="p">(</span><span class="n">out_space</span><span class="p">,</span> <span class="n">output_vars</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">out_space</span><span class="o">.</span><span class="n">estimate_non_fill_values</span><span class="p">()]])</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">support</span><span class="p">(</span><span class="n">stat</span><span class="p">:</span> <span class="n">NS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NS</span><span class="p">:</span>
-        <span class="n">stat</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
-        <span class="n">stat</span><span class="o">.</span><span class="n">fill_value</span> <span class="o">=</span> <span class="n">StaticFill</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">stat</span>
-
     <span class="k">def</span><span class="w"> </span><span class="nf">project</span><span class="p">(</span><span class="n">stat</span><span class="p">:</span> <span class="n">NS</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NS</span><span class="p">:</span>
         <span class="n">reduce_idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">stat</span><span class="o">.</span><span class="n">index_order</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">parent</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">aggregate</span><span class="p">(</span>
-            <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">support</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
+            <span class="n">ffuncs</span><span class="o">.</span><span class="n">or_</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">reduce_idxs</span><span class="p">,</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">stat</span><span class="p">)</span>
         <span class="p">)</span>
 
     <span class="n">parent</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">prefix</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
@@ -6281,7 +6253,7 @@ including the empty one, gives the query's features.</p>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">arg</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
             <span class="k">case</span><span class="w"> </span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">idxs</span><span class="p">:</span>
-                <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">support</span><span class="p">(</span><span class="n">machine</span><span class="p">(</span><span class="n">node</span><span class="p">)))</span>
+                <span class="n">inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stats_factory</span><span class="o">.</span><span class="n">support</span><span class="p">(</span><span class="n">machine</span><span class="p">(</span><span class="n">node</span><span class="p">)))</span>
     <span class="n">iter_space</span> <span class="o">=</span> <span class="n">exec_space</span>
     <span class="k">if</span> <span class="n">inputs</span><span class="p">:</span>
         <span class="n">iter_space</span> <span class="o">=</span> <span class="n">stats_factory</span><span class="o">.</span><span class="n">mapjoin</span><span class="p">(</span>
@@ -6415,7 +6387,14 @@ output_vars orders the output of the query, when there is one.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
@@ -6458,14 +6437,7 @@ output_vars orders the output of the query, when there is one.</p>
 <span class="normal">216</span>
 <span class="normal">217</span>
 <span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TransposeCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TransposeCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Count dense and sparse transposed entries, charging each input once per query.</span>
 <span class="sd">    """</span>
@@ -6551,7 +6523,14 @@ have no transposition cost.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">192</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
 <span class="normal">193</span>
 <span class="normal">194</span>
 <span class="normal">195</span>
@@ -6578,14 +6557,7 @@ have no transposition cost.</p>
 <span class="normal">216</span>
 <span class="normal">217</span>
 <span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
+<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="n">Prefix</span><span class="p">,</span>
     <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>

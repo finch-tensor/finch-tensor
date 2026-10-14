@@ -5764,11 +5764,11 @@ input position count.</p>
         <span class="n">alias</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span>
         <span class="n">term</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
         <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">,</span>
-        <span class="n">fill_value</span><span class="p">:</span> <span class="n">AbstractFill</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span>
         <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FiberTensorFType</span><span class="p">:</span>
         <span class="n">lvl</span> <span class="o">=</span> <span class="n">optimize_format</span><span class="p">(</span>
-            <span class="n">alias</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cost_model</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span>
+            <span class="n">alias</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">fill_type</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cost_model</span><span class="p">,</span> <span class="n">term</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">options</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">fiber_tensor</span><span class="p">(</span><span class="n">lvl</span><span class="p">)</span>
 
@@ -5784,8 +5784,8 @@ input position count.</p>
         <span class="n">shape_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_shape_type</span><span class="p">(</span>
             <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">shape_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
         <span class="p">)</span>
-        <span class="n">fill_values</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_fill_value</span><span class="p">(</span>
-            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_value</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="n">fill_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_fill_type</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
         <span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">formatter</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">):</span>
@@ -5803,7 +5803,7 @@ input position count.</p>
                             <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape_types</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span>
                         <span class="p">)</span>
                         <span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tensor_ftype</span><span class="p">(</span>
-                            <span class="n">lhs</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">fill_values</span><span class="p">[</span><span class="n">lhs</span><span class="p">],</span> <span class="n">shape_type</span>
+                            <span class="n">lhs</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">fill_types</span><span class="p">[</span><span class="n">lhs</span><span class="p">],</span> <span class="n">shape_type</span>
                         <span class="p">)</span>
                 <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">():</span>
                     <span class="k">return</span>

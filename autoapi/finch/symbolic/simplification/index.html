@@ -6000,19 +6000,13 @@ bubble up and to the left, where adjacent ones merge:
 
     <div class="doc doc-contents ">
 
-        <p><code>f(a..., e, b...)</code> =&gt; <code>f(a..., b...)</code> when <code>e</code> is an identity for <code>f</code>.</p>
+        <p><code>f(a..., e, b...)</code> =&gt; <code>f(a..., b...)</code> when <code>e</code> is an identity for <code>f</code>, and
+dropping it doesn't change the type of the result.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/simplification.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">195</span>
 <span class="normal">196</span>
 <span class="normal">197</span>
 <span class="normal">198</span>
@@ -6033,21 +6027,39 @@ bubble up and to the left, where adjacent ones merge:
 <span class="normal">213</span>
 <span class="normal">214</span>
 <span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_identities</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">drop_identities</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">Term</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Term</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    `f(a..., e, b...)` =&gt; `f(a..., b...)` when `e` is an identity for `f`.</span>
+<span class="sd">    `f(a..., e, b...)` =&gt; `f(a..., b...)` when `e` is an identity for `f`, and</span>
+<span class="sd">    dropping it doesn't change the type of the result.</span>
 <span class="sd">    """</span>
     <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">CallTerm</span><span class="p">(</span>
             <span class="n">op</span><span class="o">=</span><span class="n">ExpressionTerm</span><span class="p">(</span><span class="n">result_type</span><span class="o">=</span><span class="n">FinchOperatorFType</span><span class="p">()</span> <span class="k">as</span> <span class="n">op_type</span><span class="p">),</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span>
         <span class="p">)</span> <span class="k">if</span> <span class="n">is_associative</span><span class="p">(</span><span class="n">op_type</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">arity</span><span class="p">(</span><span class="n">op_type</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">LiteralTerm</span><span class="p">)</span> <span class="ow">and</span> <span class="n">is_identity</span><span class="p">(</span>
-                    <span class="n">op_type</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">val</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">LiteralTerm</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op_type</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">_keeps_type</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
                 <span class="p">):</span>
                     <span class="k">return</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">LiteralTerm</span><span class="p">)</span> <span class="ow">and</span> <span class="n">is_identity</span><span class="p">(</span>
-                    <span class="n">op_type</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">val</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">LiteralTerm</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">is_identity</span><span class="p">(</span><span class="n">op_type</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">val</span><span class="p">)</span>
+                    <span class="ow">and</span> <span class="n">_keeps_type</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
                 <span class="p">):</span>
                     <span class="k">return</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">arity</span><span class="p">(</span><span class="n">op_type</span><span class="p">)):</span>
@@ -6060,7 +6072,8 @@ bubble up and to the left, where adjacent ones merge:
                 <span class="p">]</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">kept</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
                     <span class="k">return</span> <span class="kc">None</span>
-                <span class="k">return</span> <span class="n">_call_like</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">kept</span> <span class="ow">or</span> <span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="n">new_node</span> <span class="o">=</span> <span class="n">_call_like</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">kept</span> <span class="ow">or</span> <span class="n">args</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="k">return</span> <span class="n">new_node</span> <span class="k">if</span> <span class="n">_keeps_type</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">new_node</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
             </details>
