@@ -42,7 +42,9 @@ class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
         stats_factory: StatsFactory,
     ):
         prgm_key = (prgm, tuple(bindings.items()), stats_factory)
-        entry = self.cache.setdefault(prgm_key, {"cached_emb_matrix":None, "kernels":[]})
+        entry = self.cache.setdefault(
+            prgm_key, {"cached_emb_matrix": None, "kernels": []}
+        )
 
         current_vec = None
         parts = [
@@ -62,10 +64,12 @@ class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
         if kernels and current_vec is None:
             idx = len(kernels) - 1
         elif kernels:
-            distances = vector_norm(np.abs(entry["cached_emb_matrix"] - current_vec), 
-                            ord=self.norm_order,
-                            axis=1)
-            
+            distances = vector_norm(
+                np.abs(entry["cached_emb_matrix"] - current_vec),
+                ord=self.norm_order,
+                axis=1,
+            )
+
             chosen_idx = int(np.argmin(distances))
             if distances[chosen_idx] < self.threshold:
                 idx = chosen_idx
@@ -74,7 +78,9 @@ class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
             kernels.append(kernels.pop(idx))
             if entry["cached_emb_matrix"] is not None:
                 m = entry["cached_emb_matrix"]
-                entry["cached_emb_matrix"] = np.concatenate((m[:idx],m[idx+1:],m[idx:idx+1]))
+                entry["cached_emb_matrix"] = np.concatenate(
+                    (m[:idx], m[idx + 1 :], m[idx : idx + 1])
+                )
             return kernels[-1]
 
         logger.debug(
@@ -85,11 +91,12 @@ class LogicCacheLRU_Embeddings_Norms_Matrix(UnvalidatedForm, LogicLoader):
         if current_vec is not None:
             row = current_vec[None, :]
             entry["cached_emb_matrix"] = (
-                row if entry["cached_emb_matrix"] is None else np.vstack((entry["cached_emb_matrix"], row))
+                row
+                if entry["cached_emb_matrix"] is None
+                else np.vstack((entry["cached_emb_matrix"], row))
             )
         if len(kernels) > self.max_depth:
             kernels.pop(0)  # evict the least recently used
             if entry["cached_emb_matrix"] is not None:
                 entry["cached_emb_matrix"] = entry["cached_emb_matrix"][1:]
         return result
-
