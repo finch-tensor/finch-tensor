@@ -9,8 +9,9 @@ from .cost_models import (
 from .factorize_cost_models import FactorizeCostModel, FlopsCostModel, Statement
 from .format_cost_models import (
     DenseLevelOption,
+    ElementLevelOption,
     FormatCostModel,
-    Level,
+    LevelChoice,
     LevelCostModel,
     LevelOption,
     SparseHashLevelOption,
@@ -27,10 +28,11 @@ __all__ = [
     "Concat",
     "CostModel",
     "DenseLevelOption",
+    "ElementLevelOption",
     "FactorizeCostModel",
     "FlopsCostModel",
     "FormatCostModel",
-    "Level",
+    "LevelChoice",
     "LevelCostModel",
     "LevelOption",
     "LinearPredictor",

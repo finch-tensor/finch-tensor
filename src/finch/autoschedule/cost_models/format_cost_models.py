@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -29,47 +29,6 @@ from .cost_models import NS, CostModel
 from .loop_cost_models import PigeonCostModel, Prefix
 
 
-class LevelOption(ABC):
-    """
-    A kind of level the formatter may choose for a dimension, and the number
-    of positions it passes to its child.
-    """
-
-    kind: str
-
-    @abstractmethod
-    def next_num_pos(self, num_pos, n_l, nnz_l): ...
-
-
-class DenseLevelOption(LevelOption):
-    kind = "dense"
-
-    def next_num_pos(self, num_pos, n_l, nnz_l):
-        return num_pos * n_l
-
-
-class SparseHashLevelOption(LevelOption):
-    kind = "sparse_hash"
-
-    def next_num_pos(self, num_pos, n_l, nnz_l):
-        return nnz_l
-
-
-@dataclass(frozen=True)
-class Level:
-    """
-    The level at a zero-based depth of alias, with num_pos positions entering
-    it. kind names a level option, or is "element" for the element level at the
-    tensor's rank. term is the program which reads and writes alias.
-    """
-
-    term: LogicStatement
-    alias: Alias
-    depth: int
-    num_pos: float
-    kind: str
-
-
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int):
     """Return the non-fill entries of the first depth + 1 levels of stats."""
     reduce_fields = tuple(stats.index_order[depth + 1 :])
@@ -78,7 +37,103 @@ def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int):
     return stats.estimate_non_fill_values()
 
 
-class FormatCostModel(CostModel[Level]):
+def element_sizes(stats: NS) -> tuple[int, int]:
+    """Return the bytes of a value and of a position of a tensor with stats."""
+    fill_ftype = ftype(stats.fill_value)
+    leaf = element(stats.fill_value, fill_ftype)
+    assert leaf.position_type is not None
+    return np_dtype(fill_ftype).itemsize, np_dtype(leaf.position_type).itemsize
+
+
+class LevelOption(ABC):
+    """
+    A kind of level, which describes the storage of a level with n_features
+    storage features, and the number of positions it passes to its child. Both
+    depend on the stats of the tensor, the zero-based depth of the level, and
+    the num_pos positions entering it.
+    """
+
+    kind: str
+    n_features: int
+
+    @abstractmethod
+    def next_num_pos(
+        self, stats: NS, stats_factory: StatsFactory[NS], depth: int, num_pos
+    ): ...
+
+    @abstractmethod
+    def get_storage_features(
+        self, stats: NS, stats_factory: StatsFactory[NS], depth: int, num_pos
+    ) -> np.ndarray: ...
+
+
+class DenseLevelOption(LevelOption):
+    """Storage features are positions and slots."""
+
+    kind = "dense"
+    n_features = 2
+
+    def next_num_pos(self, stats, stats_factory, depth, num_pos):
+        return num_pos * stats.get_dim_size(stats.index_order[depth])
+
+    def get_storage_features(self, stats, stats_factory, depth, num_pos):
+        return np.array(
+            [num_pos, self.next_num_pos(stats, stats_factory, depth, num_pos)]
+        )
+
+
+class SparseHashLevelOption(LevelOption):
+    """Storage features are positions, entries, position bytes, and index bytes."""
+
+    kind = "sparse_hash"
+    n_features = 4
+
+    def next_num_pos(self, stats, stats_factory, depth, num_pos):
+        return nnz_after(stats, stats_factory, depth)
+
+    def get_storage_features(self, stats, stats_factory, depth, num_pos):
+        nnz_l = nnz_after(stats, stats_factory, depth)
+        _, pos_size = element_sizes(stats)
+        return np.array([num_pos, nnz_l, (num_pos + 1) * pos_size, nnz_l * pos_size])
+
+
+class ElementLevelOption(LevelOption):
+    """
+    The element level at the rank of a tensor stores one value for each
+    position. Storage features are values and value bytes.
+    """
+
+    kind = "element"
+    n_features = 2
+
+    def next_num_pos(self, stats, stats_factory, depth, num_pos):
+        # The element level has no child, so its positions pass through.
+        return num_pos
+
+    def get_storage_features(self, stats, stats_factory, depth, num_pos):
+        val_size, _ = element_sizes(stats)
+        return np.array([num_pos, num_pos * val_size])
+
+
+@dataclass(frozen=True)
+class LevelChoice:
+    """
+    The choice of a level option at a zero-based depth of alias, with num_pos
+    positions entering it. term is the program which reads and writes alias.
+    """
+
+    term: LogicStatement
+    alias: Alias
+    depth: int
+    num_pos: float
+    option: LevelOption
+
+    @property
+    def kind(self) -> str:
+        return self.option.kind
+
+
+class FormatCostModel(CostModel[LevelChoice]):
     """
     A cost model where each level of each formatted alias is a component.
     bindings names the level options of an alias, outermost first, and the
@@ -90,18 +145,17 @@ class FormatCostModel(CostModel[Level]):
         term: LogicStatement,
         bindings: Mapping[Alias, Sequence[LevelOption]],
         machine: StatsMachine[NS],
-    ) -> Iterator[Level]:
+    ) -> Iterator[LevelChoice]:
         visited: set[Alias] = set()
 
         def visit_alias(alias: Alias, options: Sequence[LevelOption]):
             stats = machine(alias)
             num_pos = 1.0
-            for depth, option in enumerate(options):
-                yield Level(term, alias, depth, num_pos, option.kind)
-                n_l = stats.get_dim_size(stats.index_order[depth])
-                nnz_l = nnz_after(stats, machine.stats_factory, depth)
-                num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
-            yield Level(term, alias, len(options), num_pos, "element")
+            for depth, option in enumerate((*options, ElementLevelOption())):
+                yield LevelChoice(term, alias, depth, num_pos, option)
+                num_pos = option.next_num_pos(
+                    stats, machine.stats_factory, depth, num_pos
+                )
 
         def visit_stmt(stmt: LogicStatement):
             match stmt:
@@ -125,33 +179,20 @@ class FormatCostModel(CostModel[Level]):
 
 class LevelCostModel(FormatCostModel, LoopOrderedForm):
     """
-    Each level contributes an allocation row, and an access row for each query
-    loop prefix that uses it. The features are positions, slots, entries,
-    position bytes, index bytes, and value bytes for the allocation, followed by
-    sequential reads, scatter reads, sequential writes, and scatter writes for
-    the accesses.
+    The cost model of the levels of one option. Each level contributes an
+    allocation row, and an access row for each query loop prefix that uses it.
+    The features are the storage features of the option for the allocation,
+    followed by sequential reads, scatter reads, sequential writes, and scatter
+    writes for the accesses.
     """
+
+    def __init__(self, option: LevelOption, predictor: Callable[[np.ndarray], float]):
+        super().__init__(predictor)
+        self.option = option
 
     @property
     def n_features(self) -> int:
-        return 10
-
-    def get_level_features(self, num_pos, n_l, nnz_l, val_size, pos_size):
-        """
-        Return the features of a level with num_pos positions entering it, a
-        dimension of n_l, and nnz_l non-fill entries: positions, slots, entries,
-        position bytes, index bytes, and value bytes.
-        """
-        return np.array(
-            [
-                num_pos,
-                num_pos * n_l,
-                nnz_l,
-                (num_pos + 1) * pos_size,
-                nnz_l * pos_size,
-                num_pos * val_size,
-            ]
-        )
+        return self.option.n_features + 4
 
     def get_access_features(
         self,
@@ -232,32 +273,19 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
 
     def get_component_features(
         self,
-        component: Level,
+        component: LevelChoice,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
         """
         Return the allocation row of the level, followed by its access rows.
         """
-        alias, depth, num_pos = component.alias, component.depth, component.num_pos
-        stats = machine(alias)
-        fill_ftype = ftype(stats.fill_value)
-        leaf = element(stats.fill_value, fill_ftype)
-        assert leaf.position_type is not None
-        val_size = np_dtype(fill_ftype).itemsize
-        pos_size = np_dtype(leaf.position_type).itemsize
-
+        stats = machine(component.alias)
         access_features = self.get_access_features(
-            alias, depth, component.term, machine
+            component.alias, component.depth, component.term, machine
         )
         features = np.zeros((1 + len(access_features), self.n_features))
-        if component.kind == "element":
-            # The element level stores one value for each position.
-            n_l, nnz_l = 1, num_pos
-        else:
-            n_l = stats.get_dim_size(stats.index_order[depth])
-            nnz_l = nnz_after(stats, machine.stats_factory, depth)
-        features[0, :6] = self.get_level_features(
-            num_pos, n_l, nnz_l, val_size, pos_size
+        features[0, : self.option.n_features] = self.option.get_storage_features(
+            stats, machine.stats_factory, component.depth, component.num_pos
         )
-        features[1:, 6:] = access_features
+        features[1:, self.option.n_features :] = access_features
         return features

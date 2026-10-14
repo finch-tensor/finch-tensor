@@ -20,13 +20,13 @@ from finch.autoschedule.cost_models import (
     ByKind,
     CostModel,
     DenseLevelOption,
-    Level,
+    ElementLevelOption,
+    LevelChoice,
     LevelCostModel,
     LevelOption,
     LinearPredictor,
     SparseHashLevelOption,
 )
-from finch.autoschedule.cost_models.format_cost_models import nnz_after
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -48,8 +48,7 @@ def optimize_format(
     alias, shape_type, machine, fill_value, cost_model, term, options=LEVEL_OPTIONS
 ):
     stats = machine(alias)
-    fields = stats.index_order
-    n = len(fields)
+    n = len(stats.index_order)
     leaf = element(fill_value, ftype(fill_value))
     memo = {}
 
@@ -57,7 +56,8 @@ def optimize_format(
         if level == n:
             return (
                 cost_model.predict_component_cost(
-                    Level(term, alias, level, num_pos, "element"), machine
+                    LevelChoice(term, alias, level, num_pos, ElementLevelOption()),
+                    machine,
                 ),
                 leaf,
             )
@@ -66,16 +66,15 @@ def optimize_format(
         if key in memo:
             return memo[key]
 
-        n_l = stats.get_dim_size(fields[level])
-        nnz_l = nnz_after(stats, machine.stats_factory, level)
-
         best_cost = None
         best_format = None
         for option in options:
             local = cost_model.predict_component_cost(
-                Level(term, alias, level, num_pos, option.kind), machine
+                LevelChoice(term, alias, level, num_pos, option), machine
             )
-            child_num_pos = option.next_num_pos(num_pos, n_l, nnz_l)
+            child_num_pos = option.next_num_pos(
+                stats, machine.stats_factory, level, num_pos
+            )
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
             if best_cost is None or total < best_cost:
@@ -200,25 +199,29 @@ class FDFormatter(SmartFormatter):
         return fiber_tensor(lvl)
 
 
-def linear_level_model(*coefficients: float) -> LevelCostModel:
-    return LevelCostModel(LinearPredictor(np.array(coefficients, dtype=float)))
+def linear_level_model(
+    option: LevelOption,
+    storage: Sequence[float],
+    access: Sequence[float] = (0, 0, 0, 0),
+) -> LevelCostModel:
+    coefficients = np.array([*storage, *access], dtype=float)
+    return LevelCostModel(option, LinearPredictor(coefficients))
 
 
-# Level features are positions, slots, entries, position bytes, index bytes,
-# value bytes, sequential reads, scatter reads, sequential writes, and scatter
-# writes.
+# Each level option lists its storage features. The access features are
+# sequential reads, scatter reads, sequential writes, and scatter writes.
 ITER_COST_MODEL = ByKind(
     {
-        "dense": linear_level_model(0, 1, 0, 0, 0, 0, 0, 0, 0, 0),
-        "sparse_hash": linear_level_model(1, 0, 1, 0, 0, 0, 0, 0, 0, 0),
-        "element": linear_level_model(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+        "dense": linear_level_model(DenseLevelOption(), (0, 1)),
+        "sparse_hash": linear_level_model(SparseHashLevelOption(), (1, 1, 0, 0)),
+        "element": linear_level_model(ElementLevelOption(), (0, 0)),
     }
 )
 STORAGE_COST_MODEL = ByKind(
     {
-        "dense": linear_level_model(0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-        "sparse_hash": linear_level_model(0, 0, 0, 1, 1, 0, 0, 0, 0, 0),
-        "element": linear_level_model(0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
+        "dense": linear_level_model(DenseLevelOption(), (0, 0)),
+        "sparse_hash": linear_level_model(SparseHashLevelOption(), (0, 0, 1, 1)),
+        "element": linear_level_model(ElementLevelOption(), (0, 1)),
     }
 )
 
@@ -233,7 +236,7 @@ class CostFormatter(LogicFormatter):
     def __init__(
         self,
         loader: LogicLoader | None = None,
-        cost_model: CostModel[Level] = STORAGE_COST_MODEL,
+        cost_model: CostModel[LevelChoice] = STORAGE_COST_MODEL,
         options: Sequence[LevelOption] = LEVEL_OPTIONS,
     ):
         super().__init__()

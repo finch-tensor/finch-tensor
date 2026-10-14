@@ -8,10 +8,12 @@ from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.cost_models import (
     ByKind,
     DenseLevelOption,
-    Level,
+    ElementLevelOption,
+    LevelChoice,
     LevelCostModel,
     LinearPredictor,
     QuadraticPredictor,
+    SparseHashLevelOption,
 )
 from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
@@ -159,11 +161,13 @@ def test_format_cost_uses_depth_and_input_positions(formatter_cls, expected):
     model = formatter_cls().cost_model
 
     costs = [
-        model.predict_component_cost(Level(query, a, depth, num_pos, kind), machine)
-        for depth, num_pos, kind in (
-            (1, 7, "dense"),
-            (1, 7, "sparse_hash"),
-            (2, 5, "element"),
+        model.predict_component_cost(
+            LevelChoice(query, a, depth, num_pos, option), machine
+        )
+        for depth, num_pos, option in (
+            (1, 7, DenseLevelOption()),
+            (1, 7, SparseHashLevelOption()),
+            (2, 5, ElementLevelOption()),
         )
     ]
     np.testing.assert_allclose(costs, expected)
@@ -209,19 +213,19 @@ def test_format_access_features_separate_sequential_and_scatter():
         )
     )
     machine(prgm)
-    model = StorageCostFormatter().cost_model
 
-    def accessed(depth, kind, block):
+    def accessed(depth, option):
+        model = LevelCostModel(option, LinearPredictor(np.zeros(option.n_features + 4)))
         features = model.get_component_features(
-            Level(prgm, A, depth, 1.0, kind), machine
+            LevelChoice(prgm, A, depth, 1.0, option), machine
         )
-        return tuple(features.sum(axis=0)[10 * block + 6 : 10 * block + 10] > 0)
+        return tuple(features.sum(axis=0)[-4:] > 0)
 
     # Reading A in loop order is sequential at every level. Writing A is
     # sequential at i, but the k loop makes it scatter at j.
-    assert accessed(0, "dense", 0) == (True, False, True, False)
-    assert accessed(1, "dense", 0) == (True, False, False, True)
-    assert accessed(2, "element", 2) == (True, False, False, True)
+    assert accessed(0, DenseLevelOption()) == (True, False, True, False)
+    assert accessed(1, DenseLevelOption()) == (True, False, False, True)
+    assert accessed(2, ElementLevelOption()) == (True, False, False, True)
 
 
 def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
@@ -239,25 +243,34 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     )
     cost = ByKind(
         {
-            "dense": LevelCostModel(QuadraticPredictor(np.ones(100))),
-            "element": LevelCostModel(QuadraticPredictor(np.ones(100))),
+            "dense": LevelCostModel(
+                DenseLevelOption(), QuadraticPredictor(np.ones(36))
+            ),
+            "element": LevelCostModel(
+                ElementLevelOption(), QuadraticPredictor(np.ones(36))
+            ),
         }
     )
     formats = {b: [DenseLevelOption()]}
     features = cost.get_features(plan, formats, stats, sf)
     # Allocation, write, and read rows for both the dense and element levels.
-    assert features.shape == (6, 20)
-    np.testing.assert_array_equal(features[1:3, 6:10], [[0, 0, 3, 0], [3, 0, 0, 0]])
-    np.testing.assert_array_equal(features[4:6, 16:20], [[0, 0, 3, 0], [3, 0, 0, 0]])
+    assert features.shape == (6, 12)
+    np.testing.assert_array_equal(features[1:3, 2:6], [[0, 0, 3, 0], [3, 0, 0, 0]])
+    np.testing.assert_array_equal(features[4:6, 8:12], [[0, 0, 3, 0], [3, 0, 0, 0]])
     expected = sum(row.sum() ** 2 for row in features)
     assert cost.predict_cost(plan, formats, stats, sf) == expected
     machine = StatsMachine(sf, dict(stats))
     machine(plan)
     assert expected == sum(
-        cost.predict_component_cost(Level(plan, b, depth, num_pos, kind), machine)
-        for depth, num_pos, kind in ((0, 1, "dense"), (1, 3, "element"))
+        cost.predict_component_cost(
+            LevelChoice(plan, b, depth, num_pos, option), machine
+        )
+        for depth, num_pos, option in (
+            (0, 1, DenseLevelOption()),
+            (1, 3, ElementLevelOption()),
+        )
     )
-    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 20)
+    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 12)
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     fmt = CostFormatter(cost_model=cost, options=formats[b]).get_tensor_ftype(
         b, plan, machine, tensor.fill_value, (fl.ftype(np.intp),)
@@ -272,10 +285,21 @@ def test_format_selection_uses_custom_predictor():
     query = Query(Table(a, (i,)), Table(Literal(tensor), (i,)))
     machine = StatsMachine(DCStatsFactory())
     machine(query)
-    zero = LevelCostModel(LinearPredictor(np.zeros(10)))
-    slots = LevelCostModel(lambda rows: float(np.square(rows[:, 1]).sum()))
-    linear = ByKind({"dense": zero, "sparse_hash": zero, "element": zero})
-    nonlinear = ByKind({"dense": slots, "sparse_hash": zero, "element": zero})
+    zeros = {
+        option.kind: LevelCostModel(
+            option, LinearPredictor(np.zeros(option.n_features + 4))
+        )
+        for option in (
+            DenseLevelOption(),
+            SparseHashLevelOption(),
+            ElementLevelOption(),
+        )
+    }
+    slots = LevelCostModel(
+        DenseLevelOption(), lambda rows: float(np.square(rows[:, 1]).sum())
+    )
+    linear = ByKind(zeros)
+    nonlinear = ByKind({**zeros, "dense": slots})
 
     def choose(cost):
         return CostFormatter(cost_model=cost).get_tensor_ftype(
