@@ -1182,6 +1182,19 @@ def test_compile_julia_tuple_reductions_match_interpreter(op):
     np.testing.assert_array_equal(result, expected)
 
 
+@pytest.mark.parametrize("op, np_op", [(ft.argmin, np.argmin), (ft.argmax, np.argmax)])
+def test_compile_julia_index_tensor(op, np_op):
+    # Reducing over every axis reads linear indices from an IndexTensor.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.array([[3.0, 1.0, 1.0], [-2.0, 5.0, -2.0]])
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg)))
+
+    assert result.item() == np_op(arg)
+
+
 def test_register_julia_op_maps_and_defines_once():
     _requires_julia_backend()
     from finch.compile_jl import compiler
