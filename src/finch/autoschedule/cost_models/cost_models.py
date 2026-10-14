@@ -34,17 +34,41 @@ from finch.tensor import Scalar, element
 
 NS = TypeVar("NS", bound=NumericStats)
 
+class LinearModel:
+    def __init__(self, coefficients: np.ndarray):
+        self.coefficients: np.ndarray = coefficients
 
-class CostModel(Form):
+    def __call__(self, features):
+        return sum(features, axis=0) @ self.coefficients
+
+class QuadraticModel:
+    def __init__(self, coefficients: np.ndarray):
+        self.coefficients: np.ndarray = coefficients
+
+    def __call__(self, features):
+        x = np.einsum("ij,ik->ijk", features).reshape(features.shape[0], -1)
+        return x @ self.coefficients
+
+class QuadraticModel:
+    def __init__(self, coefficients: np.ndarray):
+        self.coefficients: np.ndarray = coefficients
+
+    def __call__(self, features):
+        x = np.einsum("ij,ik->ijk", features)
+        return sum(features, axis=0) @ self.coefficients
+
+class Cost(Form):
     """
-    A CostModel predicts the cost of a logic statement as a linear function
-    of its features. Like a Stage, a CostModel inherits the Form of the
-    statements it accepts.
+    A cost predicts the cost of a logic statement as a sum of modeled pieces:
+
+        sum_i model(X_i1, ..., X_in)
+    
+    using a matrix X of features for each piece. Like a Stage, a CostModel inherits the form of
+    the statements it accepts.
     """
 
-    @property
-    @abstractmethod
-    def coefficients(self) -> np.ndarray: ...
+    def __init__(self, model):
+        self.model = model
 
     @abstractmethod
     def get_features(
@@ -63,11 +87,13 @@ class CostModel(Form):
         stats_factory: StatsFactory,
     ) -> float:
         features = self.get_features(term, bindings, stats, stats_factory)
-        return float(np.dot(self.coefficients, features))
+        return self.model(features)
 
-
-class MultiCostModel(CostModel):
-    """A cost model that sums the costs of its submodels."""
+class MultiCost(Cost):
+    """
+    A cost model that composes the observations of its submodels. Note that
+    submodels must have the same number of pieces.
+    """
 
     def __init__(self, *submodels: CostModel):
         self.submodels = submodels
@@ -90,13 +116,8 @@ class MultiCostModel(CostModel):
             ]
         )
 
-    @property
-    def coefficients(self) -> np.ndarray:
-        return np.concatenate([model.coefficients for model in self.submodels])
-
-
-class LoopCostModel(CostModel):
-    """A cost model with features for individual loop prefixes."""
+class LoopCost(Cost):
+    """A cost model where each loop prefix is a piece of the cost."""
 
     @abstractmethod
     def get_prefix_features(
@@ -115,7 +136,7 @@ class LoopCostModel(CostModel):
         output_vars: tuple[Field, ...] | None = None,
     ) -> float:
         features = self.get_prefix_features(prefix, expr, machine, output_vars)
-        return float(np.dot(self.coefficients, features))
+        return self.model(features)
 
     def get_features(
         self,
@@ -125,7 +146,7 @@ class LoopCostModel(CostModel):
         stats_factory: StatsFactory[NumericStats],
     ) -> np.ndarray:
         stats = dict(stats)
-        features = np.zeros(len(self.coefficients))
+        features = []
         stats_interpreter = StatsMachine(stats_factory, stats)
 
         def visit_stmt(stmt: LogicStatement):
@@ -153,16 +174,16 @@ class LoopCostModel(CostModel):
                     raise ValueError(f"Unsupported statement type: {stmt}")
 
             for n in range(len(idxs) + 1):
-                features += self.get_prefix_features(
+                features.append(self.get_prefix_features(
                     idxs[:n], out, stats_interpreter, lhs_idxs
-                )
+                ))
             stats_interpreter(stmt)
 
         visit_stmt(term)
-        return features
+        return np.stack(features)
 
 
-class MultiLoopCostModel(LoopCostModel, MultiCostModel):
+class MultiLoopCost(LoopCostModel, MultiCostModel):
     """A loop cost model that sums the costs of its submodels."""
 
     def __init__(self, *submodels: LoopCostModel):
@@ -212,7 +233,7 @@ class SparseHashLevelOption(LevelOption):
 
 class FormatCostModel(CostModel, LoopOrderedForm):
     """
-    A cost model with features for individual levels of tensor formats. Each
+    A cost model where each tensor format within each loop prefix is a piece. Each
     entry of formats names a level option, whose coefficients weigh the level
     features of the levels which use it.
     """
@@ -355,24 +376,25 @@ class FormatCostModel(CostModel, LoopOrderedForm):
             key: np.zeros(len(format.coefficients))
             for key, format in self.formats.items()
         }
-        element_features = np.zeros(len(self.element_coefficients))
+        element_features = []
         access_features = self.get_access_features(alias, level, term, machine)
         if format_key is None:
             # The element level stores one value for each position.
-            element_features += np.concatenate(
+            element_features.append(np.concatenate(
                 [
                     self.get_level_features(num_pos, 1, num_pos, val_size, pos_size),
                     access_features,
                 ]
-            )
+            ))
         else:
             n_l = stats.get_dim_size(fields[level])
             nnz_l = self.nnz_after(stats, machine.stats_factory, level)
-            features[format_key] += np.concatenate(
+            features.append(np.concatenate(
                 [
                     self.get_level_features(num_pos, n_l, nnz_l, val_size, pos_size),
                     access_features,
                 ]
+            )
             )
         return np.concatenate([*features.values(), element_features])
 
@@ -453,10 +475,6 @@ class FlopsCostModel(CostModel, AliasedForm):
     def __init__(self):
         pass
 
-    @property
-    def coefficients(self) -> np.ndarray:
-        return np.array([1.0, 10.0])
-
     def get_features(
         self,
         term: LogicStatement,
@@ -465,7 +483,7 @@ class FlopsCostModel(CostModel, AliasedForm):
         stats_factory: StatsFactory[NumericStats],
     ) -> np.ndarray:
         stats = dict(stats)
-        features = np.zeros(len(self.coefficients))
+        features = []
 
         def visit_expr(expr: LogicExpression) -> tuple[NumericStats, NumericStats]:
             """Return the stats of the output of expr, and of its iteration space."""
@@ -515,10 +533,10 @@ class FlopsCostModel(CostModel, AliasedForm):
                 case Query(Table(Alias() as lhs, idxs), rhs):
                     out_stats, iter_stats = visit_expr(rhs)
                     stats[lhs] = stats_factory.reorder(out_stats, idxs)
-                    features += [
+                    features.append(
                         iter_stats.estimate_non_fill_values(),
                         out_stats.estimate_non_fill_values(),
-                    ]
+                    )
                 case QueryInto():
                     visit_stmt(stmt.as_query())
                 case Produces():
