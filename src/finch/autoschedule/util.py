@@ -9,6 +9,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FillTable,
     Literal,
     LogicExpression,
     LogicNode,
@@ -67,8 +68,8 @@ def push_fields(root):
                 return Reorder(Relabel(arg, idxs_4), idxs_2)
             case Relabel(Table(arg, _), idxs):
                 return Table(arg, idxs)
-            case Relabel(Literal() as lit, _):
-                return lit
+            case Relabel(Literal() | FillTable() as scalar, _):
+                return scalar
 
     root = Rewrite(PreWalk(Fixpoint(rule_1)))(root)  # ignore[type-arg]
 

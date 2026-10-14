@@ -7,8 +7,13 @@ import numpy as np
 
 import finch as ft
 from finch import ffuncs
-from finch.algebra import TensorFType, TupleFType, ftype
-from finch.algebra.fill import StaticFill
+from finch.algebra import (
+    DynamicFillFType,
+    StaticFillFType,
+    TensorFType,
+    TupleFType,
+    ftype,
+)
 from finch.autoschedule.capture import LogicCapture
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.formatter.smart_formatter import FDFormatter, SmartFormatter
@@ -49,33 +54,60 @@ from finch.tensor.traits import Dense as DenseProperty
 
 
 # ------------------- SamplingStats tests ---------------------------
-def test_sampling_reuses_random_masks():
+def sampling_sketch_array(tensor):
+    from finch.compile_jl.runtime import JuliaOwnedTensor
+
+    match tensor:
+        case JuliaOwnedTensor():
+            from finch.compile_jl.julia import jl
+
+            return jl.Array(tensor.raw_julia_obj).to_numpy().transpose()
+        case _:
+            return np.asarray(tensor)
+
+
+def test_sampling_reuses_random_seeds():
     i, j, k = Field("i"), Field("j"), Field("k")
-    factory = SamplingStatsFactory(sample_prob=0.5)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
     first = factory(ft.FillTensor((5, 7), np.intp(0)), (i, j))
-    mask_i = factory._get_mask(i, 5)
+    mask_i = factory._get_mask(i, 5, 0.5)
     assert isinstance(mask_i, ft.RandomMaskTensor)
     assert mask_i.element_type == ftype(np.intp)
 
-    second = factory(ft.FillTensor((5, 1 << 40), np.intp(0)), (i, k))
-    assert factory._get_mask(i, 5) is mask_i
-    assert first.masks_ref is second.masks_ref is factory._masks
-    assert len(factory._masks) == 3
-    assert factory._get_mask(k, 1 << 40).shape == (1 << 40,)
-    assert factory._get_mask(j, 7).ftype != mask_i.ftype
-    assert factory._get_mask(i, 6) is not mask_i
+    second = factory(ft.FillTensor((5, 11), np.intp(0)), (i, k))
+    repeated_mask = factory._get_mask(i, 5, 0.5)
+    assert repeated_mask is not mask_i
+    assert [repeated_mask[idx].item() for idx in range(5)] == [
+        mask_i[idx].item() for idx in range(5)
+    ]
+    expected_rng = np.random.default_rng(42)
+    assert list(factory._seeds.values()) == [
+        int(expected_rng.integers(0, 1 << 64, dtype=np.uint64)) for _ in range(3)
+    ]
+    assert first.seeds_ref is second.seeds_ref is factory._seeds
+    assert len(factory._seeds) == 3
+    assert factory._get_mask(k, 1 << 40, 0.5).shape == (1 << 40,)
+    assert factory._get_mask(j, 7, 0.5).ftype != mask_i.ftype
+    factory._get_mask(i, 6, 0.5)
+    assert (i, 6) in factory._seeds
+    factory._get_mask(j, 5, 0.5)
+    assert factory._seeds[i, 5] != factory._seeds[j, 5]
 
 
 @pytest.mark.parametrize("shape", [(12, 9), (0, 5)])
 @pytest.mark.parametrize("sample_prob", [0.0, 0.5, 1.0])
 def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     i, j = Field("i"), Field("j")
-    factory = SamplingStatsFactory(sample_prob=sample_prob)
+    factory = SamplingStatsFactory()
     factory._rng = np.random.default_rng(42)
-    stats = factory(ft.asarray(np.ones(shape)), (i, j))
+    stats = factory(ft.asarray(np.ones(shape)), (i, j), [sample_prob] * 2)
+    assert stats.sample_probs == [sample_prob, sample_prob]
     expected_count = math.prod(
-        sum(factory._get_mask(field, size)[idx].item() for idx in range(size))
+        sum(
+            factory._get_mask(field, size, sample_prob)[idx].item()
+            for idx in range(size)
+        )
         for field, size in zip((i, j), shape, strict=True)
     )
     assert stats.scan(needs_freq=True) == (
@@ -88,20 +120,258 @@ def test_sampling_random_mask_scan_and_coverage(shape, sample_prob):
     assert stats.coverage_correction() == pytest.approx(expected_coverage)
 
 
+@pytest.mark.parametrize(
+    "operation", ["tensor", "join", "union", "aggregate", "relabel", "reorder"]
+)
+def test_sampling_materializes_each_step(operation):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    data = np.array([[1, 0, 1], [0, 1, 0]], dtype=np.intp)
+    stats = factory(ft.asarray(data), (i, j))
+    expected = data.copy()
+    fields = (i, j)
+
+    match operation:
+        case "join":
+            stats = factory.mapjoin(ffuncs.mul, stats, stats)
+        case "union":
+            stats = factory.mapjoin(ffuncs.add, stats, stats)
+        case "aggregate":
+            stats = factory.aggregate(ffuncs.add, 0, (j,), stats)
+            expected = expected.sum(axis=1)
+            fields = (i,)
+        case "relabel":
+            fields = (Field("row"), Field("col"))
+            stats = factory.relabel(stats, fields)
+        case "reorder":
+            fields = (j, i)
+            stats = factory.reorder(stats, fields)
+            expected = expected.T
+
+    assert stats.sample_probs == [1.0] * len(fields)
+
+    # Read the stored tensor directly, without evaluating another logic plan.
+    match stats.sketch:
+        case Table(Literal(tensor), indices):
+            assert indices == fields
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+
+
+@pytest.mark.parametrize("sample_probs", [[0.25, 0.75], [0.0, 1.0], [1.0, 0.0]])
+def test_sampling_per_dimension_masks(sample_probs):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(estimator="silly")
+    factory._rng = np.random.default_rng(42)
+    stats = factory(ft.asarray(np.ones((12, 9))), (i, j), sample_probs)
+    rows, cols = (
+        np.array(
+            [
+                ft.RandomMaskTensor(
+                    size, prob, seed=factory._seeds[field, size], dtype=np.intp
+                )[idx].item()
+                for idx in range(size)
+            ]
+        )
+        for field, size, prob in zip((i, j), (12, 9), sample_probs, strict=True)
+    )
+    expected = rows[:, None] * cols[None, :]
+    match stats.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("Sampling step left a deferred sketch")
+    count = expected.sum()
+    assert stats.coverage_correction() == pytest.approx(108 if count else 0)
+    prob = math.prod(sample_probs)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        min(108, count / prob) if prob else 0
+    )
+    assert not hasattr(stats, "sample_prob")
+
+
+def test_sampling_propagates_per_dimension_probs():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    factory = SamplingStatsFactory()
+    stats = factory(ft.asarray(np.ones((3, 4))), (i, j), [0.25, 0.75])
+    other = factory(ft.asarray(np.ones((4, 5))), (j, k), [0.75, 0.5])
+    for op in (ffuncs.mul, ffuncs.add):
+        joined = factory.mapjoin(op, stats, other)
+        assert dict(zip(joined.index_order, joined.sample_probs, strict=True)) == {
+            i: 0.25,
+            j: 0.75,
+            k: 0.5,
+        }
+    assert factory.reorder(stats, (j, i)).sample_probs == [0.75, 0.25]
+    relabeled = factory.relabel(stats, (j, k))
+    assert relabeled.sample_probs == [0.25, 0.75]
+    assert relabeled.sample_probs is not stats.sample_probs
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    assert reduced.sample_probs == [0.25]
+    assert reduced.remainder_size == 4.0
+    assert reduced.remainder_prob == 0.75
+    scalar = factory.aggregate(ffuncs.add, 0, (i,), reduced)
+    assert scalar.sample_probs == []
+    assert scalar.remainder_size == 12.0
+    assert scalar.remainder_prob == 0.25 * 0.75
+    for transformed in (
+        factory.copy(reduced),
+        factory.relabel(reduced, (k,)),
+        factory.reorder(reduced, (i,)),
+        factory.aggregate(ffuncs.add, 0, (), reduced),
+    ):
+        assert transformed.remainder_size == reduced.remainder_size
+        assert transformed.remainder_prob == reduced.remainder_prob
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_combines_reduced_sizes_and_probs(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones((3, 4))), (i, j), [1.0, 0.75])
+    second_factory = SamplingStatsFactory()
+    second = second_factory(ft.asarray(np.ones((3, 5))), (i, j), [1.0, 0.25])
+    left = factory.aggregate(ffuncs.add, 0, (j,), first)
+    right = second_factory.aggregate(ffuncs.add, 0, (j,), second)
+    combined = factory.mapjoin(op, left, right)
+    assert combined.remainder_size == 4.0 * 5.0
+    assert combined.remainder_prob == 0.75 * 0.25
+
+    # Reusing the old name for a live axis must not resample the reduced axis.
+    live = factory(ft.asarray(np.ones(6)), (j,), [0.125])
+    result = factory.mapjoin(op, left, live)
+    assert result.sample_probs == [1.0, 0.125]
+    assert result.remainder_prob == 0.75
+    assert result.remainder_size == 4.0
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_aligns_shared_dimension_probs(op):
+    i = Field("i")
+    factory = SamplingStatsFactory()
+    first = factory(ft.asarray(np.ones(4)), (i,), [0.25])
+    second = factory(ft.asarray(np.ones(4)), (i,), [0.75])
+    combined = factory.mapjoin(op, first, second)
+    assert combined.sample_probs == [0.25]
+    assert combined.scan(needs_freq=False) == first.scan(needs_freq=False)
+    assert second.sample_probs == [0.75]
+
+
+@pytest.mark.parametrize(
+    "data,budget",
+    [
+        (np.ones((4, 40)), 20),
+        (np.eye(16), 4),
+        (np.pad(np.ones((2, 4)), ((0, 38), (0, 0))), 3),
+        (np.ones((3, 4, 5)), 3),
+        (np.ones((1, 12)), 1),
+    ],
+)
+def test_sampling_remask_largest_projection(data, budget):
+    fields = tuple(Field(f"i_{dim}") for dim in range(data.ndim))
+    factory = SamplingStatsFactory(sample_nnz=data.size)
+    factory._rng = np.random.default_rng(42)
+    original = factory(ft.asarray(data), fields)
+    assert original.sample_probs == [1.0] * data.ndim
+    original_count = original.scan(needs_freq=False)[1]
+    factory.sample_nnz = budget
+    sampled = factory.remask(original)
+
+    expected = (data != 0).astype(np.intp)
+    probs = [1.0] * data.ndim
+    while np.count_nonzero(expected) > budget:
+        sizes = [
+            np.count_nonzero(
+                np.any(
+                    expected,
+                    axis=tuple(axis for axis in range(data.ndim) if axis != dim),
+                )
+            )
+            for dim in range(data.ndim)
+        ]
+        dim = int(np.argmax(sizes))
+        probs[dim] *= 0.5
+        size = data.shape[dim]
+        mask = ft.RandomMaskTensor(
+            size, probs[dim], seed=factory._seeds[fields[dim], size], dtype=np.intp
+        )
+        values = np.array([mask[idx].item() for idx in range(size)])
+        shape = [1] * data.ndim
+        shape[dim] = size
+        expected *= values.reshape(shape)
+
+    assert sampled.sample_probs == probs
+    match sampled.sketch:
+        case Table(Literal(tensor), _):
+            np.testing.assert_array_equal(sampling_sketch_array(tensor), expected)
+        case _:
+            pytest.fail("remask left a deferred sketch")
+    assert sampled.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+    assert original.sample_probs == [1.0] * data.ndim
+    assert original.scan(needs_freq=False)[1] == original_count
+    assert factory.remask(sampled) is sampled
+    automatic_factory = SamplingStatsFactory(sample_nnz=budget)
+    automatic_factory._rng = np.random.default_rng(42)
+    automatic = automatic_factory(ft.asarray(data), fields)
+    assert automatic.sample_probs == probs
+    assert automatic.scan(needs_freq=False)[1] == np.count_nonzero(expected)
+
+
+@pytest.mark.parametrize("shape", [(), (0,), (0, 5), (2, 3)])
+def test_sampling_remask_under_budget(shape):
+    fields = tuple(Field(f"i_{dim}") for dim in range(len(shape)))
+    factory = SamplingStatsFactory(sample_nnz=6)
+    stats = factory(ft.asarray(np.ones(shape)), fields)
+    assert stats.sample_probs == [1.0] * len(shape)
+    assert stats.scan(needs_freq=False)[1] == math.prod(shape)
+
+
+@pytest.mark.parametrize("op", [ffuncs.mul, ffuncs.add])
+def test_sampling_bounds_each_sketch(op):
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=12)
+    factory._rng = np.random.default_rng(42)
+    first = factory(ft.asarray(np.ones(10)), (i,))
+    second = factory(ft.asarray(np.ones(10)), (j,))
+    combined = factory.mapjoin(op, first, second)
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), combined)
+    for stats in (first, second, combined, reduced):
+        assert stats.scan(needs_freq=False)[1] <= 12
+    assert min(combined.sample_probs) < 1.0
+
+
+def test_sampling_budget_counts_positions_not_multiplicities():
+    i, j = Field("i"), Field("j")
+    factory = SamplingStatsFactory(sample_nnz=100)
+    stats = factory(ft.asarray(np.ones((2, 20))), (i, j))
+    reduced = factory.aggregate(ffuncs.add, 0, (j,), stats)
+    factory.sample_nnz = 2
+    sampled = factory.remask(reduced)
+    assert sampled.sample_probs == [1.0]
+    assert sampled.scan(needs_freq=False)[:2] == (40.0, 2.0)
+
+
+@pytest.mark.parametrize("budget", [0, -1])
+def test_sampling_requires_positive_budget(budget):
+    with pytest.raises(ValueError, match="sample_nnz must be positive"):
+        SamplingStatsFactory(sample_nnz=budget)
+
+
 def test_sampling_from_tensor():
     i, j = Field("i"), Field("j")
     data = np.eye(20)
     arr = ft.asarray(data)
     node = Table(Literal(arr), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    assert stats.remainder_dims == set()
-    assert stats.remainder_dim_sizes == {}
+    assert stats.remainder_size == 1.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -115,14 +385,14 @@ def test_sampling_mapjoin_join():
 
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -130,7 +400,7 @@ def test_sampling_mapjoin_join():
     )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -149,14 +419,14 @@ def test_sampling_mapjoin_elementwise():
     tb = Table(Literal(ft.asarray(data_b)), (i, j))
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -164,7 +434,7 @@ def test_sampling_mapjoin_elementwise():
     )
     node_mapjoin_elem = MapJoin(Literal(ffuncs.add), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node_mapjoin_elem,
         bindings=OrderedDict(),
         replace=False,
@@ -191,14 +461,14 @@ def test_sampling_mapjoin_broadcast():
 
     cache = {}
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=ta,
         bindings=OrderedDict(),
         replace=False,
         cache=cache,
     )
     insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=tb,
         bindings=OrderedDict(),
         replace=False,
@@ -206,7 +476,7 @@ def test_sampling_mapjoin_broadcast():
     )
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node_mul,
         bindings=OrderedDict(),
         replace=False,
@@ -231,7 +501,7 @@ def test_sampling_aggregate():
         idxs=(k,),
     )
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
@@ -239,8 +509,8 @@ def test_sampling_aggregate():
     )
 
     assert stats.index_order == (i, j)
-    assert k in stats.remainder_dims
-    assert stats.remainder_dim_sizes[k] == 20.0
+    assert stats.remainder_size == 20.0
+    assert stats.remainder_prob == 1.0
     assert stats.estimate_non_fill_values() == pytest.approx(20.0, abs=1.0)
 
 
@@ -249,15 +519,13 @@ def test_sampling_relabel():
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    relabled = SamplingStatsFactory(sample_prob=1.0).relabel(
-        stats, (Field("row"), Field("col"))
-    )
+    relabled = SamplingStatsFactory().relabel(stats, (Field("row"), Field("col")))
 
     assert relabled.index_order == (Field("row"), Field("col"))
     assert relabled.estimate_non_fill_values() == pytest.approx(
@@ -270,13 +538,13 @@ def test_sampling_reorder():
     data = np.eye(5)
     node = Table(Literal(ft.asarray(data)), (i, j))
     stats = insert_statistics(
-        stats_factory=SamplingStatsFactory(sample_prob=1.0),
+        stats_factory=SamplingStatsFactory(),
         node=node,
         bindings=OrderedDict(),
         replace=False,
         cache={},
     )
-    reordered = SamplingStatsFactory(sample_prob=1.0).reorder(stats, (j, i))
+    reordered = SamplingStatsFactory().reorder(stats, (j, i))
     assert reordered.index_order == (j, i)
     assert reordered.estimate_non_fill_values() == pytest.approx(
         stats.estimate_non_fill_values(), abs=1.0
@@ -340,7 +608,7 @@ def _overwrite_def(stat, base: BaseTensorStats):
     """
     stat.index_order = base.index_order
     stat.dim_sizes = base.dim_sizes
-    stat.fill_value = base.fill_value
+    stat.fill_type = base.fill_type
     return stat
 
 
@@ -396,16 +664,13 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             super().__init__(loader)
             self.output_stats = []
 
-        def get_tensor_ftype(self, fill_value, shape_type, stats) -> TensorFType:
+        def get_tensor_ftype(self, fill_type, shape_type, stats) -> TensorFType:
             self.output_stats.append(stats)
-            fill_ftype = ftype(
-                fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-            )
             return ft.BufferizedNDArrayFType(
-                buffer_type=ft.NumpyBufferFType(fill_ftype),
+                buffer_type=ft.NumpyBufferFType(fill_type.element_type),
                 ndim=len(shape_type),
                 dimension_type=TupleFType.from_tuple(shape_type),
-                fill_value=fill_value,
+                fill_type=fill_type,
             )
 
     i, j = Field("i"), Field("j")
@@ -469,11 +734,11 @@ def test_fd_formatter_uses_dense_levels_for_dense_properties():
 
 def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
     i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, StaticFillFType(0))
     stats = FDStats(base, dense_props={frozenset({i})})
 
     ftype = FDFormatter().get_tensor_ftype(
-        StaticFill(0),
+        StaticFillFType(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -486,14 +751,14 @@ def test_fd_formatter_uses_sparse_hash_for_unknown_dense_properties():
 
 def test_fd_formatter_requires_outer_fields_for_inner_dense_levels():
     i, j = Field("i"), Field("j")
-    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, 0)
+    base = BaseTensorStats((i, j), {i: 2.0, j: 3.0}, StaticFillFType(0))
     stats = FDStats(
         base,
         dense_props={frozenset({i}), frozenset({j})},
     )
 
     ftype = FDFormatter().get_tensor_ftype(
-        StaticFill(0),
+        StaticFillFType(0),
         (ft.ftype(np.intp), ft.ftype(np.intp)),
         stats,
     )
@@ -519,7 +784,7 @@ def _format_stats(levels, shape, fields):
 
 def _fd_output_pattern(stats):
     ftype = FDFormatter().get_tensor_ftype(
-        stats.fill_value,
+        stats.fill_type,
         tuple(ft.intp for _ in stats.index_order),
         stats,
     )
@@ -588,10 +853,12 @@ def test_fd_stats_records_dense_projections_without_chasing():
     i, j = Field("i"), Field("j")
 
     class TensorFType:
+        fill_type = StaticFillFType(0)
         level_format_properties = [
             DenseProperty((0, 1)),
             DenseProperty((1,)),
         ]
+        shape_type = (ft.int64, ft.int64)
 
     class Tensor:
         shape = (2, 3)
@@ -1000,7 +1267,7 @@ def test_dummy_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
 
 
 def test_dummy_mapjoin_same_axes():
@@ -1067,7 +1334,7 @@ def test_dummy_mapjoin_non_same_axes():
     )
 
     assert set(stats.index_order) == {i, j, k}
-    assert stats.fill_value.value == 0.0
+    assert stats.fill_type == StaticFillFType(np.float64(0.0))
 
 
 def test_dummy_aggregate():
@@ -1158,7 +1425,7 @@ def test_vp_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1441,7 +1708,7 @@ def test_uniform_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
     assert stats.estimate_non_fill_values() == 2.0
 
 
@@ -1509,7 +1776,7 @@ def test_uniform_mapjoin_mul_and_add():
         cache=cache,
     )
     assert us_mul.estimate_non_fill_values() == pytest.approx(25.0)
-    assert us_mul.fill_value.value == 0.0
+    assert us_mul.fill_type == StaticFillFType(np.float64(0.0))
 
     # 1 - (1-P(a))(1-P(b)) = 1 - (1-0.5)*(1-0.5) =0.75 -> 0.75 * 100 = 75 nnz
     node_add = MapJoin(Literal(ffuncs.add), (ta, tb))
@@ -1756,14 +2023,43 @@ def test_copy_and_getters():
     td = BaseTensorStats.from_fields(
         index_order=(Field("i"), Field("j")),
         dim_sizes={Field("i"): 2.0, Field("j"): 3.0},
-        fill_value=42,
+        fill_type=StaticFillFType(42),
     )
     td_copy = td.copy()
     assert td_copy is not td
     assert td_copy.index_order == (Field("i"), Field("j"))
     assert td_copy.dim_sizes == {Field("i"): 2.0, Field("j"): 3.0}
     assert td_copy.get_dim_size(Field("j")) == 3.0
-    assert td_copy.fill_value.value == 42
+    assert td_copy.fill_type == StaticFillFType(42)
+
+
+def test_defs_propagate_dimension_types():
+    i, j, k = Field("i"), Field("j"), Field("k")
+    a = BaseTensorStats.from_fields(
+        (i, j),
+        {i: 2.0, j: 3.0},
+        StaticFillFType(np.float64(0.0)),
+        {i: ft.int32, j: ft.int64},
+    )
+    b = BaseTensorStats.from_fields(
+        (j, k),
+        {j: 3.0, k: 4.0},
+        StaticFillFType(np.float64(0.0)),
+        {j: ft.int32, k: ft.int64},
+    )
+    joined = BaseTensorStatsFactory._mapjoin_defs(ffuncs.mul, a, b)
+    reduced = BaseTensorStatsFactory.aggregate_def(ffuncs.add, 0.0, (j,), joined)
+    relabeled = BaseTensorStatsFactory.relabel_def(a, (k, i))
+    reordered = BaseTensorStatsFactory.reorder_def(a, (j, k, i))
+
+    assert a.element_type == ft.float64
+    assert joined.shape_type == (ft.int32, ft.int64, ft.int64)
+    assert reduced.shape_type == (ft.int32, ft.int64)
+    assert relabeled.shape_type == (ft.int32, ft.int64)
+    # A broadcast dimension has no type.
+    assert reordered.shape_type == (ft.int64, None, ft.int32)
+    tensor = ft.asarray(np.ones((2, 3)))
+    assert DCStatsFactory()(tensor, (i, j)).shape_type == ftype(tensor).shape_type
 
 
 @pytest.mark.parametrize(
@@ -1776,7 +2072,7 @@ def test_copy_and_getters():
 def test_reorder_def(orig_axes, new_axes):
     dim_sizes = {axis: float(i + 1) for i, axis in enumerate(orig_axes)}
     td = BaseTensorStats.from_fields(
-        index_order=orig_axes, dim_sizes=dim_sizes, fill_value=0
+        index_order=orig_axes, dim_sizes=dim_sizes, fill_type=StaticFillFType(0)
     )
     td2 = BaseTensorStatsFactory.reorder_def(td, tuple(new_axes))
     assert td2.index_order == tuple(new_axes)
@@ -1824,11 +2120,16 @@ def test_reorder_def(orig_axes, new_axes):
     ],
 )
 def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
-    objs = [BaseTensorStats.from_fields(ax, dims, fv) for (ax, dims, fv) in defs]
+    objs = [
+        BaseTensorStats.from_fields(ax, dims, StaticFillFType(fv))
+        for (ax, dims, fv) in defs
+    ]
     out = BaseTensorStatsFactory._mapjoin_defs(func, *objs)
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value.value == expected_fill
+    # No rule can act on the combined fill, so the format only records its
+    # element type.
+    assert out.fill_type == DynamicFillFType(ftype(expected_fill))
 
 
 @pytest.mark.parametrize(
@@ -1896,7 +2197,7 @@ def test_base_mapjoin(defs, func, expected_axes, expected_dims, expected_fill):
             (Field("j"),),
             (Field("i"),),
             {Field("i"): 2.0},
-            8.0,
+            np.float64(8.0),
         ),
         # idempotent op: reduce entire axis → empty shape
         (
@@ -1922,13 +2223,15 @@ def test_base_aggregate(
     expected_fill,
 ):
     base = BaseTensorStats.from_fields(
-        index_order=index_order, dim_sizes=dim_sizes, fill_value=fill_value
+        index_order=index_order,
+        dim_sizes=dim_sizes,
+        fill_type=StaticFillFType(fill_value),
     )
     out = BaseTensorStatsFactory.aggregate_def(op_func, None, reduce_fields, base)
 
     assert out.index_order == expected_axes
     assert out.dim_sizes == expected_dims
-    assert out.fill_value.value == expected_fill
+    assert out.fill_type == StaticFillFType(expected_fill)
 
 
 # ─────────────────────────────── DenseStats tests ─────────────────────────────
@@ -1947,7 +2250,7 @@ def test_from_tensor_and_getters():
     assert stats.index_order == (Field("i"), Field("j"))
     assert stats.get_dim_size(Field("i")) == 2.0
     assert stats.get_dim_size(Field("j")) == 3.0
-    assert stats.fill_value.value == 0
+    assert stats.fill_type == StaticFillFType(np.float64(0))
 
 
 @pytest.mark.parametrize(
@@ -2004,9 +2307,9 @@ def test_mapjoin_mul_and_add():
         replace=False,
         cache=cache,
     )
-    cache[ta].fill_value = 1
-    cache[tb].fill_value = 1
-    cache[ta2].fill_value = 2
+    cache[ta].fill_type = StaticFillFType(1)
+    cache[tb].fill_type = StaticFillFType(1)
+    cache[ta2].fill_type = StaticFillFType(2)
     node_mul = MapJoin(Literal(ffuncs.mul), (ta, tb))
     dsm = insert_statistics(
         stats_factory=DenseStatsFactory(),
@@ -2020,7 +2323,7 @@ def test_mapjoin_mul_and_add():
     assert dsm.get_dim_size(Field("i")) == 2.0
     assert dsm.get_dim_size(Field("j")) == 3.0
     assert dsm.get_dim_size(Field("k")) == 4.0
-    assert dsm.fill_value.value == 1.0
+    assert dsm.fill_type == StaticFillFType(1)
 
     node_add = MapJoin(Literal(ffuncs.add), (ta, ta2))
     ds_sum = insert_statistics(
@@ -2034,7 +2337,8 @@ def test_mapjoin_mul_and_add():
     assert ds_sum.index_order == (Field("i"), Field("j"))
     assert ds_sum.get_dim_size(Field("i")) == 2.0
     assert ds_sum.get_dim_size(Field("j")) == 3.0
-    assert ds_sum.fill_value.value == 1.0 + 2.0
+    # No rule can act on the summed fill, so the format only records its type.
+    assert ds_sum.fill_type == DynamicFillFType(ftype(1 + 2))
 
 
 def test_aggregate():
@@ -2067,7 +2371,7 @@ def test_aggregate():
 
     assert ds_agg.index_order == (Field("i"),)
     assert ds_agg.get_dim_size(Field("i")) == 2.0
-    assert ds_agg.fill_value == dsa.fill_value
+    assert ds_agg.fill_type == dsa.fill_type
 
 
 def test_relabel_dense_stats():
@@ -2090,7 +2394,7 @@ def test_relabel_dense_stats():
 
     assert new_stats.get_dim_size(Field("col")) == 3.0
 
-    assert new_stats.fill_value == stats.fill_value
+    assert new_stats.fill_type == stats.fill_type
 
     with pytest.raises(ValueError):
         DenseStatsFactory().relabel(stats, (Field("x"), Field("y"), Field("z")))
@@ -2417,7 +2721,10 @@ def test_single_tensor_card(dims, dcs, expected_nnz):
     )
 
     _overwrite_def(
-        stat, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims, 0)
+        stat,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j")]), dims, StaticFillFType(0)
+        ),
     )
     stat.dcs = set(dcs)
 
@@ -2454,7 +2761,7 @@ def test_1_join_dc_card(dims, dcs, expected_nnz):
     _overwrite_def(
         stat,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0)
         ),
     )
     stat.dcs = set(dcs)
@@ -2492,7 +2799,9 @@ def test_2_join_dc_card(dims, dcs, expected_nnz):
     _overwrite_def(
         stat,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k"), Field("l")]), dims, 0
+            frozenset([Field("i"), Field("j"), Field("k"), Field("l")]),
+            dims,
+            StaticFillFType(0),
         ),
     )
     stat.dcs = set(dcs)
@@ -2536,7 +2845,7 @@ def test_triangle_dc_card(dims, dcs, expected_nnz):
     _overwrite_def(
         stat,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0)
         ),
     )
     stat.dcs = set(dcs)
@@ -2580,7 +2889,7 @@ def test_triangle_small_dc_card(dims, dcs, expected_nnz):
     _overwrite_def(
         stat,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0)
         ),
     )
     stat.dcs = set(dcs)
@@ -2637,7 +2946,12 @@ def test_merge_dc_join(dims, dcs_list, expected_dcs):
             replace=False,
             cache={},
         )
-        _overwrite_def(s, BaseTensorStats.from_fields(frozenset({Field("i")}), dims, 0))
+        _overwrite_def(
+            s,
+            BaseTensorStats.from_fields(
+                frozenset({Field("i")}), dims, StaticFillFType(0)
+            ),
+        )
         s.dcs = set(dcs)
         stats_objs.append(s)
 
@@ -2732,7 +3046,7 @@ def test_merge_dc_union(new_dims, inputs, expected_dcs):
         field_idx_set = frozenset(idx_set)
         field_dims = {k: new_dims[k] for k in idx_set}
 
-        td = BaseTensorStats.from_fields(field_idx_set, field_dims, 0)
+        td = BaseTensorStats.from_fields(field_idx_set, field_dims, StaticFillFType(0))
         stats_objs.append(DCStats(td, dcs=set(dcs)))
 
     out = DCStatsFactory().mapjoin(ffuncs.add, *stats_objs)
@@ -2766,7 +3080,10 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
+    _overwrite_def(
+        s1,
+        BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, StaticFillFType(0)),
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("i"),))
@@ -2777,7 +3094,10 @@ def test_1d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("i")}), dims2, 0))
+    _overwrite_def(
+        s2,
+        BaseTensorStats.from_fields(frozenset({Field("i")}), dims2, StaticFillFType(0)),
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2818,7 +3138,10 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         cache=cache,
     )
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+        s1,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j")}), dims1, StaticFillFType(0)
+        ),
     )
     s1.dcs = set(dcs1)
 
@@ -2833,7 +3156,10 @@ def test_2d_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         cache=cache,
     )
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims2, 0)
+        s2,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j")}), dims2, StaticFillFType(0)
+        ),
     )
     s2.dcs = set(dcs2)
 
@@ -2872,7 +3198,10 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    _overwrite_def(s1, BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, 0))
+    _overwrite_def(
+        s1,
+        BaseTensorStats.from_fields(frozenset({Field("i")}), dims1, StaticFillFType(0)),
+    )
     s1.dcs = set(dcs1)
 
     node2 = Table(Literal(ft.asarray(np.zeros((1,), dtype=int))), (Field("j"),))
@@ -2883,7 +3212,10 @@ def test_2d_disjoin_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz):
         replace=False,
         cache=cache,
     )
-    _overwrite_def(s2, BaseTensorStats.from_fields(frozenset({Field("j")}), dims2, 0))
+    _overwrite_def(
+        s2,
+        BaseTensorStats.from_fields(frozenset({Field("j")}), dims2, StaticFillFType(0)),
+    )
     s2.dcs = set(dcs2)
 
     parent = MapJoin(Literal(ffuncs.add), (node1, node2))
@@ -2927,7 +3259,10 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         cache=cache,
     )
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 0)
+        s1,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j")}), dims1, StaticFillFType(0)
+        ),
     )
     s1.dcs = set(dcs1)
 
@@ -2943,7 +3278,10 @@ def test_3d_disjoint_disjunction_dc_card(dims1, dcs1, dims2, dcs2, expected_nnz)
         cache=cache,
     )
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 0)
+        s2,
+        BaseTensorStats.from_fields(
+            frozenset({Field("j"), Field("k")}), dims2, StaticFillFType(0)
+        ),
     )
     s2.dcs = set(dcs2)
 
@@ -2995,7 +3333,10 @@ def test_large_disjoint_disjunction_dc_card(
         cache=cache,
     )
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset({Field("i"), Field("j")}), dims1, 1)
+        s1,
+        BaseTensorStats.from_fields(
+            frozenset({Field("i"), Field("j")}), dims1, StaticFillFType(1)
+        ),
     )
     s1.dcs = set(dcs1)
 
@@ -3010,7 +3351,10 @@ def test_large_disjoint_disjunction_dc_card(
         cache=cache,
     )
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset({Field("j"), Field("k")}), dims2, 1)
+        s2,
+        BaseTensorStats.from_fields(
+            frozenset({Field("j"), Field("k")}), dims2, StaticFillFType(1)
+        ),
     )
     s2.dcs = set(dcs2)
 
@@ -3028,7 +3372,7 @@ def test_large_disjoint_disjunction_dc_card(
     _overwrite_def(
         s3,
         BaseTensorStats.from_fields(
-            frozenset({Field("i"), Field("j"), Field("k")}), dims3, 1
+            frozenset({Field("i"), Field("j"), Field("k")}), dims3, StaticFillFType(1)
         ),
     )
     s3.dcs = set(dcs3)
@@ -3078,7 +3422,10 @@ def test_mixture_disjoint_disjunction_dc_card(
         cache=cache,
     )
     _overwrite_def(
-        s1, BaseTensorStats.from_fields(frozenset([Field("i"), Field("j")]), dims1, 1)
+        s1,
+        BaseTensorStats.from_fields(
+            frozenset([Field("i"), Field("j")]), dims1, StaticFillFType(1)
+        ),
     )
     s1.dcs = set(dcs1)
 
@@ -3093,7 +3440,10 @@ def test_mixture_disjoint_disjunction_dc_card(
         cache=cache,
     )
     _overwrite_def(
-        s2, BaseTensorStats.from_fields(frozenset([Field("j"), Field("k")]), dims2, 1)
+        s2,
+        BaseTensorStats.from_fields(
+            frozenset([Field("j"), Field("k")]), dims2, StaticFillFType(1)
+        ),
     )
     s2.dcs = set(dcs2)
 
@@ -3111,7 +3461,7 @@ def test_mixture_disjoint_disjunction_dc_card(
     _overwrite_def(
         s3,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims3, 0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims3, StaticFillFType(0)
         ),
     )
     s3.dcs = set(dcs3)
@@ -3167,7 +3517,7 @@ def test_full_reduce_DC_card(dims, dcs, expected_nnz):
     _overwrite_def(
         stat,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0.0)
         ),
     )
     stat.dcs = set(dcs)
@@ -3226,7 +3576,7 @@ def test_1_attr_reduce_DC_card(dims, dcs, expected_nnz):
     _overwrite_def(
         st,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0.0)
         ),
     )
     st.dcs = set(dcs)
@@ -3285,7 +3635,7 @@ def test_2_attr_reduce_DC_card(dims, dcs, expected_nnz):
     _overwrite_def(
         st,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0.0)
         ),
     )
     st.dcs = set(dcs)
@@ -3361,7 +3711,7 @@ def test_varied_reduce_DC_card(dims, dcs, reduce_indices, expected_nnz):
     _overwrite_def(
         st,
         BaseTensorStats.from_fields(
-            frozenset([Field("i"), Field("j"), Field("k")]), dims, 0.0
+            frozenset([Field("i"), Field("j"), Field("k")]), dims, StaticFillFType(0.0)
         ),
     )
     st.dcs = set(dcs)

@@ -34,6 +34,7 @@ test = [
     "sparse>=0.17.0",
     "ty>=0.0.78",
     "pytest-regressions>=2.8.1,<3",
+    "matplotlib>=3.9,<4",
 ]
 benchmark = [
     "pytest-codspeed>=5",
@@ -147,7 +148,7 @@ default-environment = "test-mlir"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "pytest src/finch/tests/test_julia_backend.py -n {{ njobs }}"
+cmd = "pytest src/finch/tests/test_julia_backend.py src/finch/tests/test_accuracy.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 

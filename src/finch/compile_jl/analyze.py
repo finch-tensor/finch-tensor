@@ -41,7 +41,8 @@ def _is_reset_before_read(node: Any, names: set[str]) -> bool | None:
         case ntn.If(condition, body):
             if _references(condition, names):
                 return False
-            return _is_reset_before_read(body, names)
+            # When the condition is false, the previous values remain.
+            return False if _is_reset_before_read(body, names) is False else None
         case ntn.IfElse(condition, then_body, else_body):
             if _references(condition, names):
                 return False
