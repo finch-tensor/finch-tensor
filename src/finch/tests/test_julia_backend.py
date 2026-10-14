@@ -917,6 +917,23 @@ def test_compile_julia_evaluates_variadic_and_or_call(
     assert jl.seval(generated) == expected
 
 
+
+def test_compile_julia_size_reads_the_length_of_a_mode():
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLGenerator
+
+    from .test_notation_compiler import size_program
+
+    # A non-square tensor catches modes counted from the wrong end.
+    a = np.arange(12, dtype=np.float64).reshape(3, 4)
+    a_buf = BufferizedNDArray.from_numpy(a)
+    prgm = size_program(a_buf)
+    generated = FinchJLGenerator()(prgm.children[0])
+    assert "finch_size(" in generated
+    out_buf = BufferizedNDArray.from_numpy(np.array(0.0))
+    actual = FinchJLCompiler()(prgm).sizes(out_buf, a_buf)[0]
+    np.testing.assert_array_equal(actual.to_numpy(), 3 * 10 + 4 + a.sum() * 4)
+
 def test_compile_julia_galley_dense_matmul():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA_GALLEY

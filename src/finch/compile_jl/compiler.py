@@ -11,7 +11,7 @@ from finch.algebra.fill import (
     is_dynamic,
 )
 from finch.algebra.ftypes import ftype
-from finch.compile import NotationCompiler, dimension
+from finch.compile import NotationCompiler, dimension, size
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
 from finch.symbolic import PostWalk, Rewrite
@@ -76,6 +76,7 @@ _JULIA_OPS = {
     ffuncs.clip.ftype: "clamp",
     ffuncs.truth.ftype: "Bool",
     ffuncs.first_arg.ftype: "first_arg",
+    size.ftype: "finch_size",
 }
 
 _JULIA_REDUCTION_OPS = {

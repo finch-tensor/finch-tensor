@@ -376,3 +376,110 @@ def test_if_in_loop_is_lowered():
     out_buf = BufferizedNDArray.from_numpy(np.zeros_like(a))
     asm_result = asm_mod.masked_copy(out_buf, a_buf).to_numpy()
     finch_assert_equal(asm_result, expected)
+
+
+def size_program(a_buf):
+    """A kernel sizes(OUT, A) which adds size(A, 0) * 10 + size(A, 1) to OUT,
+    then A[i, j] * size(A, 1) for each i, j."""
+    i = ntn.Variable("i", finch.intp)
+    j = ntn.Variable("j", finch.intp)
+    m = ntn.Variable("m", finch.intp)
+    n = ntn.Variable("n", finch.intp)
+    out_buf = BufferizedNDArray.from_numpy(np.array(0.0))
+    OUT = ntn.Variable("OUT", ftype(out_buf))
+    A = ntn.Variable("A", ftype(a_buf))
+    OUT_ = ntn.Slot("OUT_", ftype(out_buf))
+    A_ = ntn.Slot("A_", ftype(a_buf))
+    add = ntn.Literal(ffuncs.add)
+
+    def size(mode):
+        return ntn.Call(ntn.Literal(finch.compile.size), (A_, ntn.Literal(mode)))
+
+    def increment(val):
+        return ntn.Increment(ntn.Access(OUT_, ntn.Update(add), ()), val)
+
+    return ntn.Module(
+        (
+            ntn.Function(
+                ntn.Variable(
+                    "sizes",
+                    AssemblyKernelFType(
+                        "sizes", (OUT.result_type, A.result_type), OUT.result_type
+                    ),
+                ),
+                (OUT, A),
+                ntn.Block(
+                    (
+                        ntn.Unpack(OUT_, OUT),
+                        ntn.Unpack(A_, A),
+                        ntn.Assign(m, ntn.Dimension(A_, ntn.Literal(0))),
+                        ntn.Assign(n, ntn.Dimension(A_, ntn.Literal(1))),
+                        ntn.Declare(OUT_, ntn.Literal(0.0), add, ()),
+                        increment(
+                            ntn.Call(
+                                add,
+                                (
+                                    ntn.Call(
+                                        ntn.Literal(ffuncs.mul),
+                                        (size(0), ntn.Literal(np.intp(10))),
+                                    ),
+                                    size(1),
+                                ),
+                            )
+                        ),
+                        ntn.Loop(
+                            i,
+                            ntn.Call(
+                                ntn.Literal(make_extent),
+                                (ntn.Literal(np.intp(0)), m),
+                            ),
+                            ntn.Loop(
+                                j,
+                                ntn.Call(
+                                    ntn.Literal(make_extent),
+                                    (ntn.Literal(np.intp(0)), n),
+                                ),
+                                increment(
+                                    ntn.Call(
+                                        ntn.Literal(ffuncs.mul),
+                                        (
+                                            ntn.Unwrap(
+                                                ntn.Access(A_, ntn.Read(), (i, j))
+                                            ),
+                                            size(1),
+                                        ),
+                                    )
+                                ),
+                            ),
+                        ),
+                        ntn.Freeze(OUT_, add),
+                        ntn.Repack(A_, A),
+                        ntn.Repack(OUT_, OUT),
+                        ntn.Return(OUT),
+                    )
+                ),
+            ),
+        )
+    )
+
+
+def test_size_reads_the_length_of_a_mode():
+    a = np.arange(12, dtype=np.float64).reshape(3, 4)
+    a_buf = BufferizedNDArray.from_numpy(a)
+    prgm = size_program(a_buf)
+    expected = 3 * 10 + 4 + a.sum() * 4
+
+    ntn_mod = ntn.NotationInterpreter()(prgm)
+    out_buf = BufferizedNDArray.from_numpy(np.array(0.0))
+    finch_assert_equal(ntn_mod.sizes(out_buf, a_buf).to_numpy(), expected)
+
+    asm_program = NotationCompiler(Reflector())(prgm)  # ty: ignore[invalid-argument-type]
+    asm_mod = AssemblyInterpreter()(asm_program)
+    out_buf = BufferizedNDArray.from_numpy(np.array(0.0))
+    finch_assert_equal(asm_mod.sizes(out_buf, a_buf).to_numpy(), expected)
+
+
+def test_size_returns_an_integer():
+    a_buf = BufferizedNDArray.from_numpy(np.zeros((3, 4)))
+    assert finch.compile.size(a_buf, 1) == 4
+    assert isinstance(finch.compile.size(a_buf, 1), np.intp)

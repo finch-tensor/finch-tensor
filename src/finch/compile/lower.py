@@ -252,6 +252,35 @@ class _Dimension(FinchOperator):
 dimension = _Dimension()
 
 
+class _SizeFType(SingletonOperatorFType):
+    @property
+    def operator(self):
+        return size
+
+    def return_type(self, tns: FType, mode: FType) -> FType:  # type: ignore[override]
+        return ftype(np.intp)
+
+
+class _Size(FinchOperator):
+    """
+    The length of mode `mode` of a tensor, as an integer, unlike dimension,
+    which returns the Extent of the mode.
+    """
+
+    @property
+    def ftype(self):
+        return _SizeFType()
+
+    def __call__(self, tns, mode: int) -> np.intp:
+        return np.intp(tns.shape[mode])
+
+    def __repr__(self) -> str:
+        return "size"
+
+
+size = _Size()
+
+
 class FinchCompileError(Exception):  # TODO: Let's move it to `exceptions` dir?
     """
     Exception raised during Finch compilation.
@@ -544,6 +573,9 @@ class AssemblyContext(Context):
                 return tns.result_type.get_child(self(tns), "lvl")
             case ntn.Child(parent, attr):
                 return parent.result_type.level_get_child(self(parent), attr)
+            case ntn.Call(ntn.Literal(op), (tns, ntn.Literal() as mode)) if op is size:
+                # Tensors lower their own dimensions, so backends need no size.
+                return self(ntn.Dimension(tns, mode))
             case ntn.Call(f, args):
                 f_e = self(f)
                 args_e = tuple(self(arg) for arg in args)

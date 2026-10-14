@@ -89,6 +89,7 @@ from .compile import (
     Extent,
     ExtentFType,
     dimension,
+    size,
 )
 from .finch_fused.jit import jit
 from .interface import (
@@ -555,6 +556,7 @@ __all__ = [
     "signbit",
     "sin",
     "sinh",
+    "size",
     "sort",
     "sparse_bytemap",
     "sparse_coo",

@@ -7,6 +7,7 @@ from typing import Any
 
 import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
+from finch.compile.lower import size
 from finch.symbolic import PostWalk, Rewrite, TermTree
 
 
@@ -23,6 +24,10 @@ def _argument_aliases(function: ntn.Function, argument: ntn.Variable) -> set[str
 
 
 def _references(node: Any, names: set[str]) -> bool:
+    match node:
+        case ntn.Call(ntn.Literal(op), (_, mode)) if op is size:
+            # Reading the size of a tensor does not read its values.
+            return _references(mode, names)
     if isinstance(node, (ntn.Variable, ntn.Slot)):
         return node.name in names
     return isinstance(node, TermTree) and any(

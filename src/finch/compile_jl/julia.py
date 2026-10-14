@@ -64,6 +64,8 @@ def _start_julia() -> tuple[Any, Any]:
         Main.seval(f"using {pkg}")
 
     Main.seval("first_arg(x, y...) = x")
+    # Python modes count from the last Julia axis, starting at 0.
+    Main.seval("finch_size(t, mode) = size(t)[length(size(t)) - mode]")
 
     return juliacall, Main
 

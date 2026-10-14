@@ -7,6 +7,7 @@ from .lower import (
     NotationCompiler,
     dimension,
     make_extent,
+    size,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "NotationCompiler",
     "dimension",
     "make_extent",
+    "size",
 ]
