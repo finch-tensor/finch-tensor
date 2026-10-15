@@ -1,5 +1,7 @@
 import uuid
 
+import numpy as np
+
 import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
@@ -23,6 +25,7 @@ from finch.tensor.patterns import FillTensorFType, PatternTensorFType
 from .julia import jl
 from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
+    _julia_fill_literal,
     _julia_literal,
     _leaf_type_str,
     _zero_value,
@@ -255,10 +258,13 @@ class FinchJLGenerator:
 
             case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
-                return (
-                    f"{tab_str}{self.generate_julia(tns, nestingLvl)} .= "
-                    f"{self.generate_julia(init, nestingLvl)}"
-                )
+                init_str = self.generate_julia(init, nestingLvl)
+                if isinstance(init, ntn.Literal) and isinstance(
+                    init.val, (float, np.floating)
+                ):
+                    # Declarations initialize to fills, like _julia_fill_literal.
+                    init_str = _julia_fill_literal(init.val)
+                return f"{tab_str}{self.generate_julia(tns, nestingLvl)} .= {init_str}"
 
             case ntn.Return(ntn.Call(op, args)) if op.result_type == make_tuple.ftype:
                 tab_str = "    " * nestingLvl

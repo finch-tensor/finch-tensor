@@ -1209,3 +1209,26 @@ def test_register_julia_op_maps_and_defines_once():
     assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
     assert int(jl.finch_test_twice(3)) == 6
     del compiler._JULIA_OPS[op.ftype]
+def test_compile_julia_negative_zero_fill():
+    # Python ftypes equate -0.0 and 0.0 fills, so they share Julia kernels.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.arange(4.0).reshape(2, 2)
+    square = arg @ arg
+    with with_default_scheduler(COMPILE_JULIA):
+        positive = ft.einop("P[i,j] += A[i,k] * A[k,j]", A=ft.asarray(arg))
+        negative = ft.negative(positive)
+        assert np.signbit(negative.fill_value)
+        results = [
+            ft.subtract(positive, positive),
+            ft.subtract(negative, negative),
+            ft.subtract(negative, positive),
+            ft.einop("T[i,j] = F[j,i]", F=negative),
+            ft.einop("T[i,j] = F[j,i]", F=positive),
+        ]
+        expected = [0 * square, 0 * square, -2 * square, -square.T, square.T]
+        for result, value in zip(results, expected, strict=True):
+            np.testing.assert_array_equal(result.to_numpy(), value)
+
+

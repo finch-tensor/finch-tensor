@@ -230,9 +230,20 @@ def _julia_literal(value: Any) -> str:
     return literal
 
 
+def _julia_fill_literal(fill: Any) -> str:
+    # Matches interop.py's _as_julia_fill, which drops the sign of a zero fill.
+    if isinstance(fill, StaticFill | StaticFillFType):
+        fill = fill.value
+    if isinstance(fill, (float, np.floating)) and fill == 0:
+        fill = fill + type(fill)(0)
+    return _julia_literal(fill)
+
+
 def scalar_type_str(fill: Any, element_type: Any) -> str:
     """The Julia type of a Finch scalar with the given fill and element type."""
-    return f"Finch.Scalar{{{_julia_literal(fill)}, {_leaf_type_str(element_type)}}}"
+    return (
+        f"Finch.Scalar{{{_julia_fill_literal(fill)}, {_leaf_type_str(element_type)}}}"
+    )
 
 
 def _leaf_type_str(T: Any) -> str:
@@ -254,7 +265,7 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     """
     if isinstance(level_ftype, ElementLevelFType):
         elem_t = _leaf_type_str(level_ftype.element_type)
-        fill = _julia_literal(level_ftype.fill_type)
+        fill = _julia_fill_literal(level_ftype.fill_type)
         return f"Finch.ElementLevel({fill}, {elem_t}[])"
     if isinstance(level_ftype, DenseLevelFType):
         # interop.py's level_to_jl does `int(dimension)`, so the "shape"
@@ -313,7 +324,7 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
     embedding directly in generated kernel source (see compiler.py)."""
     if isinstance(ftype, ScalarFType):
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_type)
+        fill = _julia_fill_literal(ftype.fill_type)
         return f"Finch.Tensor(Finch.ElementLevel({fill}, {elem_t}[]))"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
@@ -322,7 +333,7 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
         # (regardless of the ftype's own dimension_type).
         elem_t = _leaf_type_str(ftype.element_type)
-        fill = _julia_literal(ftype.fill_type)
+        fill = _julia_fill_literal(ftype.fill_type)
         ctor = f"Finch.ElementLevel({fill}, {elem_t}[])"
         for _ in range(ftype.ndim):
             ctor = f"Finch.DenseLevel({ctor}, 1)"

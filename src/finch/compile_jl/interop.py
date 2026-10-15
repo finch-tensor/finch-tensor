@@ -57,6 +57,14 @@ def _as_julia_scalar(val):
     return val
 
 
+def _as_julia_fill(val):
+    # Julia distinguishes -0.0 and 0.0 fills by type, but Python ftypes don't.
+    val = _as_julia_scalar(val)
+    if isinstance(val, (float, np.floating)) and val == 0:
+        return val + type(val)(0)
+    return val
+
+
 def _buffer_to_jl(buffer: Buffer, *, offset: int = 0):
     if isinstance(buffer, MinusOneBuffer):
         if offset != 1:
@@ -85,7 +93,7 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             if pin_fill:
                 fill = jl_dtypes._zero_value(ftype(fill))
             return jl.ElementLevel(
-                _as_julia_scalar(fill),
+                _as_julia_fill(fill),
                 _buffer_to_jl(level.val),
             )
         case DenseLevel(lvl=lvl, dimension=dimension):
@@ -282,7 +290,7 @@ def _ndarray_to_jl_tensor(
         arr = np.ascontiguousarray(arr)
 
     buf = jl_dtypes.to_jl_vector(ftype(arr.dtype), arr.reshape(-1))
-    fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
+    fill = _as_julia_fill(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
         lvl = jl.DenseLevel(lvl, int(dim))
@@ -398,7 +406,7 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 def scalar_to_jl(val, pin_fill: bool = False):
     fill = jl_dtypes._zero_value(ftype(val)) if pin_fill else val
     buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
+    return jl.Tensor(jl.ElementLevel(_as_julia_fill(fill), jl.Vector(buf)))
 
 
 def jl_tensor_to_python(obj):
