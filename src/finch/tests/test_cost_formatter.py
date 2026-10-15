@@ -36,6 +36,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     HardAlias,
     Literal,
     MapJoin,
@@ -279,6 +280,30 @@ def test_format_access_features_separate_sequential_and_scatter():
     assert accessed(0, DenseLevelOption()) == (True, False, True, False)
     assert accessed(1, DenseLevelOption()) == (True, False, False, True)
     assert accessed(2, ElementLevelOption()) == (True, False, False, True)
+
+
+def test_fused_alias_levels_describe_the_largest_slice():
+    t, i = Field("t"), Field("i")
+    a, scratch = HardAlias("a"), HardAlias("scratch")
+    fused = FusedAlias(scratch, 1)
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
+    copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
+    plan = Plan((copy, Produces((fused,))))
+    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    formats: dict[Alias, list[LevelOption]] = {
+        scratch: [SparseHashLevelOption(), ElementLevelOption()]
+    }
+    machine = StatsMachine(sf, dict(stats))
+    sparse, element = model.components(plan, formats, machine)
+
+    # Each slice of the diagonal stores the one entry of its row.
+    assert (sparse.alias, sparse.depth, sparse.num_pos) == (fused, 1, 1.0)
+    assert element.depth == 2
+    assert element.num_pos == pytest.approx(1.0)
+    size = np.dtype(np.intp).itemsize
+    features = model.get_component_features(sparse, machine)
+    np.testing.assert_allclose(features[0, :4], [1, 1, 2 * size, size])
 
 
 def test_nonlinear_format_cost_retains_allocations_and_query_accesses():

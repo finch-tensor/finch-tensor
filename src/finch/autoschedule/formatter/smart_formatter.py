@@ -28,6 +28,7 @@ from finch.autoschedule.cost_models import (
     LinearPredictor,
     SparseHashLevelOption,
 )
+from finch.autoschedule.cost_models.format_cost_models import fused_fields
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -50,8 +51,9 @@ def optimize_format(
 ):
     stats = machine(alias)
     n = len(stats.index_order)
-    # A fused alias stores only the levels after its fused dimensions.
-    start = n - len(shape_type)
+    # A fused alias stores only the levels after its fused fields.
+    over = fused_fields(alias, stats)
+    start = len(over)
     position_type = ftypes.intp
     leaf = element(fill_type, fill_type.element_type, position_type)
     pos_size = np_dtype(position_type).itemsize
@@ -74,7 +76,7 @@ def optimize_format(
         for option in options:
             local = cost(level, num_pos, option)
             child_num_pos = option.next_num_pos(
-                stats, machine.stats_factory, level, num_pos
+                stats, machine.stats_factory, level, num_pos, over
             )
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost

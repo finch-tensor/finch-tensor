@@ -15,6 +15,7 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
+    FusedAlias,
     Literal,
     LogicStatement,
     Plan,
@@ -30,14 +31,34 @@ from .cost_models import NS, CostModel
 from .loop_cost_models import PigeonCostModel, Prefix
 
 
-def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int):
-    """Return the non-fill entries of the first depth + 1 levels of stats."""
+def nnz_after(
+    stats: NS,
+    stats_factory: StatsFactory[NS],
+    depth: int,
+    over: tuple[Field, ...] = (),
+):
+    """
+    Return the non-fill entries of the first depth + 1 levels of stats, in the
+    largest slice which fixes the fields of over.
+    """
     reduce_fields = tuple(stats.index_order[depth + 1 :])
     if reduce_fields:
         stats = stats_factory.aggregate(
             ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
         )
-    return stats.estimate_non_fill_values()
+    return stats.estimate_non_fill_values(over=over)
+
+
+def fused_fields(alias: Alias, stats: NS) -> tuple[Field, ...]:
+    """
+    The fields of the stats of alias which a fused alias fixes in each slice it
+    stores, which are the leading fields of its table.
+    """
+    match alias:
+        case FusedAlias(_, n):
+            return stats.index_order[:n]
+        case _:
+            return ()
 
 
 class LevelOption(ABC):
@@ -47,6 +68,8 @@ class LevelOption(ABC):
     depend on the stats of the tensor, the zero-based depth of the level, and
     the num_pos positions entering it. Storage features also depend on the
     bytes of an index of the level, and of a position and a value of the tensor.
+    A tensor which stores one slice that fixes the fields of over is described
+    by its largest slice.
     """
 
     kind: ClassVar[str]
@@ -54,7 +77,12 @@ class LevelOption(ABC):
 
     @abstractmethod
     def next_num_pos(
-        self, stats: NS, stats_factory: StatsFactory[NS], depth: int, num_pos
+        self,
+        stats: NS,
+        stats_factory: StatsFactory[NS],
+        depth: int,
+        num_pos,
+        over: tuple[Field, ...] = (),
     ): ...
 
     @abstractmethod
@@ -67,6 +95,7 @@ class LevelOption(ABC):
         idx_size: int,
         pos_size: int,
         val_size: int,
+        over: tuple[Field, ...] = (),
     ) -> np.ndarray: ...
 
 
@@ -76,14 +105,22 @@ class DenseLevelOption(LevelOption):
     kind = "dense"
     n_features = 2
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos):
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
         return num_pos * stats.get_dim_size(stats.index_order[depth])
 
     def get_storage_features(
-        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size
+        self,
+        stats,
+        stats_factory,
+        depth,
+        num_pos,
+        idx_size,
+        pos_size,
+        val_size,
+        over=(),
     ):
         return np.array(
-            [num_pos, self.next_num_pos(stats, stats_factory, depth, num_pos)]
+            [num_pos, self.next_num_pos(stats, stats_factory, depth, num_pos, over)]
         )
 
 
@@ -93,13 +130,21 @@ class SparseHashLevelOption(LevelOption):
     kind = "sparse_hash"
     n_features = 4
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos):
-        return nnz_after(stats, stats_factory, depth)
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
+        return nnz_after(stats, stats_factory, depth, over)
 
     def get_storage_features(
-        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size
+        self,
+        stats,
+        stats_factory,
+        depth,
+        num_pos,
+        idx_size,
+        pos_size,
+        val_size,
+        over=(),
     ):
-        nnz_l = nnz_after(stats, stats_factory, depth)
+        nnz_l = nnz_after(stats, stats_factory, depth, over)
         return np.array([num_pos, nnz_l, (num_pos + 1) * pos_size, nnz_l * idx_size])
 
 
@@ -112,12 +157,20 @@ class ElementLevelOption(LevelOption):
     kind = "element"
     n_features = 2
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos):
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
         # The element level has no child, so its positions pass through.
         return num_pos
 
     def get_storage_features(
-        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size
+        self,
+        stats,
+        stats_factory,
+        depth,
+        num_pos,
+        idx_size,
+        pos_size,
+        val_size,
+        over=(),
     ):
         return np.array([num_pos, num_pos * val_size])
 
@@ -127,7 +180,9 @@ class LevelChoice:
     """
     The choice of a level option at a zero-based depth of alias, with num_pos
     positions entering it, in a format whose positions take pos_size bytes.
-    term is the program which reads and writes alias.
+    term is the program which reads and writes alias. A fused alias stores one
+    slice for each value of its fused fields, so its levels describe its
+    largest slice.
     """
 
     term: LogicStatement
@@ -160,14 +215,14 @@ class FormatCostModel(CostModel[LevelChoice]):
 
         def visit_alias(alias: Alias, options: Sequence[LevelOption]):
             stats = machine(alias)
+            over = fused_fields(alias, stats)
             # bindings name no position type, so positions are intp.
             pos_size = np_dtype(ftypes.intp).itemsize
-            start = len(stats.index_order) + 1 - len(options)
             num_pos = 1.0
-            for depth, option in enumerate(options, start):
+            for depth, option in enumerate(options, len(over)):
                 yield LevelChoice(term, alias, depth, num_pos, option, pos_size)
                 num_pos = option.next_num_pos(
-                    stats, machine.stats_factory, depth, num_pos
+                    stats, machine.stats_factory, depth, num_pos, over
                 )
 
         def visit_stmt(stmt: LogicStatement):
@@ -320,6 +375,7 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
             idx_size,
             component.pos_size,
             np_dtype(stats.element_type).itemsize,
+            fused_fields(component.alias, stats),
         )
         features[1:, n_storage:] = access_features
         return features

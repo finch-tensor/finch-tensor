@@ -20,6 +20,7 @@ from finch.autoschedule.tensor_stats import (
     StatsInterpreter,
 )
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.util import fuse_loop_order
 
 
@@ -155,7 +156,9 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
     monkeypatch.setattr(capture, "ctx", lambda *args: None)
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)), fields
+            ),
             lgc.Produces((fused,)),
         )
     )
@@ -165,11 +168,14 @@ def test_cost_formatters_format_the_largest_fused_slice(monkeypatch, formatter_c
     assert isinstance(fmt.lvl_t, ft.SparseHashLevelFType)
 
     # The support projected over the fused dimension would be dense.
-    formatter = formatter_cls()
-    formatter._stats_factory = factory
-    projected = factory(ft.asarray(np.ones(8)), (i,))
-    projected_fmt = formatter.get_tensor_ftype(
-        stats.fill_type, tensor.shape_type[1:], projected
+    support, projected = lgc.HardAlias("support"), lgc.HardAlias("projected")
+    query = fuse_loop_order(
+        lgc.Query(lgc.Table(projected, (i,)), lgc.Table(support, (i,))), (i,)
+    )
+    machine = StatsMachine(factory, {support: factory(ft.asarray(np.ones(8)), (i,))})
+    machine(query)
+    projected_fmt = formatter_cls().get_tensor_ftype(
+        projected, query, machine, stats.fill_type, tensor.shape_type[1:]
     )
     assert isinstance(projected_fmt, ft.FiberTensorFType)
     assert isinstance(projected_fmt.lvl_t, ft.DenseLevelFType)
