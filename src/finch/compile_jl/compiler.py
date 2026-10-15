@@ -16,7 +16,7 @@ from finch.algebra.fill import (
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
-from finch.symbolic import PostWalk, Rewrite
+from finch.symbolic import PostWalk, PreOrderDFS, Rewrite
 from finch.tensor.patterns import FillTensorFType, PatternTensorFType
 
 from .julia import jl
@@ -80,6 +80,11 @@ _JULIA_OPS = {
     ffuncs.clip.ftype: "clamp",
     ffuncs.truth.ftype: "Bool",
     ffuncs.first_arg.ftype: "first_arg",
+    ffuncs.minby.ftype: "minby",
+    ffuncs.maxby.ftype: "maxby",
+    ffuncs.add_scaled_square.ftype: "add_scaled_square",
+    ffuncs.scaled_square.ftype: "scaled_square",
+    ffuncs.root_scaled_square.ftype: "root_scaled_square",
 }
 
 _JULIA_REDUCTION_OPS = {
@@ -91,6 +96,9 @@ _JULIA_REDUCTION_OPS = {
     ffuncs.or_.ftype: "|",
     ffuncs.logical_and.ftype: "&",
     ffuncs.logical_or.ftype: "|",
+    ffuncs.minby.ftype: "<<minby>>",
+    ffuncs.maxby.ftype: "<<maxby>>",
+    ffuncs.add_scaled_square.ftype: "<<add_scaled_square>>",
 }
 _INFIX_OPS = {
     "+",
@@ -211,6 +219,13 @@ class FinchJLGenerator:
                     arg_strs.append(extent)
                 arg_str = ",".join(arg_strs)
                 proto_str = "\n".join(proto_lines)
+                # Finch can't lower a kernel that only returns its arguments,
+                # like a pattern mask, so such kernels are plain functions.
+                if not any(
+                    isinstance(node, (ntn.Loop, ntn.Declare, ntn.Access))
+                    for node in PreOrderDFS(body)
+                ):
+                    return f"function {name}({arg_str})\n{body_str}\nend"
                 return (
                     "eval(let\n"
                     f"{proto_str}\n"
@@ -400,10 +415,10 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Rewrite every Dynamic fill in `func`, and every read of one, to a zero of
-    its dtype, and report which argument positions carried a Dynamic fill. This
-    is a necessary but potentially unsound rewrite which should be removed
-    eventually.
+    """Rewrite every Dynamic fill in `func`, every read of one, and every
+    declaration of a tensor with one, to a zero of its dtype, and report which
+    argument positions carried a Dynamic fill. This is a necessary but
+    potentially unsound rewrite which should be removed eventually.
     """
     dynamic_args = tuple(
         i
@@ -423,6 +438,14 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
                         return ntn.Literal(_zero_value(fill.element_type))
                     case StaticFillFType() as fill:
                         return ntn.Literal(fill.value)
+            case ntn.Declare(tns, init, op, shape):
+                # Julia requires a declaration to initialize to the tensor's
+                # fill, and a Dynamic fill is pinned to zero.
+                match tns.result_type.fill_type:
+                    case DynamicFillFType() as fill:
+                        zero = ntn.Literal(_zero_value(fill.element_type))
+                        if init != zero:
+                            return ntn.Declare(tns, zero, op, shape)
         return None
 
     return Rewrite(PostWalk(rule))(func), dynamic_args

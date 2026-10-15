@@ -2944,6 +2944,10 @@ def std(
 def einop(prgm, **kwargs):
     stmt = ein.parse_einop(prgm)
     assert isinstance(stmt, ein.Einsum)
+    if stmt.tns.name in kwargs:
+        # Bound outputs are overwritten in place, but einop returns a new array.
+        tns = ein.Alias(gensym(stmt.tns.name))
+        stmt = ein.Einsum(stmt.op, tns, stmt.idxs, stmt.arg)
     prgm = ein.Plan((stmt, ein.Produces((stmt.tns,))))
     xp = sys.modules[__name__]
     ctx = ein.EinsumInterpreter(xp)

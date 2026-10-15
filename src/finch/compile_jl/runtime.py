@@ -14,6 +14,7 @@ from finch.algebra.fill import DynamicFillFType
 from finch.tensor import BufferizedNDArray, FiberTensorFType
 from finch.tensor.np_wrapper import NumPyWrapper
 from finch.tensor.override_tensor import OverrideTensor
+from finch.tensor.patterns import PatternTensor
 from finch.tensor.scalar import Scalar
 
 from .analyze import reset_argument_positions, returned_argument_positions
@@ -112,6 +113,14 @@ class JuliaOwnedTensor(OverrideTensor):
 
     def _as_tensor(self) -> Tensor:
         return jl_tensor_to_python(self.raw_julia_obj)
+
+    @property
+    def fill_value(self):
+        fill_type = self.ftype.fill_type
+        if isinstance(fill_type, DynamicFillFType):
+            # The Julia tensor holds the value of its dynamic fill.
+            return fill_type.element_type(jl.Finch.fill_value(self.raw_julia_obj))
+        return super().fill_value
 
     def item(self):
         if not self._shape:
@@ -234,8 +243,12 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
         getattr(jl, func_name)(*raw_args)
 
         # Associate returned tensors with their Python ownership handles.
+        # Returned pattern masks are immutable inputs, so they stay in Python.
         return tuple(
-            julia_buf_args[position] for position in metadata.returned_positions
+            args[position]
+            if isinstance(args[position], PatternTensor)
+            else julia_buf_args[position]
+            for position in metadata.returned_positions
         )
 
     def _to_julia_owned_tensor(

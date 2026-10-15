@@ -63,6 +63,37 @@ def _start_julia() -> tuple[Any, Any]:
     for pkg in _JULIA_PACKAGES:
         Main.seval(f"using {pkg}")
 
+    # Tuple reductions, matching their definitions in ffuncs.
+    Main.seval("""
+        function minby(x::Tuple, y::Tuple)
+            x[1] < y[1] && return x
+            y[1] < x[1] && return y
+            return x[end] <= y[end] ? x : y
+        end
+        function maxby(x::Tuple, y::Tuple)
+            x[1] > y[1] && return x
+            y[1] > x[1] && return y
+            return x[end] >= y[end] ? x : y
+        end
+        scaled_square(x) = ((iszero(x) ? zero(x) : one(x)) / one(x), x)
+        root_scaled_square((arg, scale)) = sqrt(arg) * scale
+        function add_scaled_square(x::Tuple, y::Tuple)
+            (x_arg, x_scale), (y_arg, y_scale) = x, y
+            if isnan(x_arg) || isnan(x_scale) || isnan(y_arg) || isnan(y_scale)
+                return (oftype(x_arg, NaN), oftype(x_scale, NaN))
+            end
+            if x_scale < y_scale
+                x_arg, y_arg = y_arg, x_arg
+                x_scale, y_scale = y_scale, x_scale
+            end
+            if x_scale > y_scale
+                ratio = y_scale / x_scale
+                return (x_arg + y_arg * ratio * ratio, x_scale)
+            end
+            return (x_arg + y_arg, x_scale)
+        end
+    """)
+
     Main.seval("first_arg(x, y...) = x")
 
     return juliacall, Main
