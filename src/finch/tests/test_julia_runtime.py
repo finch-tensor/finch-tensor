@@ -121,6 +121,29 @@ def test_julia_buffer_preserves_borrowed_and_exported_storage():
     np.testing.assert_array_equal(owned_view[:4], [10, 1, 2, 3])
 
 
+def test_numpy_buffer_resize_preserves_julia_borrow():
+    _requires_julia_backend()
+    source = NumpyBuffer(np.arange(4, dtype=np.int64))
+    owner = source.owner
+    vector = _buffer_to_jl(source)
+    source.resize(6)
+    assert source.owner is not owner
+    source.store(0, 10)
+    assert list(vector) == [0, 1, 2, 3]
+    vector[1] = 20
+    assert owner[1] == 20
+    assert source.load(1) == 1
+
+
+def test_julia_buffer_overlapping_copy_preserves_values():
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.int64)
+    vector = _buffer_to_jl(NumpyBuffer(source), offset=1)
+    getattr(jl, "copyto!")(vector, 2, vector, 1, 3)
+    assert list(vector) == [1, 1, 2, 3]
+    np.testing.assert_array_equal(source, [0, 0, 1, 2])
+
+
 @pytest.mark.parametrize("aligned", [False, True])
 def test_julia_buffer_borrows_hash_keys_without_shifting_state(aligned):
     _requires_julia_backend()
