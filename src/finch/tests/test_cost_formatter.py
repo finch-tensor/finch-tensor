@@ -17,7 +17,7 @@ from finch.autoschedule.cost_models import (
     QuadraticPredictor,
     SparseHashLevelOption,
 )
-from finch.autoschedule.cost_models.format_cost_models import nnz_after
+from finch.autoschedule.cost_models.format_cost_models import alias_blocks, nnz_after
 from finch.autoschedule.formatter.galley_formatter import estimate_nnz
 from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
@@ -43,6 +43,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Table,
     TensorStats,
 )
@@ -218,9 +219,9 @@ def test_format_cost_uses_depth_and_input_positions(formatter_cls, expected):
             LevelChoice(query, a, depth, num_pos, option, pos_size), machine
         )
         for depth, num_pos, option in (
-            (1, 7, DenseLevelOption()),
-            (1, 7, SparseHashLevelOption()),
-            (2, 5, ElementLevelOption()),
+            (1, (7,), DenseLevelOption()),
+            (1, (7,), SparseHashLevelOption()),
+            (2, (5,), ElementLevelOption()),
         )
     ]
     np.testing.assert_allclose(costs, expected)
@@ -270,7 +271,7 @@ def test_format_access_features_separate_sequential_and_scatter():
             type(option), LinearPredictor(np.zeros(option.n_features + 4))
         )
         features = model.get_component_features(
-            LevelChoice(prgm, A, depth, 1.0, option, np.dtype(np.intp).itemsize),
+            LevelChoice(prgm, A, depth, (1.0,), option, np.dtype(np.intp).itemsize),
             machine,
         )
         return tuple(features.sum(axis=0)[-4:] > 0)
@@ -298,12 +299,57 @@ def test_fused_alias_levels_describe_the_largest_slice():
     sparse, element = model.components(plan, formats, machine)
 
     # Each slice of the diagonal stores the one entry of its row.
-    assert (sparse.alias, sparse.depth, sparse.num_pos) == (fused, 1, 1.0)
-    assert element.depth == 2
-    assert element.num_pos == pytest.approx(1.0)
+    assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, (1.0,))
+    assert element.depth == 1
+    assert element.num_pos == pytest.approx((1.0,))
     size = np.dtype(np.intp).itemsize
     features = model.get_component_features(sparse, machine)
     np.testing.assert_allclose(features[0, :4], [1, 1, 2 * size, size])
+
+
+def test_format_costs_sum_the_union_of_each_block():
+    i = Field("i")
+    a, b, c, out = (HardAlias(name) for name in ("a", "b", "c", "out"))
+    sf = DCStatsFactory()
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray(np.array([1.0, 0.0, 0.0, 0.0])), (i,)),
+        b: sf(fl.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,)),
+        c: sf(fl.asarray(np.array([0.0, 0.0, 1.0, 1.0])), (i,)),
+    }
+    # The first block defines out and updates it, and the second redefines it.
+    define = Query(Table(out, (i,)), Table(a, (i,)))
+    update = QueryInto(Table(out, (i,)), Literal(ffuncs.add), Table(b, (i,)))
+    redefine = Query(Table(out, (i,)), Table(c, (i,)))
+    queries = (define, update, redefine)
+    plan = Plan(
+        (*(fuse_loop_order(query, (i,)) for query in queries), Produces((out,)))
+    )
+    machine = StatsMachine(sf, dict(stats))
+    states = []
+    for query in queries:
+        machine(query)
+        states.append(machine(out))
+    union = sf.mapjoin(ffuncs.or_, sf.support(states[0]), sf.support(states[1]))
+    nnz = [union.estimate_non_fill_values(), states[2].estimate_non_fill_values()]
+    assert nnz[0] > states[1].estimate_non_fill_values()
+
+    machine = StatsMachine(sf, dict(stats))
+    blocks = alias_blocks(out, plan, machine)
+    assert [block.estimate_non_fill_values() for block, _ in blocks] == nnz
+    assert all(block.fill_type == states[0].fill_type for block, _ in blocks)
+
+    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    size = np.dtype(np.intp).itemsize
+    choice = LevelChoice(plan, out, 0, (1.0, 1.0), SparseHashLevelOption(), size)
+    features = model.get_component_features(choice, machine)
+    # An allocation row for each block, then a write row for each query.
+    assert features.shape == (5, 8)
+    np.testing.assert_array_equal(
+        features[:2, :4], [[1, n, 2 * size, n * size] for n in nnz]
+    )
+    assert not features[:2, 4:].any()
+    assert not features[2:, :4].any()
+    assert (features[2:, 6] > 0).all()
 
 
 def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
@@ -345,8 +391,8 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             machine,
         )
         for depth, num_pos, option in (
-            (0, 1, DenseLevelOption()),
-            (1, 3, ElementLevelOption()),
+            (0, (1,), DenseLevelOption()),
+            (1, (3,), ElementLevelOption()),
         )
     )
     assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 12)

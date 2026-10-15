@@ -28,7 +28,10 @@ from finch.autoschedule.cost_models import (
     LinearPredictor,
     SparseHashLevelOption,
 )
-from finch.autoschedule.cost_models.format_cost_models import fused_fields
+from finch.autoschedule.cost_models.format_cost_models import (
+    alias_blocks,
+    next_block_num_pos,
+)
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -49,11 +52,12 @@ LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 def optimize_format(
     alias, shape_type, machine, fill_type, cost_model, term, options=LEVEL_OPTIONS
 ):
-    stats = machine(alias)
-    n = len(stats.index_order)
-    # A fused alias stores only the levels after its fused fields.
-    over = fused_fields(alias, stats)
-    start = len(over)
+    """
+    Return the format of the levels of alias, which store shape_type, with the
+    least total cost over the blocks of alias in term.
+    """
+    blocks = alias_blocks(alias, term, machine)
+    n = len(shape_type)
     position_type = ftypes.intp
     leaf = element(fill_type, fill_type.element_type, position_type)
     pos_size = np_dtype(position_type).itemsize
@@ -75,21 +79,21 @@ def optimize_format(
         best_format = None
         for option in options:
             local = cost(level, num_pos, option)
-            child_num_pos = option.next_num_pos(
-                stats, machine.stats_factory, level, num_pos, over
+            child_num_pos = next_block_num_pos(
+                option, blocks, machine.stats_factory, level, num_pos
             )
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
             if best_cost is None or total < best_cost:
                 best_cost, best_format = (
                     total,
-                    LEVEL_BUILDERS[option.kind](child_fmt, shape_type[level - start]),
+                    LEVEL_BUILDERS[option.kind](child_fmt, shape_type[level]),
                 )
 
         memo[key] = (best_cost, best_format)
         return best_cost, best_format
 
-    _, fmt = rec(start, 1.0)
+    _, fmt = rec(0, (1.0,) * len(blocks))
     return fmt
 
 
@@ -248,8 +252,9 @@ STORAGE_COST_MODEL = ByKind(
 class CostFormatter(LogicFormatter):
     """
     CostFormatter chooses the format of each alias from the level options with
-    the lowest cost under cost_model, memoizing the best format for each depth and
-    input position count.
+    the lowest cost under cost_model, summed over the blocks of the alias in the
+    program, memoizing the best format for each depth and the input position
+    counts of the blocks.
     """
 
     def __init__(
@@ -293,6 +298,8 @@ class CostFormatter(LogicFormatter):
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
+        # The dimensions each new alias stores, at its first definition.
+        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
 
         def formatter(node: lgc.LogicStatement):
             match node:
@@ -311,13 +318,10 @@ class CostFormatter(LogicFormatter):
                             pass
                         case lgc.Alias() as alias:
                             nfused = 0
-                    if alias not in bindings:
-                        shape_type = tuple(
+                    if alias not in bindings and alias not in stored_shape_types:
+                        stored_shape_types[alias] = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
                             for dim in shape_types[alias][nfused:]
-                        )
-                        bindings[alias] = self.get_tensor_ftype(
-                            lhs, prgm, machine, fill_types[alias], shape_type
                         )
                 case lgc.Produces():
                     return
@@ -327,6 +331,11 @@ class CostFormatter(LogicFormatter):
                     )
 
         formatter(prgm)
+        # Each alias is formatted for all of its blocks in the program.
+        for alias, shape_type in stored_shape_types.items():
+            bindings[alias] = self.get_tensor_ftype(
+                alias, prgm, machine, fill_types[alias], shape_type
+            )
 
         logger.debug(prgm)
 

@@ -146,7 +146,6 @@ def test_queryinto_uses_redefined_shape(op):
     [
         (DefaultLogicFormatter, DenseStatsFactory),
         (FDFormatter, FDStatsFactory),
-        (StorageCostFormatter, DenseStatsFactory),
         (GalleyFormatter, DenseStatsFactory),
     ],
 )
@@ -185,6 +184,32 @@ def test_formatters_infer_each_definition(monkeypatch, formatter, factory_cls):
     assert capture.last_bindings[scratch].ndim == 1
     assert capture.last_bindings[before].ndim == 1
     assert capture.last_bindings[after].ndim == 2
+
+
+def test_cost_formatter_rejects_rank_changes():
+    # A cost formatter formats an alias for every block, which must share a rank.
+    i, j = map(lgc.Field, "ij")
+    a, b, scratch = map(lgc.HardAlias, ("a", "b", "scratch"))
+    a_tensor, b_tensor = ft.asarray(np.ones(3)), ft.asarray(np.ones((2, 4)))
+    plan = lgc.Plan(
+        (
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i,)), lgc.Table(a, (i,))), (i,)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(b, (i, j))), (i, j)
+            ),
+            lgc.Produces((scratch,)),
+        )
+    )
+    factory = DenseStatsFactory()
+    with pytest.raises(ValueError, match="Cannot change the rank"):
+        StorageCostFormatter(LogicCapture()).lower(
+            plan,
+            {a: a_tensor.ftype, b: b_tensor.ftype},
+            {a: factory(a_tensor, (i,)), b: factory(b_tensor, (i, j))},
+            factory,
+        )
 
 
 @pytest.mark.parametrize(

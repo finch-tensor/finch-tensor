@@ -76,7 +76,8 @@ def test_formatters_keep_logical_stats_and_format_stored_dimensions(
 def test_statistics_for_alias_views_do_not_collide(monkeypatch, formatter_cls):
     i, j = lgc.Field("i"), lgc.Field("j")
     a, scratch = lgc.HardAlias("a"), lgc.HardAlias("scratch")
-    fused = lgc.FusedAlias(scratch, 1)
+    # Both views store every dimension of scratch, so one format holds both.
+    fused = lgc.FusedAlias(scratch, 0)
     tensor = ft.asarray(np.ones((2, 3)))
     factory = DenseStatsFactory()
     capture = LogicCapture()
