@@ -1209,6 +1209,8 @@ def test_register_julia_op_maps_and_defines_once():
     assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
     assert int(jl.finch_test_twice(3)) == 6
     del compiler._JULIA_OPS[op.ftype]
+
+
 def test_compile_julia_negative_zero_fill():
     # Python ftypes equate -0.0 and 0.0 fills, so they share Julia kernels.
     _requires_julia_backend()
@@ -1271,3 +1273,15 @@ def test_compile_julia_logical_ops_on_numbers(op, args):
     np.testing.assert_array_equal(result.to_numpy(), np_op(*args))
 
 
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+def test_compile_julia_complex_arithmetic(dtype):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.array([[1 + 2j, 0], [3j, -1]], dtype=dtype)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.defer(arg) * ft.defer(arg) + dtype(1 - 1j))
+        total = ft.compute(ft.sum(ft.defer(arg), axis=0))
+
+    np.testing.assert_allclose(result.to_numpy(), arg * arg + dtype(1 - 1j))
+    np.testing.assert_allclose(total.to_numpy(), arg.sum(axis=0))

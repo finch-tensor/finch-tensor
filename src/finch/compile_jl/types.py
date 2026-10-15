@@ -216,6 +216,9 @@ def _julia_literal(value: Any) -> str:
     if isinstance(value, tuple):
         elts = [_julia_literal(elt) for elt in value]
         return f"({', '.join(elts)}{',' if len(elts) == 1 else ''})"
+    if isinstance(value, (complex, np.complexfloating)):
+        real, imag = _julia_literal(value.real), _julia_literal(value.imag)
+        return f"complex({real}, {imag})"
     literal = str(value)
     if isinstance(value, (float, np.floating)):
         if math.isinf(value):
