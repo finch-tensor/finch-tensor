@@ -129,6 +129,10 @@ class ExtentFType(ImmutableStructFType):
         return Extent(start, end)
 
     def __call__(self, *args):
+        match args:
+            # Folding `make_extent` on literals converts its result to this type.
+            case (Extent() as ext,):
+                return ext
         raise TypeError(f"{self.struct_name} is not callable")
 
     def lower_loop(
@@ -283,6 +287,8 @@ class SymbolicExtent(FTyped[ExtentFType]):
                 op.result_type, _MakeExtentFType
             ):
                 return SymbolicExtent(start, end)
+            case ntn.Literal(Extent(start, end)):
+                return SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
             case _:
                 raise Exception(node)
 

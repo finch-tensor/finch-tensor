@@ -12,6 +12,7 @@ from finch.codegen.c_codegen import CBufferFType, CContext, CUnpackableFType, c_
 from finch.codegen.mlir_codegen import (
     MLIRBufferFType,
     MLIRContext,
+    llvm_type,
     mlir_cast_value,
     mlir_type,
 )
@@ -36,6 +37,19 @@ class CBufferFields(NamedTuple):
 class MLIRBufferFields:
     box: str
     obj: str
+
+
+def _tuple_leaves(dtype: np.dtype, names=(), idxs=(), offset=0):
+    """Yield the field names, field indices, dtype, and byte offset of each
+    scalar field of a structured dtype."""
+    assert dtype.fields is not None
+    for k, (name, (field_dtype, field_offset, *_)) in enumerate(dtype.fields.items()):
+        if field_dtype.names is None:
+            yield (*names, name), (*idxs, k), field_dtype, offset + field_offset
+        else:
+            yield from _tuple_leaves(
+                field_dtype, (*names, name), (*idxs, k), offset + field_offset
+            )
 
 
 @ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.POINTER(ctypes.py_object), ctypes.c_size_t)
@@ -162,6 +176,12 @@ class NumpyBufferFType(
     def __call__(self, len: int = 0, element_type: FType | None = None):
         return NumpyBuffer(np.zeros(len, dtype=self._dtype))
 
+    def _normalize_layout(self, obj):
+        # Compiled tuple accesses assume the packed layout of this ftype, while
+        # a borrowed array (e.g. from Julia) may be aligned.
+        if self._dtype.names is not None and obj.arr.dtype != self._dtype:
+            obj.arr = obj.arr.astype(self._dtype)
+
     def c_type(self):
         return ctypes.POINTER(CNumpyBuffer)
 
@@ -171,7 +191,42 @@ class NumpyBufferFType(
     def c_data(self, ctx: "CContext", buf: CBufferFields):
         return buf.data
 
+    def _c_tuple_accessors(self, ctx: "CContext"):
+        # Tuple elements keep NumPy's packed layout, which C structs don't share,
+        # so each field is copied at its byte offset.
+        t = ctx.ctype_name(c_type(self.element_type))
+        name = t.removeprefix("struct ")
+        load, store = f"finch_load_{name}", f"finch_store_{name}"
+        size = self._dtype.itemsize
+        fields = [
+            ("".join(f".{n}" for n in names), offset)
+            for names, _, _, offset in _tuple_leaves(self._dtype)
+        ]
+        loads = "".join(
+            f"    memcpy(&v{path}, (const char*)data + i * {size} + {offset}, "
+            f"sizeof(v{path}));\n"
+            for path, offset in fields
+        )
+        stores = "".join(
+            f"    memcpy((char*)data + i * {size} + {offset}, &v{path}, "
+            f"sizeof(v{path}));\n"
+            for path, offset in fields
+        )
+        ctx.add_header("#include <stddef.h>")
+        ctx.add_header("#include <string.h>")
+        ctx.add_header(
+            f"static inline {t} {load}(const void* data, size_t i) {{\n"
+            f"    {t} v;\n{loads}    return v;\n}}"
+        )
+        ctx.add_header(
+            f"static inline void {store}(void* data, size_t i, {t} v) {{\n{stores}}}"
+        )
+        return load, store
+
     def c_load(self, ctx: "CContext", buf: CBufferFields, idx: "AssemblyExpression"):
+        if isinstance(self.element_type, TupleFType):
+            load, _ = self._c_tuple_accessors(ctx)
+            return f"{load}({buf.data}, {ctx(idx)})"
         return f"({buf.data})[{ctx(idx)}]"
 
     def c_store(
@@ -181,6 +236,10 @@ class NumpyBufferFType(
         idx: "AssemblyExpression",
         value: "AssemblyExpression",
     ):
+        if isinstance(self.element_type, TupleFType):
+            _, store = self._c_tuple_accessors(ctx)
+            ctx.exec(f"{ctx.feed}{store}({buf.data}, {ctx(idx)}, {ctx(value)});")
+            return
         ctx.exec(f"{ctx.feed}({buf.data})[{ctx(idx)}] = {ctx(value)};")
 
     def c_resize(self, ctx, buf: CBufferFields, new_len):
@@ -224,6 +283,7 @@ class NumpyBufferFType(
         """
         Serialize the NumPy buffer to a C-compatible structure.
         """
+        self._normalize_layout(obj)
         data = ctypes.c_void_p(obj.arr.ctypes.data)
         length = obj.arr.size
         obj._self_obj = ctypes.py_object(obj)
@@ -281,7 +341,12 @@ class NumpyBufferFType(
 
     def numba_resize(self, ctx, buf: NumbaBufferFields, new_len):
         arr = buf.arr
-        ctx.exec(f"{ctx.feed}{arr} = numpy.resize({arr}, {ctx(new_len)})")
+        resize = (
+            "resize_records"
+            if isinstance(self.element_type, TupleFType)
+            else "numpy.resize"
+        )
+        ctx.exec(f"{ctx.feed}{arr} = {resize}({arr}, {ctx(new_len)})")
 
     def numba_unpack(self, ctx, var_n, val):
         """
@@ -319,7 +384,54 @@ class NumpyBufferFType(
         return "!llvm.ptr"
 
     def mlir_buffer_type(self):
+        if isinstance(self.element_type, TupleFType):
+            # Memrefs can't hold structs; tuple elements are accessed through
+            # the descriptor's pointer instead (see `_mlir_tuple_ptr`).
+            return "memref<?xi8>"
         return f"memref<?x{mlir_type(self.element_type)}>"
+
+    def _mlir_packed_type(self, dtype=None):
+        dtype = self._dtype if dtype is None else dtype
+        fields = (
+            llvm_type(mlir_type(ftype(field_dtype)))
+            if field_dtype.names is None
+            else self._mlir_packed_type(field_dtype)
+            for field_dtype, *_ in dtype.fields.values()
+        )
+        return f"!llvm.struct<packed ({', '.join(fields)})>"
+
+    def _mlir_tuple_ptr(self, ctx, buf, idx):
+        desc_t = self.mlir_descriptor_type()
+        desc = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
+        data = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{data} = llvm.extractvalue {desc}[1] : {desc_t}")
+        i = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{i} = arith.index_cast {self.mlir_index(ctx, idx)} "
+            ": index to i64"
+        )
+        ptr = ctx.new_ssa()
+        ctx.exec(
+            f"{ctx.feed}{ptr} = llvm.getelementptr {data}[{i}] : "
+            f"(!llvm.ptr, i64) -> !llvm.ptr, {self._mlir_packed_type()}"
+        )
+        return ptr
+
+    def _mlir_repack_tuple(self, ctx, value, src_t, dst_t):
+        result = ctx.new_ssa()
+        ctx.exec(f"{ctx.feed}{result} = llvm.mlir.undef : {dst_t}")
+        for _, idxs, _, _ in _tuple_leaves(self._dtype):
+            pos = ", ".join(map(str, idxs))
+            field = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{field} = llvm.extractvalue {value}[{pos}] : {src_t}")
+            updated = ctx.new_ssa()
+            ctx.exec(
+                f"{ctx.feed}{updated} = llvm.insertvalue {field}, "
+                f"{result}[{pos}] : {dst_t}"
+            )
+            result = updated
+        return result
 
     # this is the rank-1 memref descriptor type
     def mlir_descriptor_type(self):
@@ -388,6 +500,14 @@ class NumpyBufferFType(
     def mlir_load(
         self, ctx: "MLIRContext", buf: MLIRBufferFields, idx: "AssemblyExpression"
     ):
+        if isinstance(self.element_type, TupleFType):
+            packed_t = self._mlir_packed_type()
+            ptr = self._mlir_tuple_ptr(ctx, buf, idx)
+            packed = ctx.new_ssa()
+            ctx.exec(f"{ctx.feed}{packed} = llvm.load {ptr} : !llvm.ptr -> {packed_t}")
+            return self._mlir_repack_tuple(
+                ctx, packed, packed_t, mlir_type(self.element_type)
+            )
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
         ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
@@ -411,6 +531,14 @@ class NumpyBufferFType(
         idx: Any,
         value: Any = None,
     ):
+        if isinstance(self.element_type, TupleFType):
+            packed_t = self._mlir_packed_type()
+            packed = self._mlir_repack_tuple(
+                ctx, ctx(value), mlir_type(self.element_type), packed_t
+            )
+            ptr = self._mlir_tuple_ptr(ctx, buf, idx)
+            ctx.exec(f"{ctx.feed}llvm.store {packed}, {ptr} : {packed_t}, !llvm.ptr")
+            return
         desc_t = self.mlir_descriptor_type()
         desc = ctx.new_ssa()
         ctx.exec(f"{ctx.feed}{desc} = llvm.load {buf.box} : !llvm.ptr -> {desc_t}")
@@ -536,6 +664,7 @@ class NumpyBufferFType(
 
     # Package the NumPy array, data pointer, length, and resize callback for MLIR
     def serialize_to_mlir(self, obj):
+        self._normalize_layout(obj)
         result = MLIRNumpyBuffer(
             ctypes.py_object(obj),
             ctypes.c_void_p(obj.arr.ctypes.data),
