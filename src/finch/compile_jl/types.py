@@ -163,16 +163,19 @@ def _tuple_field(value, index: int, name: str):
     return value[index]
 
 
-def to_jl_value(T, value, *, offset: int = 0):
+def to_jl_value(
+    T, value, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+):
     T = to_fl_dtype(T)
     if isinstance(T, JuliaElementFType):
+        assert index_fields is None
         return T.julia_value(value, offset=offset)
     if isinstance(T, TupleFType):
         return tuple(
             to_jl_value(
                 field_type,
                 _tuple_field(value, index, field_name),
-                offset=offset,
+                offset=offset if index_fields is None or index in index_fields else 0,
             )
             for index, (field_name, field_type) in enumerate(T.struct_fields)
         )
@@ -181,15 +184,21 @@ def to_jl_value(T, value, *, offset: int = 0):
     return _as_julia_scalar(T(value))
 
 
-def to_jl_vector(T, values, *, offset: int = 0):
+def to_jl_vector(
+    T, values, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+):
     T = to_fl_dtype(T)
     if isinstance(T, JuliaElementFType):
+        assert index_fields is None
         return T.julia_vector(values, offset=offset)
     if isinstance(T, TupleFType) or offset:
         jl = get_jl()
         return jc.convert(
             jl.Vector[to_jl_type(T)],
-            [to_jl_value(T, value, offset=offset) for value in values],
+            [
+                to_jl_value(T, value, offset=offset, index_fields=index_fields)
+                for value in values
+            ],
         )
     return get_jl().Vector(values)
 
@@ -271,10 +280,11 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
+        dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
-            f"Finch.SparseByteMapLevel({_level_constructor_str(level_ftype.lvl_t)}, "
-            f"1, {_plus_one_ctor_str(pos_t)}, Bool[], "
-            f"{_plus_one_ctor_str(pos_t)})"
+            f"Finch.SparseByteMapLevel{{{dim_t}}}("
+            f"{_level_constructor_str(level_ftype.lvl_t)}, "
+            f"1, {pos_t}[], Bool[], {pos_t}[])"
         )
     if isinstance(level_ftype, SparseCOOLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
@@ -292,15 +302,12 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
     if isinstance(level_ftype, SparseHashLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_t = _leaf_type_str(level_ftype.dimension_type)
-        single_writer = "true" if level_ftype.single_writer else "false"
-        tbl_entry_t = f"Tuple{{{pos_t},{dim_t},{pos_t}}}"
-        # interop.py derives Ti from `np.asarray(dimension).item()`, which
-        # (like DenseLevel above) always yields plain Julia Int (Int64).
+        key_entry_t = f"Tuple{{{pos_t},{dim_t},UInt8}}"
         return (
-            f"Finch.SparseHashLevel{{Int,{single_writer}}}("
+            f"Finch.SparseHashLevel{{{dim_t}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
-            f"{_plus_one_ctor_str(pos_t)}, UInt8[], {tbl_entry_t}[], {pos_t}[], "
-            f"{_plus_one_ctor_str(pos_t)})"
+            f"Finch.SPARSE_HASH_POS_MULTIPLIER, "
+            f"{pos_t}[], UInt8[], {pos_t}[], {key_entry_t}[], {pos_t}[], Int[0])"
         )
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported level ftype "

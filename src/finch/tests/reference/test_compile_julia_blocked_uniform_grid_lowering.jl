@@ -148,9 +148,9 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                         v5_lvl_2_val[v5_lvl_q] = 1 + -phase_start_15 + phase_stop_16 + v5_lvl_2_val[v5_lvl_q]
                     end
                 end
-                resize!(v5_lvl_2_val, (v2.dims[2]).stop)
-                resize!(v4_lvl_2_val, (v1.dims[2]).stop)
-                resize!(v3_lvl_3_val, (v1.dims[2]).stop * (v2.dims[2]).stop)
+                Finch.resize_if_larger!(v5_lvl_2_val, (v2.dims[2]).stop)
+                Finch.resize_if_larger!(v4_lvl_2_val, (v1.dims[2]).stop)
+                Finch.resize_if_larger!(v3_lvl_3_val, (v1.dims[2]).stop * (v2.dims[2]).stop)
                 (v3 = Tensor((DenseLevel){Int64}((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v3_lvl_3_val), (v2.dims[2]).stop), (v1.dims[2]).stop)), v4 = Tensor((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v4_lvl_2_val), (v1.dims[2]).stop)), v5 = Tensor((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v5_lvl_2_val), (v2.dims[2]).stop)))
             end)
 end

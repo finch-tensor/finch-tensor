@@ -1,19 +1,28 @@
 import gc
 
+import pytest
+
 import numpy as np
 import scipy.sparse as sps
 
 import finch as ft
+from finch.algebra import TupleFType, np_dtype
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
-from finch.compile_jl.interop import _jl_index_buffer_to_python, tensor_to_jl
+from finch.compile_jl.interop import (
+    _jl_index_buffer_to_python,
+    jl_tensor_to_python,
+    level_to_jl,
+    tensor_to_jl,
+)
 from finch.compile_jl.julia import jl, julia_available
 from finch.compile_jl.runtime import (
     DefaultFinchJLRuntime,
     JuliaOwnedTensor,
     _KernalMetadata,
 )
+from finch.compile_jl.types import _level_constructor_str
 
 
 def _requires_julia_backend():
@@ -48,6 +57,89 @@ def test_minus_one_buffer_does_not_copy_backing_data():
     buffer.store(1, 7)
 
     assert int(jl_vec[1]) == 8
+
+
+def test_minus_one_buffer_preserves_hash_key_state():
+    key_type = TupleFType.from_tuple((ft.intp, ft.int32, ft.uint8))
+    raw = np.array([(1, 3, 128), (2, 1, 0)], dtype=np_dtype(key_type))
+    buffer = MinusOneBuffer(NumpyBuffer(raw), index_fields=(0, 1))
+
+    assert buffer.load(0) == (0, 2, 128)
+    assert buffer.load(1) == (1, 0, 0)
+    assert buffer.arr.tolist() == [(0, 2, 128), (1, 0, 0)]
+    buffer.store(1, (3, 4, 127))
+    assert raw.tolist() == [(1, 3, 128), (4, 5, 127)]
+    assert buffer.ftype != MinusOneBuffer(NumpyBuffer(raw)).ftype
+    assert buffer.ftype(1).index_fields == (0, 1)
+
+
+@pytest.mark.parametrize("level_type", [ft.sparse_hash, ft.sparse_bytemap])
+@pytest.mark.parametrize("dimension_type", [ft.intp, ft.int32])
+def test_julia_sparse_level_constructor_matches_argument(level_type, dimension_type):
+    _requires_julia_backend()
+    level_ftype = level_type(ft.element(0), dimension_type)
+    level = level_ftype.construct((4,), pos=1)
+    prototype = jl.seval(_level_constructor_str(level_ftype))
+    actual = level_to_jl(level)
+
+    assert jl.typeof(actual) == jl.typeof(prototype)
+    recovered = jl_tensor_to_python(jl.Tensor(actual)).lvl
+    assert recovered.ftype == level_ftype
+
+
+@pytest.mark.parametrize("kind", ["hash", "bytemap"])
+@pytest.mark.parametrize("copy_buffers", [False, True])
+def test_julia_sparse_level_round_trip(kind, copy_buffers):
+    _requires_julia_backend()
+    format_ = (
+        "SparseHash{Int32}(Element(0), 3, 4, typemax(UInt) - UInt(2))"
+        if kind == "hash"
+        else "SparseByteMap{Int32}(Element(0), Int32(3))"
+    )
+    original = jl.seval(f"Tensor(Dense({format_}), [1 0; 0 3; 2 4])")
+    tensor = jl_tensor_to_python(original)
+    level = tensor.lvl.lvl
+    assert level.dimension == np.int32(3)
+    assert level.ftype.dimension_type == ft.int32
+
+    if kind == "hash":
+        assert level.subtables == 4
+        assert level.pos_multiplier == np.iinfo(np.uintp).max - 2
+        assert level.key.arr["element_2"].tolist() == [128] * 4
+        assert (
+            level.key.data.arr.ctypes.data
+            == original.lvl.lvl.key.to_numpy(copy=False).ctypes.data
+        )
+        np.testing.assert_array_equal(
+            level.tbl_count.arr, original.lvl.lvl.tbl_count.to_numpy(copy=False)
+        )
+    else:
+        np.testing.assert_array_equal(level.ptr.arr, [0, 2, 4])
+        np.testing.assert_array_equal(level.srt.arr, [0, 2, 4, 5])
+
+    if copy_buffers:
+        names = (
+            ("ptr", "tbl_ctrl", "tbl", "key", "perm", "tbl_count")
+            if kind == "hash"
+            else ("ptr", "tbl", "srt")
+        )
+        for name in names:
+            setattr(level, name, NumpyBuffer(getattr(level, name).arr.copy()))
+
+    round_trip = tensor_to_jl(tensor)
+    same_values = jl.seval("(A, B) -> Array(A) == Array(B)")
+    assert same_values(original, round_trip)
+    if kind == "hash":
+        assert round_trip.lvl.lvl.pos_multiplier == original.lvl.lvl.pos_multiplier
+        lookup = jl.seval(
+            "(lvl, p, i) -> Finch.sparse_hash_lookup(lvl.tbl_ctrl, lvl.tbl, "
+            "lvl.key, p, i, lvl.subtables, lvl.pos_multiplier)"
+        )
+        for parent in (1, 2):
+            for index in (1, 2, 3):
+                assert lookup(round_trip.lvl.lvl, parent, index) == lookup(
+                    original.lvl.lvl, parent, index
+                )
 
 
 def _runtime(metadata):
