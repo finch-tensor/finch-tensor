@@ -91,7 +91,10 @@ def level_to_jl(level: Level, pin_fill: bool = False):
         case ElementLevel():
             fill = level.fill_value
             if pin_fill:
-                fill = jl_dtypes._zero_value(ftype(fill))
+                # The value's own type may differ from the level's, e.g. a Python int.
+                element_type = level.ftype.element_type
+                assert element_type is not None
+                fill = jl_dtypes._zero_value(element_type)
             return jl.ElementLevel(
                 _as_julia_fill(fill),
                 _buffer_to_jl(level.val),

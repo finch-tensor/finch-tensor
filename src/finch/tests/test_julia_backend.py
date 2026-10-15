@@ -1232,3 +1232,20 @@ def test_compile_julia_negative_zero_fill():
             np.testing.assert_array_equal(result.to_numpy(), value)
 
 
+def test_compile_julia_dynamic_fill_value_types():
+    # Dynamic fills are equal by dtype, so fills whose values have different
+    # types share a kernel, and must pin to zeros of that dtype.
+    _requires_julia_backend()
+    import scipy.sparse as sps
+
+    from finch.autoschedule import COMPILE_JULIA
+
+    matrix = sps.random(3, 3, density=0.5, format="csr", random_state=0)
+    tensor = ft.asarray(matrix)
+    with with_default_scheduler(COMPILE_JULIA):
+        for value in (np.float32(0.0), np.float64(0.0)):
+            arg = tensor.with_fill(DynamicFill(value, ftype(np.float64)))
+            result = ft.compute(ft.defer(arg) * 2.0)
+            np.testing.assert_array_equal(result.to_numpy(), matrix.toarray() * 2)
+
+
