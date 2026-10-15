@@ -6,8 +6,8 @@ are excluded. ``cached`` reuses the runtime's input translation; ``fresh``
 passes a new Python tensor handle each time, including input conversion.
 Both paths call the compiled Julia kernel and retrieve its scalar result.
 The sparse formats store every coordinate so their buffers grow with size.
-Fresh conversions currently copy storage; comparing sizes exposes that cost
-as well as the steady-state runtime overhead.
+Fresh conversions borrow storage; comparing sizes checks both first-use and
+steady-state runtime overhead without relying on the translation cache.
 """
 
 from functools import lru_cache

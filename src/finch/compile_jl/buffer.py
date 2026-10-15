@@ -46,6 +46,10 @@ class PlusOneBuffer(Buffer, ABC):
     def __init__(self, data: NumpyBuffer):
         self.data = data
 
+    @property
+    def owner(self):
+        return self.data.owner
+
     def ftype(self):
         return PlusOneBufferFType(self.data.ftype())
 
@@ -109,6 +113,10 @@ class MinusOneBuffer(Buffer, ABC):
     def __init__(self, data: NumpyBuffer, index_fields: tuple[int, ...] | None = None):
         self.data = data
         self.index_fields = index_fields
+
+    @property
+    def owner(self):
+        return self.data.owner
 
     @property
     def ftype(self):

@@ -1,4 +1,5 @@
 import gc
+import weakref
 
 import pytest
 
@@ -11,6 +12,8 @@ from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.codegen import NumpyBuffer
 from finch.compile_jl.buffer import MinusOneBuffer
 from finch.compile_jl.interop import (
+    _buffer_to_jl,
+    _jl_array_to_python_no_copy,
     _jl_index_buffer_to_python,
     jl_tensor_to_python,
     level_to_jl,
@@ -71,6 +74,84 @@ def test_minus_one_buffer_preserves_hash_key_state():
     assert raw.tolist() == [(1, 3, 128), (4, 5, 127)]
     assert buffer.ftype != MinusOneBuffer(NumpyBuffer(raw)).ftype
     assert buffer.ftype(1).index_fields == (0, 1)
+
+
+@pytest.mark.parametrize("new_length", [0, 2, 8])
+def test_julia_buffer_takes_ownership_on_resize(new_length):
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.int64)
+    buffer = NumpyBuffer(source)
+    vector = _buffer_to_jl(buffer)
+    assert buffer.owner is source
+    assert not jl.FinchInterop.owns_storage(vector)
+    assert _jl_array_to_python_no_copy(vector).ctypes.data == source.ctypes.data
+
+    vector[0] = 10
+    assert source[0] == 10
+    getattr(jl, "resize!")(vector, new_length)
+    assert jl.FinchInterop.owns_storage(vector)
+    assert list(vector)[: min(4, new_length)] == source[:new_length].tolist()
+    if new_length:
+        vector[0] = 20
+        assert source[0] == 10
+
+
+def test_julia_buffer_preserves_borrowed_and_exported_storage():
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.int64)
+    reference = weakref.ref(source)
+    vector = _buffer_to_jl(NumpyBuffer(source))
+    del source
+    gc.collect()
+    jl.GC.gc()
+    assert reference() is not None
+    assert list(vector) == [0, 1, 2, 3]
+
+    old_view = _jl_array_to_python_no_copy(vector)
+    getattr(jl, "resize!")(vector, 6)
+    vector[0] = 10
+    owned_view = _jl_array_to_python_no_copy(vector)
+    assert not jl.FinchInterop.owns_storage(vector)
+    getattr(jl, "resize!")(vector, 2)
+    vector[0] = 20
+    del vector
+    gc.collect()
+    jl.GC.gc()
+    np.testing.assert_array_equal(old_view, [0, 1, 2, 3])
+    np.testing.assert_array_equal(owned_view[:4], [10, 1, 2, 3])
+
+
+@pytest.mark.parametrize("aligned", [False, True])
+def test_julia_buffer_borrows_hash_keys_without_shifting_state(aligned):
+    _requires_julia_backend()
+    key_type = TupleFType.from_tuple((ft.intp, ft.int32, ft.uint8))
+    dtype = np.dtype(np_dtype(key_type).descr, align=aligned)
+    source = np.array([(0, 2, 128), (1, 0, 127)], dtype=dtype)
+    vector = _buffer_to_jl(NumpyBuffer(source), offset=1, index_fields=(0, 1))
+    assert _jl_array_to_python_no_copy(vector).ctypes.data == source.ctypes.data
+    assert [tuple(entry) for entry in vector] == [(1, 3, 128), (2, 1, 127)]
+    vector[1] = (4, 5, 0)
+    assert source.tolist() == [(0, 2, 128), (3, 4, 0)]
+    getattr(jl, "push!")(vector, (5, 6, 128))
+    assert jl.FinchInterop.owns_storage(vector)
+    assert [tuple(entry) for entry in vector] == [(1, 3, 128), (4, 5, 0), (5, 6, 128)]
+    assert source.tolist() == [(0, 2, 128), (3, 4, 0)]
+    getattr(jl, "empty!")(vector)
+    assert len(vector) == 0
+
+
+def test_julia_buffer_readonly_storage_detaches_on_resize():
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.float64)
+    source.flags.writeable = False
+    vector = _buffer_to_jl(NumpyBuffer(source))
+    assert _jl_array_to_python_no_copy(vector).ctypes.data == source.ctypes.data
+    assert not _jl_array_to_python_no_copy(vector).flags.writeable
+    with pytest.raises(Exception, match="ReadOnlyMemoryError"):
+        vector[0] = 10
+    getattr(jl, "resize!")(vector, 5)
+    vector[0] = 10
+    assert source[0] == 0
 
 
 @pytest.mark.parametrize("level_type", [ft.sparse_hash, ft.sparse_bytemap])

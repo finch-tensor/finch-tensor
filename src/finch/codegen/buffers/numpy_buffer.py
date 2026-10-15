@@ -78,6 +78,10 @@ class NumpyBuffer(Buffer):
         self.arr = arr
 
     @property
+    def owner(self):
+        return self.arr
+
+    @property
     def ftype(self):
         """
         Returns the ftype of the buffer, which is a NumpyBufferFType.
