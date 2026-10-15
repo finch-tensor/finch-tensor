@@ -415,10 +415,10 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Rewrite every Dynamic fill in `func`, and every read of one, to a zero of
-    its dtype, and report which argument positions carried a Dynamic fill. This
-    is a necessary but potentially unsound rewrite which should be removed
-    eventually.
+    """Rewrite every Dynamic fill in `func`, every read of one, and every
+    declaration of a tensor with one, to a zero of its dtype, and report which
+    argument positions carried a Dynamic fill. This is a necessary but
+    potentially unsound rewrite which should be removed eventually.
     """
     dynamic_args = tuple(
         i
@@ -438,6 +438,14 @@ def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
                         return ntn.Literal(_zero_value(fill.element_type))
                     case StaticFillFType() as fill:
                         return ntn.Literal(fill.value)
+            case ntn.Declare(tns, init, op, shape):
+                # Julia requires a declaration to initialize to the tensor's
+                # fill, and a Dynamic fill is pinned to zero.
+                match tns.result_type.fill_type:
+                    case DynamicFillFType() as fill:
+                        zero = ntn.Literal(_zero_value(fill.element_type))
+                        if init != zero:
+                            return ntn.Declare(tns, zero, op, shape)
         return None
 
     return Rewrite(PostWalk(rule))(func), dynamic_args
