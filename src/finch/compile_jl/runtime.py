@@ -113,6 +113,14 @@ class JuliaOwnedTensor(OverrideTensor):
     def _as_tensor(self) -> Tensor:
         return jl_tensor_to_python(self.raw_julia_obj)
 
+    @property
+    def fill_value(self):
+        fill_type = self.ftype.fill_type
+        if isinstance(fill_type, DynamicFillFType):
+            # The Julia tensor holds the value of its dynamic fill.
+            return fill_type.element_type(jl.Finch.fill_value(self.raw_julia_obj))
+        return super().fill_value
+
     def item(self):
         if not self._shape:
             values = self.raw_julia_obj.lvl.val.to_numpy(copy=False)
