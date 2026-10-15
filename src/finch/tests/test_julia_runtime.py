@@ -25,7 +25,7 @@ from finch.compile_jl.runtime import (
     JuliaOwnedTensor,
     _KernalMetadata,
 )
-from finch.compile_jl.types import _level_constructor_str
+from finch.compile_jl.types import _level_constructor_str, to_jl_vector
 
 
 def _requires_julia_backend():
@@ -175,6 +175,29 @@ def test_julia_buffer_readonly_storage_detaches_on_resize():
     getattr(jl, "resize!")(vector, 5)
     vector[0] = 10
     assert source[0] == 0
+
+
+def test_julia_buffer_converts_incompatible_dtype():
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.int32)
+    vector = to_jl_vector(ft.float64, source)
+    assert jl.eltype(vector) == jl.Float64
+    assert list(vector) == [0.0, 1.0, 2.0, 3.0]
+
+
+def test_julia_buffer_borrows_nested_tuple_layout():
+    _requires_julia_backend()
+    type_ = TupleFType.from_tuple(
+        (TupleFType.from_tuple((ft.int32, ft.int64)), ft.uint8)
+    )
+    source = np.array([((0, 2), 128), ((3, 4), 127)], dtype=np_dtype(type_))
+    vector = _buffer_to_jl(NumpyBuffer(source), offset=1, index_fields=(0,))
+    view = _jl_array_to_python_no_copy(vector)
+    assert view.ctypes.data == source.ctypes.data
+    assert view.tolist() == source.tolist()
+    assert tuple(vector[0][0]) == (1, 3)
+    vector[1] = ((5, 6), 0)
+    assert source.tolist() == [((0, 2), 128), ((4, 5), 0)]
 
 
 @pytest.mark.parametrize("level_type", [ft.sparse_hash, ft.sparse_bytemap])

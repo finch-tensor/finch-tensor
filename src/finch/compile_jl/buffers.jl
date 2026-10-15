@@ -26,11 +26,21 @@ function Buffer(data::Vector{T}, ::Val{I}=Val(())) where {T,I}
     borrow(T, reinterpret(UInt8, data), layout(T), Val(I), false)
 end
 
+valid_layout(::Type{T}, layout) where {T} = layout == (sizeof(T), ())
+function valid_layout(::Type{T}, layout) where {T<:Tuple}
+    length(layout[2]) == fieldcount(T) || return false
+    all(enumerate(layout[2])) do (i, (offset, child))
+        0 <= offset <= layout[1] - child[1] && valid_layout(fieldtype(T, i), child)
+    end
+end
+
 function borrow(::Type{T}, bytes, layout::L, ::Val{I}, shifted, writable=true) where {T,L,I}
     isbitstype(T) || throw(ArgumentError("buffer elements must be isbits"))
-    stride = layout[1]
-    stride > 0 || throw(ArgumentError("buffer elements must have nonzero size"))
-    length(bytes) % stride == 0 || throw(ArgumentError("invalid buffer layout"))
+    eltype(bytes) == UInt8 && stride(bytes, 1) == 1 ||
+        throw(ArgumentError("buffer storage must be contiguous bytes"))
+    layout[1] > 0 || throw(ArgumentError("buffer elements must have nonzero size"))
+    valid_layout(T, layout) && length(bytes) % layout[1] == 0 ||
+        throw(ArgumentError("invalid buffer layout"))
     data = unsafe_wrap(Vector{UInt8}, pointer(bytes), length(bytes); own=false)
     # NumPy views of data can outlive this buffer, so data itself retains the owner.
     finalizer(data) do _
@@ -39,13 +49,17 @@ function borrow(::Type{T}, bytes, layout::L, ::Val{I}, shifted, writable=true) w
     Buffer{T,L,I}(data, layout, bytes, shifted, writable)
 end
 
-owner(buf::Buffer) = isnothing(buf.owner) ? buf.data : buf.owner
 owns_storage(buf::Buffer) = isnothing(buf.owner)
 
-function storage(buf::Buffer)
+function owner(buf::Buffer)
     if owns_storage(buf)
         buf.owner = buf.data
     end
+    return buf.owner
+end
+
+function storage(buf::Buffer)
+    owner(buf)
     return (buf.data, buf.layout)
 end
 

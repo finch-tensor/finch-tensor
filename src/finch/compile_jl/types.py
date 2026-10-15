@@ -198,16 +198,17 @@ def to_jl_vector(
         values = np.asarray(values, dtype=np_dtype(T))
     if not values.dtype.isnative:
         values = values.astype(values.dtype.newbyteorder("="))
+    if ft.ftype(values.dtype) != ft.ftype(np_dtype(T)):
+        values = values.astype(np_dtype(T))
     values = np.ascontiguousarray(values)
     fields = ()
     if offset:
-        fields = (
-            tuple(range(1, len(T.struct_fields) + 1))
-            if isinstance(T, TupleFType) and index_fields is None
-            else tuple(i + 1 for i in index_fields)
-            if index_fields is not None
-            else (1,)
-        )
+        if index_fields is not None:
+            fields = tuple(i + 1 for i in index_fields)
+        elif isinstance(T, TupleFType):
+            fields = tuple(range(1, len(T.struct_fields) + 1))
+        else:
+            fields = (1,)
     jl = get_jl()
     return jl.FinchInterop.borrow(
         to_jl_type(T),
