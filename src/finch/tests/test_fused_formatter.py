@@ -47,8 +47,12 @@ def test_formatters_keep_logical_stats_and_format_stored_dimensions(
     monkeypatch.setattr(capture, "ctx", lambda *args: None)
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)),
-            lgc.Query(lgc.Table(out, fields), lgc.Table(fused, fields)),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, fields), lgc.Table(a, fields)), fields
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(out, fields), lgc.Table(fused, fields)), fields
+            ),
             lgc.Produces((out,)),
         )
     )
@@ -78,8 +82,12 @@ def test_statistics_for_alias_views_do_not_collide(monkeypatch, formatter_cls):
     monkeypatch.setattr(capture, "ctx", lambda *args: None)
     plan = lgc.Plan(
         (
-            lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(a, (i, j))),
-            lgc.Query(lgc.Table(fused, (j, i)), lgc.Table(scratch, (i, j))),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(a, (i, j))), (i, j)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, (j, i)), lgc.Table(scratch, (i, j))), (j, i)
+            ),
             lgc.Produces((fused,)),
         )
     )

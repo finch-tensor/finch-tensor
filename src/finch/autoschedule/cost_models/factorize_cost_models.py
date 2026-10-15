@@ -9,6 +9,7 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Fuse,
     Literal,
     LogicExpression,
     LogicStatement,
@@ -48,6 +49,8 @@ class FactorizeCostModel(CostModel[Statement]):
             case Plan(bodies):
                 for body in bodies:
                     yield from self.components(body, bindings, machine)
+            case Fuse(_, body):
+                yield from self.components(body, bindings, machine)
             case Query() | QueryInto():
                 yield Statement(term)
                 machine(term)

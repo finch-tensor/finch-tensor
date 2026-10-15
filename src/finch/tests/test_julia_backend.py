@@ -29,6 +29,7 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
+from finch.autoschedule.util import fuse_loop_order
 from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
@@ -1097,15 +1098,11 @@ def _julia_binary(op, a, b, out_fill, compiler):
     from finch import finch_logic as lgc
 
     i, j = lgc.Field("i"), lgc.Field("j")
-    A, B, Y = lgc.Alias("A"), lgc.Alias("B"), lgc.Alias("Y")
+    A, B, Y = lgc.HardAlias("A"), lgc.HardAlias("B"), lgc.HardAlias("Y")
     body = lgc.MapJoin(lgc.Literal(op), (lgc.Table(A, (i, j)), lgc.Table(B, (i, j))))
-    rhs = lgc.Aggregate(
-        lgc.Literal(ffuncs.overwrite),
-        lgc.Literal(out_fill),
-        lgc.Reorder(body, (i, j)),
-        (),
-    )
-    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    rhs = lgc.Aggregate(lgc.Literal(ffuncs.overwrite), lgc.Literal(out_fill), body, ())
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
     out_t = fiber_tensor(
         dense(
             sparse_list(
@@ -1165,14 +1162,12 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
 
     data = np.array([[0.0, 1.5, 0.0], [2.5, 0.0, 3.5]])
     i, j = lgc.Field("i"), lgc.Field("j")
-    A, Y = lgc.Alias("A"), lgc.Alias("Y")
+    A, Y = lgc.HardAlias("A"), lgc.HardAlias("Y")
     rhs = lgc.Aggregate(
-        lgc.Literal(ffuncs.overwrite),
-        lgc.Literal(0.0),
-        lgc.Reorder(lgc.Table(A, (i, j)), (i, j)),
-        (),
+        lgc.Literal(ffuncs.overwrite), lgc.Literal(0.0), lgc.Table(A, (i, j)), ()
     )
-    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
     out_t = fiber_tensor(
         sparse_coo(element(0.0, ftype(np.float64), ftype(np.intp)), 2, ftype(np.intp))
     )
@@ -1192,11 +1187,10 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
     np.testing.assert_array_equal(cols, [1, 0, 2])
 
 
-def test_compute_shape_vars_accepts_broadcast_reorder():
+def test_infer_shape_accepts_broadcast_reorder():
     from finch import finch_logic as lgc
-    from finch.finch_logic.stages import compute_shape_vars
 
-    a, out = lgc.Alias("a"), lgc.Alias("out")
+    a, out = lgc.HardAlias("a"), lgc.HardAlias("out")
     i, j = lgc.Field("i"), lgc.Field("j")
     prgm = lgc.Plan(
         (
@@ -1204,9 +1198,8 @@ def test_compute_shape_vars_accepts_broadcast_reorder():
             lgc.Produces((out,)),
         )
     )
-    tensor = ft.asarray(np.arange(3, dtype=np.int64))
-    shape_vars = compute_shape_vars(prgm, {a: tensor.ftype})
-    assert len(shape_vars[a]) == 1
+    shapes = prgm.infer_shape({a: (3,)})
+    assert shapes[out] == (3, None)
 
 
 def test_minus_one_buffer_arr_shifts_every_tuple_field():

@@ -13,13 +13,14 @@ from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Field,
+    Fuse,
     Literal,
     LogicStatement,
     Plan,
     Produces,
     Query,
     QueryInto,
-    Reorder,
     StatsFactory,
     Table,
 )
@@ -146,6 +147,7 @@ class FormatCostModel(CostModel[LevelChoice]):
     A cost model where each level of each formatted alias is a component.
     bindings lists the level options of an alias, outermost first and ending
     with its element level, and the alias is formatted when it is first written.
+    A fused alias lists the options of the levels after its fused dimensions.
     """
 
     def components(
@@ -160,8 +162,9 @@ class FormatCostModel(CostModel[LevelChoice]):
             stats = machine(alias)
             # bindings name no position type, so positions are intp.
             pos_size = np_dtype(ftypes.intp).itemsize
+            start = len(stats.index_order) + 1 - len(options)
             num_pos = 1.0
-            for depth, option in enumerate(options):
+            for depth, option in enumerate(options, start):
                 yield LevelChoice(term, alias, depth, num_pos, option, pos_size)
                 num_pos = option.next_num_pos(
                     stats, machine.stats_factory, depth, num_pos
@@ -172,13 +175,16 @@ class FormatCostModel(CostModel[LevelChoice]):
                 case Plan(bodies):
                     for body in bodies:
                         yield from visit_stmt(body)
+                case Fuse(_, body):
+                    yield from visit_stmt(body)
                 case Query(Table(Alias() as lhs, _), _) | QueryInto(
                     Table(Alias() as lhs, _), _, _
                 ):
                     machine(stmt)
-                    if lhs in bindings and lhs not in visited:
-                        yield from visit_alias(lhs, bindings[lhs])
-                    visited.add(lhs)
+                    alias = lhs.unfused
+                    if alias in bindings and alias not in visited:
+                        yield from visit_alias(lhs, bindings[alias])
+                    visited.add(alias)
                 case Produces():
                     return
                 case _:
@@ -220,8 +226,9 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
         sequential reads, scatter reads, sequential writes, and scatter writes,
         with one row per loop prefix that accesses the level in each query.
         Each access is counted by the PigeonCostModel iterations of the loops
-        from the root to the current level. The element level is accessed with
-        its parent.
+        from the root to the current level, which are the fields of the
+        enclosing Fuse nodes. Every view of alias accesses its levels. The
+        element level is accessed with its parent.
         """
         # A sequential write is when the prefix of loops from root to current
         # level matches the ordering of the access exactly.
@@ -248,26 +255,27 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
             else:
                 features[0 if is_subsequence(order, loops) else 1] += iterations
 
-        def visit_stmt(stmt: LogicStatement):
+        def visit_stmt(stmt: LogicStatement, loop_order: tuple[Field, ...]):
             match stmt:
                 case Plan(bodies):
                     for body in bodies:
-                        visit_stmt(body)
+                        visit_stmt(body, loop_order)
+                    return
+                case Fuse(idx, body):
+                    visit_stmt(body, (*loop_order, idx))
                     return
                 case QueryInto(Table(), _, Literal()):
                     stats_interpreter(stmt)
                     return
                 case Produces():
                     return
-                case Query(Table(lhs, lhs_idxs), Table() as rhs):
+                case Query(Table(Alias() as lhs, lhs_idxs), Table() as rhs):
                     arg = rhs
-                    loop_order = lhs_idxs
                 case Query(
-                    Table(lhs, lhs_idxs),
-                    Aggregate(_, _, Reorder(arg, loop_order), _) as rhs,
+                    Table(Alias() as lhs, lhs_idxs), Aggregate(_, _, arg, _) as rhs
                 ):
                     pass
-                case QueryInto(Table(lhs, lhs_idxs), _, Reorder(arg, loop_order)):
+                case QueryInto(Table(Alias() as lhs, lhs_idxs), _, arg):
                     rhs = stmt.as_query().rhs
                 case _:
                     raise ValueError(f"Unsupported statement type: {stmt}")
@@ -275,14 +283,14 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
             prefixes = {}
             for node in PostOrderDFS(arg):
                 match node:
-                    case Table(tns, idxs) if tns == alias:
+                    case Table(Alias() as tns, idxs) if tns.unfused == alias.unfused:
                         visit_access(idxs, loop_order, rhs, lhs_idxs, False, prefixes)
-            if lhs == alias:
+            if lhs.unfused == alias.unfused:
                 visit_access(lhs_idxs, loop_order, rhs, lhs_idxs, True, prefixes)
             features.extend(prefixes.values())
             stats_interpreter(stmt)
 
-        visit_stmt(term)
+        visit_stmt(term, ())
         return np.asarray(features, dtype=float).reshape(-1, 4)
 
     def get_component_features(

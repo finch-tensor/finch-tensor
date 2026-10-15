@@ -11,6 +11,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
     Literal,
     LogicExpression,
     LogicStatement,
@@ -18,7 +19,6 @@ from finch.finch_logic import (
     Produces,
     Query,
     QueryInto,
-    Reorder,
     Table,
 )
 from finch.symbolic import PostOrderDFS
@@ -42,7 +42,8 @@ class LoopCostModel(CostModel[Prefix]):
     """
     A cost model where each loop prefix, including the empty prefix, is a component.
     components yields prefixes in query order, from the shortest prefix to the
-    longest, and get_component_features returns one row for each prefix.
+    longest, and get_component_features returns one row for each prefix. The
+    loop order of a query is the fields of its enclosing Fuse nodes.
     Predictors used with branch-and-bound loop search must predict nonnegative
     component costs.
     """
@@ -53,31 +54,32 @@ class LoopCostModel(CostModel[Prefix]):
         bindings: Mapping[Alias, TensorFType],
         machine: StatsMachine[NS],
     ) -> Iterator[Prefix]:
-        match term:
-            case Plan(bodies):
-                for body in bodies:
-                    yield from self.components(body, bindings, machine)
-                return
-            case QueryInto(Table(), _, Literal()):
-                machine(term)
-                return
-            case Produces():
-                return
-            case Query(Table(_, lhs_idxs), Table() as expr):
-                idxs = lhs_idxs
-            case Query(
-                Table(_, lhs_idxs),
-                Aggregate(_, _, Reorder(_, idxs), _) as expr,
-            ):
-                pass
-            case QueryInto(Table(_, lhs_idxs), _, Reorder(_, idxs)):
-                expr = term.as_query().rhs
-            case _:
-                raise ValueError(f"Unsupported statement type: {term}")
+        def visit(stmt: LogicStatement, loop_order: tuple[Field, ...]):
+            match stmt:
+                case Plan(bodies):
+                    for body in bodies:
+                        yield from visit(body, loop_order)
+                    return
+                case Fuse(idx, body):
+                    yield from visit(body, (*loop_order, idx))
+                    return
+                case QueryInto(Table(), _, Literal()):
+                    machine(stmt)
+                    return
+                case Produces():
+                    return
+                case Query(Table(_, lhs_idxs), expr):
+                    pass
+                case QueryInto(Table(_, lhs_idxs), _, _):
+                    expr = stmt.as_query().rhs
+                case _:
+                    raise ValueError(f"Unsupported statement type: {stmt}")
 
-        for n in range(len(idxs) + 1):
-            yield Prefix(idxs[:n], expr, lhs_idxs)
-        machine(term)
+            for n in range(len(loop_order) + 1):
+                yield Prefix(loop_order[:n], expr, lhs_idxs)
+            machine(stmt)
+
+        return visit(term, ())
 
 
 class PigeonCostModel(LoopCostModel, LoopOrderedForm):

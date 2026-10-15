@@ -25,6 +25,7 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
 from finch.autoschedule.normalize import LogicNormalizer
 from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -33,7 +34,6 @@ from finch.finch_logic import (
     Literal,
     MapJoin,
     Query,
-    Reorder,
     Table,
 )
 from finch.finch_notation.interpreter import NotationInterpreter
@@ -54,12 +54,12 @@ def test_empty_input_cost_matches_model():
     for order in ((i, j, k), (j, k, i)):
         query = Query(
             Table(HardAlias("out"), (i, j, k)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(query, {}, bindings, sf)
+        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
 
 
 def test_empty_relation_cost_matches_model():
@@ -90,12 +90,12 @@ def test_empty_relation_cost_matches_model():
     for order in ((i, j, k, l_, m), (m, l_, k, j, i)):
         query = Query(
             Table(HardAlias("out"), (i, j, k, l_, m)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(query, {}, bindings, sf)
+        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
 
 
 def greedy_scheduler():
@@ -283,10 +283,8 @@ def test_prefix_totals_match_program_cost():
             )
             query = Query(
                 Table(HardAlias("out"), out_idxs),
-                Aggregate(
-                    Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), reduced
-                ),
+                Aggregate(Literal(ffuncs.add), Literal(0.0), expr, reduced),
             )
             assert prefix_total == pytest.approx(
-                model.predict_cost(query, {}, bindings, sf)
+                model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
             )

@@ -31,6 +31,7 @@ from finch.autoschedule.tensor_stats import (
 )
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.autoschedule.tensor_stats.uniform_stats import UniformStats
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -41,7 +42,6 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
-    Reorder,
     Table,
     TensorStats,
 )
@@ -85,7 +85,7 @@ def _format_matrix(formatter, matrix, fill_type):
     i, j = Field("i"), Field("j")
     A, M = HardAlias("A"), HardAlias("M")
     stats_factory = DCStatsFactory()
-    query = Query(Table(A, (i, j)), Table(M, (i, j)))
+    query = fuse_loop_order(Query(Table(A, (i, j)), Table(M, (i, j))), (i, j))
     machine = StatsMachine(
         stats_factory, {M: stats_factory(fl.asarray(matrix), (i, j))}
     )
@@ -105,20 +105,20 @@ def test_storage_cost_formatter_uses_dense_levels_for_dense_matrx():
     formatter = StorageCostFormatter(capture)
     prgm = Plan(
         (
-            Query(
-                Table(B, (i, j)),
-                Aggregate(
-                    Literal(ffuncs.overwrite),
-                    Literal(0.0),
-                    Reorder(
+            fuse_loop_order(
+                Query(
+                    Table(B, (i, j)),
+                    Aggregate(
+                        Literal(ffuncs.overwrite),
+                        Literal(0.0),
                         MapJoin(
                             Literal(ffuncs.add),
                             (Table(A, (i, j)), Table(A, (i, j))),
                         ),
-                        (i, j),
+                        (),
                     ),
-                    (),
                 ),
+                (i, j),
             ),
             Produces((B,)),
         )
@@ -204,7 +204,9 @@ def test_format_cost_uses_depth_and_input_positions(formatter_cls, expected):
     i, j = Field("i"), Field("j")
     a = HardAlias("a")
     tensor = fl.asarray(np.eye(3, 4, dtype=np.float64) * [1, 1, 0, 0])
-    query = Query(Table(a, (i, j)), Table(Literal(tensor), (i, j)))
+    query = fuse_loop_order(
+        Query(Table(a, (i, j)), Table(Literal(tensor), (i, j))), (i, j)
+    )
     machine = StatsMachine(DCStatsFactory())
     machine(query)
     model = formatter_cls().cost_model
@@ -235,29 +237,27 @@ def test_format_access_features_separate_sequential_and_scatter():
     prgm = Plan(
         (
             # A[i, j] = sum_k X[i, k] * Y[k, j], looping over (i, k, j).
-            Query(
-                Table(A, (i, j)),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0.0),
-                    Reorder(
+            fuse_loop_order(
+                Query(
+                    Table(A, (i, j)),
+                    Aggregate(
+                        Literal(ffuncs.add),
+                        Literal(0.0),
                         MapJoin(
                             Literal(ffuncs.mul), (Table(X, (i, k)), Table(Y, (k, j)))
                         ),
-                        (i, k, j),
+                        (k,),
                     ),
-                    (k,),
                 ),
+                (i, k, j),
             ),
             # C[i, j] = A[i, j], looping over (i, j).
-            Query(
-                Table(C, (i, j)),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0.0),
-                    Reorder(Table(A, (i, j)), (i, j)),
-                    (),
+            fuse_loop_order(
+                Query(
+                    Table(C, (i, j)),
+                    Aggregate(Literal(ffuncs.add), Literal(0.0), Table(A, (i, j)), ()),
                 ),
+                (i, j),
             ),
             Produces((C,)),
         )
@@ -289,8 +289,8 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     stats: dict[Alias, TensorStats] = {a: sf(tensor, (i,))}
     plan = Plan(
         (
-            Query(Table(b, (i,)), Table(a, (i,))),
-            Query(Table(c, (i,)), Table(b, (i,))),
+            fuse_loop_order(Query(Table(b, (i,)), Table(a, (i,))), (i,)),
+            fuse_loop_order(Query(Table(c, (i,)), Table(b, (i,))), (i,)),
             Produces((c,)),
         )
     )
@@ -337,7 +337,7 @@ def test_format_selection_uses_custom_predictor():
     i = Field("i")
     a = HardAlias("a")
     tensor = fl.asarray(np.ones(3))
-    query = Query(Table(a, (i,)), Table(Literal(tensor), (i,)))
+    query = fuse_loop_order(Query(Table(a, (i,)), Table(Literal(tensor), (i,))), (i,))
     machine = StatsMachine(DCStatsFactory())
     machine(query)
     zeros = {

@@ -12,6 +12,7 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     FillTable,
+    Fuse,
     Literal,
     LogicExpression,
     LogicInterpreter,
@@ -90,6 +91,10 @@ class StatsMachine(Generic[TS]):
                 for body in node.bodies:
                     last_result = self(body)
                 return last_result
+
+            case Fuse(_, body):
+                # Fusing loops doesn't change the statistics of their results.
+                return self(body)
 
             case Query(Table(Alias() as var, idxs), rhs):
                 if rhs.fields() != idxs:

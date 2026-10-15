@@ -33,10 +33,12 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
 from finch.autoschedule.stages import LoopOrderedForm
 from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
     HardAlias,
     Literal,
     MapJoin,
@@ -44,7 +46,6 @@ from finch.finch_logic import (
     Produces,
     Query,
     QueryInto,
-    Reorder,
     Table,
     TensorStats,
 )
@@ -81,9 +82,11 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
     def cost(order):
         query = Query(
             Table(HardAlias("out"), expr.fields()),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
-        return model.predict_cost(query, {}, stats, stats_factory)
+        return model.predict_cost(
+            fuse_loop_order(query, order), {}, stats, stats_factory
+        )
 
     greedy_cost, bfs_cost, dfs_cost = map(cost, (greedy, bfs, dfs))
 
@@ -126,9 +129,11 @@ def test_brute_force_is_no_worse_than_heuristics():
     def cost(order):
         query = Query(
             Table(HardAlias("out"), expr.fields()),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
-        return model.predict_cost(query, {}, stats, stats_factory)
+        return model.predict_cost(
+            fuse_loop_order(query, order), {}, stats, stats_factory
+        )
 
     greedy_cost, bfs_cost, dfs_cost, brute_cost = map(cost, (greedy, bfs, dfs, brute))
 
@@ -161,10 +166,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     )
 
     def cost(order):
-        query = Query(
-            Table(out, (i, k)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
-        )
+        query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
         features = model.get_features(query, {}, stats, sf)
         return sum(row.sum() ** 2 for row in features)
 
@@ -226,10 +228,8 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     assert scheduler.cost_model is model
     assert model.predict_cost(ordered, {}, stats, sf) == 7
     match ordered.bodies[0]:
-        case Query(_, Aggregate(_, _, Reorder(_, order), _)) | QueryInto(
-            _, _, Reorder(_, order)
-        ):
-            assert order == (j, i)
+        case Fuse(outer, Fuse(inner, Query() | QueryInto())):
+            assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
     assert isinstance(orderer().cost_model, Sum)
@@ -264,10 +264,7 @@ def test_prefix_cost_uses_reduction_statistics(op, init):
     model = BFSLoopOrderer().cost_model
     machine = StatsMachine(sf, dict(stats))
     for order in ((i, j), (j, i)):
-        query = Query(
-            Table(out, (i,)),
-            Aggregate(Literal(op), Literal(init), Reorder(table, order), (j,)),
-        )
+        query = fuse_loop_order(Query(Table(out, (i,)), expr), order)
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr, (i,)), machine)
             for n in range(len(order) + 1)
