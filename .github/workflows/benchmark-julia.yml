@@ -2,7 +2,7 @@ name: Julia Benchmark
 
 jobs:
   benchmark-julia:
-    runs-on: ubuntu-latest
+    runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
     permissions:
       contents: read # required for actions/checkout
     steps:

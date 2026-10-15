@@ -1069,3 +1069,171 @@ def test_compile_julia_full_reduction_returns_a_scalar(scheduler):
 
     assert result.shape == ()
     np.testing.assert_allclose(np.array(result), data.sum())
+
+
+def _float_csr(data: np.ndarray, fill: float) -> FiberTensor:
+    ptr, idx, vals = [0], [], []
+    for row in data:
+        stored = np.flatnonzero(row != fill)
+        idx.extend(stored)
+        vals.extend(row[stored])
+        ptr.append(len(vals))
+    elem_t = element(fill, ftype(np.float64), ftype(np.intp), NumpyBufferFType)
+    return FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(elem_t, NumpyBuffer(np.array(vals, dtype=np.float64))),
+                np.intp(data.shape[1]),
+                NumpyBuffer(np.array(ptr, dtype=np.intp)),
+                NumpyBuffer(np.array(idx, dtype=np.intp)),
+            ),
+            np.intp(data.shape[0]),
+        )
+    )
+
+
+def _julia_binary(op, a, b, out_fill, compiler):
+    from finch import dense, fiber_tensor, sparse_list
+    from finch import finch_logic as lgc
+
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, B, Y = lgc.Alias("A"), lgc.Alias("B"), lgc.Alias("Y")
+    body = lgc.MapJoin(lgc.Literal(op), (lgc.Table(A, (i, j)), lgc.Table(B, (i, j))))
+    rhs = lgc.Aggregate(
+        lgc.Literal(ffuncs.overwrite),
+        lgc.Literal(out_fill),
+        lgc.Reorder(body, (i, j)),
+        (),
+    )
+    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        dense(
+            sparse_list(
+                element(out_fill, ftype(np.float64), ftype(np.intp)), ftype(np.intp)
+            ),
+            ftype(np.intp),
+        )
+    )
+    bindings = {A: a, B: b, Y: out_t.construct(a.shape)}
+    lib, *_ = CompilerFormLowerer(LogicCompiler(compiler))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (res,) = lib.main(*bindings.values())
+    return np.transpose(jl.Array(res.raw_julia_obj).to_numpy())
+
+
+def test_julia_floor_divide_floors_like_numpy():
+    _requires_julia_backend()
+    a = np.array([[-7.0, 7.0], [1.0, -1.0]])
+    b = np.array([[2.0, 2.0], [0.1, 0.1]])
+    got = _julia_binary(
+        ffuncs.floordiv,
+        _float_csr(a, 0.0),
+        _float_csr(b, 0.0),
+        np.float64(np.nan),
+        FinchJLCompiler(),
+    )
+    np.testing.assert_array_equal(got, np.floor_divide(a, b))
+
+
+def test_julia_coo_round_trip_keeps_python_dim_order():
+    _requires_julia_backend()
+    dense = np.zeros((2, 3, 4), dtype=DTYPE)
+    coords = np.array([[0, 0, 1], [0, 2, 3], [1, 1, 0], [1, 2, 2]], dtype=np.intp)
+    dense[tuple(coords.T)] = [1, 2, 3, 4]
+    level = SparseCOOLevel(
+        _element_level([1, 2, 3, 4]),
+        (np.intp(2), np.intp(3), np.intp(4)),
+        NumpyBuffer(np.array([0, 4], dtype=np.intp)),
+        tuple(NumpyBuffer(np.ascontiguousarray(c)) for c in coords.T),
+    )
+    tensor = FiberTensor(level)
+
+    jl_obj = tensor_to_jl(tensor)
+    np.testing.assert_array_equal(np.transpose(jl.Array(jl_obj).to_numpy()), dense)
+
+    back = jl_tensor_to_python(jl_obj).lvl
+    assert tuple(int(s) for s in back.coo_shape) == (2, 3, 4)
+    for got, want in zip(back.tbl, coords.T, strict=True):
+        np.testing.assert_array_equal(got.arr, want)
+
+
+def test_julia_kernel_writes_coo_output_in_python_dim_order():
+    _requires_julia_backend()
+    from finch import fiber_tensor, sparse_coo
+    from finch import finch_logic as lgc
+
+    data = np.array([[0.0, 1.5, 0.0], [2.5, 0.0, 3.5]])
+    i, j = lgc.Field("i"), lgc.Field("j")
+    A, Y = lgc.Alias("A"), lgc.Alias("Y")
+    rhs = lgc.Aggregate(
+        lgc.Literal(ffuncs.overwrite),
+        lgc.Literal(0.0),
+        lgc.Reorder(lgc.Table(A, (i, j)), (i, j)),
+        (),
+    )
+    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    out_t = fiber_tensor(
+        sparse_coo(element(0.0, ftype(np.float64), ftype(np.intp)), 2, ftype(np.intp))
+    )
+    bindings = {A: _float_csr(data, 0.0), Y: out_t.construct(data.shape)}
+    lib, *_ = CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))(
+        prgm, {k: v.ftype for k, v in bindings.items()}, {}, None
+    )
+    (res,) = lib.main(*bindings.values())
+
+    np.testing.assert_array_equal(
+        np.transpose(jl.Array(res.raw_julia_obj).to_numpy()), data
+    )
+    lvl = jl_tensor_to_python(res.raw_julia_obj).lvl
+    assert tuple(int(s) for s in lvl.coo_shape) == data.shape
+    rows, cols = (np.asarray(c.arr)[: int(lvl.ptr.arr[-1])] for c in lvl.tbl)
+    np.testing.assert_array_equal(rows, [0, 1, 1])
+    np.testing.assert_array_equal(cols, [1, 0, 2])
+
+
+def test_compute_shape_vars_accepts_broadcast_reorder():
+    from finch import finch_logic as lgc
+    from finch.finch_logic.stages import compute_shape_vars
+
+    a, out = lgc.Alias("a"), lgc.Alias("out")
+    i, j = lgc.Field("i"), lgc.Field("j")
+    prgm = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(out, (i, j)), lgc.Reorder(lgc.Table(a, (i,)), (i, j))),
+            lgc.Produces((out,)),
+        )
+    )
+    tensor = ft.asarray(np.arange(3, dtype=np.int64))
+    shape_vars = compute_shape_vars(prgm, {a: tensor.ftype})
+    assert len(shape_vars[a]) == 1
+
+
+def test_minus_one_buffer_arr_shifts_every_tuple_field():
+    from finch.compile_jl.buffer import MinusOneBuffer
+
+    raw = np.zeros(3, dtype=[("element_1", np.intp), ("element_2", np.intp)])
+    raw["element_1"] = [1, 2, 3]
+    raw["element_2"] = [4, 5, 6]
+    arr = MinusOneBuffer(NumpyBuffer(raw)).arr
+
+    np.testing.assert_array_equal(arr["element_1"], [0, 1, 2])
+    np.testing.assert_array_equal(arr["element_2"], [3, 4, 5])
+    np.testing.assert_array_equal(raw["element_1"], [1, 2, 3])
+
+
+def test_register_julia_op_maps_and_defines_once():
+    _requires_julia_backend()
+    from finch.compile_jl import compiler
+
+    class _Op:
+        ftype = object()
+
+    op = _Op()
+    source = "finch_test_twice(x) = 2x"
+    compiler.register_julia_op(op, "finch_test_twice", source)
+    compiler.register_julia_op(op, "finch_test_twice", source)
+
+    assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
+    assert int(jl.finch_test_twice(3)) == 6
+    del compiler._JULIA_OPS[op.ftype]

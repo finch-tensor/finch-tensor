@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -34,9 +34,7 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         ]
 
     def struct_setattr(self, obj, attr, value):
-        # The stride is derived from the dimensions of the inner levels.
-        if attr != "stride":
-            setattr(obj, attr, value)
+        setattr(obj, attr, value)
 
     def level_cost(self, fields, stats, stats_factory, num_pos, lvl) -> float:
         n = stats.get_dim_size(fields[lvl])
@@ -260,19 +258,21 @@ class DenseLevel(SingleDimensionLevel):
 
     lvl: Level
     dimension: np.integer
+    stride: np.integer = field(init=False)
+
+    def __post_init__(self):
+        # The stride is stored so that kernels can write it back; it must be
+        # recomputed whenever the dimensions of the dense levels below change.
+        dim_t = ftype(self.dimension)
+        match self.lvl:
+            case DenseLevel():
+                self.stride = dim_t(self.lvl.dimension * self.lvl.stride)
+            case _:
+                self.stride = dim_t(1)
 
     @property
     def shape(self) -> tuple:
         return (self.dimension, *self.lvl.shape)
-
-    @property
-    def stride(self) -> np.integer:
-        dim_t = ftype(self.dimension)
-        match self.lvl:
-            case DenseLevel():
-                return dim_t(self.lvl.dimension * self.lvl.stride)
-            case _:
-                return dim_t(1)
 
     @property
     def ftype(self) -> DenseLevelFType:

@@ -1,7 +1,8 @@
 Compiling MLIR code:
 module {
-  func.func @scansearch(
-    %arr: memref<?xindex>, %x: index, %lo: index, %hi: index
+  func.func @scansearch_index(
+    %arr: memref<?xindex>, %x: index,
+    %lo: index, %hi: index
   ) -> index attributes {llvm.emit_c_interface} {
     %1 = arith.constant 1 : index
     %g:2 = scf.while (%d = %1, %p = %lo) : (index, index) -> (index, index) {
@@ -330,7 +331,7 @@ module {
           %v_267 = llvm.load %v_61 : !llvm.ptr -> !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)>
           %v_268 = builtin.unrealized_conversion_cast %v_267 : !llvm.struct<(ptr, ptr, i64, array<1 x i64>, array<1 x i64>)> to memref<?xindex>
           %v_269 = arith.subi %v_252, %v_207 : index
-          %v_270 = func.call @scansearch(%v_268, %v_233, %v_248, %v_269) : (memref<?xindex>, index, index, index) -> index
+          %v_270 = func.call @scansearch_index(%v_268, %v_233, %v_248, %v_269) : (memref<?xindex>, index, index, index) -> index
           scf.yield %v_270 : index
         } else {
           scf.yield %v_248 : index

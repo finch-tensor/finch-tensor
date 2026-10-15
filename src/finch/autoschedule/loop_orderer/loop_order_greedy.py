@@ -1,15 +1,23 @@
-import itertools
 from collections.abc import Mapping, Sequence
 from typing import Generic, TypeVar
 
+from finch.autoschedule.cost_models import (
+    CostModel,
+    PigeonCostModel,
+    Prefix,
+    Sum,
+    TransposeCostModel,
+)
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
-from finch.autoschedule.tensor_stats import TensorStats
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
+from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Literal,
     LogicExpression,
+    LogicLoader,
     Plan,
     Query,
     QueryInto,
@@ -17,95 +25,54 @@ from finch.finch_logic import (
     Table,
 )
 
-from .loop_order_cost import (
-    cost_of_reformat,
-    get_conjunctive_and_disjunctive_inputs,
-    get_prefix_cost,
-    get_reformat_set,
-)
 from .loop_ordering import AbstractLoopOrderer, with_loop_order
 
-TS = TypeVar("TS", bound=TensorStats)
 NS = TypeVar("NS", bound=NumericStats)
 
 
 def connected_loop_candidates(
     prefix: tuple[Field, ...],
     remaining: Sequence[Field],
-    conjunct_stats: Sequence[TensorStats],
-    disjunct_stats: Sequence[TensorStats],
+    output_vars: tuple[Field, ...] | None = None,
 ) -> list[Field]:
-    """All fields still available for the next loop index."""
-    return list(remaining)
-
-
-def transpose_penalty(
-    input_stats: Sequence[TensorStats],
-    prefix: tuple[Field, ...],
-    charged: frozenset[int],
-) -> float:
-    """Cost of the reformats that ``prefix`` newly forces.
-
-    ``needs_reformat`` is monotone in the prefix: an index placed before one
-    that precedes it in a tensor's storage order already forces that tensor to
-    be reformatted, and extending the prefix cannot undo it. So each tensor is
-    charged exactly once, at the step where its reformat becomes unavoidable,
-    and the total over a full order matches ``loop_order_cost``.
-    """
-    return sum(
-        cost_of_reformat(input_stats[i])
-        for i in get_reformat_set(input_stats, prefix) - charged
-    )
+    """Preserve candidate order while respecting the output's index order."""
+    # TODO this could eventually be improved to consider output transpose.
+    output_vars = output_vars or ()
+    next_output = next((idx for idx in output_vars if idx not in prefix), None)
+    return [idx for idx in remaining if idx not in output_vars or idx == next_output]
 
 
 def greedy_loop_order(
     expr: LogicExpression,
-    stats_factory: StatsFactory,
+    stats_factory: StatsFactory[NS],
     stats_bindings: Mapping[Alias, NS],
     output_vars: tuple[Field, ...] | None = None,
+    *,
+    cost_model: CostModel[Prefix] | None = None,
 ) -> tuple[Field, ...]:
-    """Build a loop order one index at a time, appending the cheapest candidate.
-
-    Each step is scored with the same terms ``loop_order_cost`` charges for that
-    prefix -- ``get_prefix_cost`` for the reads and writes, plus the reformats
-    the new index forces -- so the summed score of the returned order equals its
-    ``loop_order_cost``.
-    """
-    all_vars = tuple(dict.fromkeys(expr.fields()))
-    if not all_vars:
-        return ()
-
-    stats_bindings_2 = dict(stats_bindings)
-    cache: dict[object, NS] = {}
-    conjunct_stats, disjunct_stats = get_conjunctive_and_disjunctive_inputs(
-        expr, stats_factory, stats_bindings_2, cache
-    )
-
-    # Deduplicated by identity, matching how loop_order_cost charges reformats.
-    input_stats: list[NS] = []
-    for stat in itertools.chain(conjunct_stats, disjunct_stats):
-        if not any(stat is seen for seen in input_stats):
-            input_stats.append(stat)
-
+    """Build a loop order by appending the cheapest candidate prefix."""
+    if cost_model is None:
+        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
+    machine = StatsMachine(stats_factory, dict(stats_bindings))
+    match expr:
+        case Aggregate(arg=arg):
+            pass
+        case _:
+            arg = expr
+    fields = (*arg.fields(), *(expr.fields() if output_vars is None else output_vars))
+    remaining = list(dict.fromkeys(fields))
     prefix: list[Field] = []
-    remaining = list(all_vars)
-    charged: frozenset[int] = frozenset()
 
     def candidate_cost(field: Field) -> float:
-        new_prefix = tuple(prefix) + (field,)
-        prefix_cost = get_prefix_cost(
-            new_prefix, conjunct_stats, disjunct_stats, stats_factory, output_vars
+        return cost_model.predict_component_cost(
+            Prefix((*prefix, field), expr, output_vars), machine
         )
-        return prefix_cost + transpose_penalty(input_stats, new_prefix, charged)
 
     while remaining:
-        candidates = connected_loop_candidates(
-            tuple(prefix), remaining, conjunct_stats, disjunct_stats
-        )
+        candidates = connected_loop_candidates(tuple(prefix), remaining, output_vars)
         best = min(candidates, key=candidate_cost)
         prefix.append(best)
         remaining.remove(best)
-        charged = get_reformat_set(input_stats, tuple(prefix))
 
     return tuple(prefix)
 
@@ -114,18 +81,23 @@ def set_greedy_loop_order(
     plan: Plan,
     stats_factory: StatsFactory[NS],
     stats: dict[Alias, NS],
+    cost_model: CostModel[Prefix] | None = None,
 ) -> Plan:
     stats_bindings = dict(stats)
-
     new_queries = []
     for query in plan.bodies[:-1]:
-        # The query's result layout decides whether writing an index is
-        # sequential or random, so pass it to the cost model.
         match query:
-            case Query(Table(_, out_idxs), Aggregate(_, _, arg, _)) | QueryInto(
+            case QueryInto(_, _, Literal()):
+                new_queries.append(query)
+            case Query(Table(_, out_idxs), Aggregate() as arg) | QueryInto(
                 Table(_, out_idxs), _, arg
             ):
-                idxs_2 = greedy_loop_order(arg, stats_factory, stats_bindings, out_idxs)
+                match query:
+                    case QueryInto():
+                        arg = query.as_query().rhs
+                idxs_2 = greedy_loop_order(
+                    arg, stats_factory, stats_bindings, out_idxs, cost_model=cost_model
+                )
                 new_queries.append(with_loop_order(query, idxs_2))
             case Query(_, Table(Alias(), _)) as q:
                 new_queries.append(q)
@@ -138,10 +110,23 @@ def set_greedy_loop_order(
 
 
 class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
+    def __init__(
+        self,
+        ctx: LogicLoader | None = None,
+        *,
+        cost_model: CostModel[Prefix] | None = None,
+    ):
+        super().__init__(ctx)
+        self.cost_model = (
+            cost_model
+            if cost_model is not None
+            else Sum(PigeonCostModel(), TransposeCostModel())
+        )
+
     def set_loop_orders(
         self,
         prgm: Plan,
         stats: dict[Alias, NS],
         stats_factory: StatsFactory[NS],
     ) -> Plan:
-        return set_greedy_loop_order(prgm, stats_factory, stats)
+        return set_greedy_loop_order(prgm, stats_factory, stats, self.cost_model)

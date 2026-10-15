@@ -35,7 +35,8 @@ _JULIA_OPS = {
     ffuncs.mul.ftype: "*",
     ffuncs.sub.ftype: "-",
     ffuncs.truediv.ftype: "/",
-    ffuncs.floordiv.ftype: "div",
+    # fld floors like numpy; div truncates toward zero
+    ffuncs.floordiv.ftype: "fld",
     ffuncs.mod.ftype: "mod",
     ffuncs.pow.ftype: "^",
     ffuncs.neg.ftype: "-",
@@ -143,6 +144,17 @@ class FinchJLLibrary(AssemblyLibrary):
 
     def __getattr__(self, name: str) -> FinchJLKernel:
         return self.kernel_dict[name]
+
+
+def register_julia_op(op, julia_name: str, definition: str | None = None) -> None:
+    # generated kernels call op as julia_name; definition (Julia source) runs once
+    if definition is not None and _JULIA_DEFINITIONS.get(julia_name) != definition:
+        jl.seval(definition)
+        _JULIA_DEFINITIONS[julia_name] = definition
+    _JULIA_OPS[op.ftype] = julia_name
+
+
+_JULIA_DEFINITIONS: dict[str, str] = {}
 
 
 class FinchJLGenerator:

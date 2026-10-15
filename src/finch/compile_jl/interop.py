@@ -115,11 +115,12 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             assert isinstance(tbl, tuple)
+            # Julia's COO lists its dims fastest first, Python's slowest first
             return jl.SparseCOOLevel(
                 level_to_jl(lvl, pin_fill),
-                tuple(int(dim) for dim in coo_shape),
+                tuple(int(dim) for dim in reversed(coo_shape)),
                 _plus_one_buffer_to_jl(ptr),
-                tuple(_plus_one_buffer_to_jl(idx) for idx in tbl),
+                tuple(_plus_one_buffer_to_jl(idx) for idx in reversed(tbl)),
             )
         case SparseHashLevel(
             lvl=lvl,
@@ -239,8 +240,8 @@ def jl_level_to_python(jl_lvl) -> Level:
         )
 
     if jl.isa(jl_lvl, jl.Finch.SparseCOOLevel):
-        coo_shape = tuple(np.intp(int(s)) for s in jl_lvl.shape)
-        tbl = tuple(_jl_index_buffer_to_python(idx) for idx in jl_lvl.tbl)
+        coo_shape = tuple(np.intp(int(s)) for s in reversed(jl_lvl.shape))
+        tbl = tuple(_jl_index_buffer_to_python(idx) for idx in reversed(jl_lvl.tbl))
         return SparseCOOLevel(
             jl_level_to_python(jl_lvl.lvl),
             coo_shape,
