@@ -107,6 +107,10 @@ DATASETS = {
     "Striped": partial(make_striped, DENSE_MATRIX_SIZE),
     "Uniform Random": make_uniform_random,
     "ct20stif": partial(load_matrix_market, "ct20stif.mtx"),
+    "bcsstk39": partial(load_matrix_market, "bcsstk39.mtx"),
+    "ca-GrQc": partial(load_matrix_market, "ca-GrQc.mtx"),
+    "ca-HepTh": partial(load_matrix_market, "ca-HepTh.mtx"),
+    "web-NotreDame": partial(load_matrix_market, "web-NotreDame.mtx"),
     "roadNet-PA": partial(load_matrix_market, "roadNet-PA.mtx"),
     "soc-sign-epinions": partial(load_matrix_market, "soc-sign-epinions.mtx"),
 }
