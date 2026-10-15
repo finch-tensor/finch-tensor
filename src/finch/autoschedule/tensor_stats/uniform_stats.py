@@ -96,7 +96,9 @@ class UniformStatsFactory(
             raise TypeError("Stats Class must be inherit from NumericStats")
         if is_annihilator(op.ftype, stats.fill_type):
             res_p = math.pow(p_old, k)
-        elif is_identity(op.ftype, stats.fill_type):
+        elif is_identity(op.ftype, stats.fill_type) or init is None:
+            # Without an init, a fold of fills is the new fill, so an output is
+            # fill when all of its inputs are, as for an identity.
             res_p = 1 - math.pow((1 - p_old), k)
         else:
             res_p = 1.0

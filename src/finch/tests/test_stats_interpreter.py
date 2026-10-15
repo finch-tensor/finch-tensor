@@ -28,6 +28,7 @@ from finch.finch_logic import (
     Plan,
     Produces,
     Query,
+    QueryInto,
     Table,
 )
 
@@ -74,6 +75,33 @@ def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_
     assert source.index_order == fields
     assert source.fill_type == fill_type
     assert source.estimate_non_fill_values() == 6
+
+
+@pytest.mark.parametrize("use_interpreter", [False, True])
+@pytest.mark.parametrize(
+    "factory_cls", [DCStatsFactory, UniformStatsFactory, ExactStatsFactory]
+)
+@pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
+def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, op):
+    # An update which reduces no fields is the mapjoin of its operands, whatever
+    # the fill means to its operator.
+    i = Field("i")
+    a, b, out = HardAlias("a"), HardAlias("b"), HardAlias("out")
+    factory = factory_cls()
+    a_stats = factory(ft.asarray(np.array([1.0, 0.0, 0.0, 0.0])), (i,))
+    b_stats = factory(ft.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,))
+    update = QueryInto(Table(out, (i,)), Literal(op), Table(b, (i,)))
+    bindings: dict[Alias, NumericStats] = {a: a_stats, b: b_stats, out: a_stats}
+    if use_interpreter:
+        stats = StatsInterpreter(factory)(update, bindings)
+    else:
+        stats = insert_statistics(factory, update, bindings, replace=False, cache={})
+    assert isinstance(stats, NumericStats)
+    expected = factory.mapjoin(op, a_stats, b_stats)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        expected.estimate_non_fill_values()
+    )
+    assert stats.estimate_non_fill_values() < 4
 
 
 @pytest.mark.parametrize("use_interpreter", [False, True])
