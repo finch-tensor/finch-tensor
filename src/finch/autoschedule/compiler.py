@@ -533,33 +533,55 @@ class NotationContext:
                     written.add(var.unfused)
         return written
 
-    def fused_extent(
+    def fused_extents(
         self, idx: lgc.Field, body: lgc.LogicStatement
-    ) -> ntn.NotationExpression:
-        """The extent of the fused field `idx`. The shapes of the tensors which
-        `body` defines follow from the shapes of those it reads, so they are
-        known before the loop. A field which only an output has is broadcast,
-        with extent 1."""
+    ) -> list[ntn.NotationExpression]:
+        """The extent of the fused field `idx` in each statement of `body` which
+        has it. The shapes of the tensors which `body` defines follow from the
+        shapes of those it reads, so they are known before the loop."""
         shapes = body.infer_dimmap(merge_shapes, dict(self.shapes))
-        for node in PostOrderDFS(body):
-            match node:
-                case lgc.Table(lgc.Alias() as var, idxs) if idx in idxs:
-                    # A workspace which is only initialized has the shape of
-                    # its storage, which lacks its fused fields.
-                    shape = shapes[var.unfused]
-                    pos = idxs.index(idx) - len(idxs) + len(shape)
-                    if pos >= 0:
-                        dim = shape[pos]
+        extents = []
+        for stmt in PostOrderDFS(body):
+            match stmt:
+                case lgc.Query() | lgc.QueryInto():
+                    pass
+                case _:
+                    continue
+            for node in PostOrderDFS(stmt):
+                match node:
+                    case lgc.Table(lgc.Alias() as var, idxs) if idx in idxs:
+                        # A workspace which is only initialized has the shape
+                        # of its storage, which lacks its fused fields.
+                        shape = shapes[var.unfused]
+                        pos = idxs.index(idx) - len(idxs) + len(shape)
+                        dim = shape[pos] if pos >= 0 else None
                         if dim is not None:
-                            return dim
-        return ntn.Literal(ftypes.intp(1))
+                            extents.append(dim)
+                            break
+        return extents
+
+    def check_extents(
+        self, extents: list[ntn.NotationExpression], dim: ntn.NotationExpression
+    ) -> tuple[ntn.NotationStatement, ...]:
+        """Check that every statement of a fused loop has its extent `dim`."""
+        if not (self.mode.safe or self.mode.debug):
+            return ()
+        checks = []
+        for extent in extents:
+            check = ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (extent, dim)))
+            if extent != dim and check not in checks:
+                checks.append(check)
+        return tuple(checks)
 
     def lower_fuse(
         self, idx: lgc.Field, body: lgc.LogicStatement
     ) -> ntn.NotationStatement:
         """Lower `body` to a loop over `idx`. The shapes of the body, and the
         declarations of tensors which span its iterations, run before the loop."""
-        dim = self.fused_extent(idx, body)
+        # A field which only an output has is broadcast, with extent 1.
+        extents = self.fused_extents(idx, body)
+        dim = extents[0] if extents else ntn.Literal(ftypes.intp(1))
+        checks = self.hoist_invariant(self.check_extents(extents, dim))
         loop = FusedLoop(idx, ntn.Variable(gensym(idx.name), dim.result_type))
         # The tensors which the body only reads are frozen before the loop,
         # rather than in each iteration.
@@ -591,6 +613,7 @@ class NotationContext:
             (
                 *frozen,
                 *loop.hoisted,
+                *checks,
                 ntn.Loop(loop.var, ext, inner),
             )
         )

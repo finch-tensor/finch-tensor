@@ -60,14 +60,14 @@ class ExactStatsFactory(
         f = stats.fill_type
         bool_op: FinchOperator
 
-        if is_annihilator(op.ftype, f):
-            bool_op, bool_init = ffuncs.and_, True
-        elif is_identity(op.ftype, f) or init is None:
+        if is_identity(op.ftype, f):
+            bool_op, bool_init = ffuncs.or_, False
+        elif not is_annihilator(op.ftype, f) and not is_identity(op.ftype, f):
             # Without an init, a fold of fills is the new fill, so an output is
             # fill when all of its inputs are, as for an identity.
-            bool_op, bool_init = ffuncs.or_, False
+            bool_op, bool_init = ffuncs.or_, init is not None
         else:
-            bool_op, bool_init = ffuncs.or_, True
+            bool_op, bool_init = ffuncs.and_, True
 
         base = self.aggregate_def(op, init, reduce_indices, stats)
         expr = Aggregate(

@@ -7,7 +7,7 @@ from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_einsum import EinsumLoader, MockEinsumLoader
 from finch.finch_logic import Alias, LogicStatement, StatsFactory
 from finch.finch_logic.stages import LogicLoader
-from finch.symbolic import PostOrderDFS
+from finch.symbolic import PreOrderDFS
 
 from .stages import FormattedForm, LogicEinsumLowerer
 
@@ -141,12 +141,19 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
         dict[lgc.Alias, TensorFType],
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
-        # Query results are storage placeholders, not initialized einsum inputs.
+        # Aliases which are defined before any other access are storage
+        # placeholders, not initialized einsum inputs. Statements come in
+        # program order, and a query's lhs before its rhs.
+        accessed = set()
         defined = set()
-        for node in PostOrderDFS(prgm):
+        for node in PreOrderDFS(prgm):
             match node:
-                case lgc.Query(lgc.Table(lgc.Alias(name), _), _):
+                case lgc.Query(lgc.Table(lgc.Alias(name), _), _) if (
+                    name not in accessed
+                ):
                     defined.add(ein.Alias(name))
+                case lgc.Alias(name):
+                    accessed.add(name)
         mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
         lgc_bindings: dict[lgc.Alias, TensorFType] = {
             lgc.HardAlias(var.name): val for var, val in ein_bindings.items()

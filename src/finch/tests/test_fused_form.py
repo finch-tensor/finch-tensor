@@ -100,16 +100,6 @@ def test_fuse_printer():
                 lgc.Fuse(j, lgc.Query(lgc.Table(a, (j,)), lgc.Table(b, (j,)))),
             )
         ),
-        # A tensor not accessed by the fused field may be read and written.
-        lgc.Fuse(
-            i,
-            lgc.Plan(
-                (
-                    lgc.Query(lgc.Table(scratch, (j,)), lgc.Table(a, (i, j))),
-                    lgc.Query(lgc.Table(b, (i, j)), lgc.Table(scratch, (j,))),
-                )
-            ),
-        ),
     ],
 )
 def test_fused_form_accepts(term):
@@ -216,7 +206,7 @@ def test_fused_form_rejects_read_write_in_stored_dimension_of_fused_alias():
             ),
         ),
     )
-    with pytest.raises(ValueError, match="Fuse field j accesses a non-fused dimension"):
+    with pytest.raises(ValueError, match="iterations of Fuse field j share"):
         FusedForm.validate_inputs(term, {}, {}, DenseStatsFactory())
 
 
@@ -233,5 +223,81 @@ def test_fused_form_rejects_read_write_across_nested_blocks():
             )
         ),
     )
-    with pytest.raises(ValueError, match="Fuse field i accesses a non-fused dimension"):
+    with pytest.raises(ValueError, match="iterations of Fuse field i share"):
+        FusedForm.validate_inputs(term, {}, {}, DenseStatsFactory())
+
+
+@pytest.mark.parametrize(
+    "term, error",
+    [
+        # A Fuse field isn't fused again within its body.
+        (
+            lgc.Fuse(i, lgc.Fuse(i, lgc.Query(lgc.Table(b, (i,)), lgc.Table(a, (i,))))),
+            "nested in another Fuse of i",
+        ),
+        # Every statement uses the field of each enclosing Fuse, so that it
+        # runs once.
+        (
+            lgc.Fuse(
+                k,
+                lgc.Plan(
+                    (
+                        lgc.Fuse(
+                            i,
+                            lgc.QueryInto(
+                                lgc.Table(b, (i,)),
+                                lgc.Literal(ffuncs.add),
+                                lgc.Table(a, (i,)),
+                            ),
+                        ),
+                        lgc.Query(lgc.Table(scratch, (k,)), lgc.Table(a, (k,))),
+                    )
+                ),
+            ),
+            "doesn't use the field k",
+        ),
+        # A tensor which a query reduces the Fuse field into accumulates over
+        # every iteration, so no other statement of the body reads it...
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Query(lgc.Table(scratch, (j,)), lgc.Table(a, (i, j))),
+                        lgc.Query(lgc.Table(b, (i, j)), lgc.Table(scratch, (j,))),
+                    )
+                ),
+            ),
+            "share scratch",
+        ),
+        # ...or writes it.
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Query(lgc.Table(scratch, (j,)), lgc.Table(a, (i, j))),
+                        lgc.Query(lgc.Table(scratch, (j,)), lgc.Table(b, (i, j))),
+                    )
+                ),
+            ),
+            "reduced into scratch",
+        ),
+        # A definition which broadcasts the Fuse field has extent 1 in it.
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Query(lgc.Table(scratch, (i, j)), lgc.Table(a, (j,))),
+                        lgc.Query(lgc.Table(b, (i,)), lgc.Table(a, (i,))),
+                    )
+                ),
+            ),
+            "broadcasts Fuse field i",
+        ),
+    ],
+)
+def test_fused_form_rejects(term, error):
+    with pytest.raises(ValueError, match=error):
         FusedForm.validate_inputs(term, {}, {}, DenseStatsFactory())

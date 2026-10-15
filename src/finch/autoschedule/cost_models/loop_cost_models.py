@@ -53,33 +53,32 @@ class LoopCostModel(CostModel[Prefix]):
         term: LogicStatement,
         bindings: Mapping[Alias, TensorFType],
         machine: StatsMachine[NS],
+        loop_order: tuple[Field, ...] = (),
     ) -> Iterator[Prefix]:
-        def visit(stmt: LogicStatement, loop_order: tuple[Field, ...]):
-            match stmt:
-                case Plan(bodies):
-                    for body in bodies:
-                        yield from visit(body, loop_order)
-                    return
-                case Fuse(idx, body):
-                    yield from visit(body, (*loop_order, idx))
-                    return
-                case QueryInto(Table(), _, Literal()):
-                    machine(stmt)
-                    return
-                case Produces():
-                    return
-                case Query(Table(_, lhs_idxs), expr):
-                    pass
-                case QueryInto(Table(_, lhs_idxs), _, _):
-                    expr = stmt.as_query().rhs
-                case _:
-                    raise ValueError(f"Unsupported statement type: {stmt}")
+        match term:
+            case Plan(bodies):
+                for body in bodies:
+                    yield from self.components(body, bindings, machine, loop_order)
+                return
+            case Fuse(idx, body):
+                loop_order = (*loop_order, idx)
+                yield from self.components(body, bindings, machine, loop_order)
+                return
+            case QueryInto(Table(), _, Literal()):
+                machine(term)
+                return
+            case Produces():
+                return
+            case Query(Table(_, lhs_idxs), expr):
+                pass
+            case QueryInto(Table(_, lhs_idxs), _, _):
+                expr = term.as_query().rhs
+            case _:
+                raise ValueError(f"Unsupported statement type: {term}")
 
-            for n in range(len(loop_order) + 1):
-                yield Prefix(loop_order[:n], expr, lhs_idxs)
-            machine(stmt)
-
-        return visit(term, ())
+        for n in range(len(loop_order) + 1):
+            yield Prefix(loop_order[:n], expr, lhs_idxs)
+        machine(term)
 
 
 class PigeonCostModel(LoopCostModel, LoopOrderedForm):

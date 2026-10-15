@@ -28,10 +28,7 @@ from finch.autoschedule.cost_models import (
     LinearPredictor,
     SparseHashLevelOption,
 )
-from finch.autoschedule.cost_models.format_cost_models import (
-    alias_blocks,
-    next_block_num_pos,
-)
+from finch.autoschedule.cost_models.format_cost_models import alias_blocks
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -52,10 +49,6 @@ LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 def optimize_format(
     alias, shape_type, machine, fill_type, cost_model, term, options=LEVEL_OPTIONS
 ):
-    """
-    Return the format of the levels of alias, which store shape_type, with the
-    least total cost over the blocks of alias in term.
-    """
     blocks = alias_blocks(alias, term, machine)
     n = len(shape_type)
     position_type = ftypes.intp
@@ -79,8 +72,11 @@ def optimize_format(
         best_format = None
         for option in options:
             local = cost(level, num_pos, option)
-            child_num_pos = next_block_num_pos(
-                option, blocks, machine.stats_factory, level, num_pos
+            child_num_pos = tuple(
+                option.next_num_pos(
+                    stats, machine.stats_factory, len(over) + level, n, over
+                )
+                for (stats, over), n in zip(blocks, num_pos, strict=True)
             )
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
@@ -252,9 +248,9 @@ STORAGE_COST_MODEL = ByKind(
 class CostFormatter(LogicFormatter):
     """
     CostFormatter chooses the format of each alias from the level options with
-    the lowest cost under cost_model, summed over the blocks of the alias in the
-    program, memoizing the best format for each depth and the input position
-    counts of the blocks.
+    the lowest cost under cost_model, memoizing the best format for each depth and
+    input position count. The cost of a level is summed over the blocks of its
+    alias in the program.
     """
 
     def __init__(

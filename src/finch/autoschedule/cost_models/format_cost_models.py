@@ -31,12 +31,7 @@ from .cost_models import NS, CostModel
 from .loop_cost_models import PigeonCostModel, Prefix
 
 
-def nnz_after(
-    stats: NS,
-    stats_factory: StatsFactory[NS],
-    depth: int,
-    over: tuple[Field, ...] = (),
-):
+def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
     """
     Return the non-fill entries of the first depth + 1 levels of stats, in the
     largest slice which fixes the fields of over.
@@ -47,18 +42,6 @@ def nnz_after(
             ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
         )
     return stats.estimate_non_fill_values(over=over)
-
-
-def fused_fields(alias: Alias, idxs: tuple[Field, ...]) -> tuple[Field, ...]:
-    """
-    The fields of a table of alias with idxs which a fused alias fixes in each
-    slice it stores, which are its leading fields.
-    """
-    match alias:
-        case FusedAlias(_, n):
-            return idxs[:n]
-        case _:
-            return ()
 
 
 def alias_blocks(
@@ -82,26 +65,32 @@ def alias_blocks(
                     visit_stmt(body)
             case Fuse(_, body):
                 visit_stmt(body)
+            case QueryInto(Table(Alias() as lhs, _), _, _) if (
+                lhs.unfused == alias.unfused and blocks
+            ):
+                stats_interpreter(stmt)
+                block, over = blocks[-1]
+                stats = stats_factory.relabel(stats_interpreter(lhs), block.index_order)
+                union = stats_factory.mapjoin(
+                    ffuncs.or_,
+                    stats_factory.support(block),
+                    stats_factory.support(stats),
+                )
+                union.fill_type = block.fill_type
+                blocks[-1] = (union, over)
             case Query(Table(Alias() as lhs, idxs), _) | QueryInto(
                 Table(Alias() as lhs, idxs), _, _
             ):
                 stats_interpreter(stmt)
-                if lhs.unfused != alias.unfused:
-                    return
-                stats = stats_interpreter(lhs)
-                if isinstance(stmt, Query) or not blocks:
-                    blocks.append((stats, fused_fields(lhs, idxs)))
-                    return
-                block, over = blocks[-1]
-                union = stats_factory.mapjoin(
-                    ffuncs.or_,
-                    stats_factory.support(block),
-                    stats_factory.support(
-                        stats_factory.relabel(stats, block.index_order)
-                    ),
-                )
-                union.fill_type = block.fill_type
-                blocks[-1] = (union, over)
+                if lhs.unfused == alias.unfused:
+                    # A fused alias stores one slice for each value of its
+                    # leading fields.
+                    match lhs:
+                        case FusedAlias(_, n):
+                            over = idxs[:n]
+                        case _:
+                            over = ()
+                    blocks.append((stats_interpreter(lhs), over))
             case Produces():
                 return
             case _:
@@ -129,12 +118,7 @@ class LevelOption(ABC):
 
     @abstractmethod
     def next_num_pos(
-        self,
-        stats: NS,
-        stats_factory: StatsFactory[NS],
-        depth: int,
-        num_pos,
-        over: tuple[Field, ...] = (),
+        self, stats: NS, stats_factory: StatsFactory[NS], depth: int, num_pos, over
     ): ...
 
     @abstractmethod
@@ -147,7 +131,7 @@ class LevelOption(ABC):
         idx_size: int,
         pos_size: int,
         val_size: int,
-        over: tuple[Field, ...] = (),
+        over: tuple[Field, ...],
     ) -> np.ndarray: ...
 
 
@@ -157,19 +141,11 @@ class DenseLevelOption(LevelOption):
     kind = "dense"
     n_features = 2
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         return num_pos * stats.get_dim_size(stats.index_order[depth])
 
     def get_storage_features(
-        self,
-        stats,
-        stats_factory,
-        depth,
-        num_pos,
-        idx_size,
-        pos_size,
-        val_size,
-        over=(),
+        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
     ):
         return np.array(
             [num_pos, self.next_num_pos(stats, stats_factory, depth, num_pos, over)]
@@ -182,19 +158,11 @@ class SparseHashLevelOption(LevelOption):
     kind = "sparse_hash"
     n_features = 4
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         return nnz_after(stats, stats_factory, depth, over)
 
     def get_storage_features(
-        self,
-        stats,
-        stats_factory,
-        depth,
-        num_pos,
-        idx_size,
-        pos_size,
-        val_size,
-        over=(),
+        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
     ):
         nnz_l = nnz_after(stats, stats_factory, depth, over)
         return np.array([num_pos, nnz_l, (num_pos + 1) * pos_size, nnz_l * idx_size])
@@ -209,36 +177,14 @@ class ElementLevelOption(LevelOption):
     kind = "element"
     n_features = 2
 
-    def next_num_pos(self, stats, stats_factory, depth, num_pos, over=()):
+    def next_num_pos(self, stats, stats_factory, depth, num_pos, over):
         # The element level has no child, so its positions pass through.
         return num_pos
 
     def get_storage_features(
-        self,
-        stats,
-        stats_factory,
-        depth,
-        num_pos,
-        idx_size,
-        pos_size,
-        val_size,
-        over=(),
+        self, stats, stats_factory, depth, num_pos, idx_size, pos_size, val_size, over
     ):
         return np.array([num_pos, num_pos * val_size])
-
-
-def next_block_num_pos(
-    option: LevelOption,
-    blocks: list[tuple[NS, tuple[Field, ...]]],
-    stats_factory: StatsFactory[NS],
-    depth: int,
-    num_pos: tuple[float, ...],
-) -> tuple[float, ...]:
-    """The positions the level at a stored depth passes to its child in each block."""
-    return tuple(
-        option.next_num_pos(stats, stats_factory, len(over) + depth, n, over)
-        for (stats, over), n in zip(blocks, num_pos, strict=True)
-    )
 
 
 @dataclass(frozen=True)
@@ -288,8 +234,11 @@ class FormatCostModel(CostModel[LevelChoice]):
             num_pos = (1.0,) * len(blocks)
             for depth, option in enumerate(options):
                 yield LevelChoice(term, alias, depth, num_pos, option, pos_size)
-                num_pos = next_block_num_pos(
-                    option, blocks, machine.stats_factory, depth, num_pos
+                num_pos = tuple(
+                    option.next_num_pos(
+                        stats, machine.stats_factory, len(over) + depth, n, over
+                    )
+                    for (stats, over), n in zip(blocks, num_pos, strict=True)
                 )
 
 
@@ -344,7 +293,12 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
         def visit_access(tns, idxs, loop_order, rhs, lhs_idxs, is_write, prefixes):
             if not idxs:
                 return
-            depth = min(len(fused_fields(tns, idxs)) + level, len(idxs) - 1)
+            # The levels of a fused alias follow its fused fields.
+            match tns:
+                case FusedAlias(_, n):
+                    depth = min(n + level, len(idxs) - 1)
+                case _:
+                    depth = min(level, len(idxs) - 1)
             order = tuple(idxs[: depth + 1])
             loops = tuple(loop_order[: loop_order.index(idxs[depth]) + 1])
             iterations = pigeon.get_component_features(

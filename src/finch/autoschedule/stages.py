@@ -1,13 +1,15 @@
 from abc import abstractmethod
+from itertools import count
 
 from finch import finch_einsum as ein
 from finch import finch_notation as ntn
-from finch.algebra import ffuncs
+from finch.algebra import AbstractFillFType, ffuncs, is_static
 from finch.algebra.tensor import TensorFType
 from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_logic import (
     Aggregate,
     Alias,
+    Field,
     FillTable,
     Fuse,
     FusedAlias,
@@ -23,6 +25,8 @@ from finch.finch_logic import (
     QueryInto,
     Reorder,
     Table,
+    fill_expression,
+    is_fill_expression,
 )
 from finch.finch_logic.stages import LogicLoader
 from finch.finch_logic.tensor_stats import StatsFactory, TensorStats
@@ -37,6 +41,13 @@ class AliasedForm(Form):
     the HardAlias or a FusedAlias with some number of fused dimensions, and
     invalidates every other view of that alias. Statements may only read or
     update the current view of an alias. Bindings define the HardAlias view.
+
+    Every Fuse node is in FusedForm. A FusedAlias defined within Fuse nodes
+    stores a slice for each value of its fused fields, so it can only be read
+    within the Fuse nodes of those fields which define it. The reset of a
+    definition or overwrite runs before the outermost Fuse over a field which
+    its lhs stores or which is reduced into it, so it can't read a dynamic fill
+    of a tensor which that Fuse defines.
     """
 
     @classmethod
@@ -48,20 +59,72 @@ class AliasedForm(Form):
         stats_factory: StatsFactory,
     ) -> None:
         views: dict[Alias, Alias] = {var.unfused: var for var in bindings}
+        fills: dict[Alias, AbstractFillFType] = {
+            var.unfused: val.fill_type for var, val in bindings.items()
+        }
+        # The Fuse nodes enclosing the latest definition of each tensor.
+        scopes: dict[Alias, tuple] = {}
+        fuse_ids = count()
 
-        def validate(node):
+        def check_reset(stmt, fuses):
+            if not fuses:
+                return
+            match stmt:
+                case Query(Table(Alias() as lhs, idxs), Aggregate(_, init, arg, _)):
+                    pass
+                case Query(Table(Alias() as lhs, idxs), arg):
+                    init = fill_expression(arg)
+                case QueryInto(
+                    Table(Alias() as lhs, idxs), Literal(ffuncs.overwrite), arg
+                ) if not is_static(fills[lhs.unfused]):
+                    init = fill_expression(arg)
+                case _:
+                    return
+            if is_fill_expression(init) and is_static(init.fill_type(fills)):
+                return
+            match lhs:
+                case FusedAlias(_, n):
+                    spanned = {*idxs[n:], *arg.fields()} - set(idxs[:n])
+                case _:
+                    spanned = {*idxs, *arg.fields()}
+            for level, (idx, _) in enumerate(fuses):
+                if idx in spanned:
+                    scope = fuses[: level + 1]
+                    for node in PostOrderDFS(init):
+                        match node:
+                            case Alias() as var if (
+                                scopes.get(var.unfused, ())[: level + 1] == scope
+                            ):
+                                raise ValueError(
+                                    f"The reset of {lhs} runs before the Fuse of "
+                                    f"{idx}, so it can't read the fill of "
+                                    f"{var.name}, which that Fuse defines."
+                                )
+                    return
+
+        def validate(node, fuses):
             match node:
+                case Fuse(idx, body):
+                    validate(body, (*fuses, (idx, next(fuse_ids))))
+                    if not fuses:
+                        FusedForm.validate_inputs(node, bindings, stats, stats_factory)
                 case Query(Table(Alias() as lhs, _), rhs):
                     # The rhs is read before the lhs is defined.
-                    validate(rhs)
+                    validate(rhs, fuses)
+                    check_reset(node, fuses)
                     views[lhs.unfused] = lhs
+                    fills.setdefault(lhs.unfused, rhs.fill_type(fills))
+                    scopes[lhs.unfused] = fuses
                 case QueryInto(Table(Alias() as lhs, _), _, rhs):
-                    validate(rhs)
+                    validate(rhs, fuses)
                     if lhs.unfused not in views:
                         raise ValueError(
                             f"QueryInto updates alias {lhs.name}, which is not defined."
                         )
-                    validate(lhs)
+                    validate(lhs, fuses)
+                    check_reset(node, fuses)
+                case Query(lhs, _) | QueryInto(lhs, _, _):
+                    raise ValueError(f"Query must write to a Table of an Alias: {lhs}")
                 case Alias() as var:
                     view = views.get(var.unfused)
                     if view is None:
@@ -72,15 +135,24 @@ class AliasedForm(Form):
                         raise ValueError(
                             f"{var} was invalidated by the definition of {view}."
                         )
+                    match var:
+                        case FusedAlias(_, n) if (
+                            fuses[:n] != scopes.get(var.unfused, ())[:n]
+                        ):
+                            raise ValueError(
+                                f"{var} stores a slice for each value of its fused "
+                                "fields, so it can't be read outside the Fuse "
+                                "nodes which define it."
+                            )
                 case Table(Alias() as tns, _):
-                    validate(tns)
+                    validate(tns, fuses)
                 case Table():
                     raise ValueError("Table nodes must wrap an Alias.")
                 case LogicTree():
                     for child in node.children:
-                        validate(child)
+                        validate(child, fuses)
 
-        validate(term)
+        validate(term, ())
 
 
 def _fused_statements(node: LogicStatement) -> tuple[LogicStatement, ...]:
@@ -225,10 +297,6 @@ class LoopOrderedForm(SingleAggregateForm):
                     for body in bodies:
                         validate(body, loop_order)
                 case Fuse(idx, body):
-                    if idx in loop_order:
-                        raise ValueError(
-                            f"Fuse({idx}) is nested in another Fuse of {idx}."
-                        )
                     validate(body, (*loop_order, idx))
                 case Produces() | QueryInto(Table(), _, Literal()):
                     return
@@ -266,7 +334,8 @@ class FormattedForm(LoopOrderedForm):
     """
     FormattedForm requires that the input query has had its tensor formats
     set. Every alias must have a TensorFType in the bindings. The valid forms
-    of a query are those of LoopOrderedForm.
+    of a query are those of LoopOrderedForm. The rank of each TensorFType is
+    the number of fields which the views of its alias store.
     """
 
     @classmethod
@@ -290,7 +359,17 @@ class FormattedForm(LoopOrderedForm):
                 case Query(lhs, rhs) | QueryInto(lhs, _, rhs):
                     validate(lhs)
                     validate(rhs)
-                case Aggregate(_, _, arg, _):
+                    # A fused alias may store only the fields after its fused ones.
+                    match lhs:
+                        case Table(FusedAlias(var, n), idxs):
+                            ranks = {len(idxs), len(idxs) - n}
+                        case Table(Alias() as var, idxs):
+                            ranks = {len(idxs)}
+                    if bindings[var.unfused].ndim not in ranks:
+                        raise ValueError(
+                            f"Cannot change the rank of allocated tensor {lhs.tns}."
+                        )
+                case Aggregate(_, _, arg, _) | Reorder(arg, _):
                     validate(arg)
                 case MapJoin(_, args):
                     for arg in args:
@@ -339,14 +418,12 @@ class CompilerForm(FormattedForm):
     dimensions after its fused ones, as a workspace for each fused iteration.
 
     In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
-    loop order of every statement but an initialization is the fields of its
-    enclosing Fuse nodes, as in LoopOrderedForm, which include every field of
-    the statement and visit lhs_idxs in order. Tables in a MapJoin must also
-    follow loop order, but a single Table argument may have a different storage
-    order, as in a copy. Fields absent from lhs_idxs are reduced with op. Every
-    alias must have a TensorFType in the bindings, and a statement can't read
-    the alias it writes. Definitions may change dimension sizes but must
-    preserve the allocated tensor's rank.
+    loop order contains each field once and visits all fields of lhs_idxs in
+    order. Tables in a MapJoin must also follow loop order, but a single Table
+    argument may have a different storage order, as in a copy. Fields absent
+    from lhs_idxs are reduced with op. Every alias must have a TensorFType in
+    the bindings, and a statement can't read the alias it writes. The loop
+    order is the fields of the enclosing Fuse nodes.
     """
 
     @classmethod
@@ -366,34 +443,21 @@ class CompilerForm(FormattedForm):
                 pass
             case _:
                 raise ValueError("The last body of a plan must be a Produces node.")
-        # Deleting a Fuse doesn't change the meaning of a program, so fused
-        # aliases outside of Fuse nodes are views of their whole tensors.
-        for body in bodies:
-            if isinstance(body, Fuse):
-                FusedForm.validate_inputs(body, bindings, stats, stats_factory)
         stmts = tuple(stmt for body in bodies for stmt in _fused_statements(body))
         for body in stmts:
             match body:
-                case Query(Table(Alias() as lhs, idxs), rhs) | QueryInto(
-                    Table(Alias() as lhs, idxs), _, rhs
+                case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
+                    Table(Alias() as lhs, _), _, rhs
                 ):
                     pass
                 case _:
                     raise ValueError(f"CompilerForm only allows queries, not {body}")
-            # A fused alias may store only the dimensions after its fused ones.
-            ranks = {len(idxs)}
-            if isinstance(lhs, FusedAlias):
-                ranks.add(len(idxs) - lhs.n)
-            if bindings[lhs.unfused].ndim not in ranks:
-                raise ValueError(f"Cannot change the rank of allocated tensor {lhs}.")
-            if any(
-                node.unfused == lhs.unfused
-                for node in PostOrderDFS(rhs)
-                if isinstance(node, Alias)
-            ):
-                raise ValueError(
-                    f"{type(body).__name__} can't both read and write {lhs}."
-                )
+            for node in PostOrderDFS(rhs):
+                match node:
+                    case Alias() as var if var.unfused == lhs.unfused:
+                        raise ValueError(
+                            f"{type(body).__name__} can't both read and write {lhs}."
+                        )
             match body:
                 case Query(_, Aggregate(_, init, _, _)) if not _is_init(init):
                     raise ValueError(
@@ -406,14 +470,21 @@ class CompilerForm(FormattedForm):
 
 class FusedForm(Form):
     """
-    Each Fuse field occurs in a HardAlias table in its body. The leading n
-    indices of every FusedAlias table match the first n enclosing Fuse fields,
-    from outermost to innermost.
+    A Fuse runs its body once for each value of its field, and deleting it
+    doesn't change the meaning of a program. So a Fuse field isn't fused again
+    within its body, every statement of its body uses it, and it occurs in a
+    HardAlias table of its body, which gives its extent. The leading n indices
+    of every FusedAlias table match the first n enclosing Fuse fields, from
+    outermost to innermost.
 
-    Within each Fuse body, a tensor accessed by that Fuse's field in a stored
-    dimension cannot occur on both a query lhs and a query rhs, even in separate
-    queries. Different alias views refer to the same tensor for this check.
-    These constraints apply independently of the query's lowering stage.
+    Every iteration of a Fuse shares the tensors which its body stores along
+    its field, or reduces it into, so they cannot occur on both lhs and rhs in
+    its body, and only one statement of its body may reduce into a tensor. A
+    definition which broadcasts the Fuse field, which its rhs lacks, has extent
+    1 in it, so it is the only statement of its body. A statement which reads a
+    Table out of loop order revisits its fields, so it shares no Fuse node
+    with other statements. Different alias views refer to the same tensor for
+    these checks, which apply independently of the query's lowering stage.
     """
 
     @classmethod
@@ -424,44 +495,97 @@ class FusedForm(Form):
         stats: dict[Alias, TensorStats],
         stats_factory: StatsFactory,
     ) -> None:
-        def validate(node, fused_idxs):
+        def validate_body(idx: Field, stmts: tuple[LogicStatement, ...]):
+            extent = False
+            shared: set[Alias] = set()
+            reads: set[Alias] = set()
+            writes: list[Alias] = []
+            reductions: list[Alias] = []
+            broadcasts: list[Alias] = []
+            for stmt in stmts:
+                match stmt:
+                    case Query(Table(Alias() as lhs, idxs), rhs) | QueryInto(
+                        Table(Alias() as lhs, idxs), _, rhs
+                    ):
+                        pass
+                    case _:
+                        continue
+                writes.append(lhs.unfused)
+                match lhs:
+                    case FusedAlias(_, n):
+                        stores = idx in idxs[n:]
+                    case _:
+                        stores = idx in idxs
+                        extent = extent or stores
+                if stores:
+                    shared.add(lhs.unfused)
+                reads_idx = False
+                for node in PostOrderDFS(rhs):
+                    match node:
+                        case Alias() as var:
+                            reads.add(var.unfused)
+                        case Table(HardAlias() as tns, arg_idxs) if idx in arg_idxs:
+                            reads_idx = extent = True
+                            shared.add(tns)
+                        case Table(FusedAlias(tns, n), arg_idxs) if idx in arg_idxs:
+                            reads_idx = True
+                            if idx in arg_idxs[n:]:
+                                shared.add(tns)
+                if idx not in idxs:
+                    if not reads_idx:
+                        raise ValueError(
+                            f"{stmt} doesn't use the field {idx} of its enclosing "
+                            "Fuse, so it would run once for each of its values."
+                        )
+                    shared.add(lhs.unfused)
+                    reductions.append(lhs.unfused)
+                match stmt:
+                    case Query() if stores and not reads_idx:
+                        broadcasts.append(lhs)
+            if not extent:
+                raise ValueError(
+                    f"Fuse field {idx} must occur in a HardAlias table in its body."
+                )
+            conflicts = shared & reads & set(writes)
+            if conflicts:
+                names = ", ".join(sorted(tns.name for tns in conflicts))
+                raise ValueError(
+                    f"The iterations of Fuse field {idx} share {names}, which "
+                    "cannot occur on both lhs and rhs in its body."
+                )
+            for tns in reductions:
+                if writes.count(tns) > 1:
+                    raise ValueError(
+                        f"Fuse field {idx} is reduced into {tns.name}, which no "
+                        "other statement of its body may write."
+                    )
+            if broadcasts and len(stmts) > 1:
+                raise ValueError(
+                    f"{broadcasts[0]} broadcasts Fuse field {idx}, so it has "
+                    "extent 1 and needs a Fuse of its own."
+                )
+
+        def validate(node, fused_idxs, alone):
+            """Validate node within Fuse nodes of fused_idxs, whose bodies have
+            only one statement when alone is true."""
             match node:
                 case Fuse(idx, body):
-                    hard_idxs = set()
-                    stored = set()
-                    reads = set()
-                    writes = set()
-                    for child in PostOrderDFS(body):
-                        match child:
-                            case Table(HardAlias() as tns, idxs):
-                                hard_idxs.update(idxs)
-                                if idx in idxs:
-                                    stored.add(tns)
-                            case Table(FusedAlias(tns, n), idxs):
-                                if idx in idxs[n:]:
-                                    stored.add(tns)
-                            case Query(Table(Alias() as lhs, _), rhs) | QueryInto(
-                                Table(Alias() as lhs, _), _, rhs
-                            ):
-                                writes.add(lhs.unfused)
-                                for arg in PostOrderDFS(rhs):
-                                    match arg:
-                                        case Alias() as tns:
-                                            reads.add(tns.unfused)
-                    if idx not in hard_idxs:
+                    if idx in fused_idxs:
                         raise ValueError(
-                            f"Fuse field {idx} must occur in a HardAlias table "
-                            "in its body."
+                            f"Fuse({idx}) is nested in another Fuse of {idx}."
                         )
-                    conflicts = stored & reads & writes
-                    if conflicts:
-                        names = ", ".join(sorted(tns.name for tns in conflicts))
-                        raise ValueError(
-                            f"Fuse field {idx} accesses a non-fused dimension of "
-                            f"{names}, which cannot occur on both lhs and rhs "
-                            "in its body."
-                        )
-                    validate(body, (*fused_idxs, idx))
+                    stmts = _fused_statements(body)
+                    validate_body(idx, stmts)
+                    validate(body, (*fused_idxs, idx), alone and len(stmts) == 1)
+                case Query(_, Table(_, arg_idxs) as rhs) | QueryInto(
+                    _, _, Table(_, arg_idxs) as rhs
+                ) if not alone and tuple(
+                    idx for idx in arg_idxs if idx in fused_idxs
+                ) != tuple(idx for idx in fused_idxs if idx in arg_idxs):
+                    raise ValueError(
+                        f"{node} reads {rhs} out of loop order, which revisits "
+                        "its fields, so it needs Fuse nodes of its own."
+                    )
                 case Table(FusedAlias(tns, n), idxs):
                     if n > len(fused_idxs) or idxs[:n] != fused_idxs[:n]:
                         raise ValueError(
@@ -470,9 +594,9 @@ class FusedForm(Form):
                         )
                 case LogicTree():
                     for child in node.children:
-                        validate(child, fused_idxs)
+                        validate(child, fused_idxs, alone)
 
-        validate(term, ())
+        validate(term, (), True)
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):

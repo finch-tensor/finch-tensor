@@ -5,7 +5,7 @@ import numpy as np
 import finch as ft
 import finch.finch_logic as lgc
 from finch import finch_notation as ntn
-from finch.algebra import TensorFType, ffuncs, ftype
+from finch.algebra import DynamicFill, TensorFType, ffuncs, ftype
 from finch.autoschedule import CompilerFormLowerer, LogicCapture, NotationGenerator
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.normalize import normalize_names
@@ -14,9 +14,10 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import MLIRCompiler
-from finch.compile import NotationCompiler
+from finch.compile import CompilerMode, NotationCompiler
 from finch.finch_logic.interpreter import MockFusedTensor
 from finch.finch_notation.nodes import NotationTree
+from finch.tensor import BufferizedNDArray
 
 
 def test_fused_alias_node():
@@ -177,7 +178,8 @@ def test_updating_an_invalidated_view_is_rejected():
 def test_compiler_form_definition_defines_a_view():
     i = lgc.Field("i")
     a = lgc.HardAlias("a")
-    fused = lgc.FusedAlias(_SCRATCH, 1)
+    # A view without fused fields is read after its Fuse, like any tensor.
+    fused = lgc.FusedAlias(_SCRATCH, 0)
     ftypes: dict[lgc.Alias, TensorFType] = {
         a: ftype(ft.asarray(np.ones(2))),
         _SCRATCH: ftype(ft.asarray(np.ones(2))),
@@ -239,6 +241,14 @@ def test_fused_alias_inference_and_normalization():
     assert result.index_order == (j, i)
 
 
+def within_fused_fields(stmts, fields):
+    # A fused alias stores a slice for each value of its fused fields, so its
+    # queries share the Fuse nodes of those fields.
+    if not fields:
+        return stmts
+    return (fuse_loop_order(lgc.Plan(stmts), fields),)
+
+
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
 @pytest.mark.parametrize("n", [0, 1, 2])
 def test_fused_alias_compilation(compiler, n):
@@ -248,32 +258,33 @@ def test_fused_alias_compilation(compiler, n):
     materialized = lgc.HardAlias("materialized")
     data_a = np.array([[1, 2, 0], [0, 3, 4]])
     data_b = np.array([[1, 0], [0, 1], [2, 2]])
+    define = fuse_loop_order(
+        lgc.Query(
+            lgc.Table(fused, (i, j)),
+            lgc.Aggregate(
+                lgc.Literal(ffuncs.add),
+                lgc.Literal(0),
+                lgc.MapJoin(
+                    lgc.Literal(ffuncs.mul),
+                    (lgc.Table(a, (i, k)), lgc.Table(b, (j, k))),
+                ),
+                (k,),
+            ),
+        ),
+        (i, j, k)[n:],
+    )
+    materialize = fuse_loop_order(
+        lgc.Query(lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))),
+        (i, j)[n:],
+    )
     plan = lgc.Plan(
         (
-            fuse_loop_order(
-                lgc.Query(
-                    lgc.Table(fused, (i, j)),
-                    lgc.Aggregate(
-                        lgc.Literal(ffuncs.add),
-                        lgc.Literal(0),
-                        lgc.MapJoin(
-                            lgc.Literal(ffuncs.mul),
-                            (lgc.Table(a, (i, k)), lgc.Table(b, (j, k))),
-                        ),
-                        (k,),
-                    ),
-                ),
-                (i, j, k),
-            ),
-            fuse_loop_order(
-                lgc.Query(lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))),
-                (i, j),
-            ),
+            *within_fused_fields((define, materialize), (i, j)[:n]),
             fuse_loop_order(
                 lgc.Query(lgc.Table(out, (j, i)), lgc.Table(materialized, (i, j))),
                 (j, i),
             ),
-            lgc.Produces((out, fused)),
+            lgc.Produces((out, materialized)),
         )
     )
     bindings = {a: ft.asarray(data_a), b: ft.asarray(data_b.T)}
@@ -342,24 +353,31 @@ def test_compiling_a_redefined_view(compiler, n):
             fuse_loop_order(
                 lgc.Query(lgc.Table(out, (j, i)), lgc.Table(scratch, (i, j))), (j, i)
             ),
-            fuse_loop_order(
-                lgc.Query(
-                    lgc.Table(fused, (i, j)),
-                    lgc.Aggregate(
-                        lgc.Literal(ffuncs.add),
-                        lgc.Literal(0),
-                        lgc.MapJoin(
-                            lgc.Literal(ffuncs.mul),
-                            (lgc.Table(a, (i, j)), lgc.Literal(2)),
+            *within_fused_fields(
+                (
+                    fuse_loop_order(
+                        lgc.Query(
+                            lgc.Table(fused, (i, j)),
+                            lgc.Aggregate(
+                                lgc.Literal(ffuncs.add),
+                                lgc.Literal(0),
+                                lgc.MapJoin(
+                                    lgc.Literal(ffuncs.mul),
+                                    (lgc.Table(a, (i, j)), lgc.Literal(2)),
+                                ),
+                                (),
+                            ),
                         ),
-                        (),
+                        (i, j)[n:],
+                    ),
+                    fuse_loop_order(
+                        lgc.Query(
+                            lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))
+                        ),
+                        (i, j)[n:],
                     ),
                 ),
-                (i, j),
-            ),
-            fuse_loop_order(
-                lgc.Query(lgc.Table(materialized, (i, j)), lgc.Table(fused, (i, j))),
-                (i, j),
+                (i, j)[:n],
             ),
             fuse_loop_order(
                 lgc.Query(lgc.Table(out2, (j, i)), lgc.Table(materialized, (i, j))),
@@ -580,8 +598,127 @@ def test_workspace_needs_its_fuse():
     ftypes: dict[lgc.Alias, TensorFType] = {
         var: val.ftype for var, val in bindings.items()
     }
-    with pytest.raises(ValueError, match="need Fuse nodes"):
+    with pytest.raises(ValueError, match="must match the enclosing Fuse fields"):
         NotationGenerator()(unfused, ftypes, {}, None)
+
+
+def test_workspace_cant_be_read_after_its_fuse():
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, w, c = map(lgc.HardAlias, "awc")
+    fused = lgc.FusedAlias(w, 1)
+    plan = lgc.Plan(
+        (
+            fuse_loop_order(
+                lgc.Query(lgc.Table(fused, (i, j)), lgc.Table(a, (i, j))), (i, j)
+            ),
+            fuse_loop_order(
+                lgc.Query(lgc.Table(c, (i, j)), lgc.Table(fused, (i, j))), (i, j)
+            ),
+            lgc.Produces((c,)),
+        )
+    )
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        a: ftype(ft.asarray(np.ones((2, 2)))),
+        # The workspace stores only the field after its fused one.
+        w: ftype(ft.asarray(np.ones(2))),
+        c: ftype(ft.asarray(np.ones((2, 2)))),
+    }
+    with pytest.raises(ValueError, match="can't be read outside the Fuse nodes"):
+        AliasedForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    # The fused alias says which fields it stores, whatever its format.
+    ftypes[w] = ftype(ft.asarray(np.ones((2, 2))))
+    with pytest.raises(ValueError, match="can't be read outside the Fuse nodes"):
+        AliasedForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
+def test_hoisted_reset_cant_read_a_fill_its_fuse_defines():
+    # The reset of c runs before the loop over i, but the dynamic fill of the
+    # workspace it copies is only set within that loop.
+    i, k = lgc.Field("i"), lgc.Field("k")
+    a, w, c = map(lgc.HardAlias, "awc")
+    fused = lgc.FusedAlias(w, 1)
+    increment = lgc.Aggregate(
+        lgc.Literal(ffuncs.overwrite),
+        lgc.FillTable(a),
+        lgc.MapJoin(lgc.Literal(ffuncs.add), (lgc.Table(a, (i, k)), lgc.Literal(1.0))),
+        (),
+    )
+    plan = lgc.Plan(
+        (
+            lgc.Fuse(
+                i,
+                lgc.Plan(
+                    (
+                        lgc.Fuse(k, lgc.Query(lgc.Table(fused, (i, k)), increment)),
+                        lgc.Fuse(
+                            k, lgc.Query(lgc.Table(c, (i, k)), lgc.Table(fused, (i, k)))
+                        ),
+                    )
+                ),
+            ),
+            lgc.Produces((c,)),
+        )
+    )
+
+    def dynamic(arr):
+        fill = DynamicFill(np.float64(0.0))
+        return BufferizedNDArray.from_numpy(arr, fill_value=fill).ftype
+
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        a: dynamic(np.ones((2, 2))),
+        w: dynamic(np.zeros(0)),
+        c: dynamic(np.zeros((0, 0))),
+    }
+    with pytest.raises(ValueError, match="can't read the fill of w"):
+        CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
+def test_transposed_read_needs_its_own_fuse():
+    # A transposed read revisits a field of its Fuse nodes, which would run the
+    # other statements of their bodies again.
+    i, j = lgc.Field("i"), lgc.Field("j")
+    a, b, x, y = map(lgc.HardAlias, "abxy")
+    body = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(x, (i, j)), lgc.Table(a, (j, i))),
+            lgc.Query(lgc.Table(y, (i, j)), lgc.Table(b, (i, j))),
+        )
+    )
+    plan = lgc.Plan((fuse_loop_order(body, (i, j)), lgc.Produces((x, y))))
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: ftype(ft.asarray(np.ones((2, 2)))) for var in (a, b, x, y)
+    }
+    with pytest.raises(ValueError, match="out of loop order"):
+        CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+
+
+@pytest.mark.parametrize("size", [2, 3])
+def test_fused_statements_check_their_extents(size):
+    i = lgc.Field("i")
+    a, b, c, d = map(lgc.HardAlias, "abcd")
+    body = lgc.Plan(
+        (
+            lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))),
+            lgc.Query(lgc.Table(d, (i,)), lgc.Table(b, (i,))),
+        )
+    )
+    plan = lgc.Plan((lgc.Fuse(i, body), lgc.Produces((c, d))))
+    bindings = {
+        a: ft.asarray(np.arange(2.0)),
+        b: ft.asarray(np.arange(size, dtype=np.float64)),
+        c: ft.asarray(np.zeros(0)),
+        d: ft.asarray(np.zeros(0)),
+    }
+    ftypes = {var: val.ftype for var, val in bindings.items()}
+    program = NotationGenerator(mode=CompilerMode(safe=True))(plan, ftypes, {}, None)
+    kernel = ntn.NotationInterpreter()(program).main
+    if size != 2:
+        with pytest.raises(AssertionError, match="Finch assertion failed"):
+            kernel(*bindings.values())
+        return
+    result_c, result_d = kernel(*bindings.values())
+    np.testing.assert_array_equal(result_c.to_numpy(), np.arange(2.0))
+    np.testing.assert_array_equal(result_d.to_numpy(), np.arange(2.0))
 
 
 def test_compiler_form_checks_fuse_bodies():

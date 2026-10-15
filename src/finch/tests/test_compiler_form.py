@@ -401,7 +401,8 @@ def test_loop_ordered_form_checks_lhs(form, inplace, lhs_idxs, error):
         )
     )
     plan = Plan((fuse_loop_order(stmt, (i, j)), Produces((C,))))
-    ftypes = {var: tns.ftype for var, tns in bindings().items()}
+    output = np.zeros((1,) * len(lhs_idxs))
+    ftypes = {var: tns.ftype for var, tns in bindings(c=output).items()}
     if error is None:
         form.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
     else:
