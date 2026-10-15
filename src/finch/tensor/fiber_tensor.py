@@ -271,6 +271,7 @@ class FiberTensor(OverrideTensor):
                     _val=NumpyBuffer(data),
                 ),
                 shape=tuple(index_type(d) for d in obj.shape),
+                ptr=NumpyBuffer(np.array([0, len(data)], dtype=row.dtype)),
                 tbl=(NumpyBuffer(row), NumpyBuffer(col)),
             ),
             _device=device,
