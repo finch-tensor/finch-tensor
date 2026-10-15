@@ -304,7 +304,8 @@ def test_sparse_level_construct_initializes_empty_storage():
     assert coo_level.lvl.val.length() == 0
 
     bytemap_level = finch.sparse_bytemap(elem_t, finch.intp).construct((4,), pos=3)
-    np.testing.assert_array_equal(bytemap_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    # Unoccupied parents' pointers are unset, as Finch.jl's 0 shifted to -1.
+    np.testing.assert_array_equal(bytemap_level.ptr.arr, [0, -1, -1, -1])
     np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
     assert bytemap_level.srt.length() == 0
     assert bytemap_level.lvl.val.length() == 12
