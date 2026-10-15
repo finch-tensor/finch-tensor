@@ -28,6 +28,7 @@ from finch.autoschedule.cost_models import (
     LinearPredictor,
     SparseHashLevelOption,
 )
+from finch.autoschedule.cost_models.format_cost_models import alias_blocks
 from finch.autoschedule.tensor_stats import FDStats, StatsInterpreter
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
 from finch.finch_logic import LogicLoader, MockLogicLoader, StatsFactory
@@ -48,8 +49,8 @@ LEVEL_BUILDERS = {"dense": dense, "sparse_hash": sparse_hash}
 def optimize_format(
     alias, shape_type, machine, fill_type, cost_model, term, options=LEVEL_OPTIONS
 ):
-    stats = machine(alias)
-    n = len(stats.index_order)
+    blocks = alias_blocks(alias, term, machine)
+    n = len(shape_type)
     position_type = ftypes.intp
     leaf = element(fill_type, fill_type.element_type, position_type)
     pos_size = np_dtype(position_type).itemsize
@@ -71,8 +72,11 @@ def optimize_format(
         best_format = None
         for option in options:
             local = cost(level, num_pos, option)
-            child_num_pos = option.next_num_pos(
-                stats, machine.stats_factory, level, num_pos
+            child_num_pos = tuple(
+                option.next_num_pos(
+                    stats, machine.stats_factory, len(over) + level, n, over
+                )
+                for (stats, over), n in zip(blocks, num_pos, strict=True)
             )
             child_cost, child_fmt = rec(level + 1, child_num_pos)
             total = local + child_cost
@@ -85,7 +89,7 @@ def optimize_format(
         memo[key] = (best_cost, best_format)
         return best_cost, best_format
 
-    _, fmt = rec(0, 1.0)
+    _, fmt = rec(0, (1.0,) * len(blocks))
     return fmt
 
 
@@ -105,7 +109,10 @@ class SmartFormatter(LogicFormatter):
         fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
-    ) -> TensorFType: ...
+        over: tuple[lgc.Field, ...] = (),
+    ) -> TensorFType:
+        """The format of a tensor with the given stats. If `over` lists
+        fields, each tensor stores one slice which fixes those fields."""
 
     def lower(
         self,
@@ -117,9 +124,9 @@ class SmartFormatter(LogicFormatter):
         bindings = bindings.copy()
         stats_bindings: OrderedDict[lgc.Alias, TS] = OrderedDict(stats)
         stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
@@ -128,9 +135,12 @@ class SmartFormatter(LogicFormatter):
             match node:
                 case lgc.Plan(bodies):
                     return lgc.Plan(tuple(formatter(body) for body in bodies))
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body))
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
+                    node.infer_shape_type(shape_types)
                     # Evaluating the query gives the stats of the stored result,
                     # in the order of its left-hand table.
                     rhs_stats = stats_interpreter(node, stats_bindings)
@@ -139,15 +149,21 @@ class SmartFormatter(LogicFormatter):
                     assert isinstance(rhs_stats, TensorStats)
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    if lhs not in bindings:
+                    match lhs:
+                        case lgc.FusedAlias(alias, nfused):
+                            pass
+                        case lgc.Alias() as alias:
+                            nfused = 0
+                    if alias not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[lhs]
+                            for dim in shape_types[alias][nfused:]
                         )
-                        bindings[lhs] = self.get_tensor_ftype(
-                            fill_types[lhs],
+                        bindings[alias] = self.get_tensor_ftype(
+                            fill_types[alias],
                             shape_type,
                             rhs_stats,
+                            rhs_stats.index_order[:nfused],
                         )
 
                     return node
@@ -171,20 +187,24 @@ class FDFormatter(SmartFormatter):
         fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: TensorStats,
+        over: tuple[lgc.Field, ...] = (),
     ) -> FiberTensorFType:
         if not isinstance(stats, FDStats):
             raise TypeError("FDFormatter requires FDStats.")
-        if len(shape_type) != len(stats.index_order):
+        fields = tuple(idx for idx in stats.index_order if idx not in over)
+        if len(shape_type) != len(fields):
             raise ValueError(
                 f"Got {len(shape_type)} shape dimensions for "
-                f"{len(stats.index_order)} stats dimensions."
+                f"{len(fields)} stats dimensions."
             )
 
+        # Slices are formatted by the support of every slice, so the fields of
+        # `over` are dropped from the dense dimensions.
         fill_ftype = fill_type.element_type
         lvl = element(fill_type, fill_ftype)
-        for dim in reversed(range(len(stats.index_order))):
-            field = stats.index_order[dim]
-            outer_fields = frozenset(stats.index_order[:dim])
+        for dim in reversed(range(len(fields))):
+            field = fields[dim]
+            outer_fields = frozenset(fields[:dim])
             required_fields = outer_fields | {field}
             is_dense = any(
                 required_fields.issubset(dense_fields)
@@ -229,7 +249,8 @@ class CostFormatter(LogicFormatter):
     """
     CostFormatter chooses the format of each alias from the level options with
     the lowest cost under cost_model, memoizing the best format for each depth and
-    input position count.
+    input position count. The cost of a level is summed over the blocks of its
+    alias in the program.
     """
 
     def __init__(
@@ -267,29 +288,36 @@ class CostFormatter(LogicFormatter):
     ):
         bindings = bindings.copy()
         machine = StatsMachine(stats_factory, OrderedDict(stats))
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
+        # The dimensions each new alias stores, at its first definition.
+        stored_shape_types: dict[lgc.Alias, tuple[FType, ...]] = {}
 
         def formatter(node: lgc.LogicStatement):
             match node:
                 case lgc.Plan(bodies):
                     for body in bodies:
                         formatter(body)
+                case lgc.Fuse(_, body):
+                    formatter(body)
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
+                    node.infer_shape_type(shape_types)
                     machine(node)
-                    if lhs not in bindings:
-                        shape_type = tuple(
+                    match lhs:
+                        case lgc.FusedAlias(alias, nfused):
+                            pass
+                        case lgc.Alias() as alias:
+                            nfused = 0
+                    if alias not in bindings and alias not in stored_shape_types:
+                        stored_shape_types[alias] = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[lhs]
-                        )
-                        bindings[lhs] = self.get_tensor_ftype(
-                            lhs, prgm, machine, fill_types[lhs], shape_type
+                            for dim in shape_types[alias][nfused:]
                         )
                 case lgc.Produces():
                     return
@@ -299,6 +327,11 @@ class CostFormatter(LogicFormatter):
                     )
 
         formatter(prgm)
+        # Each alias is formatted for all of its blocks in the program.
+        for alias, shape_type in stored_shape_types.items():
+            bindings[alias] = self.get_tensor_ftype(
+                alias, prgm, machine, fill_types[alias], shape_type
+            )
 
         logger.debug(prgm)
 

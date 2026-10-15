@@ -29,6 +29,8 @@ from finch.autoschedule import (
     with_default_scheduler,
 )
 from finch.autoschedule.tensor_stats import FDStatsFactory
+from finch.autoschedule.util import fuse_loop_order
+from finch.compile.lower import make_extent
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.compile_jl.interop import jl_tensor_to_python, tensor_to_jl
 from finch.compile_jl.julia import jl, julia_available
@@ -101,6 +103,82 @@ def test_compile_julia_preserves_definition_type():
     assert ftype(first) != ftype(second)
     for kernel in (first, second):
         np.testing.assert_array_equal(kernel(tensor)[0].to_numpy(), tensor.to_numpy())
+
+
+def test_compile_julia_resolves_shape_bindings():
+    _requires_julia_backend()
+    tensor_type = ft.asarray(np.zeros(0, dtype=np.int64)).ftype
+    source, output = (ntn.Variable(name, tensor_type) for name in ("source", "output"))
+    src, dst = (ntn.Slot(name, tensor_type) for name in ("src", "dst"))
+    dim, stop, idx = (
+        ntn.Variable(name, ftype(np.int64)) for name in ("dim", "stop", "idx")
+    )
+    op = ntn.Literal(ffuncs.overwrite)
+    result = ntn.Call(ntn.Literal(ffuncs.make_tuple), (output,))
+    body = ntn.Block(
+        (
+            ntn.Unpack(src, source),
+            ntn.Unpack(dst, output),
+            ntn.Assign(dim, ntn.Dimension(src, ntn.Literal(0))),
+            # This dimension is used through a binding in a nested block.
+            # Its scope must include the loop in the following block.
+            ntn.Block(
+                (
+                    ntn.Block(
+                        (
+                            ntn.Assign(
+                                stop,
+                                ntn.Call(ntn.Literal(ffuncs.astype(ft.int64)), (dim,)),
+                            ),
+                        )
+                    ),
+                )
+            ),
+            ntn.Block(
+                (
+                    ntn.Declare(dst, ntn.Literal(np.int64(0)), op, (stop,)),
+                    ntn.Loop(
+                        idx,
+                        ntn.Call(ntn.Literal(make_extent), (ntn.Literal(0), stop)),
+                        ntn.Increment(
+                            ntn.Access(dst, ntn.Update(op), (idx,)),
+                            ntn.Call(
+                                ntn.Literal(ffuncs.add),
+                                (
+                                    ntn.Unwrap(ntn.Access(src, ntn.Read(), (idx,))),
+                                    ntn.Literal(np.int64(3)),
+                                ),
+                            ),
+                        ),
+                    ),
+                )
+            ),
+            ntn.Repack(src, source),
+            ntn.Repack(dst, output),
+            ntn.Return(result),
+        )
+    )
+    function = ntn.Function(
+        ntn.Variable(
+            "bound_copy",
+            AssemblyKernelFType(
+                "bound_copy", (tensor_type, tensor_type), result.result_type
+            ),
+        ),
+        (source, output),
+        body,
+    )
+    kernel = FinchJLCompiler()(ntn.Module((function,))).bound_copy
+    assert kernel.extents == ((0, 0, (ffuncs.astype(ft.int64),)),)
+    # Shape bindings must not introduce scopes around declared/returned tensors.
+    for line in kernel.jl_code.splitlines():
+        if ".=" in line or line.lstrip().startswith("return "):
+            assert line.startswith("        ") and not line.startswith("         ")
+    assert "Int64(" not in kernel.jl_code
+    for size in (5, 0, 2):
+        data = np.arange(size, dtype=np.int64)
+        (actual,) = kernel(ft.asarray(data), ft.asarray(np.zeros_like(data)))
+        np.testing.assert_array_equal(actual.to_numpy(), data + 3)
 
 
 @pytest.mark.parametrize(
@@ -239,6 +317,7 @@ def test_compile_julia_pattern_masks(mask):
     with with_default_scheduler(COMPILE_JULIA):
         result = ft.compute(ft.defer(mask) + ft.defer(data))
 
+    assert result.shape == expected.shape
     np.testing.assert_array_equal(result.to_numpy(), expected)
 
 
@@ -618,8 +697,8 @@ class RecordingFDFormatter(FDFormatter):
         super().__init__(loader)
         self.output_ftypes = []
 
-    def get_tensor_ftype(self, fill_value, shape_type, stats):
-        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats)
+    def get_tensor_ftype(self, fill_value, shape_type, stats, over=()):
+        tensor_ftype = super().get_tensor_ftype(fill_value, shape_type, stats, over)
         self.output_ftypes.append(tensor_ftype)
         return tensor_ftype
 
@@ -1019,15 +1098,11 @@ def _julia_binary(op, a, b, out_fill, compiler):
     from finch import finch_logic as lgc
 
     i, j = lgc.Field("i"), lgc.Field("j")
-    A, B, Y = lgc.Alias("A"), lgc.Alias("B"), lgc.Alias("Y")
+    A, B, Y = lgc.HardAlias("A"), lgc.HardAlias("B"), lgc.HardAlias("Y")
     body = lgc.MapJoin(lgc.Literal(op), (lgc.Table(A, (i, j)), lgc.Table(B, (i, j))))
-    rhs = lgc.Aggregate(
-        lgc.Literal(ffuncs.overwrite),
-        lgc.Literal(out_fill),
-        lgc.Reorder(body, (i, j)),
-        (),
-    )
-    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    rhs = lgc.Aggregate(lgc.Literal(ffuncs.overwrite), lgc.Literal(out_fill), body, ())
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
     out_t = fiber_tensor(
         dense(
             sparse_list(
@@ -1087,14 +1162,12 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
 
     data = np.array([[0.0, 1.5, 0.0], [2.5, 0.0, 3.5]])
     i, j = lgc.Field("i"), lgc.Field("j")
-    A, Y = lgc.Alias("A"), lgc.Alias("Y")
+    A, Y = lgc.HardAlias("A"), lgc.HardAlias("Y")
     rhs = lgc.Aggregate(
-        lgc.Literal(ffuncs.overwrite),
-        lgc.Literal(0.0),
-        lgc.Reorder(lgc.Table(A, (i, j)), (i, j)),
-        (),
+        lgc.Literal(ffuncs.overwrite), lgc.Literal(0.0), lgc.Table(A, (i, j)), ()
     )
-    prgm = lgc.Plan((lgc.Query(lgc.Table(Y, (i, j)), rhs), lgc.Produces((Y,))))
+    query = fuse_loop_order(lgc.Query(lgc.Table(Y, (i, j)), rhs), (i, j))
+    prgm = lgc.Plan((query, lgc.Produces((Y,))))
     out_t = fiber_tensor(
         sparse_coo(element(0.0, ftype(np.float64), ftype(np.intp)), 2, ftype(np.intp))
     )
@@ -1114,11 +1187,10 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
     np.testing.assert_array_equal(cols, [1, 0, 2])
 
 
-def test_compute_shape_vars_accepts_broadcast_reorder():
+def test_infer_shape_accepts_broadcast_reorder():
     from finch import finch_logic as lgc
-    from finch.finch_logic.stages import compute_shape_vars
 
-    a, out = lgc.Alias("a"), lgc.Alias("out")
+    a, out = lgc.HardAlias("a"), lgc.HardAlias("out")
     i, j = lgc.Field("i"), lgc.Field("j")
     prgm = lgc.Plan(
         (
@@ -1126,9 +1198,8 @@ def test_compute_shape_vars_accepts_broadcast_reorder():
             lgc.Produces((out,)),
         )
     )
-    tensor = ft.asarray(np.arange(3, dtype=np.int64))
-    shape_vars = compute_shape_vars(prgm, {a: tensor.ftype})
-    assert len(shape_vars[a]) == 1
+    shapes = prgm.infer_shape({a: (3,)})
+    assert shapes[out] == (3, None)
 
 
 def test_minus_one_buffer_arr_shifts_every_tuple_field():

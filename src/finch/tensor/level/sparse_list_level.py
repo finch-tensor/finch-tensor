@@ -163,6 +163,12 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        dimension = shape[0]
+        if dimension.result_type != self.dimension_type:
+            dimension = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
         p_t = self.ptr_type.length_type
         p = asm.Variable(ctx.freshen("p"), p_t)
         stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
@@ -181,7 +187,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         """
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, zero
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape[1:], zero
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):

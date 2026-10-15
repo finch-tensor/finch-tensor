@@ -22,11 +22,13 @@ from finch.finch_logic import (
     Alias,
     Field,
     FillTable,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
+    QueryInto,
     Table,
 )
 
@@ -53,7 +55,7 @@ from finch.finch_logic import (
 def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_type):
     factory = factory_cls()
     fields = (Field("i"), Field("j"))
-    alias = Alias("a")
+    alias = HardAlias("a")
     source = factory(ft.asarray(np.ones((2, 3))), fields)
     source.fill_type = fill_type
     bindings: dict[Alias, NumericStats] = {alias: source}
@@ -76,9 +78,36 @@ def test_fill_table_statistics(use_interpreter, factory_cls, expected_nnz, fill_
 
 
 @pytest.mark.parametrize("use_interpreter", [False, True])
+@pytest.mark.parametrize(
+    "factory_cls", [DCStatsFactory, UniformStatsFactory, ExactStatsFactory]
+)
+@pytest.mark.parametrize("op", [ffuncs.add, ffuncs.overwrite])
+def test_elementwise_updates_join_their_operands(use_interpreter, factory_cls, op):
+    # An update which reduces no fields is the mapjoin of its operands, whatever
+    # the fill means to its operator.
+    i = Field("i")
+    a, b, out = HardAlias("a"), HardAlias("b"), HardAlias("out")
+    factory = factory_cls()
+    a_stats = factory(ft.asarray(np.array([1.0, 0.0, 0.0, 0.0])), (i,))
+    b_stats = factory(ft.asarray(np.array([0.0, 1.0, 0.0, 0.0])), (i,))
+    update = QueryInto(Table(out, (i,)), Literal(op), Table(b, (i,)))
+    bindings: dict[Alias, NumericStats] = {a: a_stats, b: b_stats, out: a_stats}
+    if use_interpreter:
+        stats = StatsInterpreter(factory)(update, bindings)
+    else:
+        stats = insert_statistics(factory, update, bindings, replace=False, cache={})
+    assert isinstance(stats, NumericStats)
+    expected = factory.mapjoin(op, a_stats, b_stats)
+    assert stats.estimate_non_fill_values() == pytest.approx(
+        expected.estimate_non_fill_values()
+    )
+    assert stats.estimate_non_fill_values() < 4
+
+
+@pytest.mark.parametrize("use_interpreter", [False, True])
 def test_fill_table_statistics_requires_binding(use_interpreter):
     factory = DCStatsFactory()
-    node = FillTable(Alias("missing"))
+    node = FillTable(HardAlias("missing"))
     with pytest.raises(ValueError, match="alias"):
         if use_interpreter:
             StatsInterpreter(factory)(node, {})
@@ -103,25 +132,25 @@ def test_stats_matrix_multiplication(shape_a, shape_b):
 
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 
@@ -148,25 +177,25 @@ def test_stats_matmul_error():
 
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal(a_val), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal(b_val), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal(a_val), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal(b_val), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 
@@ -197,25 +226,25 @@ def test_vp_stats_matrix_multiplication(shape_a, shape_b):
 
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal(a), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal(b), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal(a), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal(b), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 
@@ -242,25 +271,25 @@ def test_vp_stats_matmul_error():
 
     p = Plan(
         (
-            Query(Table(Alias("A"), (i, k)), Table(Literal(a_val), (i, k))),
-            Query(Table(Alias("B"), (k, j)), Table(Literal(b_val), (k, j))),
+            Query(Table(HardAlias("A"), (i, k)), Table(Literal(a_val), (i, k))),
+            Query(Table(HardAlias("B"), (k, j)), Table(Literal(b_val), (k, j))),
             Query(
-                Table(Alias("AB"), (i, k, j)),
+                Table(HardAlias("AB"), (i, k, j)),
                 MapJoin(
                     Literal(ffuncs.mul),
-                    (Table(Alias("A"), (i, k)), Table(Alias("B"), (k, j))),
+                    (Table(HardAlias("A"), (i, k)), Table(HardAlias("B"), (k, j))),
                 ),
             ),
             Query(
-                Table(Alias("C"), (i, j)),
+                Table(HardAlias("C"), (i, j)),
                 Aggregate(
                     Literal(ffuncs.add),
                     Literal(0),
-                    Table(Alias("AB"), (i, k, j)),
+                    Table(HardAlias("AB"), (i, k, j)),
                     (k,),
                 ),
             ),
-            Produces((Alias("C"),)),
+            Produces((HardAlias("C"),)),
         )
     )
 

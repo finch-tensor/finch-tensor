@@ -130,13 +130,35 @@ class DenseLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        dimension = shape[0]
+        if dimension.result_type != self.dimension_type:
+            dimension = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
         pos = asm.Call(
             asm.Literal(ffuncs.mul),
             (pos, asm.GetAttr(tns, asm.Literal("dimension"))),
         )
-        return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, pos
-        )
+        child = asm.GetAttr(tns, asm.Literal("lvl"))
+        self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], pos)
+        # Compiled structs store the stride, so refresh it after sizing the child.
+        match self.lvl_t:
+            case DenseLevelFType():
+                stride = asm.Call(
+                    asm.Literal(ffuncs.mul),
+                    (
+                        asm.GetAttr(child, asm.Literal("dimension")),
+                        asm.GetAttr(child, asm.Literal("stride")),
+                    ),
+                )
+            case _:
+                stride = asm.Literal(self.dimension_type(1))
+        if stride.result_type != self.dimension_type:
+            stride = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (stride,)
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("stride"), stride))
 
     def level_lower_freeze(self, ctx, lvl, op, pos):
         pos = asm.Call(

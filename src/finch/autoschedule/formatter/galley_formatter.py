@@ -150,23 +150,6 @@ def select_output_format(
     return tuple(formats)
 
 
-def query_loop_order(rhs: lgc.LogicExpression) -> tuple[Field, ...]:
-    """
-    The loop order a query's right hand side is evaluated under.
-
-    Loop orders are carried by the `Reorder` node interior to an aggregate, or
-    at the root of an in-place update; a transpose query is looped in the order
-    its input is stored.
-    """
-    match rhs:
-        case lgc.Table(_, idxs):
-            return idxs
-        case lgc.Aggregate(_, _, lgc.Reorder(_, idxs), _) | lgc.Reorder(_, idxs):
-            return idxs
-        case _:
-            return rhs.fields()
-
-
 class GalleyFormatter(LogicFormatter):
     """
     A formatter which picks output formats the way Galley's physical optimizer
@@ -214,20 +197,28 @@ class GalleyFormatter(LogicFormatter):
         bindings = bindings.copy()
         stats_bindings: OrderedDict[lgc.Alias, NS] = OrderedDict(stats)
         stats_interpreter = StatsInterpreter(stats_factory=stats_factory)
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
 
-        def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
+        # The loop order of a query is the fields of its enclosing Fuse nodes.
+        def formatter(
+            node: lgc.LogicStatement, loop_order: tuple[Field, ...] = ()
+        ) -> lgc.LogicStatement:
             match node:
                 case lgc.Plan(bodies):
-                    return lgc.Plan(tuple(formatter(body) for body in bodies))
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), rhs) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as lhs, _), _, rhs
+                    return lgc.Plan(
+                        tuple(formatter(body, loop_order) for body in bodies)
+                    )
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body, (*loop_order, idx)))
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
+                    node.infer_shape_type(shape_types)
                     # Evaluating the query gives the stats of the stored result,
                     # in the order of its left-hand table.
                     rhs_stats = stats_interpreter(node, stats_bindings)
@@ -235,17 +226,34 @@ class GalleyFormatter(LogicFormatter):
                         raise TypeError("GalleyFormatter requires NumericStats.")
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    if lhs not in bindings:
+                    match lhs:
+                        case lgc.FusedAlias(alias, nfused):
+                            pass
+                        case lgc.Alias() as alias:
+                            nfused = 0
+                    if alias not in bindings:
+                        format_stats = stats_bindings[lhs]
+                        if nfused:
+                            fused_indices = format_stats.index_order[:nfused]
+                            format_stats = stats_factory.aggregate(
+                                ffuncs.or_,
+                                False,
+                                fused_indices,
+                                stats_factory.support(format_stats),
+                            )
+                            loop_order = tuple(
+                                idx for idx in loop_order if idx not in fused_indices
+                            )
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
-                            for dim in shape_types[lhs]
+                            for dim in shape_types[alias][nfused:]
                         )
-                        bindings[lhs] = self.get_tensor_ftype(
-                            fill_types[lhs],
+                        bindings[alias] = self.get_tensor_ftype(
+                            fill_types[alias],
                             shape_type,
-                            rhs_stats,
+                            format_stats,
                             stats_factory,
-                            query_loop_order(rhs),
+                            loop_order,
                         )
 
                     return node

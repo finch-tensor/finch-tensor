@@ -7,9 +7,11 @@ from finch.algebra import (
     DynamicFillFType,
     TupleFType,
     as_fill,
+    ffuncs,
     fisinstance,
     fixpoint_type,
     ftype,
+    is_dynamic,
     np_dtype,
     return_type,
 )
@@ -27,6 +29,9 @@ from .nodes import (
     Alias,
     Field,
     FillTable,
+    Fuse,
+    FusedAlias,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -39,7 +44,7 @@ from .nodes import (
     TableValue,
     Value,
 )
-from .stages import LogicEvaluator, LogicLoader, compute_shape_vars
+from .stages import LogicEvaluator, LogicLoader
 from .tensor_stats import StatsFactory, TensorStats
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_LOGIC_PRE_OPT)
@@ -52,6 +57,43 @@ def make_tensor(shape, fill_value, *, dtype=None):
     arr = np.empty(shape, dtype=np_dtype(dtype))
     arr[...] = fill.value
     return BufferizedNDArray.from_numpy(arr, fill_value=fill)
+
+
+class MockFusedTensor:
+    """Interpret fused storage with one materialized tensor per outer coordinate.
+
+    Keeping every slice lets the interpreter execute whole queries in sequence
+    while preserving the values a fused loop would pass between statements.
+    """
+
+    def __init__(self, shape, n, fill_value, dtype, *, make_tensor=make_tensor):
+        self.shape = tuple(shape)
+        if not 0 <= n <= len(self.shape):
+            raise ValueError("The fused dimension count exceeds the tensor rank")
+        self.n = n
+        self.outer_shape = self.shape[:n]
+        self.inner_shape = self.shape[n:]
+        self.fill_value = fill_value
+        self.element_type = ftype(dtype)
+        self.make_tensor = make_tensor
+        self.store_tns = {}
+
+    def slot(self, outer_crds):
+        if outer_crds not in self.store_tns:
+            self.store_tns[outer_crds] = self.make_tensor(
+                self.inner_shape, self.fill_value, dtype=self.element_type
+            )
+        return self.store_tns[outer_crds]
+
+    def __getitem__(self, crds):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        return self.slot(crds[: self.n])[crds[self.n :]]
+
+    def __setitem__(self, crds, val):
+        if not isinstance(crds, tuple):
+            crds = (crds,)
+        self.slot(crds[: self.n])[crds[self.n :]] = val
 
 
 class LogicInterpreter(UnvalidatedForm, LogicEvaluator):
@@ -72,6 +114,14 @@ class LogicMachine:
         self.bindings = bindings
         self.make_tensor = make_tensor
 
+    def view(self, var: Alias) -> Alias:
+        """The view of `var` which its stored value currently defines."""
+        base = var.unfused
+        match base, self.bindings[base]:
+            case HardAlias(), MockFusedTensor(n=n):
+                return FusedAlias(base, n)
+        return base
+
     def __call__(self, node):
         logger.debug("Evaluating: %s", node)
         match node:
@@ -88,16 +138,18 @@ class LogicMachine:
             case Field(_):
                 raise ValueError("Fields cannot be used in expressions")
             case Table(Alias() as var, idxs):
-                val = self.bindings.get(var, None)
-                if val is None:
-                    raise ValueError(f"undefined tensor alias {node}")
-                return TableValue(val, idxs)
+                return TableValue(self(var), idxs)
             case Table(Literal(val), idxs):
                 return TableValue(val, idxs)
             case Alias() as var:
-                val = self.bindings.get(var, None)
+                val = self.bindings.get(var.unfused, None)
                 if val is None:
                     raise ValueError(f"undefined tensor alias {node}")
+                view = self.view(var)
+                if view != var:
+                    raise ValueError(
+                        f"{var} was invalidated by the definition of {view}"
+                    )
                 return val
             case MapJoin(Literal(op), args):
                 args = tuple(self(a) for a in args)
@@ -189,18 +241,52 @@ class LogicMachine:
                 return TableValue(result, idxs)
             case Query(Table(Alias() as var, idxs), rhs):
                 rhs = self(Reorder(rhs, idxs))
-                if var not in self.bindings:
-                    self.bindings[var] = self.make_tensor(
-                        rhs.tns.shape,
-                        rhs.tns.fill,
-                        dtype=rhs.tns.element_type,
+                key = var.unfused
+                # Defining a view of the alias invalidates its other views.
+                if (
+                    key not in self.bindings
+                    or self.view(var) != var
+                    or self.bindings[key].shape != rhs.tns.shape
+                    or not bool(
+                        ffuncs.same(self.bindings[key].fill_value, rhs.tns.fill_value)
                     )
-                tns = self.bindings[var]
+                ):
+                    match var:
+                        case FusedAlias(_, n):
+                            self.bindings[key] = MockFusedTensor(
+                                rhs.tns.shape,
+                                n,
+                                rhs.tns.fill_value,
+                                rhs.tns.element_type,
+                                make_tensor=self.make_tensor,
+                            )
+                        case Alias():
+                            fill = rhs.tns.fill
+                            if (
+                                key in self.bindings
+                                and self.view(var) == var
+                                and is_dynamic(self.bindings[key].fill)
+                            ):
+                                fill = fill.as_dynamic()
+                            self.bindings[key] = self.make_tensor(
+                                rhs.tns.shape,
+                                fill,
+                                dtype=rhs.tns.element_type,
+                            )
+                tns = self.bindings[key]
                 for crds in product(*[range(dim) for dim in rhs.tns.shape]):
                     tns[*crds] = rhs.tns[*crds].item()
                 return (rhs,)
             case QueryInto() as stmt:
-                return self(stmt.as_query())
+                tns = self(stmt.lhs.tns)
+                rhs = self(Reorder(stmt.as_query().rhs, stmt.lhs.idxs))
+                if tns.shape != rhs.tns.shape:
+                    raise ValueError("QueryInto cannot change the tensor shape.")
+                for crds in product(*[range(dim) for dim in tns.shape]):
+                    tns[*crds] = rhs.tns[*crds].item()
+                return (TableValue(tns, stmt.lhs.idxs),)
+            case Fuse(_, body):
+                return self(body)
             case Plan(bodies):
                 res = ()
                 for body in bodies:
@@ -230,7 +316,7 @@ class MockLogicKernel(AssemblyKernel):
         for arg in prgm.bodies[-1].args:
             match arg:
                 case lgc.Table(lgc.Alias() as var, _) | (lgc.Alias() as var):
-                    outputs.append(result_types[var])
+                    outputs.append(result_types[var.unfused])
                 case _:
                     raise TypeError(f"Expected an output alias or table, got {arg}")
         super().__init__(
@@ -286,8 +372,5 @@ class MockLogicLoader(UnvalidatedForm, LogicLoader):
     ) -> tuple[
         MockLogicLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-        lgc.LogicStatement,
     ]:
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return MockLogicLibrary(prgm, bindings), bindings, shape_vars, prgm
+        return MockLogicLibrary(prgm, bindings), bindings

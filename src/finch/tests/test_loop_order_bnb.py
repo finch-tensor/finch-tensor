@@ -31,27 +31,30 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
     greedy_loop_order,
 )
 from finch.autoschedule.stages import LoopOrderedForm
-from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
+from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
     QueryInto,
-    Reorder,
     Table,
+    TensorStats,
 )
 
 
 def test_bfs_and_dfs_are_no_worse_than_greedy():
     stats_factory = DCStatsFactory()
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (Alias(name) for name in "ABCD")
+    a, b, c, d = (HardAlias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -61,7 +64,7 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
             Table(d, (l_, m)),
         ),
     )
-    stats = OrderedDict(
+    stats: OrderedDict[Alias, DCStats] = OrderedDict(
         {
             a: stats_factory(fl.asarray(np.ones((2, 2))), (i, j)),
             b: stats_factory(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -78,10 +81,12 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
 
     def cost(order):
         query = Query(
-            Table(Alias("out"), expr.fields()),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Table(HardAlias("out"), expr.fields()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
-        return model.predict_cost(query, {}, stats, stats_factory)
+        return model.predict_cost(
+            fuse_loop_order(query, order), {}, stats, stats_factory
+        )
 
     greedy_cost, bfs_cost, dfs_cost = map(cost, (greedy, bfs, dfs))
 
@@ -95,7 +100,7 @@ def test_bfs_and_dfs_are_no_worse_than_greedy():
 def test_brute_force_is_no_worse_than_heuristics():
     stats_factory = DCStatsFactory()
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (Alias(name) for name in "ABCD")
+    a, b, c, d = (HardAlias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -105,7 +110,7 @@ def test_brute_force_is_no_worse_than_heuristics():
             Table(d, (l_, m)),
         ),
     )
-    stats = OrderedDict(
+    stats: OrderedDict[Alias, DCStats] = OrderedDict(
         {
             a: stats_factory(fl.asarray(np.ones((2, 2))), (i, j)),
             b: stats_factory(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -123,10 +128,12 @@ def test_brute_force_is_no_worse_than_heuristics():
 
     def cost(order):
         query = Query(
-            Table(Alias("out"), expr.fields()),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Table(HardAlias("out"), expr.fields()),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
-        return model.predict_cost(query, {}, stats, stats_factory)
+        return model.predict_cost(
+            fuse_loop_order(query, order), {}, stats, stats_factory
+        )
 
     greedy_cost, bfs_cost, dfs_cost, brute_cost = map(cost, (greedy, bfs, dfs, brute))
 
@@ -145,8 +152,8 @@ def test_brute_force_is_no_worse_than_heuristics():
 def test_loop_search_minimizes_nonlinear_component_cost(search):
     sf = DCStatsFactory()
     i, j, k = (Field(name) for name in "ijk")
-    a, b, out = (Alias(name) for name in ("a", "b", "out"))
-    stats = {
+    a, b, out = (HardAlias(name) for name in ("a", "b", "out"))
+    stats: dict[Alias, TensorStats] = {
         a: sf(fl.asarray(np.ones((2, 3))), (i, j)),
         b: sf(fl.asarray(np.ones((3, 4))), (j, k)),
     }
@@ -159,10 +166,7 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     )
 
     def cost(order):
-        query = Query(
-            Table(out, (i, k)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
-        )
+        query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
         features = model.get_features(query, {}, stats, sf)
         return sum(row.sum() ** 2 for row in features)
 
@@ -206,9 +210,9 @@ class PreferFieldCostModel(LoopCostModel, LoopOrderedForm):
 def test_loop_orderers_use_selected_model(search, orderer, inplace):
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
+    a, out = HardAlias("a"), HardAlias("out")
     expr = Table(a, (i, j))
-    stats = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
     model = PreferFieldCostModel(j)
     assert search(expr, sf, stats, cost_model=model) == (j, i)
     if inplace:
@@ -224,10 +228,8 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     assert scheduler.cost_model is model
     assert model.predict_cost(ordered, {}, stats, sf) == 7
     match ordered.bodies[0]:
-        case Query(_, Aggregate(_, _, Reorder(_, order), _)) | QueryInto(
-            _, _, Reorder(_, order)
-        ):
-            assert order == (j, i)
+        case Fuse(outer, Fuse(inner, Query() | QueryInto())):
+            assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
     assert isinstance(orderer().cost_model, Sum)
@@ -240,8 +242,8 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
 def test_loop_orderers_respect_output_order(search):
     sf = UniformStatsFactory()
     i, j, unit = Field("i"), Field("j"), Field("unit")
-    a = Alias("a")
-    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    a = HardAlias("a")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
     order = search(expr, sf, stats, (unit, i), cost_model=PreferFieldCostModel(j))
     assert order == (j, unit, i)
@@ -253,17 +255,16 @@ def test_loop_orderers_respect_output_order(search):
 def test_prefix_cost_uses_reduction_statistics(op, init):
     sf = UniformStatsFactory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
-    stats = {a: sf(fl.asarray([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]), (i, j))}
+    a, out = HardAlias("a"), HardAlias("out")
+    stats: dict[Alias, TensorStats] = {
+        a: sf(fl.asarray([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]), (i, j))
+    }
     table = Table(a, (i, j))
     expr = Aggregate(Literal(op), Literal(init), table, (j,))
     model = BFSLoopOrderer().cost_model
     machine = StatsMachine(sf, dict(stats))
     for order in ((i, j), (j, i)):
-        query = Query(
-            Table(out, (i,)),
-            Aggregate(Literal(op), Literal(init), Reorder(table, order), (j,)),
-        )
+        query = fuse_loop_order(Query(Table(out, (i,)), expr), order)
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr, (i,)), machine)
             for n in range(len(order) + 1)
@@ -285,7 +286,7 @@ def test_loop_orderers_refresh_stats_of_redefined_aliases(
     # The second copy is the same node as the first, but scratch has been
     # redefined in between, so its statistics must not come from a cache.
     i = Field("i")
-    a, b, scratch, out, result = map(Alias, ("a", "b", "scratch", "out", "result"))
+    a, b, scratch, out, result = map(HardAlias, ("a", "b", "scratch", "out", "result"))
     copy = Query(Table(out, (i,)), Table(scratch, (i,)))
     total = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(out, (i,)), (i,))
     plan = Plan(
