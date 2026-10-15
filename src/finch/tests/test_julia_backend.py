@@ -1249,3 +1249,25 @@ def test_compile_julia_dynamic_fill_value_types():
             np.testing.assert_array_equal(result.to_numpy(), matrix.toarray() * 2)
 
 
+@pytest.mark.parametrize(
+    "op, args",
+    [
+        (ft.logical_not, (np.array([0, 1, 2, -3]),)),
+        (ft.logical_not, (np.array([0.0, 0.5, np.nan, -1.0]),)),
+        (ft.logical_and, (np.array([0, 1, 2, -3]), np.array([5, 0, 0, 1]))),
+        (ft.logical_or, (np.array([0, 1, 0, -3]), np.array([0, 0, 2, 1]))),
+        (ft.logical_xor, (np.array([0, 1, 2, -3]), np.array([5, 0, 0, 1]))),
+    ],
+    ids=["not_int", "not_float", "and_int", "or_int", "xor_int"],
+)
+def test_compile_julia_logical_ops_on_numbers(op, args):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(*(ft.defer(arg) for arg in args)))
+
+    np_op = getattr(np, op.__name__)
+    np.testing.assert_array_equal(result.to_numpy(), np_op(*args))
+
+

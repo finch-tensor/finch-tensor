@@ -99,6 +99,15 @@ _JULIA_REDUCTION_OPS = {
 # Julia promotes Bool arithmetic to Int, but Finch keeps it Bool.
 _JULIA_BOOL_OPS = {"+": "|", "*": "&"}
 
+# NumPy's logical operators accept any value, but Julia's need a Bool.
+_LOGICAL_OPS = {
+    ffuncs.logical_and.ftype,
+    ffuncs.logical_or.ftype,
+    ffuncs.logical_not.ftype,
+    ffuncs.logical_xor.ftype,
+    ffuncs.not_.ftype,
+}
+
 _INFIX_OPS = {
     "+",
     "*",
@@ -321,6 +330,14 @@ class FinchJLGenerator:
                 julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
                     op, nestingLvl
                 )
+                if op.result_type in _LOGICAL_OPS:
+                    arg_strs = [
+                        arg_str
+                        if not isinstance(arg, (ntn.Literal, ntn.Unwrap, ntn.Variable))
+                        or isinstance(arg.result_type, FDTypeBoolean)
+                        else f"!iszero({arg_str})"
+                        for arg, arg_str in zip(args, arg_strs, strict=True)
+                    ]
                 if julia_op in _JULIA_BOOL_OPS and all(
                     isinstance(arg.result_type, FDTypeBoolean) for arg in args
                 ):
