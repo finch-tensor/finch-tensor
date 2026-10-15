@@ -77,6 +77,56 @@ def test_julia_owned_tensor_addition():
     assert (ft.add(tensor, 1).to_numpy() == np.arange(1, 5)).all()
 
 
+def test_julia_owned_sparse_results_convert_to_numpy_and_scipy():
+    _requires_julia_backend()
+    matrix = sps.random(7, 5, density=0.3, format="csr", random_state=0)
+    dense = matrix.toarray()
+    tensor = ft.asarray(matrix)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        results = [
+            (tensor * 2.0, dense * 2),
+            (ft.permute_dims(tensor, (1, 0)), dense.T),
+            (tensor > 0.5, dense > 0.5),
+        ]
+        for result, expected in results:
+            assert isinstance(result, JuliaOwnedTensor)
+            np.testing.assert_array_equal(result.to_numpy(), expected)
+            np.testing.assert_array_equal(result[1:3].to_numpy(), expected[1:3])
+            scipy_result = result.to_scipy()
+            assert scipy_result.format == "csr"
+            assert scipy_result.dtype == expected.dtype
+            np.testing.assert_array_equal(scipy_result.toarray(), expected)
+
+
+def test_julia_owned_dense_results_support_item_assignment():
+    _requires_julia_backend()
+    with with_default_scheduler(COMPILE_JULIA):
+        vector = ft.full((5,), np.inf)
+        assert isinstance(vector, JuliaOwnedTensor)
+        vector[2] = 0
+        np.testing.assert_array_equal(
+            vector.to_numpy(), [np.inf, np.inf, 0, np.inf, np.inf]
+        )
+
+        matrix = ft.zeros((3, 3), dtype=bool)
+        matrix[ft.asarray(np.array([1, 0, 2])), ft.arange(3)] = True
+        np.testing.assert_array_equal(
+            matrix.to_numpy(), np.eye(3, dtype=bool)[[1, 0, 2]].T
+        )
+
+
+def test_julia_owned_results_reshape():
+    _requires_julia_backend()
+    matrix = sps.random(4, 6, density=0.4, format="csr", random_state=0)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.asarray(matrix) * 2.0
+        np.testing.assert_array_equal(
+            ft.reshape(result, (6, -1)).to_numpy(),
+            (matrix.toarray() * 2).reshape(6, 4),
+        )
+
+
 def test_default_runtime_uses_a_free_buffer():
     runtime = _runtime(
         {"test_runtime_free_buffer": _KernalMetadata(frozenset({0}), (0,))}

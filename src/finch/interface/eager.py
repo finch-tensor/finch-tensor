@@ -1540,7 +1540,7 @@ def reshape(x, /, shape: tuple, *, copy=None):
     if isinstance(x, lazy.LazyTensor):
         return lazy.reshape(x, shape, copy=copy)
     if not hasattr(x, "reshape"):
-        raise NotImplementedError(f"Object of type {type(x)} does not support reshape")
+        return compute(lazy.reshape(x, shape, copy=copy))
     return x.reshape(shape, copy=copy)
 
 

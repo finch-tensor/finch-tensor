@@ -772,6 +772,33 @@ def test_compile_julia_sums_sparse_coo_level():
     np.testing.assert_array_equal(result.to_numpy(), EXPECTED_ROW_SUMS)
 
 
+@pytest.mark.parametrize(
+    "op",
+    [
+        ft.sum,
+        lambda a: ft.sum(a, axis=0),
+        lambda a: a @ np.arange(6.0),
+        lambda a: ft.permute_dims(a, (1, 0)),
+    ],
+    ids=["sum", "sum_axis0", "matvec", "transpose"],
+)
+def test_compile_julia_scipy_coo(op):
+    # Julia's COO axes are reversed, so non-square matrices check their order.
+    _requires_julia_backend()
+    import scipy.sparse as sps
+
+    from finch.autoschedule import COMPILE_JULIA
+
+    matrix = sps.coo_array(
+        (np.array([1.0, 2.0, 3.0]), (np.array([0, 1, 2]), np.array([5, 0, 3]))),
+        shape=(3, 6),
+    )
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(ft.asarray(matrix))))
+
+    np.testing.assert_array_equal(result.to_numpy(), op(matrix.toarray()))
+
+
 def test_compile_julia_sums_sparse_bytemap_level():
     _requires_julia_backend()
     stored_positions = np.array([0, 2, 4, 6, 8], dtype=np.intp)

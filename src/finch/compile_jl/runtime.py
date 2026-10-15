@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import weakref
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -17,7 +18,11 @@ from finch.tensor.override_tensor import OverrideTensor
 from finch.tensor.scalar import Scalar
 
 from .analyze import reset_argument_positions, returned_argument_positions
-from .interop import jl_tensor_to_python, tensor_to_jl
+from .interop import (
+    _jl_array_to_python_no_copy,
+    jl_tensor_to_python,
+    tensor_to_jl,
+)
 from .julia import jl
 from .types import _zero_value
 
@@ -113,6 +118,14 @@ class JuliaOwnedTensor(OverrideTensor):
     def _as_tensor(self) -> Tensor:
         return jl_tensor_to_python(self.raw_julia_obj)
 
+    @property
+    def fill_value(self):
+        fill_type = self.ftype.fill_type
+        if isinstance(fill_type, DynamicFillFType):
+            # The Julia tensor holds the value of its dynamic fill.
+            return fill_type.element_type(jl.Finch.fill_value(self.raw_julia_obj))
+        return super().fill_value
+
     def item(self):
         if not self._shape:
             values = self.raw_julia_obj.lvl.val.to_numpy(copy=False)
@@ -124,7 +137,7 @@ class JuliaOwnedTensor(OverrideTensor):
             return Scalar(self.item(), fill_value=self.fill_value, device=self.device)[
                 index
             ]
-        result = self._as_tensor().to_numpy()[index]
+        result = self.to_numpy()[index]
         if isinstance(result, np.ndarray):
             return BufferizedNDArray.from_numpy(
                 result,
@@ -133,8 +146,23 @@ class JuliaOwnedTensor(OverrideTensor):
             )
         return Scalar(result, fill_value=self.fill_value, device=self.device)
 
+    def __setitem__(self, index, value):
+        lvl = self.raw_julia_obj.lvl
+        for _ in self._shape:
+            if not jl.isa(lvl, jl.Finch.DenseLevel):
+                raise NotImplementedError(
+                    f"Item assignment is not supported for {self.ftype}"
+                )
+            lvl = lvl.lvl
+        # Dense Julia storage, with its axes reversed, is row-major.
+        values = lvl.val.to_numpy(copy=False)[: math.prod(self._shape)]
+        values.reshape(self._shape)[index] = value
+
     def to_numpy(self):
-        return self._as_tensor().to_numpy()
+        if not self._shape:
+            return self._as_tensor().to_numpy()
+        # Julia arrays are column-major, so their axes are reversed.
+        return _jl_array_to_python_no_copy(jl.Array(self.raw_julia_obj)).transpose()
 
     def __array__(self, dtype=None, copy=None):
         out = np.asarray(self.to_numpy())
@@ -149,7 +177,10 @@ class JuliaOwnedTensor(OverrideTensor):
         return out
 
     def to_scipy(self):
-        return self._as_tensor().to_scipy()
+        if self.ndim != 2:
+            raise ValueError("SciPy sparse arrays must be two-dimensional.")
+        # Julia's column-major CSC format is a Python CSR format.
+        return jl_tensor_to_python(jl.dense_sparse_list(self.raw_julia_obj)).to_scipy()
 
 
 @dataclass(frozen=True)

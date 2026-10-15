@@ -280,7 +280,7 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         pos_t = _leaf_type_str(level_ftype.position_type)
         dim_ts = [
             _leaf_type_str(t)
-            for t in level_ftype.coo_shape_tuple_type.struct_fieldtypes
+            for t in reversed(level_ftype.coo_shape_tuple_type.struct_fieldtypes)
         ]
         dims = ",".join("1" for _ in dim_ts)
         idxs = ",".join(_plus_one_ctor_str(t) for t in dim_ts)
