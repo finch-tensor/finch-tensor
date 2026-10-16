@@ -395,7 +395,7 @@ class Unwrap(NotationTree, NotationExpression):
         """
         Returns the type of the unwrapped value.
         """
-        assert isinstance(self.arg.result_type, TensorFType)
+        assert isinstance(self.arg.result_type, (TensorFType, AccessFType))
         return self.arg.result_type.element_type
 
 

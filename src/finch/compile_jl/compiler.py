@@ -1,5 +1,7 @@
 import uuid
 
+import numpy as np
+
 import finch.algebra.ffuncs as ffuncs
 import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
@@ -13,6 +15,7 @@ from finch.algebra.fill import (
     StaticFillFType,
     is_dynamic,
 )
+from finch.algebra.ftypes import FDTypeBoolean
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -22,6 +25,7 @@ from finch.tensor.patterns import FillTensorFType, PatternTensorFType
 from .julia import jl
 from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
+    _julia_fill_literal,
     _julia_literal,
     _leaf_type_str,
     _zero_value,
@@ -92,6 +96,18 @@ _JULIA_REDUCTION_OPS = {
     ffuncs.logical_and.ftype: "&",
     ffuncs.logical_or.ftype: "|",
 }
+# Julia promotes Bool arithmetic to Int, but Finch keeps it Bool.
+_JULIA_BOOL_OPS = {"+": "|", "*": "&"}
+
+# NumPy's logical operators accept any value, but Julia's need a Bool.
+_LOGICAL_OPS = {
+    ffuncs.logical_and.ftype,
+    ffuncs.logical_or.ftype,
+    ffuncs.logical_not.ftype,
+    ffuncs.logical_xor.ftype,
+    ffuncs.not_.ftype,
+}
+
 _INFIX_OPS = {
     "+",
     "*",
@@ -251,10 +267,13 @@ class FinchJLGenerator:
 
             case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
-                return (
-                    f"{tab_str}{self.generate_julia(tns, nestingLvl)} .= "
-                    f"{self.generate_julia(init, nestingLvl)}"
-                )
+                init_str = self.generate_julia(init, nestingLvl)
+                if isinstance(init, ntn.Literal) and isinstance(
+                    init.val, (float, np.floating)
+                ):
+                    # Declarations initialize to fills, like _julia_fill_literal.
+                    init_str = _julia_fill_literal(init.val)
+                return f"{tab_str}{self.generate_julia(tns, nestingLvl)} .= {init_str}"
 
             case ntn.Return(ntn.Call(op, args)) if op.result_type == make_tuple.ftype:
                 tab_str = "    " * nestingLvl
@@ -300,6 +319,10 @@ class FinchJLGenerator:
                         return f"{elem_t}({access})"
                 return access
 
+            case ntn.Call(ntn.Literal(ffuncs._Cast(dtype=dtype)), (arg,)):
+                arg_str = self.generate_julia(arg, nestingLvl)
+                return f"astype({_leaf_type_str(dtype)}, {arg_str})"
+
             case ntn.Call(op, args):
                 arg_strs = [self.generate_julia(arg, nestingLvl) for arg in args]
                 if op.result_type == make_tuple.ftype:
@@ -307,6 +330,18 @@ class FinchJLGenerator:
                 julia_op = _JULIA_OPS.get(op.result_type) or self.generate_julia(
                     op, nestingLvl
                 )
+                if op.result_type in _LOGICAL_OPS:
+                    arg_strs = [
+                        arg_str
+                        if not isinstance(arg, (ntn.Literal, ntn.Unwrap, ntn.Variable))
+                        or isinstance(arg.result_type, FDTypeBoolean)
+                        else f"!iszero({arg_str})"
+                        for arg, arg_str in zip(args, arg_strs, strict=True)
+                    ]
+                if julia_op in _JULIA_BOOL_OPS and all(
+                    isinstance(arg.result_type, FDTypeBoolean) for arg in args
+                ):
+                    julia_op = _JULIA_BOOL_OPS[julia_op]
                 if len(arg_strs) > 1 and julia_op in _INFIX_OPS:
                     return "(" + f" {julia_op} ".join(arg_strs) + ")"
                 return f"{julia_op}(" + ",".join(arg_strs) + ")"
@@ -339,6 +374,9 @@ class FinchJLGenerator:
                         stmt = f"{lhs_str} := {rhs_str}"
                     case _:
                         op = _JULIA_REDUCTION_OPS[lhs.mode.op.result_type]
+                        elem_t = getattr(lhs.result_type, "element_type", None)
+                        if isinstance(elem_t, FDTypeBoolean):
+                            op = _JULIA_BOOL_OPS.get(op, op)
                         stmt = f"{lhs_str} {op}= {rhs_str}"
                 return f"{tab_str}{stmt}"
 

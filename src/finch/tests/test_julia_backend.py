@@ -289,6 +289,56 @@ def test_compile_julia_pattern_interface(op, np_op, arg):
     np.testing.assert_array_equal(result.to_numpy(), np_op(arg))
 
 
+@pytest.mark.parametrize(
+    "arg, dtype",
+    [
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.int64),
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.bool_),
+        (np.array([-2.7, -0.5, 0.0, 1.5, 3.9]), np.float32),
+        (np.array([0, 1, 2, -3, 300]), np.bool_),
+        (np.array([0, 1, 2, -3, 300]), np.uint8),
+        (np.array([True, False, True]), np.int64),
+    ],
+)
+def test_compile_julia_astype_matches_numpy(arg, dtype):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.astype(ft.defer(arg), dtype))
+
+    expected = arg.astype(dtype)
+    assert result.to_numpy().dtype == expected.dtype
+    np.testing.assert_array_equal(result.to_numpy(), expected)
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        ft.sum,
+        lambda a: ft.sum(a, axis=1),
+        lambda a: ft.sum(a, axis=1, dtype=np.int64),
+        lambda a: ft.prod(a, axis=0),
+        lambda a: ft.matmul(a, ft.permute_dims(a, (1, 0))),
+        lambda a: a + a,
+        lambda a: a * a,
+    ],
+    ids=["sum", "sum_axis", "sum_int", "prod_axis", "matmul", "add", "mul"],
+)
+def test_compile_julia_bool_arithmetic_matches_interpreter(op):
+    # Julia promotes Bool arithmetic to Int, but Finch keeps it Bool.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA, INTERPRET_NOTATION
+
+    arg = np.array([[True, True, False], [True, True, True]])
+    with with_default_scheduler(INTERPRET_NOTATION):
+        expected = ft.compute(op(ft.defer(arg))).to_numpy()
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg))).to_numpy()
+
+    np.testing.assert_array_equal(result, expected)
+
+
 def test_compile_julia_numeric_pattern_mask():
     _requires_julia_backend()
     from finch.autoschedule import COMPILE_JULIA
@@ -1159,3 +1209,79 @@ def test_register_julia_op_maps_and_defines_once():
     assert compiler._JULIA_OPS[op.ftype] == "finch_test_twice"
     assert int(jl.finch_test_twice(3)) == 6
     del compiler._JULIA_OPS[op.ftype]
+
+
+def test_compile_julia_negative_zero_fill():
+    # Python ftypes equate -0.0 and 0.0 fills, so they share Julia kernels.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.arange(4.0).reshape(2, 2)
+    square = arg @ arg
+    with with_default_scheduler(COMPILE_JULIA):
+        positive = ft.einop("P[i,j] += A[i,k] * A[k,j]", A=ft.asarray(arg))
+        negative = ft.negative(positive)
+        assert np.signbit(negative.fill_value)
+        results = [
+            ft.subtract(positive, positive),
+            ft.subtract(negative, negative),
+            ft.subtract(negative, positive),
+            ft.einop("T[i,j] = F[j,i]", F=negative),
+            ft.einop("T[i,j] = F[j,i]", F=positive),
+        ]
+        expected = [0 * square, 0 * square, -2 * square, -square.T, square.T]
+        for result, value in zip(results, expected, strict=True):
+            np.testing.assert_array_equal(result.to_numpy(), value)
+
+
+def test_compile_julia_dynamic_fill_value_types():
+    # Dynamic fills are equal by dtype, so fills whose values have different
+    # types share a kernel, and must pin to zeros of that dtype.
+    _requires_julia_backend()
+    import scipy.sparse as sps
+
+    from finch.autoschedule import COMPILE_JULIA
+
+    matrix = sps.random(3, 3, density=0.5, format="csr", random_state=0)
+    tensor = ft.asarray(matrix)
+    with with_default_scheduler(COMPILE_JULIA):
+        for value in (np.float32(0.0), np.float64(0.0)):
+            arg = tensor.with_fill(DynamicFill(value, ftype(np.float64)))
+            result = ft.compute(ft.defer(arg) * 2.0)
+            np.testing.assert_array_equal(result.to_numpy(), matrix.toarray() * 2)
+
+
+@pytest.mark.parametrize(
+    "op, args",
+    [
+        (ft.logical_not, (np.array([0, 1, 2, -3]),)),
+        (ft.logical_not, (np.array([0.0, 0.5, np.nan, -1.0]),)),
+        (ft.logical_and, (np.array([0, 1, 2, -3]), np.array([5, 0, 0, 1]))),
+        (ft.logical_or, (np.array([0, 1, 0, -3]), np.array([0, 0, 2, 1]))),
+        (ft.logical_xor, (np.array([0, 1, 2, -3]), np.array([5, 0, 0, 1]))),
+    ],
+    ids=["not_int", "not_float", "and_int", "or_int", "xor_int"],
+)
+def test_compile_julia_logical_ops_on_numbers(op, args):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(*(ft.defer(arg) for arg in args)))
+
+    np_op = getattr(np, op.__name__)
+    np.testing.assert_array_equal(result.to_numpy(), np_op(*args))
+
+
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+def test_compile_julia_complex_arithmetic(dtype):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.array([[1 + 2j, 0], [3j, -1]], dtype=dtype)
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(ft.defer(arg) * ft.defer(arg) + dtype(1 - 1j))
+        total = ft.compute(ft.sum(ft.defer(arg), axis=0))
+
+    np.testing.assert_allclose(result.to_numpy(), arg * arg + dtype(1 - 1j))
+    np.testing.assert_allclose(total.to_numpy(), arg.sum(axis=0))

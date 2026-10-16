@@ -58,6 +58,16 @@ def _start_julia() -> tuple[Any, Any]:
     import juliacall
     from juliacall import Main
 
+    # Casts follow NumPy, which truncates floats and wraps integers.
+    Main.seval("""
+        function astype(::Type{T}, x) where {T}
+            T === Bool && return !iszero(x)
+            T <: Integer && x isa AbstractFloat && return unsafe_trunc(T, x)
+            T <: Integer && x isa Integer && return x % T
+            return convert(T, x)
+        end
+    """)
+
     # To change the version of Finch used, see pyjuliapkg and
     # `juliapkg.json` in this package.
     for pkg in _JULIA_PACKAGES:
