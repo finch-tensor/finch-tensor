@@ -42,10 +42,6 @@ function borrow(::Type{T}, bytes, layout::L, ::Val{I}, shifted, writable=true) w
     valid_layout(T, layout) && length(bytes) % layout[1] == 0 ||
         throw(ArgumentError("invalid buffer layout"))
     data = unsafe_wrap(Vector{UInt8}, pointer(bytes), length(bytes); own=false)
-    # NumPy views of data can outlive this buffer, so data itself retains the owner.
-    finalizer(data) do _
-        GC.@preserve bytes nothing
-    end
     Buffer{T,L,I}(data, layout, bytes, shifted, writable)
 end
 
@@ -59,8 +55,8 @@ function owner(buf::Buffer)
 end
 
 function storage(buf::Buffer)
-    owner(buf)
-    return (buf.data, buf.layout)
+    # Export the allocation's owner so views retain it after this buffer detaches.
+    return (owner(buf), buf.layout)
 end
 
 Base.IndexStyle(::Type{<:Buffer}) = IndexLinear()
@@ -69,6 +65,27 @@ Base.similar(::Buffer, ::Type{T}, dims::Dims) where {T} = Array{T}(undef, dims)
 Base.dataids(buf::Buffer) = Base.dataids(buf.data)
 Base.copy(buf::Buffer{T,L,I}) where {T,L,I} =
     Buffer{T,L,I}(copy(buf.data), buf.layout, nothing, buf.shifted, true)
+
+function Base.copyto!(dest::Buffer, dstart::Integer, src::Buffer, sstart::Integer, n::Integer)
+    if dest !== src
+        return invoke(copyto!, Tuple{AbstractArray,Integer,AbstractArray,Integer,Integer},
+                      dest, dstart, src, sstart, n)
+    end
+    n == 0 && return dest
+    n >= 0 || throw(ArgumentError("copy length must be nonnegative"))
+    checkbounds(dest, dstart)
+    checkbounds(dest, dstart + n - 1)
+    checkbounds(src, sstart)
+    checkbounds(src, sstart + n - 1)
+    dest.writable || throw(ReadOnlyMemoryError())
+    # The AbstractArray fallback copies the entire source to handle aliasing.
+    # Hash checkpoints copy short ranges repeatedly; the byte vector handles
+    # overlap directly, keeping their total cost linear in the buffer length.
+    width = dest.layout[1]
+    GC.@preserve dest copyto!(dest.data, (dstart - 1) * width + 1,
+                             src.data, (sstart - 1) * width + 1, n * width)
+    return dest
+end
 
 @generated function load(::Type{T}, ptr, layout) where {T}
     if T <: Tuple
