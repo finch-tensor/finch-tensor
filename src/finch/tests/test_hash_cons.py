@@ -13,16 +13,10 @@ from finch.symbolic.hashcons import _table
 class Leaf(HashCons):
     name: str
 
-    def __hash_keys__(self) -> tuple:
-        return (self.name,)
-
 
 @dataclass(eq=False, frozen=True)
 class OtherLeaf(HashCons):
     name: str
-
-    def __hash_keys__(self) -> tuple:
-        return (self.name,)
 
 
 @dataclass(eq=False, frozen=True)
@@ -30,25 +24,14 @@ class Node(HashCons):
     left: Any
     right: Any
 
-    def __hash_keys__(self) -> tuple:
-        return (self.left, self.right)
-
 
 @dataclass(eq=False, frozen=True)
 class Box(HashCons):
     val: Any
 
-    def __hash_keys__(self) -> tuple:
-        try:
-            hash(self.val)
-        except TypeError:
-            return (type(self.val), id(self.val))
-        return (type(self.val), self.val)
-
 
 def test_interned_leaves():
     assert Leaf("a") is Leaf("a")
-    assert Leaf("a") is Leaf(name="a")
     assert Leaf("a") is not Leaf("b")
     assert Leaf("a") is not OtherLeaf("a")
 
@@ -78,21 +61,31 @@ def test_key_rule_decides_identity():
     assert Box(1) is not Box(np.int64(1))
 
 
-def test_unhashable_payload_is_interned_by_pointer():
-    a = np.ones(3)
-    assert Box(a) is Box(a)
-    assert Box(a) is not Box(np.ones(3))
-
-
 def test_copy_returns_self():
     t = Node(Leaf("a"), Leaf("b"))
     assert copy.copy(t) is t
     assert copy.deepcopy(t) is t
 
 
+def test_non_hashable():
+    arr = np.zeros(())
+    arr2 = np.zeros(())
+    assert Box(arr) is Box(arr)
+    assert Box(arr) is not Box(arr2)
+
+
+def test_nan():
+    assert Box(np.nan) is Box(np.nan)
+    assert Box(np.complex128(np.nan, 5.0)) is Box(np.complex128(np.nan, 5.0))
+    assert Box(np.complex128(5.0, np.nan)) is Box(np.complex128(5.0, np.nan))
+    assert Box(np.complex128(np.nan, np.nan)) is Box(np.complex128(np.nan, np.nan))
+    assert Box(np.complex128(5.0, np.nan)) is not Box(np.complex128(np.nan, 5.0))
+    assert Box(np.complex128(5.0, np.nan)) is not Box(np.complex128(np.nan, np.nan))
+
+
 def test_table_is_weak():
     t = Leaf("garbage_collected_leaf")
-    key = (Leaf, *t.__hash_keys__())
+    key = Leaf.hash_key("garbage_collected_leaf")
     assert _table[key] is t
     del t
     gc.collect()
