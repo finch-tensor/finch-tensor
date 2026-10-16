@@ -148,7 +148,7 @@ default-environment = "test-mlir"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "pytest src/finch/tests/test_julia_backend.py src/finch/tests/test_accuracy.py -n {{ njobs }}"
+cmd = "pytest src/finch/tests/test_julia_backend.py src/finch/tests/test_julia_runtime.py src/finch/tests/test_accuracy.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
