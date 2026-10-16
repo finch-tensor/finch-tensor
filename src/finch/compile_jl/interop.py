@@ -172,7 +172,11 @@ def level_to_jl(level: Level, pin_fill: bool = False):
 
 def _jl_array_to_python_no_copy(v):
     """Return a NumPy view of a Julia array without copying its data."""
-    return v.to_numpy(copy=False)
+    arr = v.to_numpy(copy=False)
+    if jl.eltype(v) == jl.UInt8:
+        # juliacall exposes UInt8 arrays with a signed buffer format.
+        return arr.view(np.uint8)
+    return arr
 
 
 def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
@@ -200,10 +204,17 @@ def _jl_tuple_buffer_to_python(
     src_fields = raw.dtype.fields
     assert src_fields is not None
     src_names = [f"f{i}" for i in range(n_fields)]
+    # juliacall exposes UInt8 fields with a signed format.
+    formats = [
+        np.dtype(np.uint8)
+        if jl.fieldtype(jl.eltype(v), i + 1) == jl.UInt8
+        else src_fields[name][0]
+        for i, name in enumerate(src_names)
+    ]
     dtype = np.dtype(
         {
             "names": [f"element_{i}" for i in range(n_fields)],
-            "formats": [src_fields[name][0] for name in src_names],
+            "formats": formats,
             "offsets": [src_fields[name][1] for name in src_names],
             "itemsize": raw.dtype.itemsize,
         }
