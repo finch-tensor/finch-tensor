@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 
 import finch
+from finch.algebra import ffuncs
 from finch.autoschedule.einsum import LogicEinsumLoader
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.factorizer.optimize import DefaultLogicFactorizer
@@ -10,7 +11,7 @@ from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.loop_orderer.loop_ordering import DefaultLoopOrderer
 from finch.finch_einsum import MockEinsumLoader
 from finch.interface.fuse import compute
-from finch.interface.lazy import defer
+from finch.interface.lazy import defer, reduce
 
 from .conftest import finch_assert_allclose
 
@@ -29,6 +30,19 @@ def ctx():
             )
         )
     )
+
+
+@pytest.mark.parametrize(
+    "op, init, np_op",
+    [(ffuncs.add, 5.0, np.add), (ffuncs.max, 0.5, np.maximum)],
+    ids=["add", "max"],
+)
+def test_reduction_starts_from_its_init(rng, ctx, op, init, np_op):
+    # An init which isn't the identity of the reduction is an initializing
+    # einsum, which the reduction then folds into.
+    A = rng.random((4, 3))
+    result = compute(reduce(op, defer(finch.asarray(A)), axis=1, init=init), ctx=ctx)
+    finch_assert_allclose(result, np_op(init, np_op.reduce(A, axis=1)))
 
 
 def test_simple_addition(rng, ctx):

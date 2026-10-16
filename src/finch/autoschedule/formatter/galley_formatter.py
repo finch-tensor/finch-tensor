@@ -16,7 +16,14 @@ from enum import Enum
 from typing import TypeVar
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, FType, TensorFType, ffuncs, ftype, ftypes
+from finch.algebra import (
+    AbstractFillFType,
+    FType,
+    TensorFType,
+    ffuncs,
+    ftype,
+    ftypes,
+)
 from finch.autoschedule.stages import LogicFormatter
 from finch.autoschedule.tensor_stats import StatsInterpreter
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
@@ -90,7 +97,9 @@ def estimate_nnz(
     """
     reduce_fields = tuple(idx for idx in stats.index_order if idx not in indices)
     if reduce_fields:
-        stats = stats_factory.aggregate(ffuncs.or_, False, reduce_fields, stats)
+        stats = stats_factory.aggregate(
+            ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
+        )
     return stats.estimate_non_fill_values()
 
 
@@ -174,7 +183,7 @@ class GalleyFormatter(LogicFormatter):
 
     def get_tensor_ftype(
         self,
-        fill_value: AbstractFill,
+        fill_type: AbstractFillFType,
         shape_type: tuple[FType, ...],
         stats: NumericStats,
         stats_factory: StatsFactory,
@@ -190,7 +199,7 @@ class GalleyFormatter(LogicFormatter):
         formats = select_output_format(stats, stats_factory, loop_order, output_indices)
         logger.debug("Galley formats for %s: %s", output_indices, formats)
 
-        lvl = element(fill_value, ftype(fill_value))
+        lvl = element(fill_type, fill_type.element_type)
         for level in reversed(range(len(output_indices))):
             lvl = formats[level].build(lvl, shape_type[level])
         return fiber_tensor(lvl)
@@ -208,8 +217,8 @@ class GalleyFormatter(LogicFormatter):
         shape_types = prgm.infer_shape_type(
             {var: val.shape_type for var, val in bindings.items()}
         )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -232,7 +241,7 @@ class GalleyFormatter(LogicFormatter):
                             for dim in shape_types[lhs]
                         )
                         bindings[lhs] = self.get_tensor_ftype(
-                            fill_values[lhs],
+                            fill_types[lhs],
                             shape_type,
                             rhs_stats,
                             stats_factory,

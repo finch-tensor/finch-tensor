@@ -15,11 +15,13 @@ from finch import finch_assembly as asm
 from finch.algebra import (
     DynamicFillError,
     FType,
+    MutableStructFType,
     StructFType,
     TupleFType,
     ffuncs,
     fisinstance,
     is_dynamic,
+    is_static,
     np_dtype,
     promote_type,
 )
@@ -28,7 +30,7 @@ from finch.finch_assembly import BufferFType
 from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
-from .scansearch import SCANSEARCH
+from .scansearch import gen_ss
 from .stages import MLIRCode, MLIRLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
@@ -36,9 +38,7 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_ML
 
 mlir_memrefs: dict[Any, Any] = {}
 mlir_structs: dict[Any, Any] = {}
-mlir_globals: dict[str, str] = {
-    "scansearch": SCANSEARCH,
-}
+mlir_globals: dict[str, str] = {}
 MLIR_PIPELINE = (
     "builtin.module("
     "expand-realloc,"
@@ -671,7 +671,7 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             return ctx(args[0])
         case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs._InitWriteFType(fill=fill):
+        case ffuncs._InitWriteFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
@@ -680,13 +680,13 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
         case ffuncs._SameFType():
             x, y = args
             return mlir_same(ctx, ctx(x), ctx(y), x.result_type, y.result_type)
-        case ffuncs._ChooseFType(fill=fill):
+        case ffuncs._ChooseFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError("Pass a dynamic choose as a runtime operator")
             value = (
-                asm.GetAttr(op, asm.Literal("fill_value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value)
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value"))
             )
             fill_value = ctx(value)
             arg_values = [ctx(arg) for arg in args]
@@ -765,12 +765,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
         case ffuncs._ScansearchFType():
-            return mlir_call_function_call(
-                mlir_function_name(op_type, _promote_type_helper(args)),
-                op_type.return_type(*(arg.result_type for arg in args)),
-                ctx,
-                *args,
-            )
+            arr, _, _, hi = args
+            name, code = gen_ss(mlir_type(arr.result_type.element_type))
+            mlir_globals.setdefault(name, code)
+            return mlir_call_function_call(name, hi.result_type, ctx, *args)
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
@@ -782,11 +780,40 @@ def mlir_getattr(fmt: FType, ctx, obj, attrs):
     idxs = []
     t: FType = fmt
 
-    for a in attrs:
+    for i, a in enumerate(attrs):
         if not isinstance(t, StructFType):
             raise TypeError(f"Expected struct type, got: {t}")
         if not t.struct_hasattr(a):
             raise ValueError(f"trying to get missing attr {a!r}")
+        if t.is_mutable:
+            if i:
+                obj = mlir_getattr(fmt, ctx, obj, attrs[:i])
+            ptr, res = ctx.new_ssa(), ctx.new_ssa()
+            field_t = t.struct_attrtype(a)
+            value_t = mlir_type(field_t)
+            stored_t = llvm_type(value_t)
+            ctx.exec(
+                f"{ctx.feed}{ptr} = llvm.getelementptr {obj}"
+                f"[0, {t.struct_fieldnames.index(a)}] : (!llvm.ptr) -> !llvm.ptr, "
+                f"{mlir_struct_type(t)}"
+            )
+            ctx.exec(f"{ctx.feed}{res} = llvm.load {ptr} : !llvm.ptr -> {stored_t}")
+            if stored_t != value_t:
+                cast = ctx.new_ssa()
+                if value_t == "index":
+                    ctx.exec(
+                        f"{ctx.feed}{cast} = arith.index_cast {res} : i64 to index"
+                    )
+                else:
+                    ctx.exec(
+                        f"{ctx.feed}{cast} = builtin.unrealized_conversion_cast "
+                        f"{res} : {stored_t} to {value_t}"
+                    )
+                res = cast
+            if i + 1 < len(attrs):
+                return mlir_getattr(field_t, ctx, res, attrs[i + 1 :])
+            # Mutable fields must be reloaded after writes through any alias.
+            return res
         idxs.append(t.struct_fieldnames.index(a))
         t = t.struct_attrtype(a)
 
@@ -879,13 +906,17 @@ def mlir_type(t: FType):
                     return f"f{dt.itemsize * 8}"
                 case _:
                     raise NotImplementedError(f"No MLIR type for numpy dtype {dt}")
+        case MutableStructFType():
+            return "!llvm.ptr"
         case StructFType():
-            fields = (
-                llvm_type(mlir_type(field_type)) for _, field_type in t.struct_fields
-            )
-            return f"!llvm.struct<({', '.join(fields)})>"
+            return mlir_struct_type(t)
         case _:
             raise NotImplementedError(f"No MLIR type mapping for {t}")
+
+
+def mlir_struct_type(t: StructFType) -> str:
+    fields = (llvm_type(mlir_type(field_type)) for _, field_type in t.struct_fields)
+    return f"!llvm.struct<({', '.join(fields)})>"
 
 
 def llvm_type(s: str) -> str:
@@ -911,6 +942,8 @@ def mlir_ctype(s: FType | str):
     can pass arguments to and read results from a compiled MLIR kernel.
     """
     match s:
+        case MutableStructFType():
+            return ctypes.POINTER(mlir_struct_ctype(s))
         case StructFType():
             return mlir_struct_ctype(s)
         case FType():
@@ -985,7 +1018,8 @@ def serialize_struct_to_mlir(fmt: StructFType, obj):
         serialize_to_mlir(t, fmt.struct_getattr(obj, name))
         for name, t in fmt.struct_fields
     ]
-    return mlir_struct_ctype(fmt)(*args)
+    value = mlir_struct_ctype(fmt)(*args)
+    return ctypes.pointer(value) if fmt.is_mutable else value
 
 
 def deserialize_from_mlir(fmt: FType, obj, c_obj):
@@ -999,10 +1033,17 @@ def deserialize_from_mlir(fmt: FType, obj, c_obj):
 
 
 def deserialize_struct_from_mlir(fmt: StructFType, obj, c_obj):
-    if not fmt.is_mutable:
-        return
+    if fmt.is_mutable:
+        c_obj = c_obj.contents
     for name, t in fmt.struct_fields:
-        fmt.struct_setattr(obj, name, construct_from_mlir(t, getattr(c_obj, name)))
+        value = getattr(c_obj, name)
+        match t:
+            case MLIRArgumentFType() | MutableStructFType():
+                deserialize_from_mlir(t, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                fmt.struct_setattr(obj, name, construct_from_mlir(t, value))
+            case _:
+                deserialize_from_mlir(t, fmt.struct_getattr(obj, name), value)
 
 
 def construct_from_mlir(fmt: FType, mlir_obj):
@@ -1026,6 +1067,8 @@ def construct_from_mlir(fmt: FType, mlir_obj):
 
 
 def construct_struct_from_mlir(fmt: StructFType, mlir_obj):
+    if fmt.is_mutable:
+        mlir_obj = mlir_obj.contents
     return fmt.from_fields(
         *(
             construct_from_mlir(t, getattr(mlir_obj, name))
@@ -1362,6 +1405,36 @@ class MLIRContext(Context):
                 return mlir_getattr(obj_t, self, self(base), attrs)
 
             case asm.SetAttr(obj, asm.Literal(attr), value):
+                match obj.result_type:
+                    case MutableStructFType() as obj_t:
+                        obj_value = self(obj)
+                        val = self(value)
+                        value_t = mlir_type(obj_t.struct_attrtype(attr))
+                        stored_t = llvm_type(value_t)
+                        if stored_t != value_t:
+                            cast = self.new_ssa()
+                            if value_t == "index":
+                                self.exec(
+                                    f"{feed}{cast} = arith.index_cast {val} "
+                                    ": index to i64"
+                                )
+                            else:
+                                self.exec(
+                                    f"{feed}{cast} = "
+                                    "builtin.unrealized_conversion_cast "
+                                    f"{val} : {value_t} to {stored_t}"
+                                )
+                            val = cast
+                        ptr = self.new_ssa()
+                        self.exec(
+                            f"{feed}{ptr} = llvm.getelementptr {obj_value}"
+                            f"[0, {obj_t.struct_fieldnames.index(attr)}] "
+                            f": (!llvm.ptr) -> !llvm.ptr, {mlir_struct_type(obj_t)}"
+                        )
+                        self.exec(
+                            f"{feed}llvm.store {val}, {ptr} : {stored_t}, !llvm.ptr"
+                        )
+                        return None
                 attrs = [attr]
                 base = obj
                 while isinstance(base, asm.GetAttr):

@@ -67,12 +67,14 @@ def test_generated_init_write(kind, init, compiler):
             query = Query(Table(dst, output_idxs), rhs)
         expected = data[:, -1] if reduced else data
 
-    # Static pointwise initialization can differ from the storage format's fill.
-    output_fill = 0 if kind == "pointwise" else fill
+    # A declaration can't change a static fill, so the output has the fill it is
+    # declared with, which a copy takes from its source.
     bindings = {
-        src: BufferizedNDArray.from_numpy(data),
+        src: BufferizedNDArray.from_numpy(
+            data, fill_value=fill if kind in ("copy", "dynamic_copy") else 0
+        ),
         dst: BufferizedNDArray.from_numpy(
-            np.full(expected.shape, 9, dtype=np.int64), fill_value=output_fill
+            np.full(expected.shape, 9, dtype=np.int64), fill_value=fill
         ),
     }
     plan = Plan((query, Produces((dst,))))

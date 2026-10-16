@@ -57,12 +57,11 @@ class TensorViewFType(TensorFType[FT]):
         return self.tns.element_type
 
     @property
-    def fill_value(self):
+    def fill_type(self):
         """
-        Get the fill value of the tensor view.
-        This is the value used to fill the tensor at the specified indices.
+        Get the fill of the tensor view's format.
         """
-        return self.tns.fill_value
+        return self.tns.fill_type
 
     @property
     def shape_type(self):
@@ -136,7 +135,7 @@ class TensorView(Tensor[FT]):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return self.tns.ftype.fill_value.value
+        return self.tns.fill_value
 
     @property
     def shape_type(self):
@@ -515,6 +514,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 r_e = self(r)
                 shape_ft = tns_e.ftype.shape_type[r_e]
                 return shape_ft(tns_e.shape[r_e])
+            case ntn.FillValue(tns):
+                return self(tns).fill_value
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)
