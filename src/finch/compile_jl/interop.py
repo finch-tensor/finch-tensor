@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, cast
 
 import numpy as np
@@ -57,24 +58,29 @@ def _as_julia_scalar(val):
     return val
 
 
-def _buffer_to_jl(buffer: Buffer, *, offset: int = 0):
+def _buffer_to_jl(
+    buffer: Buffer, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+):
     if isinstance(buffer, MinusOneBuffer):
-        if offset != 1:
-            raise ValueError("MinusOneBuffer can only be unwrapped with offset=1")
-        return _buffer_to_jl(buffer.data)
+        if offset != 1 or index_fields != buffer.index_fields:
+            raise ValueError(
+                "MinusOneBuffer can only be unwrapped with matching offsets"
+            )
+        result = _buffer_to_jl(buffer.data, offset=offset, index_fields=index_fields)
+        result.shifted = False
+        return result
     if isinstance(buffer, NumpyBuffer):
         return jl_dtypes.to_jl_vector(
             buffer.ftype.element_type,
             buffer.arr,
             offset=offset,
+            index_fields=index_fields,
         )
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
 def _plus_one_buffer_to_jl(buffer: Buffer):
-    if isinstance(buffer, MinusOneBuffer):
-        return _buffer_to_jl(buffer.data)
-    return jl.Finch.PlusOneVector(_buffer_to_jl(buffer))
+    return _buffer_to_jl(buffer, offset=1)
 
 
 def level_to_jl(level: Level, pin_fill: bool = False):
@@ -106,12 +112,13 @@ def level_to_jl(level: Level, pin_fill: bool = False):
                 raise ValueError(
                     "SparseByteMapLevel must have ptr, tbl, and srt buffers"
                 )
-            return jl.SparseByteMapLevel(
+            constructor = jl.SparseByteMapLevel[jl_dtypes.to_jl_type(ftype(dimension))]
+            return constructor(
                 level_to_jl(lvl, pin_fill),
                 int(dimension),
-                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                _buffer_to_jl(cast(Buffer, ptr), offset=1),
                 _buffer_to_jl(cast(Buffer, tbl)),
-                _plus_one_buffer_to_jl(cast(Buffer, srt)),
+                _buffer_to_jl(cast(Buffer, srt), offset=1),
             )
         case SparseCOOLevel(lvl=lvl, coo_shape=coo_shape, ptr=ptr, tbl=tbl):
             assert isinstance(tbl, tuple)
@@ -128,33 +135,36 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             ptr=ptr,
             tbl_ctrl=tbl_ctrl,
             tbl=tbl,
-            pool=pool,
+            key=key,
             perm=perm,
+            tbl_count=tbl_count,
             subtables=subtables,
-            single_writer=single_writer,
+            pos_multiplier=pos_multiplier,
         ):
             if (
                 ptr is None
                 or tbl_ctrl is None
                 or tbl is None
-                or pool is None
+                or key is None
                 or perm is None
+                or tbl_count is None
             ):
                 raise ValueError(
-                    "SparseHashLevel must have ptr, tbl_ctrl, tbl, pool, and perm "
-                    "buffers"
+                    "SparseHashLevel must have ptr, tbl_ctrl, tbl, key, perm, "
+                    "and tbl_count buffers"
                 )
-            dimension = _as_julia_scalar(np.asarray(dimension).item())
-            constructor = jl.SparseHashLevel[(jl.typeof(dimension), single_writer)]
+            constructor = jl.SparseHashLevel[jl_dtypes.to_jl_type(ftype(dimension))]
             return constructor(
                 level_to_jl(lvl, pin_fill),
-                dimension,
+                int(dimension),
                 int(subtables),
-                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
+                pos_multiplier,
+                _buffer_to_jl(cast(Buffer, ptr), offset=1),
                 _buffer_to_jl(cast(Buffer, tbl_ctrl)),
                 _buffer_to_jl(cast(Buffer, tbl), offset=1),
-                _buffer_to_jl(cast(Buffer, pool)),
-                _plus_one_buffer_to_jl(cast(Buffer, perm)),
+                _buffer_to_jl(cast(Buffer, key), offset=1, index_fields=(0, 1)),
+                _buffer_to_jl(cast(Buffer, perm), offset=1),
+                _buffer_to_jl(cast(Buffer, tbl_count)),
             )
         case _:
             raise ValueError(f"Unsupported Finch level type: {type(level)}")
@@ -162,7 +172,36 @@ def level_to_jl(level: Level, pin_fill: bool = False):
 
 def _jl_array_to_python_no_copy(v):
     """Return a NumPy view of a Julia array without copying its data."""
+    if jl.isa(v, jl.FinchInterop.Buffer):
+        data, layout = jl.FinchInterop.storage(v)
+        dtype = _dtype_with_layout(_jl_numpy_dtype(jl.eltype(v)), layout)
+        raw = np.array(data, copy=False).view(dtype)
+        if not v.writable:
+            raw.flags.writeable = False
+        return raw
     return v.to_numpy(copy=False)
+
+
+@lru_cache
+def _jl_numpy_dtype(type_):
+    return jl.Vector[type_]().to_numpy(copy=False).dtype
+
+
+def _dtype_with_layout(dtype, layout):
+    if dtype.names is None:
+        return dtype
+    fields = tuple(layout[1])
+    return np.dtype(
+        {
+            "names": dtype.names,
+            "formats": [
+                _dtype_with_layout(dtype.fields[name][0], field[1])
+                for name, field in zip(dtype.names, fields, strict=True)
+            ],
+            "offsets": [field[0] for field in fields],
+            "itemsize": layout[0],
+        }
+    )
 
 
 def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
@@ -171,9 +210,11 @@ def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
     to Python's 0-based indexing without copying.
     """
     if jl.isa(v, jl.Finch.PlusOneVector):
-        raw = _jl_array_to_python_no_copy(v.data).astype(np.intp, copy=False)
+        raw = _jl_array_to_python_no_copy(v.data)
         return NumpyBuffer(raw)
-    raw = _jl_array_to_python_no_copy(v).astype(np.intp, copy=False)
+    raw = _jl_array_to_python_no_copy(v)
+    if jl.isa(v, jl.FinchInterop.Buffer) and v.shifted:
+        return NumpyBuffer(raw)
     return MinusOneBuffer(NumpyBuffer(raw))
 
 
@@ -181,10 +222,10 @@ def _jl_buffer_to_python(v) -> NumpyBuffer:
     return NumpyBuffer(_jl_array_to_python_no_copy(v))
 
 
-def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> Buffer:
+def _jl_tuple_buffer_to_python(
+    v, n_fields: int, *, index_fields: tuple[int, ...] = ()
+) -> Buffer:
     """Convert a Julia tuple buffer while preserving its Julia-owned data."""
-    if offset not in (0, 1):
-        raise ValueError("Only offset=0 or offset=1 can be represented without a copy")
     raw = _jl_array_to_python_no_copy(v)
 
     src_fields = raw.dtype.fields
@@ -199,8 +240,8 @@ def _jl_tuple_buffer_to_python(v, n_fields: int, *, offset: int = 0) -> Buffer:
         }
     )
     buffer = NumpyBuffer(raw.view(dtype))
-    if offset:
-        return MinusOneBuffer(buffer)
+    if index_fields and not (jl.isa(v, jl.FinchInterop.Buffer) and v.shifted):
+        return MinusOneBuffer(buffer, index_fields=index_fields)
     return buffer
 
 
@@ -233,7 +274,7 @@ def jl_level_to_python(jl_lvl) -> Level:
     if jl.isa(jl_lvl, jl.Finch.SparseByteMapLevel):
         return SparseByteMapLevel(
             jl_level_to_python(jl_lvl.lvl),
-            np.intp(int(jl_lvl.shape)),
+            jl_dtypes.to_fl_dtype(jl.first(jl.typeof(jl_lvl).parameters))(jl_lvl.shape),
             _jl_index_buffer_to_python(jl_lvl.ptr),
             _jl_buffer_to_python(jl_lvl.tbl),
             _jl_index_buffer_to_python(jl_lvl.srt),
@@ -250,17 +291,17 @@ def jl_level_to_python(jl_lvl) -> Level:
         )
 
     if jl.isa(jl_lvl, jl.Finch.SparseHashLevel):
-        single_writer = bool(jl.typeof(jl_lvl).parameters[1])
         return SparseHashLevel(
             jl_level_to_python(jl_lvl.lvl),
-            np.intp(int(jl_lvl.shape)),
+            jl_dtypes.to_fl_dtype(jl.first(jl.typeof(jl_lvl).parameters))(jl_lvl.shape),
             _jl_index_buffer_to_python(jl_lvl.ptr),
             _jl_buffer_to_python(jl_lvl.tbl_ctrl),
-            _jl_tuple_buffer_to_python(jl_lvl.tbl, 3, offset=1),
-            _jl_buffer_to_python(jl_lvl.pool),
+            _jl_index_buffer_to_python(jl_lvl.tbl),
+            _jl_tuple_buffer_to_python(jl_lvl.key, 3, index_fields=(0, 1)),
             _jl_index_buffer_to_python(jl_lvl.perm),
+            _jl_buffer_to_python(jl_lvl.tbl_count),
             subtables=int(jl_lvl.subtables),
-            single_writer=single_writer,
+            pos_multiplier=np.uintp(jl_lvl.pos_multiplier),
         )
 
     raise ValueError(f"Unsupported Julia level type for recovery: {jl.typeof(jl_lvl)}")
@@ -394,7 +435,9 @@ def tensor_to_jl(obj, pin_fill: bool = False):
 def scalar_to_jl(val, pin_fill: bool = False):
     fill = jl_dtypes._zero_value(ftype(val)) if pin_fill else val
     buf = np.asarray([val])
-    return jl.Tensor(jl.ElementLevel(_as_julia_scalar(fill), jl.Vector(buf)))
+    return jl.Tensor(
+        jl.ElementLevel(_as_julia_scalar(fill), jl_dtypes.to_jl_vector(ftype(val), buf))
+    )
 
 
 def jl_tensor_to_python(obj):

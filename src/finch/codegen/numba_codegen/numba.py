@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
 
+import numpy as np
+
 import numba
 import numba.core.types
 
@@ -34,9 +36,22 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
+
+
+@numba.njit
+def resize_records(arr, new_length):
+    # numpy.resize isn't supported on record arrays; new entries are left
+    # uninitialized.
+    out = np.empty(new_length, arr.dtype)
+    for i in range(min(new_length, len(arr))):
+        out[i] = arr[i]
+    return out
+
+
 numba_globals: dict[str, Any] = {
     "scansearch": numba.njit(ffuncs.scansearch._func),
     "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
+    "resize_records": resize_records,
 }
 
 

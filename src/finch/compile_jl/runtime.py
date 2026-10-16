@@ -115,8 +115,7 @@ class JuliaOwnedTensor(OverrideTensor):
 
     def item(self):
         if not self._shape:
-            values = self.raw_julia_obj.lvl.val.to_numpy(copy=False)
-            return values[0].item()
+            return jl.first(self.raw_julia_obj.lvl.val)
         return self._as_tensor().item()
 
     def __getitem__(self, index):

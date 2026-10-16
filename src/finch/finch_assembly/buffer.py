@@ -78,6 +78,15 @@ class Buffer(FTyped[BufferFType[FT]], ABC):
     @abstractmethod
     def store(self, idx: int, val): ...
 
+    @property
+    def owner(self):
+        """Object retaining the storage, which may change on resize.
+
+        Raw pointers must be reacquired after resize. Borrowing implementations
+        retain the previous allocation for existing views when they detach.
+        """
+        return self
+
     @abstractmethod
     def resize(self, len: int):
         """
