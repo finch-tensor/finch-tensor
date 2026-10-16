@@ -66,6 +66,27 @@ Base.dataids(buf::Buffer) = Base.dataids(buf.data)
 Base.copy(buf::Buffer{T,L,I}) where {T,L,I} =
     Buffer{T,L,I}(copy(buf.data), buf.layout, nothing, buf.shifted, true)
 
+function Base.copyto!(dest::Buffer, dstart::Integer, src::Buffer, sstart::Integer, n::Integer)
+    if dest !== src
+        return invoke(copyto!, Tuple{AbstractArray,Integer,AbstractArray,Integer,Integer},
+                      dest, dstart, src, sstart, n)
+    end
+    n == 0 && return dest
+    n >= 0 || throw(ArgumentError("copy length must be nonnegative"))
+    checkbounds(dest, dstart)
+    checkbounds(dest, dstart + n - 1)
+    checkbounds(src, sstart)
+    checkbounds(src, sstart + n - 1)
+    dest.writable || throw(ReadOnlyMemoryError())
+    # The AbstractArray fallback copies the entire source to handle aliasing.
+    # Hash checkpoints copy short ranges repeatedly; the byte vector handles
+    # overlap directly, keeping their total cost linear in the buffer length.
+    width = dest.layout[1]
+    GC.@preserve dest copyto!(dest.data, (dstart - 1) * width + 1,
+                             src.data, (sstart - 1) * width + 1, n * width)
+    return dest
+end
+
 @generated function load(::Type{T}, ptr, layout) where {T}
     if T <: Tuple
         fields = [:(load($(fieldtype(T, i)), ptr + layout[2][$i][1], layout[2][$i][2]))

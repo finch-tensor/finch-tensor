@@ -136,13 +136,63 @@ def test_numpy_buffer_resize_preserves_julia_borrow():
     assert source.load(1) == 1
 
 
-def test_julia_buffer_overlapping_copy_preserves_values():
+@pytest.mark.parametrize(
+    "destination, source_start, expected",
+    [(2, 1, [0, 0, 1, 2]), (1, 2, [1, 2, 3, 3])],
+)
+def test_julia_buffer_overlapping_copy_preserves_values(
+    destination, source_start, expected
+):
     _requires_julia_backend()
     source = np.arange(4, dtype=np.int64)
     vector = _buffer_to_jl(NumpyBuffer(source), offset=1)
-    getattr(jl, "copyto!")(vector, 2, vector, 1, 3)
-    assert list(vector) == [1, 1, 2, 3]
-    np.testing.assert_array_equal(source, [0, 0, 1, 2])
+    getattr(jl, "copyto!")(vector, destination, vector, source_start, 3)
+    assert list(vector) == [value + 1 for value in expected]
+    np.testing.assert_array_equal(source, expected)
+
+
+def test_julia_buffer_partial_copy_does_not_copy_entire_storage():
+    _requires_julia_backend()
+    vector = _buffer_to_jl(NumpyBuffer(np.arange(10_000, dtype=np.int64)))
+    allocated = jl.seval(
+        """function (buffer)
+            copyto!(buffer, 1, buffer, 2, 1)
+            return @allocated copyto!(buffer, 1, buffer, 2, 1)
+        end"""
+    )
+    # Hash statistics checkpoint one entry at a time in a large buffer.
+    assert allocated(vector) < 1024
+    assert vector[0] == 1
+
+
+@pytest.mark.parametrize(
+    "destination, source_start, length, error",
+    [
+        (0, 1, 1, "BoundsError"),
+        (1, 0, 1, "BoundsError"),
+        (3, 1, 3, "BoundsError"),
+        (1, 3, 3, "BoundsError"),
+        (1, 1, -1, "ArgumentError"),
+    ],
+)
+def test_julia_buffer_partial_copy_checks_bounds(
+    destination, source_start, length, error
+):
+    _requires_julia_backend()
+    source = np.arange(4, dtype=np.int64)
+    vector = _buffer_to_jl(NumpyBuffer(source))
+    with pytest.raises(Exception, match=error):
+        getattr(jl, "copyto!")(vector, destination, vector, source_start, length)
+    np.testing.assert_array_equal(source, np.arange(4))
+
+
+def test_julia_buffer_copy_between_buffers_preserves_offsets():
+    _requires_julia_backend()
+    source = _buffer_to_jl(NumpyBuffer(np.arange(4, dtype=np.int32)), offset=1)
+    data = np.zeros(4, dtype=np.int64)
+    destination = _buffer_to_jl(NumpyBuffer(data))
+    getattr(jl, "copyto!")(destination, 1, source, 1, 4)
+    np.testing.assert_array_equal(data, [1, 2, 3, 4])
 
 
 @pytest.mark.parametrize("aligned", [False, True])
@@ -173,6 +223,9 @@ def test_julia_buffer_readonly_storage_detaches_on_resize():
     assert not _jl_array_to_python_no_copy(vector).flags.writeable
     with pytest.raises(Exception, match="ReadOnlyMemoryError"):
         vector[0] = 10
+    with pytest.raises(Exception, match="ReadOnlyMemoryError"):
+        getattr(jl, "copyto!")(vector, 2, vector, 1, 3)
+    getattr(jl, "copyto!")(vector, 1, vector, 1, 0)
     getattr(jl, "resize!")(vector, 5)
     vector[0] = 10
     assert source[0] == 0
