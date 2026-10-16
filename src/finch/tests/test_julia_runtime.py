@@ -117,6 +117,7 @@ def test_julia_buffer_preserves_borrowed_and_exported_storage():
     del vector
     gc.collect()
     jl.GC.gc()
+    assert reference() is not None
     np.testing.assert_array_equal(old_view, [0, 1, 2, 3])
     np.testing.assert_array_equal(owned_view[:4], [10, 1, 2, 3])
 

@@ -175,7 +175,7 @@ def _jl_array_to_python_no_copy(v):
     if jl.isa(v, jl.FinchInterop.Buffer):
         data, layout = jl.FinchInterop.storage(v)
         dtype = _dtype_with_layout(_jl_numpy_dtype(jl.eltype(v)), layout)
-        raw = data.to_numpy(copy=False).view(dtype)
+        raw = np.array(data, copy=False).view(dtype)
         if not v.writable:
             raw.flags.writeable = False
         return raw

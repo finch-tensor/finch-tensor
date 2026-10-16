@@ -42,10 +42,6 @@ function borrow(::Type{T}, bytes, layout::L, ::Val{I}, shifted, writable=true) w
     valid_layout(T, layout) && length(bytes) % layout[1] == 0 ||
         throw(ArgumentError("invalid buffer layout"))
     data = unsafe_wrap(Vector{UInt8}, pointer(bytes), length(bytes); own=false)
-    # NumPy views of data can outlive this buffer, so data itself retains the owner.
-    finalizer(data) do _
-        GC.@preserve bytes nothing
-    end
     Buffer{T,L,I}(data, layout, bytes, shifted, writable)
 end
 
@@ -59,8 +55,8 @@ function owner(buf::Buffer)
 end
 
 function storage(buf::Buffer)
-    owner(buf)
-    return (buf.data, buf.layout)
+    # Export the allocation's owner so views retain it after this buffer detaches.
+    return (owner(buf), buf.layout)
 end
 
 Base.IndexStyle(::Type{<:Buffer}) = IndexLinear()
