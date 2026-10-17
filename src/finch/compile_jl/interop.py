@@ -79,10 +79,6 @@ def _buffer_to_jl(
     raise ValueError(f"Unsupported buffer type: {type(buffer)}")
 
 
-def _plus_one_buffer_to_jl(buffer: Buffer):
-    return _buffer_to_jl(buffer, offset=1)
-
-
 def level_to_jl(level: Level, pin_fill: bool = False):
     """Convert a level to its Julia counterpart, optionally pinning its fill."""
     match level:
@@ -102,8 +98,8 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             return jl.SparseListLevel(
                 level_to_jl(lvl, pin_fill),
                 int(dimension),
-                _plus_one_buffer_to_jl(cast(Buffer, ptr)),
-                _plus_one_buffer_to_jl(cast(Buffer, idx)),
+                _buffer_to_jl(cast(Buffer, ptr), offset=1),
+                _buffer_to_jl(cast(Buffer, idx), offset=1),
             )
         case SparseByteMapLevel(
             lvl=lvl, dimension=dimension, ptr=ptr, tbl=tbl, srt=srt
@@ -126,8 +122,8 @@ def level_to_jl(level: Level, pin_fill: bool = False):
             return jl.SparseCOOLevel(
                 level_to_jl(lvl, pin_fill),
                 tuple(int(dim) for dim in reversed(coo_shape)),
-                _plus_one_buffer_to_jl(ptr),
-                tuple(_plus_one_buffer_to_jl(idx) for idx in reversed(tbl)),
+                _buffer_to_jl(ptr, offset=1),
+                tuple(_buffer_to_jl(idx, offset=1) for idx in reversed(tbl)),
             )
         case SparseHashLevel(
             lvl=lvl,
