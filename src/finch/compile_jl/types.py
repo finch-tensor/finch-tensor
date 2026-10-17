@@ -1,4 +1,5 @@
 import math
+import warnings
 from functools import lru_cache
 from typing import Any
 
@@ -162,30 +163,44 @@ def to_jl_buffer(
     T = to_fl_dtype(T)
     if offset not in (0, 1):
         raise ValueError("Julia index conversion only supports offsets 0 and 1")
+    jl_type = to_jl_type(T)
+    jl_dtype = _jl_numpy_dtype(jl_type)
     if not isinstance(values, np.ndarray):
-        values = np.asarray(values, dtype=np_dtype(T))
-    if not values.dtype.isnative:
-        values = values.astype(values.dtype.newbyteorder("="))
-    if ft.ftype(values.dtype) != ft.ftype(np_dtype(T)):
-        values = values.astype(np_dtype(T))
+        values = np.asarray(values, dtype=jl_dtype)
+    if ft.ftype(values.dtype.newbyteorder("=")) != ft.ftype(np_dtype(T)):
+        values = values.astype(jl_dtype)
+    elif not (
+        values.dtype.isnative
+        and values.flags.aligned
+        and _buffer_layout(values.dtype) == _buffer_layout(jl_dtype)
+    ):
+        # Empty buffers detach on their first resize, so copying them is free.
+        if values.size:
+            warnings.warn(
+                f"Copying a {values.dtype} buffer into Julia's {jl_type} layout; "
+                "its storage cannot be shared with Julia.",
+                stacklevel=2,
+            )
+        values = values.astype(jl_dtype)
     values = np.ascontiguousarray(values)
-    fields = ()
-    if offset:
-        if index_fields is not None:
-            fields = tuple(i + 1 for i in index_fields)
-        elif isinstance(T, TupleFType):
-            fields = tuple(range(1, len(T.struct_fields) + 1))
-        else:
-            fields = (1,)
     jl = get_jl()
-    return jl.FinchInterop.borrow(
-        to_jl_type(T),
-        values.reshape(-1).view(np.uint8),
-        _buffer_layout(values.dtype),
-        jl.Val(fields),
-        _py_bool(offset),
-        values.flags.writeable,
+    buffer = jl.FinchInterop.borrow(
+        jl_type, values.reshape(-1).view(np.uint8), values.flags.writeable
     )
+    if not offset:
+        return buffer
+    if index_fields is not None:
+        fields = tuple(i + 1 for i in index_fields)
+    elif isinstance(T, TupleFType):
+        fields = tuple(range(1, len(T.struct_fields) + 1))
+    else:
+        fields = (1,)
+    return jl.FinchInterop.PlusOneBuffer(buffer, jl.Val(fields))
+
+
+@lru_cache
+def _jl_numpy_dtype(type_):
+    return get_jl().Vector[type_]().to_numpy(copy=False).dtype
 
 
 def _buffer_layout(dtype):
@@ -244,7 +259,10 @@ def _leaf_type_str(T: Any) -> str:
 
 
 def _buffer_ctor_str(elem_type_str: str, index_fields: tuple[int, ...] = ()) -> str:
-    return f"FinchInterop.Buffer({elem_type_str}[], Val({index_fields}))"
+    buffer = f"FinchInterop.Buffer({elem_type_str}[])"
+    if index_fields:
+        return f"FinchInterop.PlusOneBuffer({buffer}, Val({index_fields}))"
+    return buffer
 
 
 def _level_constructor_str(level_ftype: LevelFType) -> str:

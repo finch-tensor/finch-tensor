@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any, cast
 
 import numpy as np
@@ -66,9 +65,7 @@ def _buffer_to_jl(
             raise ValueError(
                 "MinusOneBuffer can only be unwrapped with matching offsets"
             )
-        result = _buffer_to_jl(buffer.data, offset=offset, index_fields=index_fields)
-        result.shifted = False
-        return result
+        return _buffer_to_jl(buffer.data)
     if isinstance(buffer, NumpyBuffer):
         return jl_dtypes.to_jl_buffer(
             buffer.ftype.element_type,
@@ -169,35 +166,12 @@ def level_to_jl(level: Level, pin_fill: bool = False):
 def _jl_array_to_python_no_copy(v):
     """Return a NumPy view of a Julia array without copying its data."""
     if jl.isa(v, jl.FinchInterop.Buffer):
-        data, layout = jl.FinchInterop.storage(v)
-        dtype = _dtype_with_layout(_jl_numpy_dtype(jl.eltype(v)), layout)
-        raw = np.array(data, copy=False).view(dtype)
+        data = jl.FinchInterop.storage(v)
+        raw = np.array(data, copy=False).view(jl_dtypes._jl_numpy_dtype(jl.eltype(v)))
         if not v.writable:
             raw.flags.writeable = False
         return raw
     return v.to_numpy(copy=False)
-
-
-@lru_cache
-def _jl_numpy_dtype(type_):
-    return jl.Vector[type_]().to_numpy(copy=False).dtype
-
-
-def _dtype_with_layout(dtype, layout):
-    if dtype.names is None:
-        return dtype
-    fields = tuple(layout[1])
-    return np.dtype(
-        {
-            "names": dtype.names,
-            "formats": [
-                _dtype_with_layout(dtype.fields[name][0], field[1])
-                for name, field in zip(dtype.names, fields, strict=True)
-            ],
-            "offsets": [field[0] for field in fields],
-            "itemsize": layout[0],
-        }
-    )
 
 
 def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
@@ -205,13 +179,9 @@ def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
     Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
     to Python's 0-based indexing without copying.
     """
-    if jl.isa(v, jl.Finch.PlusOneVector):
-        raw = _jl_array_to_python_no_copy(v.data)
-        return NumpyBuffer(raw)
-    raw = _jl_array_to_python_no_copy(v)
-    if jl.isa(v, jl.FinchInterop.Buffer) and v.shifted:
-        return NumpyBuffer(raw)
-    return MinusOneBuffer(NumpyBuffer(raw))
+    if jl.isa(v, jl.FinchInterop.PlusOneBuffer):
+        return NumpyBuffer(_jl_array_to_python_no_copy(v.data))
+    return MinusOneBuffer(NumpyBuffer(_jl_array_to_python_no_copy(v)))
 
 
 def _jl_buffer_to_python(v) -> NumpyBuffer:
@@ -222,7 +192,8 @@ def _jl_tuple_buffer_to_python(
     v, n_fields: int, *, index_fields: tuple[int, ...] = ()
 ) -> Buffer:
     """Convert a Julia tuple buffer while preserving its Julia-owned data."""
-    raw = _jl_array_to_python_no_copy(v)
+    shifted = jl.isa(v, jl.FinchInterop.PlusOneBuffer)
+    raw = _jl_array_to_python_no_copy(v.data if shifted else v)
 
     src_fields = raw.dtype.fields
     assert src_fields is not None
@@ -236,7 +207,7 @@ def _jl_tuple_buffer_to_python(
         }
     )
     buffer = NumpyBuffer(raw.view(dtype))
-    if index_fields and not (jl.isa(v, jl.FinchInterop.Buffer) and v.shifted):
+    if index_fields and not shifted:
         return MinusOneBuffer(buffer, index_fields=index_fields)
     return buffer
 

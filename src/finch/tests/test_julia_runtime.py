@@ -1,4 +1,5 @@
 import gc
+import warnings
 import weakref
 
 import pytest
@@ -245,23 +246,39 @@ def test_julia_buffer_copy_between_buffers_preserves_offsets():
     np.testing.assert_array_equal(data, [1, 2, 3, 4])
 
 
-@pytest.mark.parametrize("aligned", [False, True])
-def test_julia_buffer_borrows_hash_keys_without_shifting_state(aligned):
+def test_julia_buffer_borrows_hash_keys_without_shifting_state():
     _requires_julia_backend()
     key_type = TupleFType.from_tuple((ft.intp, ft.int32, ft.uint8))
-    dtype = np.dtype(np_dtype(key_type).descr, align=aligned)
+    dtype = np.dtype(np_dtype(key_type).descr, align=True)
     source = np.array([(0, 2, 128), (1, 0, 127)], dtype=dtype)
     vector = _buffer_to_jl(NumpyBuffer(source), offset=1, index_fields=(0, 1))
-    assert _jl_array_to_python_no_copy(vector).ctypes.data == source.ctypes.data
+    assert _jl_array_to_python_no_copy(vector.data).ctypes.data == source.ctypes.data
     assert [tuple(entry) for entry in vector] == [(1, 3, 128), (2, 1, 127)]
     vector[1] = (4, 5, 0)
     assert source.tolist() == [(0, 2, 128), (3, 4, 0)]
     getattr(jl, "push!")(vector, (5, 6, 128))
-    assert jl.FinchInterop.owns_storage(vector)
+    assert jl.FinchInterop.owns_storage(vector.data)
     assert [tuple(entry) for entry in vector] == [(1, 3, 128), (4, 5, 0), (5, 6, 128)]
     assert source.tolist() == [(0, 2, 128), (3, 4, 0)]
     getattr(jl, "empty!")(vector)
     assert len(vector) == 0
+
+
+def test_julia_buffer_copies_packed_layout_with_warning():
+    _requires_julia_backend()
+    key_type = TupleFType.from_tuple((ft.intp, ft.int32, ft.uint8))
+    source = np.array([(0, 2, 128), (1, 0, 127)], dtype=np_dtype(key_type))
+    with pytest.warns(UserWarning, match="Copying"):
+        vector = _buffer_to_jl(NumpyBuffer(source), offset=1, index_fields=(0, 1))
+    assert _jl_array_to_python_no_copy(vector.data).ctypes.data != source.ctypes.data
+    assert [tuple(entry) for entry in vector] == [(1, 3, 128), (2, 1, 127)]
+    vector[1] = (4, 5, 0)
+    assert source.tolist() == [(0, 2, 128), (1, 0, 127)]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        empty = _buffer_to_jl(NumpyBuffer(source[:0]), offset=1, index_fields=(0, 1))
+    assert len(empty) == 0
 
 
 def test_julia_buffer_readonly_storage_detaches_on_resize():
@@ -294,9 +311,10 @@ def test_julia_buffer_borrows_nested_tuple_layout():
     type_ = TupleFType.from_tuple(
         (TupleFType.from_tuple((ft.int32, ft.int64)), ft.uint8)
     )
-    source = np.array([((0, 2), 128), ((3, 4), 127)], dtype=np_dtype(type_))
+    dtype = np.dtype(np_dtype(type_).descr, align=True)
+    source = np.array([((0, 2), 128), ((3, 4), 127)], dtype=dtype)
     vector = _buffer_to_jl(NumpyBuffer(source), offset=1, index_fields=(0,))
-    view = _jl_array_to_python_no_copy(vector)
+    view = _jl_array_to_python_no_copy(vector.data)
     assert view.ctypes.data == source.ctypes.data
     assert view.tolist() == source.tolist()
     assert tuple(vector[0][0]) == (1, 3)

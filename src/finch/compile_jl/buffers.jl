@@ -6,43 +6,22 @@ using Base: @propagate_inbounds
 Resizable storage with an explicit owner. Borrowed storage is shared until resize;
 the first resize detaches it, preserving the surviving prefix. Exporting storage
 borrows it again so existing views remain valid across subsequent resizes.
-
-The byte layout supports both packed NumPy records and aligned Julia tuples.
-Index fields are shifted on access, without rewriting the borrowed allocation.
 """
-mutable struct Buffer{T,L,I} <: AbstractVector{T}
-    data::Vector{UInt8}
-    layout::L
+mutable struct Buffer{T} <: AbstractVector{T}
+    data::Vector{T}
     owner::Any
-    shifted::Bool
     writable::Bool
 end
 
-layout(::Type{T}) where {T} = (sizeof(T), ())
-layout(::Type{T}) where {T<:Tuple} =
-    (sizeof(T), ntuple(i -> (Int(fieldoffset(T, i)), layout(fieldtype(T, i))), fieldcount(T)))
+Buffer(data::Vector{T}) where {T} = Buffer{T}(data, data, true)
 
-function Buffer(data::Vector{T}, ::Val{I}=Val(())) where {T,I}
-    borrow(T, reinterpret(UInt8, data), layout(T), Val(I), false)
-end
-
-valid_layout(::Type{T}, layout) where {T} = layout == (sizeof(T), ())
-function valid_layout(::Type{T}, layout) where {T<:Tuple}
-    length(layout[2]) == fieldcount(T) || return false
-    all(enumerate(layout[2])) do (i, (offset, child))
-        0 <= offset <= layout[1] - child[1] && valid_layout(fieldtype(T, i), child)
-    end
-end
-
-function borrow(::Type{T}, bytes, layout::L, ::Val{I}, shifted, writable=true) where {T,L,I}
-    isbitstype(T) || throw(ArgumentError("buffer elements must be isbits"))
-    eltype(bytes) == UInt8 && stride(bytes, 1) == 1 ||
+function borrow(::Type{T}, bytes, writable=true) where {T}
+    isbitstype(T) && sizeof(T) > 0 ||
+        throw(ArgumentError("buffer elements must be nonempty isbits"))
+    eltype(bytes) == UInt8 && stride(bytes, 1) == 1 && length(bytes) % sizeof(T) == 0 ||
         throw(ArgumentError("buffer storage must be contiguous bytes"))
-    layout[1] > 0 || throw(ArgumentError("buffer elements must have nonzero size"))
-    valid_layout(T, layout) && length(bytes) % layout[1] == 0 ||
-        throw(ArgumentError("invalid buffer layout"))
-    data = unsafe_wrap(Vector{UInt8}, pointer(bytes), length(bytes); own=false)
-    Buffer{T,L,I}(data, layout, bytes, shifted, writable)
+    data = unsafe_wrap(Vector{T}, Ptr{T}(pointer(bytes)), length(bytes) ÷ sizeof(T); own=false)
+    Buffer{T}(data, bytes, writable)
 end
 
 owns_storage(buf::Buffer) = isnothing(buf.owner)
@@ -54,87 +33,44 @@ function owner(buf::Buffer)
     return buf.owner
 end
 
-function storage(buf::Buffer)
-    # Export the allocation's owner so views retain it after this buffer detaches.
-    return (owner(buf), buf.layout)
-end
+# Export the allocation's owner so views retain it after this buffer detaches.
+storage(buf::Buffer) = owner(buf)
 
 Base.IndexStyle(::Type{<:Buffer}) = IndexLinear()
-Base.size(buf::Buffer) = (length(buf.data) ÷ buf.layout[1],)
+Base.size(buf::Buffer) = size(buf.data)
 Base.similar(::Buffer, ::Type{T}, dims::Dims) where {T} = Array{T}(undef, dims)
 Base.dataids(buf::Buffer) = Base.dataids(buf.data)
-Base.copy(buf::Buffer{T,L,I}) where {T,L,I} =
-    Buffer{T,L,I}(copy(buf.data), buf.layout, nothing, buf.shifted, true)
+Base.copy(buf::Buffer{T}) where {T} = Buffer{T}(copy(buf.data), nothing, true)
 
 function Base.copyto!(dest::Buffer, dstart::Integer, src::Buffer, sstart::Integer, n::Integer)
     if dest !== src
         return invoke(copyto!, Tuple{AbstractArray,Integer,AbstractArray,Integer,Integer},
                       dest, dstart, src, sstart, n)
     end
-    n == 0 && return dest
-    n >= 0 || throw(ArgumentError("copy length must be nonnegative"))
-    checkbounds(dest, dstart)
-    checkbounds(dest, dstart + n - 1)
-    checkbounds(src, sstart)
-    checkbounds(src, sstart + n - 1)
-    dest.writable || throw(ReadOnlyMemoryError())
+    n == 0 || dest.writable || throw(ReadOnlyMemoryError())
     # The AbstractArray fallback copies the entire source to handle aliasing.
-    # Hash checkpoints copy short ranges repeatedly; the byte vector handles
+    # Hash checkpoints copy short ranges repeatedly; the vector handles
     # overlap directly, keeping their total cost linear in the buffer length.
-    width = dest.layout[1]
-    GC.@preserve dest copyto!(dest.data, (dstart - 1) * width + 1,
-                             src.data, (sstart - 1) * width + 1, n * width)
+    copyto!(dest.data, dstart, src.data, sstart, n)
     return dest
 end
 
-@generated function load(::Type{T}, ptr, layout) where {T}
-    if T <: Tuple
-        fields = [:(load($(fieldtype(T, i)), ptr + layout[2][$i][1], layout[2][$i][2]))
-                  for i in 1:fieldcount(T)]
-        return Expr(:tuple, fields...)
-    end
-    return :(unsafe_load(Ptr{T}(ptr)))
-end
+@propagate_inbounds Base.getindex(buf::Buffer, i::Int) = buf.data[i]
 
-@generated function store!(ptr, value::T, layout) where {T}
-    if T <: Tuple
-        fields = [:(store!(ptr + layout[2][$i][1], value[$i], layout[2][$i][2]))
-                  for i in 1:fieldcount(T)]
-        return Expr(:block, fields..., :(nothing))
-    end
-    return :(unsafe_store!(Ptr{T}(ptr), value))
-end
-
-@inline offset(value, op) = op(value, one(value))
-@inline offset(value::Tuple, op) = map(x -> offset(x, op), value)
-@inline shift(value, ::Val, op) = offset(value, op)
-@inline shift(value::Tuple, ::Val{I}, op) where {I} =
-    ntuple(i -> i in I ? offset(value[i], op) : value[i], Val(length(value)))
-
-@propagate_inbounds function Base.getindex(buf::Buffer{T,L,I}, i::Int) where {T,L,I}
-    @boundscheck checkbounds(buf, i)
-    value = GC.@preserve buf load(T, pointer(buf.data) + (i - 1) * buf.layout[1], buf.layout)
-    return buf.shifted ? shift(value, Val(I), +) : value
-end
-
-@propagate_inbounds function Base.setindex!(buf::Buffer{T,L,I}, value, i::Int) where {T,L,I}
-    @boundscheck checkbounds(buf, i)
-    buf.writable || throw(ReadOnlyMemoryError())
-    value = convert(T, value)
-    value = buf.shifted ? shift(value, Val(I), -) : value
-    GC.@preserve buf store!(pointer(buf.data) + (i - 1) * buf.layout[1], value, buf.layout)
+@propagate_inbounds function Base.setindex!(buf::Buffer, value, i::Int)
+    @boundscheck buf.writable || throw(ReadOnlyMemoryError())
+    buf.data[i] = value
     return buf
 end
 
-function Base.resize!(buf::Buffer, n::Integer)
+function Base.resize!(buf::Buffer{T}, n::Integer) where {T}
     n >= 0 || throw(ArgumentError("buffer length must be nonnegative"))
     n == length(buf) && return buf
-    nbytes = Base.checked_mul(Int(n), buf.layout[1])
     if owns_storage(buf)
-        resize!(buf.data, nbytes)
+        resize!(buf.data, n)
     else
-        data = Vector{UInt8}(undef, nbytes)
-        copyto!(data, 1, buf.data, 1, min(nbytes, length(buf.data)))
+        data = Vector{T}(undef, n)
+        copyto!(data, 1, buf.data, 1, min(n, length(buf.data)))
         buf.data = data
         buf.owner = nothing
         buf.writable = true
@@ -147,6 +83,47 @@ function Base.push!(buf::Buffer, value)
     resize!(buf, length(buf) + 1)
     buf[end] = value
     return buf
+end
+
+"""
+Shifts the index fields `I` of each element up by one on load and down by one
+on store, so Julia sees 1-based indices over 0-based storage.
+"""
+struct PlusOneBuffer{T,I,A<:AbstractVector{T}} <: AbstractVector{T}
+    data::A
+end
+
+PlusOneBuffer(data::AbstractVector{T}, ::Val{I}) where {T,I} =
+    PlusOneBuffer{T,I,typeof(data)}(data)
+
+@inline offset(value, op) = op(value, one(value))
+@inline offset(value::Tuple, op) = map(x -> offset(x, op), value)
+@inline shift(value, ::Val, op) = offset(value, op)
+@inline shift(value::Tuple, ::Val{I}, op) where {I} =
+    ntuple(i -> i in I ? offset(value[i], op) : value[i], Val(length(value)))
+
+@propagate_inbounds Base.getindex(buf::PlusOneBuffer{T,I}, i::Int) where {T,I} =
+    shift(buf.data[i], Val(I), +)
+
+@propagate_inbounds function Base.setindex!(buf::PlusOneBuffer{T,I}, value, i::Int) where {T,I}
+    buf.data[i] = shift(value, Val(I), -)
+    return buf
+end
+
+Base.IndexStyle(::Type{<:PlusOneBuffer}) = IndexLinear()
+Base.size(buf::PlusOneBuffer) = size(buf.data)
+Base.dataids(buf::PlusOneBuffer) = Base.dataids(buf.data)
+Base.copy(buf::PlusOneBuffer{T,I}) where {T,I} = PlusOneBuffer(copy(buf.data), Val(I))
+Base.resize!(buf::PlusOneBuffer, n::Integer) = (resize!(buf.data, n); buf)
+Base.empty!(buf::PlusOneBuffer) = (empty!(buf.data); buf)
+Base.push!(buf::PlusOneBuffer{T,I}, value) where {T,I} =
+    (push!(buf.data, shift(value, Val(I), -)); buf)
+
+# Both sides store the same shifted representation, so forward to the storage.
+function Base.copyto!(dest::PlusOneBuffer{T,I}, dstart::Integer,
+                      src::PlusOneBuffer{T,I}, sstart::Integer, n::Integer) where {T,I}
+    copyto!(dest.data, dstart, src.data, sstart, n)
+    return dest
 end
 
 end
