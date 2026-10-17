@@ -1,4 +1,4 @@
-function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Vector{Int64}}, PlusOneVector{Int64, Vector{Int64}}, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.DiagMask}, v2::Tensor{SparseHashLevel{Int64, true, PlusOneVector{Int64, Vector{Int64}}, Vector{UInt8}, Vector{Tuple{Int64, Int64, Int64}}, Vector{Int64}, PlusOneVector{Int64, Vector{Int64}}, SparseHashLevel{Int64, true, PlusOneVector{Int64, Vector{Int64}}, Vector{UInt8}, Vector{Tuple{Int64, Int64, Int64}}, Vector{Int64}, PlusOneVector{Int64, Vector{Int64}}, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v5::Int64, v6::Int64)
+function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, ()}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.DiagMask}, v2::Tensor{SparseHashLevel{Int64, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{UInt8, Tuple{Int64, Tuple{}}, ()}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}, Tuple{Int64, Tuple{Tuple{Int64, Tuple{Int64, Tuple{}}}, Tuple{Int64, Tuple{Int64, Tuple{}}}, Tuple{Int64, Tuple{Int64, Tuple{}}}}}, (1, 2)}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, ()}, SparseHashLevel{Int64, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{UInt8, Tuple{Int64, Tuple{}}, ()}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{Tuple{Int64, Int64, UInt8}, Tuple{Int64, Tuple{Tuple{Int64, Tuple{Int64, Tuple{}}}, Tuple{Int64, Tuple{Int64, Tuple{}}}, Tuple{Int64, Tuple{Int64, Tuple{}}}}}, (1, 2)}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, (1,)}, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, ()}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64, Tuple{Int64, Tuple{}}, ()}}}}}, v5::Int64, v6::Int64)
     @inbounds @fastmath(begin
                 v0_lvl = v0.lvl
                 v0_lvl_stop = v0_lvl.shape
@@ -12,14 +12,16 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 v2_lvl_ptr = v2_lvl.ptr
                 v2_lvl_tbl_ctrl = v2_lvl.tbl_ctrl
                 v2_lvl_tbl = v2_lvl.tbl
-                v2_lvl_pool = v2_lvl.pool
+                v2_lvl_key = v2_lvl.key
                 v2_lvl_perm = v2_lvl.perm
+                v2_lvl_tbl_count = v2_lvl.tbl_count
                 v2_lvl_2 = v2_lvl.lvl
                 v2_lvl_2_ptr = v2_lvl_2.ptr
                 v2_lvl_2_tbl_ctrl = v2_lvl_2.tbl_ctrl
                 v2_lvl_2_tbl = v2_lvl_2.tbl
-                v2_lvl_2_pool = v2_lvl_2.pool
+                v2_lvl_2_key = v2_lvl_2.key
                 v2_lvl_2_perm = v2_lvl_2.perm
+                v2_lvl_2_tbl_count = v2_lvl_2.tbl_count
                 v2_lvl_3 = v2_lvl_2.lvl
                 v2_lvl_3_val = v2_lvl_3.val
                 v0_lvl_2_stop == v6 || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_2_stop) != $(v6))"))
@@ -28,38 +30,49 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 v0_lvl_2_stop == (v1.dims[1]).stop || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_2_stop) != $((v1.dims[1]).stop))"))
                 1 == (v1.dims[2]).start || throw(DimensionMismatch("mismatched dimension limits ($(1) != $((v1.dims[2]).start))"))
                 v0_lvl_stop == (v1.dims[2]).stop || throw(DimensionMismatch("mismatched dimension limits ($(v0_lvl_stop) != $((v1.dims[2]).stop))"))
-                empty!(v2_lvl_tbl_ctrl)
-                empty!(v2_lvl_tbl)
-                empty!(v2_lvl_pool)
+                Finch.sparse_hash_clear!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, v2_lvl_perm, v2_lvl.subtables, v2_lvl.pos_multiplier)
+                empty!(v2_lvl_key)
+                empty!(v2_lvl_perm)
+                fill!(v2_lvl_tbl_count, 0)
                 v2_lvl_qos_stop = 0
-                resize!(v2_lvl_perm, 0)
-                empty!(v2_lvl_2_tbl_ctrl)
-                empty!(v2_lvl_2_tbl)
-                empty!(v2_lvl_2_pool)
+                v2_lvl_pending = 0
+                v2_lvl_free_head = zero(Int64)
+                Finch.sparse_hash_clear!(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_key, v2_lvl_2_perm, v2_lvl_2.subtables, v2_lvl_2.pos_multiplier)
+                empty!(v2_lvl_2_key)
+                empty!(v2_lvl_2_perm)
+                fill!(v2_lvl_2_tbl_count, 0)
                 v2_lvl_2_qos_stop = 0
-                resize!(v2_lvl_2_perm, 0)
+                v2_lvl_2_pending = 0
+                v2_lvl_2_free_head = zero(Int64)
                 for v11_5 = 1:v0_lvl_stop
-                    if v2_lvl_qos_stop == length(v2_lvl_perm)
-                        v2_lvl_q_stop = max(length(v2_lvl_perm) << 1, v2_lvl_qos_stop + 1)
-                        Finch.resize_if_smaller!(v2_lvl_perm, v2_lvl_q_stop)
-                        v2_lvl_tbl_cap = Finch.sparse_hash_table_capacity(v2_lvl_q_stop, v2_lvl.subtables)
-                        Finch.sparse_hash_table_resize!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_tbl_cap, v2_lvl.subtables)
+                    v2_lvl_x = Finch.sparse_hash_hash(1, v11_5, v2_lvl.pos_multiplier)
+                    v2_lvl_b = Finch.sparse_hash_hash_subtable(v2_lvl_x, v2_lvl.subtables)
+                    if 2 * v2_lvl.subtables * (v2_lvl_tbl_count[v2_lvl_b] + 1) > length(v2_lvl_tbl_ctrl)
+                        Finch.sparse_hash_resize!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, max(2 * length(v2_lvl_tbl_ctrl), 4 * v2_lvl.subtables), v2_lvl.subtables, v2_lvl.pos_multiplier, v2_lvl_qos_stop)
                     end
-                    v2_lvl_tbl_hash = Finch.sparse_hash_hash(1, v11_5)
-                    v2_lvl_tbl_ctrl_byte = Finch.sparse_hash_hash_ctrl(v2_lvl_tbl_hash)
-                    v2_lvl_tbl_n = length(v2_lvl_tbl)
-                    v2_lvl_tbl_slot = Finch.sparse_hash_table_lookup_insert_slot(v2_lvl_tbl_ctrl, v2_lvl_tbl, 1, v11_5, v2_lvl_tbl_hash, v2_lvl_tbl_ctrl_byte, v2_lvl_tbl_n, v2_lvl.subtables)
-                    v2_lvl_qos = 0
-                    v2_lvl_tbl_found = false
-                    if v2_lvl_tbl_slot != 0 && @inbounds(v2_lvl_tbl_ctrl[v2_lvl_tbl_slot]) != Finch.SPARSE_HASH_CTRL_EMPTY
-                        @inbounds v2_lvl_tbl_entry = v2_lvl_tbl[v2_lvl_tbl_slot]
-                        v2_lvl_qos = Finch.sparse_hash_entry_val(v2_lvl_tbl_entry)
-                        v2_lvl_tbl_found = true
+                    v2_lvl_h = Finch.sparse_hash_find(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, 1, v11_5, v2_lvl_x, v2_lvl.subtables)
+                    v2_lvl_s = true
+                    if v2_lvl_tbl_ctrl[v2_lvl_h] == Finch.SPARSE_HASH_CTRL_EMPTY
+                        v2_lvl_tbl_count[v2_lvl_b] += 1
+                        if v2_lvl_free_head == 0
+                            v2_lvl_qos = (Int64)(v2_lvl_qos_stop += 1)
+                        else
+                            v2_lvl_qos = v2_lvl_free_head
+                            v2_lvl_free_head = (v2_lvl_key[v2_lvl_free_head])[1]
+                        end
+                        if v2_lvl_qos > length(v2_lvl_key)
+                            v2_lvl_q_stop = max(2 * length(v2_lvl_key), v2_lvl_qos)
+                            resize!(v2_lvl_key, v2_lvl_q_stop)
+                        end
+                        v2_lvl_key[v2_lvl_qos] = (1, v11_5, 0x01)
+                        v2_lvl_tbl_ctrl[v2_lvl_h] = Finch.sparse_hash_hash_ctrl(v2_lvl_x)
+                        v2_lvl_tbl[v2_lvl_h] = v2_lvl_qos
+                    else
+                        v2_lvl_qos = v2_lvl_tbl[v2_lvl_h]
+                        v2_lvl_s = (v2_lvl_key[v2_lvl_qos])[3] != Finch.SPARSE_HASH_KEY_RETAINED
+                        v2_lvl_s && Finch.sparse_hash_share!(v2_lvl_key, v2_lvl_qos)
                     end
-                    if v2_lvl_qos == 0
-                        v2_lvl_qos = v2_lvl_qos_stop + 1
-                        v2_lvl_qos_stop = v2_lvl_qos
-                    end
+                    v2_lvl_s && (v2_lvl_pending += 1)
                     v2_lvl_dirty = false
                     v0_lvl_q = (1 - 1) * v0_lvl_stop + v11_5
                     v0_lvl_2_q = v0_lvl_2_ptr[v0_lvl_q]
@@ -80,129 +93,65 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                             phase_stop_2 = min(phase_stop, v0_lvl_2_i)
                             if v0_lvl_2_i == phase_stop_2
                                 v0_lvl_3_val_2 = v0_lvl_3_val[v0_lvl_2_q]
-                                if v2_lvl_2_qos_stop == length(v2_lvl_2_perm)
-                                    v2_lvl_2_old = length(v2_lvl_2_perm) + 1
-                                    v2_lvl_2_q_stop = max(length(v2_lvl_2_perm) << 1, v2_lvl_2_qos_stop + 1)
-                                    Finch.resize_if_smaller!(v2_lvl_2_perm, v2_lvl_2_q_stop)
-                                    v2_lvl_2_tbl_cap = Finch.sparse_hash_table_capacity(v2_lvl_2_q_stop, v2_lvl_2.subtables)
-                                    Finch.sparse_hash_table_resize!(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_tbl_cap, v2_lvl_2.subtables)
-                                    Finch.resize_if_smaller!(v2_lvl_3_val, v2_lvl_2_q_stop)
-                                    Finch.fill_range!(v2_lvl_3_val, 0, v2_lvl_2_old, v2_lvl_2_q_stop)
+                                v2_lvl_2_x = Finch.sparse_hash_hash(v2_lvl_qos, phase_stop_2, v2_lvl_2.pos_multiplier)
+                                v2_lvl_2_b = Finch.sparse_hash_hash_subtable(v2_lvl_2_x, v2_lvl_2.subtables)
+                                if 2 * v2_lvl_2.subtables * (v2_lvl_2_tbl_count[v2_lvl_2_b] + 1) > length(v2_lvl_2_tbl_ctrl)
+                                    Finch.sparse_hash_resize!(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_key, max(2 * length(v2_lvl_2_tbl_ctrl), 4 * v2_lvl_2.subtables), v2_lvl_2.subtables, v2_lvl_2.pos_multiplier, v2_lvl_2_qos_stop)
                                 end
-                                v2_lvl_2_tbl_hash = Finch.sparse_hash_hash(v2_lvl_qos, phase_stop_2)
-                                v2_lvl_2_tbl_ctrl_byte = Finch.sparse_hash_hash_ctrl(v2_lvl_2_tbl_hash)
-                                v2_lvl_2_tbl_n = length(v2_lvl_2_tbl)
-                                v2_lvl_2_tbl_slot = Finch.sparse_hash_table_lookup_insert_slot(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_qos, phase_stop_2, v2_lvl_2_tbl_hash, v2_lvl_2_tbl_ctrl_byte, v2_lvl_2_tbl_n, v2_lvl_2.subtables)
-                                v2_lvl_2_qos = 0
-                                v2_lvl_2_tbl_found = false
-                                if v2_lvl_2_tbl_slot != 0 && @inbounds(v2_lvl_2_tbl_ctrl[v2_lvl_2_tbl_slot]) != Finch.SPARSE_HASH_CTRL_EMPTY
-                                    @inbounds v2_lvl_2_tbl_entry = v2_lvl_2_tbl[v2_lvl_2_tbl_slot]
-                                    v2_lvl_2_qos = Finch.sparse_hash_entry_val(v2_lvl_2_tbl_entry)
-                                    v2_lvl_2_tbl_found = true
+                                v2_lvl_2_h = Finch.sparse_hash_find(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_key, v2_lvl_qos, phase_stop_2, v2_lvl_2_x, v2_lvl_2.subtables)
+                                v2_lvl_2_s = true
+                                if v2_lvl_2_tbl_ctrl[v2_lvl_2_h] == Finch.SPARSE_HASH_CTRL_EMPTY
+                                    v2_lvl_2_tbl_count[v2_lvl_2_b] += 1
+                                    if v2_lvl_2_free_head == 0
+                                        v2_lvl_2_qos = (Int64)(v2_lvl_2_qos_stop += 1)
+                                    else
+                                        v2_lvl_2_qos = v2_lvl_2_free_head
+                                        v2_lvl_2_free_head = (v2_lvl_2_key[v2_lvl_2_free_head])[1]
+                                    end
+                                    if v2_lvl_2_qos > length(v2_lvl_2_key)
+                                        v2_lvl_2_old = length(v2_lvl_2_key) + 1
+                                        v2_lvl_2_q_stop = max(2 * length(v2_lvl_2_key), v2_lvl_2_qos)
+                                        resize!(v2_lvl_2_key, v2_lvl_2_q_stop)
+                                        Finch.resize_if_smaller!(v2_lvl_3_val, v2_lvl_2_q_stop)
+                                        Finch.fill_range!(v2_lvl_3_val, 0, v2_lvl_2_old, v2_lvl_2_q_stop)
+                                    end
+                                    v2_lvl_2_key[v2_lvl_2_qos] = (v2_lvl_qos, phase_stop_2, 0x01)
+                                    v2_lvl_2_tbl_ctrl[v2_lvl_2_h] = Finch.sparse_hash_hash_ctrl(v2_lvl_2_x)
+                                    v2_lvl_2_tbl[v2_lvl_2_h] = v2_lvl_2_qos
+                                else
+                                    v2_lvl_2_qos = v2_lvl_2_tbl[v2_lvl_2_h]
+                                    v2_lvl_2_s = (v2_lvl_2_key[v2_lvl_2_qos])[3] != Finch.SPARSE_HASH_KEY_RETAINED
+                                    v2_lvl_2_s && Finch.sparse_hash_share!(v2_lvl_2_key, v2_lvl_2_qos)
                                 end
-                                if v2_lvl_2_qos == 0
-                                    v2_lvl_2_qos = v2_lvl_2_qos_stop + 1
-                                    v2_lvl_2_qos_stop = v2_lvl_2_qos
-                                end
+                                v2_lvl_2_s && (v2_lvl_2_pending += 1)
                                 v2_lvl_3_val[v2_lvl_2_qos] = v0_lvl_3_val_2
-                                if !v2_lvl_2_tbl_found
-                                    Finch.sparse_hash_table_insert_at_slot!(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_tbl_slot, v2_lvl_qos, phase_stop_2, v2_lvl_2_qos, v2_lvl_2_tbl_ctrl_byte)
+                                true && (v2_lvl_dirty = true)
+                                if v2_lvl_2_s
+                                    if Finch.sparse_hash_release!(v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_key, v2_lvl_2_qos, v2_lvl_2_x, v2_lvl_2.subtables, true, v2_lvl_2_free_head, v2_lvl_2.pos_multiplier)
+                                        v2_lvl_2_tbl_count[v2_lvl_2_b] = v2_lvl_2_tbl_count[v2_lvl_2_b] - 1
+                                        v2_lvl_2_free_head = (Int64)(v2_lvl_2_qos)
+                                    end
+                                    v2_lvl_2_pending = v2_lvl_2_pending - 1
                                 end
-                                v2_lvl_dirty = true
                             end
                         end
                     end
-                    if v2_lvl_dirty
-                        if !v2_lvl_tbl_found
-                            Finch.sparse_hash_table_insert_at_slot!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_tbl_slot, 1, v11_5, v2_lvl_qos, v2_lvl_tbl_ctrl_byte)
+                    v2_lvl_dirty && true
+                    if v2_lvl_s
+                        if Finch.sparse_hash_release!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, v2_lvl_qos, v2_lvl_x, v2_lvl.subtables, v2_lvl_dirty, v2_lvl_free_head, v2_lvl.pos_multiplier)
+                            v2_lvl_tbl_count[v2_lvl_b] = v2_lvl_tbl_count[v2_lvl_b] - 1
+                            v2_lvl_free_head = (Int64)(v2_lvl_qos)
                         end
+                        v2_lvl_pending = v2_lvl_pending - 1
                     end
                 end
-                resize!(v2_lvl_ptr, 1 + 1)
-                v2_lvl_ptr[1] = 1
-                Finch.fill_range!(v2_lvl_ptr, 0, 2, 1 + 1)
-                q = 0
-                qos_max = 0
-                resize!(v2_lvl_perm, length(v2_lvl_tbl_ctrl))
-                for h = eachindex(v2_lvl_tbl_ctrl)
-                    if v2_lvl_tbl_ctrl[h] != Finch.SPARSE_HASH_CTRL_EMPTY
-                        entry = v2_lvl_tbl[h]
-                        p = Finch.sparse_hash_entry_pos(entry)
-                        v = Finch.sparse_hash_entry_val(entry)
-                        q += 1
-                        v2_lvl_perm[q] = h
-                        qos_max = max(qos_max, v)
-                        if p < 1
-                            v2_lvl_ptr[p + 2] += 1
-                        end
-                    end
-                end
-                resize!(v2_lvl_perm, q)
-                for p = 2:1 + 1
-                    v2_lvl_ptr[p] += v2_lvl_ptr[p - 1]
-                end
-                idx_tmp = Vector{Int64}(undef, q)
-                @inbounds for q = eachindex(v2_lvl_perm)
-                        h = v2_lvl_perm[q]
-                        idx_tmp[q] = Finch.sparse_hash_entry_idx(v2_lvl_tbl[h])
-                    end
-                shuffler = sortperm(idx_tmp)
-                @inbounds for q = eachindex(shuffler)
-                        shuffler[q] = v2_lvl_perm[shuffler[q]]
-                    end
-                @inbounds for h = shuffler
-                        p = Finch.sparse_hash_entry_pos(v2_lvl_tbl[h])
-                        r = v2_lvl_ptr[p + 1]
-                        v2_lvl_perm[r] = h
-                        v2_lvl_ptr[p + 1] += 1
-                    end
-                0 == 0 || error("SparseHash pending writer stack is not empty during freeze")
-                for v = v2_lvl_pool
-                    qos_max = max(qos_max, v)
-                end
-                resize!(v2_lvl_2_ptr, qos_max + 1)
-                v2_lvl_2_ptr[1] = 1
-                Finch.fill_range!(v2_lvl_2_ptr, 0, 2, qos_max + 1)
-                q_2 = 0
-                qos_max_2 = 0
-                resize!(v2_lvl_2_perm, length(v2_lvl_2_tbl_ctrl))
-                for h_2 = eachindex(v2_lvl_2_tbl_ctrl)
-                    if v2_lvl_2_tbl_ctrl[h_2] != Finch.SPARSE_HASH_CTRL_EMPTY
-                        entry_2 = v2_lvl_2_tbl[h_2]
-                        p_2 = Finch.sparse_hash_entry_pos(entry_2)
-                        v_2 = Finch.sparse_hash_entry_val(entry_2)
-                        q_2 += 1
-                        v2_lvl_2_perm[q_2] = h_2
-                        qos_max_2 = max(qos_max_2, v_2)
-                        if p_2 < qos_max
-                            v2_lvl_2_ptr[p_2 + 2] += 1
-                        end
-                    end
-                end
-                resize!(v2_lvl_2_perm, q_2)
-                for p_2 = 2:qos_max + 1
-                    v2_lvl_2_ptr[p_2] += v2_lvl_2_ptr[p_2 - 1]
-                end
-                idx_tmp_2 = Vector{Int64}(undef, q_2)
-                @inbounds for q_2 = eachindex(v2_lvl_2_perm)
-                        h_2 = v2_lvl_2_perm[q_2]
-                        idx_tmp_2[q_2] = Finch.sparse_hash_entry_idx(v2_lvl_2_tbl[h_2])
-                    end
-                shuffler_2 = sortperm(idx_tmp_2)
-                @inbounds for q_2 = eachindex(shuffler_2)
-                        shuffler_2[q_2] = v2_lvl_2_perm[shuffler_2[q_2]]
-                    end
-                @inbounds for h_2 = shuffler_2
-                        p_2 = Finch.sparse_hash_entry_pos(v2_lvl_2_tbl[h_2])
-                        r_2 = v2_lvl_2_ptr[p_2 + 1]
-                        v2_lvl_2_perm[r_2] = h_2
-                        v2_lvl_2_ptr[p_2 + 1] += 1
-                    end
-                0 == 0 || error("SparseHash pending writer stack is not empty during freeze")
-                for v_2 = v2_lvl_2_pool
-                    qos_max_2 = max(qos_max_2, v_2)
-                end
-                resize!(v2_lvl_3_val, qos_max_2)
-                (v2 = Tensor((SparseHashLevel){Int64, true}((SparseHashLevel){Int64, true}(ElementLevel{0, Int64, Int64}(v2_lvl_3_val), v0_lvl_2_stop, v2_lvl_2.subtables, v2_lvl_2_ptr, v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_pool, v2_lvl_2_perm), v0_lvl_stop, v2_lvl.subtables, v2_lvl_ptr, v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_pool, v2_lvl_perm)),)
+                v2_lvl_pending == 0 || error("SparseHash has unfinished writers during freeze")
+                qos_stop = Finch.sparse_hash_freeze!(v2_lvl_ptr, v2_lvl_perm, v2_lvl_key, 1, v2_lvl_qos_stop)
+                Finch.sparse_hash_count_buckets!(v2_lvl_tbl_count, v2_lvl_perm, v2_lvl_key, v2_lvl.subtables, v2_lvl.pos_multiplier)
+                v2_lvl_2_pending == 0 || error("SparseHash has unfinished writers during freeze")
+                qos_stop_2 = Finch.sparse_hash_freeze!(v2_lvl_2_ptr, v2_lvl_2_perm, v2_lvl_2_key, qos_stop, v2_lvl_2_qos_stop)
+                Finch.sparse_hash_count_buckets!(v2_lvl_2_tbl_count, v2_lvl_2_perm, v2_lvl_2_key, v2_lvl_2.subtables, v2_lvl_2.pos_multiplier)
+                Finch.resize_if_larger!(v2_lvl_3_val, qos_stop_2)
+                (v2 = Tensor((SparseHashLevel){Int64}((SparseHashLevel){Int64}(ElementLevel{0, Int64, Int64}(v2_lvl_3_val), v0_lvl_2_stop, v2_lvl_2.subtables, v2_lvl_2.pos_multiplier, v2_lvl_2_ptr, v2_lvl_2_tbl_ctrl, v2_lvl_2_tbl, v2_lvl_2_key, v2_lvl_2_perm, v2_lvl_2_tbl_count), v0_lvl_stop, v2_lvl.subtables, v2_lvl.pos_multiplier, v2_lvl_ptr, v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, v2_lvl_perm, v2_lvl_tbl_count)),)
             end)
 end

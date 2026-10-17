@@ -632,7 +632,7 @@ class SamplingStats(NumericStats):
                     while True:
                         match level:
                             case ElementLevel():
-                                values = level.val.arr
+                                values = level.val.to_numpy()
                                 break
                             case (
                                 DenseLevel(lvl=child)

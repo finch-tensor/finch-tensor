@@ -32,7 +32,7 @@ from finch.codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
-from finch.codegen.buffers import MallocBuffer
+from finch.codegen.buffers import MallocBuffer, MallocBufferFType
 from finch.codegen.buffers.memref_buffer import MemrefBufferFType
 from finch.codegen.c_codegen import (
     construct_from_c,
@@ -1670,6 +1670,34 @@ def test_resize_mlir_regression(file_regression):
     MLIRCompiler()(prgm).sparse_output(idx_buf, val_buf)
     np.testing.assert_array_equal(idx_buf.arr, np.array([2], dtype=np.intp))
     np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
+
+
+@pytest.mark.parametrize(
+    "buffer_factory",
+    [
+        pytest.param(MallocBufferFType, marks=pytest.mark.c_backend),
+        pytest.param(MemrefBufferFType, marks=pytest.mark.mlir_backend),
+    ],
+)
+@pytest.mark.parametrize("copy", [None, False, True])
+@pytest.mark.parametrize("length", [0, 4])
+def test_native_buffer_to_numpy(buffer_factory, copy, length):
+    buffer = buffer_factory(ftypes.float64)(length)
+    expected = np.arange(length, dtype=np.float64)
+    for i, value in enumerate(expected):
+        buffer.store(i, value)
+    if copy is False:
+        with pytest.raises(ValueError, match="Unable to avoid copy"):
+            buffer.to_numpy(copy=False)
+        return
+    result = buffer.to_numpy(copy=copy)
+    assert result.dtype == expected.dtype
+    np.testing.assert_array_equal(result, expected)
+    if length:
+        buffer.store(0, 99.0)
+        buffer.resize(length + 2)
+    del buffer
+    np.testing.assert_array_equal(result, expected)
 
 
 # Test for resize with MemrefBuffer

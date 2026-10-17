@@ -64,6 +64,7 @@ def _start_julia() -> tuple[Any, Any]:
         Main.seval(f"using {pkg}")
 
     Main.seval("first_arg(x, y...) = x")
+    Main.include(str(Path(__file__).with_name("buffers.jl")))
 
     return juliacall, Main
 

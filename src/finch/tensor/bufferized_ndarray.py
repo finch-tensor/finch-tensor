@@ -80,7 +80,7 @@ class BufferizedNDArray(OverrideTensor):
         Convert the bufferized NDArray to a NumPy array.
         This is used to get the underlying NumPy array from the bufferized NDArray.
         """
-        return self.val.arr.reshape(self._shape, copy=False)
+        return self.val.to_numpy().reshape(self._shape, copy=False)
 
     def to_scipy(self):
         raise NotImplementedError(f"{type(self).__name__} does not support to_scipy.")
