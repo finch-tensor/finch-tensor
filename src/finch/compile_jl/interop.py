@@ -179,7 +179,7 @@ def _jl_index_buffer_to_python(v) -> MinusOneBuffer | NumpyBuffer:
     Converts a Julia index/position buffer, adjusting Julia's 1-based indexing
     to Python's 0-based indexing without copying.
     """
-    if jl.isa(v, jl.FinchInterop.PlusOneBuffer):
+    if jl.isa(v, jl.Finch.PlusOneVector):
         return NumpyBuffer(_jl_array_to_python_no_copy(v.data))
     return MinusOneBuffer(NumpyBuffer(_jl_array_to_python_no_copy(v)))
 
@@ -192,7 +192,7 @@ def _jl_tuple_buffer_to_python(
     v, n_fields: int, *, index_fields: tuple[int, ...] = ()
 ) -> Buffer:
     """Convert a Julia tuple buffer while preserving its Julia-owned data."""
-    shifted = jl.isa(v, jl.FinchInterop.PlusOneBuffer)
+    shifted = jl.isa(v, jl.Finch.PlusOneVector)
     raw = _jl_array_to_python_no_copy(v.data if shifted else v)
 
     src_fields = raw.dtype.fields

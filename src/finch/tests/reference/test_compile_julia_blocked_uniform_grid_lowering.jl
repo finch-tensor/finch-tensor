@@ -1,6 +1,6 @@
 # Finch kernel
 eval(let
-        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, FinchInterop.PlusOneBuffer(FinchInterop.Buffer(Int64[]), Val((1,))), FinchInterop.PlusOneBuffer(FinchInterop.Buffer(Int64[]), Val((1,)))), 1))
+        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
         v1 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v2 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v3 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1), 1))
@@ -40,7 +40,7 @@ eval(let
 end)
 
 # Generated Julia
-function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, Main.FinchInterop.PlusOneBuffer{Int64, (1,), Main.FinchInterop.Buffer{Int64}}, Main.FinchInterop.PlusOneBuffer{Int64, (1,), Main.FinchInterop.Buffer{Int64}}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v6::Int64, v7::Int64, v8::Int64, v9::Int64, v10::Int64, v11::Int64)
+function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v6::Int64, v7::Int64, v8::Int64, v9::Int64, v10::Int64, v11::Int64)
     @inbounds @fastmath(begin
                 v0_lvl = v0.lvl
                 v0_lvl_stop = v0_lvl.shape

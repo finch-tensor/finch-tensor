@@ -189,13 +189,9 @@ def to_jl_buffer(
     )
     if not offset:
         return buffer
-    if index_fields is not None:
-        fields = tuple(i + 1 for i in index_fields)
-    elif isinstance(T, TupleFType):
-        fields = tuple(range(1, len(T.struct_fields) + 1))
-    else:
-        fields = (1,)
-    return jl.FinchInterop.PlusOneBuffer(buffer, jl.Val(fields))
+    if index_fields is None:
+        return jl.Finch.PlusOneVector(buffer)
+    return jl.Finch.PlusOneVector(buffer, tuple(i + 1 for i in index_fields))
 
 
 @lru_cache
@@ -258,11 +254,15 @@ def _leaf_type_str(T: Any) -> str:
     return str(get_jl().string(to_jl_type(T)))
 
 
-def _buffer_ctor_str(elem_type_str: str, index_fields: tuple[int, ...] = ()) -> str:
+def _buffer_ctor_str(
+    elem_type_str: str, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
+) -> str:
     buffer = f"FinchInterop.Buffer({elem_type_str}[])"
-    if index_fields:
-        return f"FinchInterop.PlusOneBuffer({buffer}, Val({index_fields}))"
-    return buffer
+    if not offset:
+        return buffer
+    if index_fields is None:
+        return f"Finch.PlusOneVector({buffer})"
+    return f"Finch.PlusOneVector({buffer}, {tuple(i + 1 for i in index_fields)})"
 
 
 def _level_constructor_str(level_ftype: LevelFType) -> str:
@@ -289,7 +289,8 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         dim_t = _leaf_type_str(level_ftype.dimension_type)
         return (
             f"Finch.SparseListLevel({_level_constructor_str(level_ftype.lvl_t)}, "
-            f"1, {_buffer_ctor_str(pos_t, (1,))}, {_buffer_ctor_str(dim_t, (1,))})"
+            f"1, {_buffer_ctor_str(pos_t, offset=1)}, "
+            f"{_buffer_ctor_str(dim_t, offset=1)})"
         )
     if isinstance(level_ftype, SparseByteMapLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
@@ -297,8 +298,8 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
         return (
             f"Finch.SparseByteMapLevel{{{dim_t}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, "
-            f"1, {_buffer_ctor_str(pos_t, (1,))}, {_buffer_ctor_str('Bool')}, "
-            f"{_buffer_ctor_str(pos_t, (1,))})"
+            f"1, {_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('Bool')}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)})"
         )
     if isinstance(level_ftype, SparseCOOLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
@@ -307,11 +308,11 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
             for t in level_ftype.coo_shape_tuple_type.struct_fieldtypes
         ]
         dims = ",".join("1" for _ in dim_ts)
-        idxs = ",".join(_buffer_ctor_str(t, (1,)) for t in dim_ts)
+        idxs = ",".join(_buffer_ctor_str(t, offset=1) for t in dim_ts)
         return (
             f"Finch.SparseCOOLevel{{{level_ftype.coo_ndim}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, ({dims},), "
-            f"{_buffer_ctor_str(pos_t, (1,))}, ({idxs},))"
+            f"{_buffer_ctor_str(pos_t, offset=1)}, ({idxs},))"
         )
     if isinstance(level_ftype, SparseHashLevelFType):
         pos_t = _leaf_type_str(level_ftype.position_type)
@@ -321,10 +322,10 @@ def _level_constructor_str(level_ftype: LevelFType) -> str:
             f"Finch.SparseHashLevel{{{dim_t}}}("
             f"{_level_constructor_str(level_ftype.lvl_t)}, 1, 1, "
             f"Finch.SPARSE_HASH_POS_MULTIPLIER, "
-            f"{_buffer_ctor_str(pos_t, (1,))}, {_buffer_ctor_str('UInt8')}, "
-            f"{_buffer_ctor_str(pos_t, (1,))}, "
-            f"{_buffer_ctor_str(key_entry_t, (1, 2))}, "
-            f"{_buffer_ctor_str(pos_t, (1,))}, FinchInterop.Buffer(Int[0]))"
+            f"{_buffer_ctor_str(pos_t, offset=1)}, {_buffer_ctor_str('UInt8')}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, "
+            f"{_buffer_ctor_str(key_entry_t, offset=1, index_fields=(0, 1))}, "
+            f"{_buffer_ctor_str(pos_t, offset=1)}, FinchInterop.Buffer(Int[0]))"
         )
     raise NotImplementedError(
         f"ftype_to_jl_constructor_str: unsupported level ftype "
