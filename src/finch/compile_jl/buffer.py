@@ -20,7 +20,7 @@ class PlusOneBufferFType(BufferFType[FT]):
         self.index_fields = index_fields
 
     def __call__(self, *args, **kwargs):
-        return PlusOneBuffer(self.data_ftype(*args, **kwargs))
+        return PlusOneBuffer(self.data_ftype(*args, **kwargs), self.index_fields)
 
     @property
     def element_type(self):
@@ -34,10 +34,11 @@ class PlusOneBufferFType(BufferFType[FT]):
         return (
             isinstance(other, PlusOneBufferFType)
             and self.data_ftype == other.data_ftype
+            and self.index_fields == other.index_fields
         )
 
     def __hash__(self):
-        return hash(self.data_ftype)
+        return hash((self.data_ftype, self.index_fields))
 
 
 class PlusOneBuffer(Buffer, ABC):
@@ -54,8 +55,9 @@ class PlusOneBuffer(Buffer, ABC):
     def owner(self):
         return self.data.owner
 
+    @property
     def ftype(self):
-        return PlusOneBufferFType(self.data.ftype(), self.index_fields)
+        return PlusOneBufferFType(self.data.ftype, self.index_fields)
 
     def length(self):
         return self.data.length()

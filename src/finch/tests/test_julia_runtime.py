@@ -92,18 +92,38 @@ def test_minus_one_buffer_does_not_copy_backing_data():
     assert int(jl_vec[1]) == 8
 
 
-def test_minus_one_buffer_preserves_hash_key_state():
+@pytest.mark.parametrize(
+    "buffer_type, offset", [(PlusOneBuffer, 1), (MinusOneBuffer, -1)]
+)
+def test_offset_buffer_preserves_hash_key_state(buffer_type, offset):
     key_type = TupleFType.from_tuple((ft.intp, ft.int32, ft.uint8))
     raw = np.array([(1, 3, 128), (2, 1, 0)], dtype=np_dtype(key_type))
-    buffer = MinusOneBuffer(NumpyBuffer(raw), index_fields=(0, 1))
+    buffer = buffer_type(NumpyBuffer(raw), index_fields=(0, 1))
 
-    assert buffer.load(0) == (0, 2, 128)
-    assert buffer.load(1) == (1, 0, 0)
-    assert buffer.to_numpy().tolist() == [(0, 2, 128), (1, 0, 0)]
+    expected = [(1 + offset, 3 + offset, 128), (2 + offset, 1 + offset, 0)]
+    assert buffer.load(0) == expected[0]
+    assert buffer.load(1) == expected[1]
+    assert buffer.to_numpy().tolist() == expected
     buffer.store(1, (3, 4, 127))
-    assert raw.tolist() == [(1, 3, 128), (4, 5, 127)]
-    assert buffer.ftype != MinusOneBuffer(NumpyBuffer(raw)).ftype
+    assert raw.tolist() == [(1, 3, 128), (3 - offset, 4 - offset, 127)]
+    assert buffer.ftype != buffer_type(NumpyBuffer(raw)).ftype
     assert buffer.ftype(1).index_fields == (0, 1)
+
+
+@pytest.mark.parametrize("buffer_type", [PlusOneBuffer, MinusOneBuffer])
+def test_offset_buffer_ftype_preserves_index_fields(buffer_type):
+    data = NumpyBuffer(
+        np.zeros(2, dtype=np_dtype(TupleFType.from_tuple((ft.intp, ft.uint8))))
+    )
+    buffer = buffer_type(data, index_fields=(0,))
+    type_ = buffer.ftype
+    assert type_.data_ftype == data.ftype
+    assert type_.index_fields == (0,)
+    rebuilt = type_(2)
+    assert rebuilt.index_fields == (0,)
+    assert rebuilt.ftype == type_
+    assert hash(rebuilt.ftype) == hash(type_)
+    assert len({type_, buffer_type(data, index_fields=(1,)).ftype}) == 2
 
 
 @pytest.mark.parametrize("new_length", [0, 2, 8])

@@ -3,9 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-import numpy as np
-
-from finch.algebra import FType, FTyped, intp, np_dtype
+from finch.algebra import FType, FTyped, intp
 from finch.algebra.ftypes import FDTypeInteger
 
 FT = TypeVar("FT", bound=FType)
