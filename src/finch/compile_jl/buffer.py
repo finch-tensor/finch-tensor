@@ -13,8 +13,9 @@ FT = TypeVar("FT", bound=FType)
 
 
 class PlusOneBufferFType(BufferFType[FT]):
-    def __init__(self, data_ftype: BufferFType[FT]):
+    def __init__(self, data_ftype: BufferFType[FT], index_fields: tuple[int, ...] | None = None):
         self.data_ftype = data_ftype
+        self.index_fields = index_fields
 
     def __call__(self, *args, **kwargs):
         return PlusOneBuffer(self.data_ftype(*args, **kwargs))
@@ -43,15 +44,16 @@ class PlusOneBuffer(Buffer, ABC):
     element when stored.
     """
 
-    def __init__(self, data: NumpyBuffer):
+    def __init__(self, data: NumpyBuffer, index_fields: tuple[int, ...] | None = None):
         self.data = data
+        self.index_fields = index_fields
 
     @property
     def owner(self):
         return self.data.owner
 
     def ftype(self):
-        return PlusOneBufferFType(self.data.ftype())
+        return PlusOneBufferFType(self.data.ftype(), self.index_fields)
 
     def length(self):
         return self.data.length()
@@ -69,11 +71,28 @@ class PlusOneBuffer(Buffer, ABC):
         return self.data.length_type
 
     def load(self, idx: int):
-        return self.data.load(idx) + 1
+        value = self.data.load(idx)
+        if isinstance(value, tuple):
+            return tuple(
+                field + 1
+                if self.index_fields is None or i in self.index_fields
+                else field
+                for i, field in enumerate(value)
+            )
+        return value + 1
 
     def store(self, idx: int, val):
-        self.data.store(idx, val - 1)
+        if isinstance(val, tuple):
+            val = tuple(
+                field - 1
+                if self.index_fields is None or i in self.index_fields
+                else field
+                for i, field in enumerate(val)
+            )
+        else:
+            val = val - 1
 
+        self.data.store(idx, val)
     def resize(self, len: int):
         self.data.resize(len)
 
