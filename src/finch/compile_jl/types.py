@@ -1,5 +1,4 @@
 import math
-from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Any
 
@@ -43,7 +42,7 @@ from finch.tensor.patterns import (
 )
 from finch.tensor.scalar import ScalarFType
 
-from .julia import get_jl, jc
+from .julia import get_jl
 
 _py_bool = bool
 
@@ -66,29 +65,6 @@ bool: FDTypeNumpy = ft.bool
 
 finfo = ft.finfo
 iinfo = ft.iinfo
-
-
-class JuliaElementFType(ABC):
-    @abstractmethod
-    def julia_type(self):
-        """
-        Return the Julia type used for elements with this ftype.
-        """
-        ...
-
-    @abstractmethod
-    def julia_value(self, value: Any, *, offset: int = 0):
-        """
-        Convert a Python value with this ftype into a Julia element value.
-        """
-        ...
-
-    def julia_vector(self, values, *, offset: int = 0):
-        jl = get_jl()
-        return jc.convert(
-            jl.Vector[self.julia_type()],
-            [self.julia_value(value, offset=offset) for value in values],
-        )
 
 
 @lru_cache
@@ -141,8 +117,6 @@ def to_fl_dtype(x) -> FType:
 
 def to_jl_type(T):
     T = to_fl_dtype(T)
-    if isinstance(T, JuliaElementFType):
-        return T.julia_type()
     if isinstance(T, TupleFType):
         jl = get_jl()
         return jl.Tuple[tuple(to_jl_type(field) for field in T.struct_fieldtypes)]
@@ -168,9 +142,6 @@ def to_jl_value(
     T, value, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
 ):
     T = to_fl_dtype(T)
-    if isinstance(T, JuliaElementFType):
-        assert index_fields is None
-        return T.julia_value(value, offset=offset)
     if isinstance(T, TupleFType):
         return tuple(
             to_jl_value(
@@ -185,13 +156,10 @@ def to_jl_value(
     return _as_julia_scalar(T(value))
 
 
-def to_jl_vector(
+def to_jl_buffer(
     T, values, *, offset: int = 0, index_fields: tuple[int, ...] | None = None
 ):
     T = to_fl_dtype(T)
-    if isinstance(T, JuliaElementFType):
-        assert index_fields is None
-        return T.julia_vector(values, offset=offset)
     if offset not in (0, 1):
         raise ValueError("Julia index conversion only supports offsets 0 and 1")
     if not isinstance(values, np.ndarray):

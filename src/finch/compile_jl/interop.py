@@ -70,7 +70,7 @@ def _buffer_to_jl(
         result.shifted = False
         return result
     if isinstance(buffer, NumpyBuffer):
-        return jl_dtypes.to_jl_vector(
+        return jl_dtypes.to_jl_buffer(
             buffer.ftype.element_type,
             buffer.arr,
             offset=offset,
@@ -314,7 +314,7 @@ def _ndarray_to_jl_tensor(
     elif not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
 
-    buf = jl_dtypes.to_jl_vector(ftype(arr.dtype), arr.reshape(-1))
+    buf = jl_dtypes.to_jl_buffer(ftype(arr.dtype), arr.reshape(-1))
     fill = _as_julia_scalar(np.asarray(fill_value, dtype=arr.dtype)[()])
     lvl = jl.ElementLevel(fill, buf)
     for dim in reversed(arr.shape):
@@ -432,7 +432,7 @@ def scalar_to_jl(val, pin_fill: bool = False):
     fill = jl_dtypes._zero_value(ftype(val)) if pin_fill else val
     buf = np.asarray([val])
     return jl.Tensor(
-        jl.ElementLevel(_as_julia_scalar(fill), jl_dtypes.to_jl_vector(ftype(val), buf))
+        jl.ElementLevel(_as_julia_scalar(fill), jl_dtypes.to_jl_buffer(ftype(val), buf))
     )
 
 

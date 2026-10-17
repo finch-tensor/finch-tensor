@@ -516,36 +516,6 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     file_regression.check("\n\n".join(compiler.sources), extension=".jl")
 
 
-def test_julia_element_ftype_can_customize_vector_lowering():
-    _requires_julia_backend()
-    from finch.compile_jl import JuliaElementFType
-    from finch.compile_jl import types as jl_dtypes
-    from finch.compile_jl.julia import jl
-
-    class PairFType(ft.FType, JuliaElementFType):
-        def __eq__(self, other):
-            return isinstance(other, PairFType)
-
-        def __hash__(self):
-            return hash(PairFType)
-
-        def __call__(self, val):
-            left, right = val
-            return int(left), int(right)
-
-        def julia_type(self):
-            return jl.Tuple[(jl.Int64, jl.Int64)]
-
-        def julia_value(self, value, *, offset: int = 0):
-            left, right = value
-            return int(left) + offset, int(right) + offset
-
-    vec = jl_dtypes.to_jl_vector(PairFType(), [(0, 3), (4, 5)], offset=1)
-
-    assert str(jl.typeof(vec)) == "Vector{Tuple{Int64, Int64}}"
-    assert [tuple(entry) for entry in vec] == [(1, 4), (5, 6)]
-
-
 def _element_level(data) -> ElementLevel:
     elem_ftype = element(DTYPE(0), ftype(DTYPE), ftype(np.intp), NumpyBufferFType)
     return ElementLevel(elem_ftype, NumpyBuffer(np.asarray(data, dtype=DTYPE)))

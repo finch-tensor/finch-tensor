@@ -25,7 +25,7 @@ from finch.compile_jl.runtime import (
     JuliaOwnedTensor,
     _KernalMetadata,
 )
-from finch.compile_jl.types import _level_constructor_str, to_jl_vector
+from finch.compile_jl.types import _level_constructor_str, to_jl_buffer
 
 
 def _requires_julia_backend():
@@ -284,7 +284,7 @@ def test_julia_buffer_readonly_storage_detaches_on_resize():
 def test_julia_buffer_converts_incompatible_dtype():
     _requires_julia_backend()
     source = np.arange(4, dtype=np.int32)
-    vector = to_jl_vector(ft.float64, source)
+    vector = to_jl_buffer(ft.float64, source)
     assert jl.eltype(vector) == jl.Float64
     assert list(vector) == [0.0, 1.0, 2.0, 3.0]
 
