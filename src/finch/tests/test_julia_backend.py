@@ -1077,7 +1077,7 @@ def test_julia_coo_round_trip_keeps_python_dim_order():
     back = jl_tensor_to_python(jl_obj).lvl
     assert tuple(int(s) for s in back.coo_shape) == (2, 3, 4)
     for got, want in zip(back.tbl, coords.T, strict=True):
-        np.testing.assert_array_equal(got.arr, want)
+        np.testing.assert_array_equal(got.to_numpy(), want)
 
 
 def test_julia_kernel_writes_coo_output_in_python_dim_order():
@@ -1109,7 +1109,7 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
     )
     lvl = jl_tensor_to_python(res.raw_julia_obj).lvl
     assert tuple(int(s) for s in lvl.coo_shape) == data.shape
-    rows, cols = (np.asarray(c.arr)[: int(lvl.ptr.arr[-1])] for c in lvl.tbl)
+    rows, cols = (c.to_numpy()[: int(lvl.ptr.to_numpy()[-1])] for c in lvl.tbl)
     np.testing.assert_array_equal(rows, [0, 1, 1])
     np.testing.assert_array_equal(cols, [1, 0, 2])
 
@@ -1131,13 +1131,13 @@ def test_compute_shape_vars_accepts_broadcast_reorder():
     assert len(shape_vars[a]) == 1
 
 
-def test_minus_one_buffer_arr_shifts_every_tuple_field():
+def test_minus_one_buffer_to_numpy_shifts_every_tuple_field():
     from finch.compile_jl.buffer import MinusOneBuffer
 
     raw = np.zeros(3, dtype=[("element_1", np.intp), ("element_2", np.intp)])
     raw["element_1"] = [1, 2, 3]
     raw["element_2"] = [4, 5, 6]
-    arr = MinusOneBuffer(NumpyBuffer(raw)).arr
+    arr = MinusOneBuffer(NumpyBuffer(raw)).to_numpy()
 
     np.testing.assert_array_equal(arr["element_1"], [0, 1, 2])
     np.testing.assert_array_equal(arr["element_2"], [3, 4, 5])

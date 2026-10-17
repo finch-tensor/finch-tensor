@@ -106,6 +106,9 @@ class NumpyBuffer(Buffer):
     def resize(self, new_length: int):
         self.arr = np.resize(self.arr, new_length)
 
+    def to_numpy(self, *, copy: bool | None = None):
+        return self.arr.copy() if copy is True else self.arr
+
     def __str__(self):
         arr_str = str(self.arr).replace("\n", "")
         return f"np_buf({arr_str})"

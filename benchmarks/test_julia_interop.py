@@ -62,12 +62,14 @@ def _make_tensor(kind, size):
     for name, _ in level.ftype.struct_fields:
         value = getattr(level, name)
         if name == "lvl":
-            value = ft.ElementLevel(value.ftype, ft.NumpyBuffer(value.val.arr.copy()))
+            value = ft.ElementLevel(
+                value.ftype, ft.NumpyBuffer(value.val.to_numpy(copy=True))
+            )
         elif isinstance(value, Buffer):
-            data = value.arr.copy()
+            data = value.to_numpy(copy=True)
             if kind == "hash" and name == "tbl":
                 # Julia leaves unoccupied slots uninitialized.
-                data[level.tbl_ctrl.arr == 0] = 0
+                data[level.tbl_ctrl.to_numpy() == 0] = 0
             value = ft.NumpyBuffer(data)
         fields.append(value)
     return ft.FiberTensor(level.ftype.from_fields(*fields))

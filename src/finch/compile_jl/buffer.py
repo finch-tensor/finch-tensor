@@ -13,7 +13,9 @@ FT = TypeVar("FT", bound=FType)
 
 
 class PlusOneBufferFType(BufferFType[FT]):
-    def __init__(self, data_ftype: BufferFType[FT], index_fields: tuple[int, ...] | None = None):
+    def __init__(
+        self, data_ftype: BufferFType[FT], index_fields: tuple[int, ...] | None = None
+    ):
         self.data_ftype = data_ftype
         self.index_fields = index_fields
 
@@ -58,6 +60,20 @@ class PlusOneBuffer(Buffer, ABC):
     def length(self):
         return self.data.length()
 
+    def to_numpy(self, *, copy: bool | None = None):
+        if copy is False:
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
+        arr = self.data.to_numpy()
+        if arr.dtype.names is None:
+            return arr + 1
+        out = arr.copy()
+        for i, name in enumerate(arr.dtype.names):
+            if self.index_fields is None or i in self.index_fields:
+                out[name] += 1
+        return out
+
     @property
     def element_type(self):
         """
@@ -93,6 +109,7 @@ class PlusOneBuffer(Buffer, ABC):
             val = val - 1
 
         self.data.store(idx, val)
+
     def resize(self, len: int):
         self.data.resize(len)
 
@@ -148,9 +165,12 @@ class MinusOneBuffer(Buffer, ABC):
     def element_type(self):
         return self.data.element_type
 
-    @property
-    def arr(self):
-        arr = self.data.arr
+    def to_numpy(self, *, copy: bool | None = None):
+        if copy is False:
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
+        arr = self.data.to_numpy()
         if arr.dtype.names is None:
             return arr - 1
         out = arr.copy()

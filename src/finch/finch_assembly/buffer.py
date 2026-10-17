@@ -3,7 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from finch.algebra import FType, FTyped, intp
+import numpy as np
+
+from finch.algebra import FType, FTyped, intp, np_dtype
 from finch.algebra.ftypes import FDTypeInteger
 
 FT = TypeVar("FT", bound=FType)
@@ -77,6 +79,15 @@ class Buffer(FTyped[BufferFType[FT]], ABC):
 
     @abstractmethod
     def store(self, idx: int, val): ...
+
+    @abstractmethod
+    def to_numpy(self, *, copy: bool | None = None):
+        """Return logical values as a NumPy array.
+
+        ``copy=True`` returns independent storage, ``copy=False`` requires shared
+        storage, and ``copy=None`` shares storage when supported and copies otherwise.
+        """
+        ...
 
     @property
     def owner(self):

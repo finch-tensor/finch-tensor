@@ -10,7 +10,7 @@ import finch as ft
 from finch.algebra import TupleFType, np_dtype
 from finch.autoschedule import COMPILE_JULIA, with_default_scheduler
 from finch.codegen import NumpyBuffer
-from finch.compile_jl.buffer import MinusOneBuffer
+from finch.compile_jl.buffer import MinusOneBuffer, PlusOneBuffer
 from finch.compile_jl.interop import (
     _buffer_to_jl,
     _jl_array_to_python_no_copy,
@@ -33,6 +33,36 @@ def _requires_julia_backend():
         import pytest
 
         pytest.skip("the julia extra (juliapkg, juliacall) is not installed")
+
+
+@pytest.mark.parametrize("copy", [None, False, True])
+def test_numpy_buffer_to_numpy_copy(copy):
+    source = np.arange(4, dtype=np.int64)
+    result = NumpyBuffer(source).to_numpy(copy=copy)
+    np.testing.assert_array_equal(result, source)
+    assert result.dtype == source.dtype
+    assert np.shares_memory(result, source) == (copy is not True)
+    result[0] = 10
+    assert source[0] == (0 if copy is True else 10)
+
+
+@pytest.mark.parametrize(
+    "buffer_type, offset", [(PlusOneBuffer, 1), (MinusOneBuffer, -1)]
+)
+@pytest.mark.parametrize("copy", [None, False, True])
+def test_offset_buffer_to_numpy_copy(buffer_type, offset, copy):
+    source = np.arange(4, dtype=np.int64)
+    buffer = buffer_type(NumpyBuffer(source))
+    if copy is False:
+        with pytest.raises(ValueError, match="Unable to avoid copy"):
+            buffer.to_numpy(copy=copy)
+    else:
+        result = buffer.to_numpy(copy=copy)
+        np.testing.assert_array_equal(result, source + offset)
+        assert result.dtype == source.dtype
+        assert not np.shares_memory(result, source)
+        result[0] = 10
+    np.testing.assert_array_equal(source, np.arange(4))
 
 
 def test_minus_one_buffer_loads_and_stores_with_offset():
@@ -69,7 +99,7 @@ def test_minus_one_buffer_preserves_hash_key_state():
 
     assert buffer.load(0) == (0, 2, 128)
     assert buffer.load(1) == (1, 0, 0)
-    assert buffer.arr.tolist() == [(0, 2, 128), (1, 0, 0)]
+    assert buffer.to_numpy().tolist() == [(0, 2, 128), (1, 0, 0)]
     buffer.store(1, (3, 4, 127))
     assert raw.tolist() == [(1, 3, 128), (4, 5, 127)]
     assert buffer.ftype != MinusOneBuffer(NumpyBuffer(raw)).ftype
@@ -286,17 +316,17 @@ def test_julia_sparse_level_round_trip(kind, copy_buffers):
     if kind == "hash":
         assert level.subtables == 4
         assert level.pos_multiplier == np.iinfo(np.uintp).max - 2
-        assert level.key.arr["element_2"].tolist() == [128] * 4
+        assert level.key.to_numpy()["element_2"].tolist() == [128] * 4
         assert (
             level.key.data.arr.ctypes.data
             == original.lvl.lvl.key.to_numpy(copy=False).ctypes.data
         )
         np.testing.assert_array_equal(
-            level.tbl_count.arr, original.lvl.lvl.tbl_count.to_numpy(copy=False)
+            level.tbl_count.to_numpy(), original.lvl.lvl.tbl_count.to_numpy(copy=False)
         )
     else:
-        np.testing.assert_array_equal(level.ptr.arr, [0, 2, 4])
-        np.testing.assert_array_equal(level.srt.arr, [0, 2, 4, 5])
+        np.testing.assert_array_equal(level.ptr.to_numpy(), [0, 2, 4])
+        np.testing.assert_array_equal(level.srt.to_numpy(), [0, 2, 4, 5])
 
     if copy_buffers:
         names = (
@@ -305,7 +335,7 @@ def test_julia_sparse_level_round_trip(kind, copy_buffers):
             else ("ptr", "tbl", "srt")
         )
         for name in names:
-            setattr(level, name, NumpyBuffer(getattr(level, name).arr.copy()))
+            setattr(level, name, NumpyBuffer(getattr(level, name).to_numpy(copy=True)))
 
     round_trip = tensor_to_jl(tensor)
     same_values = jl.seval("(A, B) -> Array(A) == Array(B)")
