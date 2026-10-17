@@ -140,6 +140,12 @@ def sparse_bytemap(lvl_t, dimension_type=None):
 
 @dataclass
 class SparseByteMapLevel(SingleDimensionLevel):
+    """Byte map with sorted, zero-based packed child positions in ``srt``.
+
+    Each child position is ``parent * dimension + index``; ``ptr`` groups
+    these positions by parent, and ``tbl`` marks the stored children.
+    """
+
     lvl: Level
     dimension: np.integer
     ptr: Any | None = None

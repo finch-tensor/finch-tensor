@@ -67,7 +67,7 @@ class LevelFormat(Enum):
             case LevelFormat.BYTEMAP:
                 return sparse_bytemap(lvl, dimension_type)
             case LevelFormat.HASH:
-                return sparse_hash(lvl, dimension_type, single_writer=True)
+                return sparse_hash(lvl, dimension_type)
             case LevelFormat.SPARSE_LIST:
                 return sparse_list(lvl, dimension_type)
 

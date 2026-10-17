@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import numpy as np
 
-from finch.algebra import FType, ftypes
+from finch.algebra import FType, ftypes, np_dtype
 from finch.codegen.mlir_codegen import (
     MLIRBufferFType,
     MLIRContext,
@@ -206,6 +206,18 @@ class MemrefBuffer(Buffer):
     def store(self, index, value):
         serialized = serialize_to_mlir(self.ftype.element_type, value)
         self.castbuffer[index] = getattr(serialized, "value", serialized)
+
+    def to_numpy(self, *, copy: bool | None = None):
+        # Native resize/free can invalidate views, so exported arrays own their data.
+        if copy is False:
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
+        return np.fromiter(
+            (self.load(i) for i in range(self.length())),
+            dtype=np_dtype(self.element_type),
+            count=self.length(),
+        )
 
     def resize(self, new_length):
         self.buffer = self._library.resize(

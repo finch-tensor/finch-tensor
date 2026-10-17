@@ -78,6 +78,10 @@ class NumpyBuffer(Buffer):
         self.arr = arr
 
     @property
+    def owner(self):
+        return self.arr
+
+    @property
     def ftype(self):
         """
         Returns the ftype of the buffer, which is a NumpyBufferFType.
@@ -101,6 +105,9 @@ class NumpyBuffer(Buffer):
 
     def resize(self, new_length: int):
         self.arr = np.resize(self.arr, new_length)
+
+    def to_numpy(self, *, copy: bool | None = None):
+        return self.arr.copy() if copy is True else self.arr
 
     def __str__(self):
         arr_str = str(self.arr).replace("\n", "")
