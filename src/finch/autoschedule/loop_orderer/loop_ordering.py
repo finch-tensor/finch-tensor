@@ -20,6 +20,7 @@ from finch.finch_logic import (
     Field,
     Fuse,
     HardAlias,
+    Literal,
     LogicExpression,
     LogicLoader,
     LogicStatement,
@@ -106,15 +107,14 @@ def concordize(
             ]
             for body in bodies:
                 stmts.append(body)
-                written = dict.fromkeys(
-                    node.lhs.tns
-                    for node in PostOrderDFS(body)
-                    if isinstance(node, Query | QueryInto)
-                )
-                for lhs in written:
-                    assert isinstance(lhs, Alias)
-                    if lhs in needed_swizzles:
-                        stmts.extend(_get_swizzle_queries(lhs))
+                swizzled: set[Alias] = set()
+                for node in PostOrderDFS(body):
+                    match node:
+                        case Query(Table(Alias() as lhs, _), _) | QueryInto(
+                            Table(Alias() as lhs, _), _, _
+                        ) if lhs in needed_swizzles and lhs not in swizzled:
+                            swizzled.add(lhs)
+                            stmts.extend(_get_swizzle_queries(lhs))
             return Plan((*stmts, prod))
         case _:
             raise Exception(f"Invalid root: {root}")
@@ -239,6 +239,8 @@ def heuristic_loop_order(plan: Plan) -> Plan:
 
         def rule_1(query):
             match query:
+                case QueryInto(_, _, Literal()):
+                    return query
                 case Query(_, Aggregate(_, _, arg, _)) | QueryInto(_, _, arg):
                     return with_loop_order(query, _heuristic_loop_order(arg))
                 case Query(_, Table(Alias(), _)) as q:

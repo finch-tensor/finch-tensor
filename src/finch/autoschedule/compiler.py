@@ -173,7 +173,6 @@ class NotationContext:
     def hoist(
         self, level: int, var: lgc.Alias, stmts: tuple[ntn.NotationStatement, ...]
     ) -> None:
-        """Run `stmts`, which declare `var`, before the fused loop at `level`."""
         self.fused[level].hoisted.extend(stmts)
         for loop in self.fused[level:]:
             loop.modes[var] = self.modes[var]
@@ -521,18 +520,6 @@ class NotationContext:
             raise ValueError(f"The fields {unfused} of a query need Fuse nodes.")
         return order
 
-    @staticmethod
-    def written(body: lgc.LogicStatement) -> set[lgc.Alias]:
-        """The tensors which the queries of `body` write."""
-        written = set()
-        for node in PostOrderDFS(body):
-            match node:
-                case lgc.Query(lgc.Table(lgc.Alias() as var, _), _) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as var, _), _, _
-                ):
-                    written.add(var.unfused)
-        return written
-
     def fused_extents(
         self, idx: lgc.Field, body: lgc.LogicStatement
     ) -> list[ntn.NotationExpression]:
@@ -560,19 +547,6 @@ class NotationContext:
                             break
         return extents
 
-    def check_extents(
-        self, extents: list[ntn.NotationExpression], dim: ntn.NotationExpression
-    ) -> tuple[ntn.NotationStatement, ...]:
-        """Check that every statement of a fused loop has its extent `dim`."""
-        if not (self.mode.safe or self.mode.debug):
-            return ()
-        checks = []
-        for extent in extents:
-            check = ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (extent, dim)))
-            if extent != dim and check not in checks:
-                checks.append(check)
-        return tuple(checks)
-
     def lower_fuse(
         self, idx: lgc.Field, body: lgc.LogicStatement
     ) -> ntn.NotationStatement:
@@ -581,11 +555,24 @@ class NotationContext:
         # A field which only an output has is broadcast, with extent 1.
         extents = self.fused_extents(idx, body)
         dim = extents[0] if extents else ntn.Literal(ftypes.intp(1))
-        checks = self.hoist_invariant(self.check_extents(extents, dim))
+        # Every statement of the body has the extent of the loop.
+        extent_checks = []
+        if self.mode.safe or self.mode.debug:
+            for extent in extents:
+                check = ntn.Assert(ntn.Call(ntn.Literal(ffuncs.eq), (extent, dim)))
+                if extent != dim and check not in extent_checks:
+                    extent_checks.append(check)
+        checks = self.hoist_invariant(tuple(extent_checks))
         loop = FusedLoop(idx, ntn.Variable(gensym(idx.name), dim.result_type))
         # The tensors which the body only reads are frozen before the loop,
         # rather than in each iteration.
-        written = self.written(body)
+        written = set()
+        for node in PostOrderDFS(body):
+            match node:
+                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
+                    lgc.Table(lgc.Alias() as lhs, _), _, _
+                ):
+                    written.add(lhs.unfused)
         reads = dict.fromkeys(
             node.unfused
             for node in PostOrderDFS(body)

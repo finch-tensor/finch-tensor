@@ -35,8 +35,6 @@ def reorder_to(ex: LogicExpression, idxs: tuple[Field, ...]) -> LogicExpression:
 def fuse_loop_order(
     stmt: LogicStatement, loop_order: tuple[Field, ...]
 ) -> LogicStatement:
-    """`stmt` within a Fuse node for each field of `loop_order`, from outermost
-    to innermost, which sets its loop order."""
     for idx in reversed(loop_order):
         stmt = Fuse(idx, stmt)
     return stmt
@@ -128,8 +126,8 @@ def push_fields(root):
 
     # A query stores its result in the order of its left-hand table, so we
     # expose that order to `rule_2` as a Reorder and strip it afterwards. The
-    # Reorder at the root of an in-place update is its loop order, which must
-    # visit the fields of the table it updates in order, so that one is kept.
+    # Reorder at the root of an in-place update visits the fields of the table
+    # it updates in order, so that one is kept.
     def wrap_query(stmt):
         match stmt:
             case Query(Table(_, idxs) as lhs, rhs) if rhs.fields() != idxs:

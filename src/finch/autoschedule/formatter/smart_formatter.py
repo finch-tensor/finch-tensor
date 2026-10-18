@@ -149,11 +149,7 @@ class SmartFormatter(LogicFormatter):
                     assert isinstance(rhs_stats, TensorStats)
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    match lhs:
-                        case lgc.FusedAlias(alias, nfused):
-                            pass
-                        case lgc.Alias() as alias:
-                            nfused = 0
+                    alias, nfused = lhs.unfused, lhs.nfused
                     if alias not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftypes.intp
@@ -309,11 +305,7 @@ class CostFormatter(LogicFormatter):
                 ):
                     node.infer_shape_type(shape_types)
                     machine(node)
-                    match lhs:
-                        case lgc.FusedAlias(alias, nfused):
-                            pass
-                        case lgc.Alias() as alias:
-                            nfused = 0
+                    alias, nfused = lhs.unfused, lhs.nfused
                     if alias not in bindings and alias not in stored_shape_types:
                         stored_shape_types[alias] = tuple(
                             ftype(dim) if dim is not None else ftypes.intp

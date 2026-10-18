@@ -226,11 +226,7 @@ class GalleyFormatter(LogicFormatter):
                         raise TypeError("GalleyFormatter requires NumericStats.")
                     stats_bindings[lhs] = rhs_stats  # ty: ignore[invalid-assignment]
 
-                    match lhs:
-                        case lgc.FusedAlias(alias, nfused):
-                            pass
-                        case lgc.Alias() as alias:
-                            nfused = 0
+                    alias, nfused = lhs.unfused, lhs.nfused
                     if alias not in bindings:
                         format_stats = stats_bindings[lhs]
                         if nfused:

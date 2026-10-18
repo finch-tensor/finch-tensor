@@ -456,6 +456,10 @@ class Alias(LogicNode, NamedTerm):
     def unfused(self) -> Alias: ...
 
     @property
+    @abstractmethod
+    def nfused(self) -> int: ...
+
+    @property
     def symbol(self) -> str:
         return self.name
 
@@ -494,6 +498,10 @@ class HardAlias(Alias):
     def unfused(self) -> Alias:
         return self
 
+    @property
+    def nfused(self) -> int:
+        return 0
+
 
 @dataclass(eq=True, frozen=True, init=False)
 class FusedAlias(Alias):
@@ -527,6 +535,10 @@ class FusedAlias(Alias):
     @property
     def unfused(self) -> HardAlias:
         return self.alias
+
+    @property
+    def nfused(self) -> int:
+        return self.n
 
 
 @dataclass(eq=True, frozen=True)

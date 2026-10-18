@@ -82,11 +82,8 @@ class AliasedForm(Form):
                     return
             if is_fill_expression(init) and is_static(init.fill_type(fills)):
                 return
-            match lhs:
-                case FusedAlias(_, n):
-                    spanned = {*idxs[n:], *arg.fields()} - set(idxs[:n])
-                case _:
-                    spanned = {*idxs, *arg.fields()}
+            n = lhs.nfused
+            spanned = {*idxs[n:], *arg.fields()} - set(idxs[:n])
             for level, (idx, _) in enumerate(fuses):
                 if idx in spanned:
                     scope = fuses[: level + 1]
@@ -156,7 +153,6 @@ class AliasedForm(Form):
 
 
 def _fused_statements(node: LogicStatement) -> tuple[LogicStatement, ...]:
-    """The statements of `node`, looking through the bodies of Fuse nodes."""
     match node:
         case Fuse(_, body):
             return _fused_statements(body)

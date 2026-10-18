@@ -15,7 +15,6 @@ from finch.finch_logic import (
     Alias,
     Field,
     Fuse,
-    FusedAlias,
     Literal,
     LogicStatement,
     Plan,
@@ -85,12 +84,7 @@ def alias_blocks(
                 if lhs.unfused == alias.unfused:
                     # A fused alias stores one slice for each value of its
                     # leading fields.
-                    match lhs:
-                        case FusedAlias(_, n):
-                            over = idxs[:n]
-                        case _:
-                            over = ()
-                    blocks.append((stats_interpreter(lhs), over))
+                    blocks.append((stats_interpreter(lhs), idxs[: lhs.nfused]))
             case Produces():
                 return
             case _:
@@ -294,11 +288,7 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
             if not idxs:
                 return
             # The levels of a fused alias follow its fused fields.
-            match tns:
-                case FusedAlias(_, n):
-                    depth = min(n + level, len(idxs) - 1)
-                case _:
-                    depth = min(level, len(idxs) - 1)
+            depth = min(tns.nfused + level, len(idxs) - 1)
             order = tuple(idxs[: depth + 1])
             loops = tuple(loop_order[: loop_order.index(idxs[depth]) + 1])
             iterations = pigeon.get_component_features(
