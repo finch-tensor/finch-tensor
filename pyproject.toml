@@ -65,7 +65,7 @@ platforms = [
     { name = "win-amd64", platform = "win-64" },
 ]
 preview = ["pixi-build"]
-requires-pixi = ">=0.71.0"
+requires-pixi = ">=0.72.0"
 
 # finch-tensor package definition
 
@@ -148,7 +148,7 @@ default-environment = "test-mlir"
 args = [
     { arg = "njobs", default = "logical" },
 ]
-cmd = "pytest src/finch/tests/test_julia_backend.py src/finch/tests/test_accuracy.py -n {{ njobs }}"
+cmd = "pytest src/finch/tests/test_julia_backend.py src/finch/tests/test_julia_runtime.py src/finch/tests/test_accuracy.py -n {{ njobs }}"
 depends-on = [{task = "compile", environment = "test-julia"}]
 default-environment = "test-julia"
 
@@ -158,7 +158,7 @@ depends-on = [{task = "compile", environment = "benchmark"}]
 default-environment = "benchmark"
 
 [tool.pixi.feature.julia.tasks.benchmark-julia]
-cmd = "pytest --codspeed benchmarks/test_julia_boeing.py benchmarks/test_julia_bellman_ford.py benchmarks/test_galley.py"
+cmd = "pytest --codspeed benchmarks/test_julia_boeing.py benchmarks/test_julia_bellman_ford.py benchmarks/test_julia_interop.py benchmarks/test_galley.py"
 depends-on = [{task = "compile", environment = "benchmark-julia"}]
 default-environment = "benchmark-julia"
 

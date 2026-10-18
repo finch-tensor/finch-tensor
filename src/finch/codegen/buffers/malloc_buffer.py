@@ -7,7 +7,7 @@ from textwrap import dedent
 
 import numpy as np
 
-from finch.algebra import FType, ftypes
+from finch.algebra import FType, ftypes, np_dtype
 from finch.codegen.c_codegen import (
     CBufferFType,
     CContext,
@@ -219,6 +219,18 @@ class MallocBuffer(Buffer):
     def store(self, index, value):
         value = serialize_to_c(self.ftype.element_type, value)
         self.castbuffer[index] = value
+
+    def to_numpy(self, *, copy: bool | None = None):
+        # Native resize/free can invalidate views, so exported arrays own their data.
+        if copy is False:
+            raise ValueError(
+                "Unable to avoid copy while creating an array as requested."
+            )
+        return np.fromiter(
+            (self.load(i) for i in range(self.length())),
+            dtype=np_dtype(self.element_type),
+            count=self.length(),
+        )
 
     def resize(self, new_length):
         # we effectively have to run an entire serialization cycle ourselves.

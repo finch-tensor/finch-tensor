@@ -106,7 +106,7 @@ class FiberTensor(OverrideTensor):
 
     def to_numpy(self) -> np.ndarray:
         # TODO: temporary for dense only. TBD in sparse_level PR
-        return np.reshape(self.lvl.val.arr, self.shape, copy=False)
+        return np.reshape(self.lvl.val.to_numpy(), self.shape, copy=False)
 
     def to_scipy(self):
         from .level import (
@@ -130,7 +130,7 @@ class FiberTensor(OverrideTensor):
                 tbl=(row, col),
             ):
                 return sps.coo_array(
-                    (element.val.arr, (row.arr, col.arr)),
+                    (element.val.to_numpy(), (row.to_numpy(), col.to_numpy())),
                     shape=self.shape,
                     copy=False,
                 )
@@ -143,7 +143,7 @@ class FiberTensor(OverrideTensor):
                 )
             ):
                 return sps.csr_array(
-                    (element.val.arr, idx.arr, ptr.arr),
+                    (element.val.to_numpy(), idx.to_numpy(), ptr.to_numpy()),
                     shape=self.shape,
                     copy=False,
                 )
