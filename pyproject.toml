@@ -65,7 +65,7 @@ platforms = [
     { name = "win-amd64", platform = "win-64" },
 ]
 preview = ["pixi-build"]
-requires-pixi = ">=0.71.0"
+requires-pixi = ">=0.72.0"
 
 # finch-tensor package definition
 
