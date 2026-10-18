@@ -1,6 +1,7 @@
 import pytest
 
 import numpy as np
+import scipy.sparse as sps
 
 import finch as ft
 import finch.finch_logic as lgc
@@ -13,10 +14,12 @@ from finch.autoschedule.stages import AliasedForm, CompilerForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
 from finch.autoschedule.util import fuse_loop_order
-from finch.codegen import MLIRCompiler
+from finch.codegen import MLIRCompiler, NumbaCompiler, NumbaGenerator
 from finch.compile import CompilerMode, NotationCompiler
 from finch.finch_logic.interpreter import MockFusedTensor
 from finch.finch_notation.nodes import NotationTree
+from finch.symbolic import Reflector
+from finch.symbolic.gensym import SymbolGenerator
 from finch.tensor import BufferizedNDArray
 
 
@@ -496,6 +499,33 @@ def test_fuse_compilation_uses_a_workspace(compiler):
     (result,) = compiler()(program).main(*bindings.values())
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
     assert bindings[w].shape == (2,)
+
+
+def test_gustavson_matmul_regression(file_regression, monkeypatch):
+    # Each row of a CSR product accumulates into a dense workspace, since the
+    # compiled sparse levels can only be written in order. Generated names are
+    # numbered from zero, whichever tests ran before.
+    monkeypatch.setattr(SymbolGenerator, "counter", 0)
+    a, b, w, c = map(lgc.HardAlias, "abwc")
+    data_a = np.array([[2, 0, 3], [1, 3, -1], [0, 0, 8]])
+    data_b = np.array([[4, 0, 9, 0], [0, 2, 0, 0], [4, 0, 0, -5]])
+    bindings = {
+        a: ft.asarray(sps.csr_array(data_a)),
+        b: ft.asarray(sps.csr_array(data_b)),
+        w: ft.asarray(np.zeros(0, dtype=np.int64)),
+        c: ft.asarray(sps.csr_array((0, 0), dtype=np.int64)),
+    }
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: val.ftype for var, val in bindings.items()
+    }
+    plan = gustavson_plan(a, b, w, c)
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    assert declare_depths(program) == {"w": [1], "c": [0]}
+    asm_program = NotationCompiler(Reflector())(program)  # ty: ignore[invalid-argument-type]
+    (result,) = NumbaCompiler()(asm_program).main(*bindings.values())
+    np.testing.assert_array_equal(result.to_scipy().toarray(), data_a @ data_b)
+    file_regression.check(str(NumbaGenerator()(asm_program)), extension=".py")
 
 
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
