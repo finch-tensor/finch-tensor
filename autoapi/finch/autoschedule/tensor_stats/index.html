@@ -7457,7 +7457,7 @@ sample_probs : per-dimension probabilities in index_order</p>
                     <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
                         <span class="k">match</span> <span class="n">level</span><span class="p">:</span>
                             <span class="k">case</span> <span class="n">ElementLevel</span><span class="p">():</span>
-                                <span class="n">values</span> <span class="o">=</span> <span class="n">level</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">arr</span>
+                                <span class="n">values</span> <span class="o">=</span> <span class="n">level</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
                                 <span class="k">break</span>
                             <span class="k">case</span> <span class="p">(</span>
                                 <span class="n">DenseLevel</span><span class="p">(</span><span class="n">lvl</span><span class="o">=</span><span class="n">child</span><span class="p">)</span>

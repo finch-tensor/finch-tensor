@@ -3180,45 +3180,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        JuliaElementFType
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="JuliaElementFType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType.julia_type" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        julia_type
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType.julia_value" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        julia_value
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#finch.compile_jl.types.ftype_to_jl_constructor_str" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5727,45 +5688,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        JuliaElementFType
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="JuliaElementFType">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType.julia_type" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        julia_type
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#finch.compile_jl.types.JuliaElementFType.julia_value" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        julia_value
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#finch.compile_jl.types.ftype_to_jl_constructor_str" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5857,171 +5779,6 @@
 
 
 
-<div class="doc doc-object doc-class">
-
-
-
-<h2 id="finch.compile_jl.types.JuliaElementFType" class="doc doc-heading">
-            <code>JuliaElementFType</code>
-
-
-</h2>
-
-
-    <div class="doc doc-contents ">
-            <p class="doc doc-class-bases">
-              Bases: <code><a class="autorefs autorefs-external" title="abc.ABC" href="https://docs.python.org/3/library/abc.html#abc.ABC">ABC</a></code></p>
-
-
-
-
-
-
-
-
-
-
-              <details class="mkdocstrings-source">
-                <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaElementFType</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Return the Julia type used for elements with this ftype.</span>
-<span class="sd">        """</span>
-        <span class="o">...</span>
-
-    <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Convert a Python value with this ftype into a Julia element value.</span>
-<span class="sd">        """</span>
-        <span class="o">...</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">julia_vector</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="n">jl</span> <span class="o">=</span> <span class="n">get_jl</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">jc</span><span class="o">.</span><span class="n">convert</span><span class="p">(</span>
-            <span class="n">jl</span><span class="o">.</span><span class="n">Vector</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">julia_type</span><span class="p">()],</span>
-            <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">julia_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="n">offset</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">],</span>
-        <span class="p">)</span>
-</code></pre></div></td></tr></table></div>
-              </details>
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="finch.compile_jl.types.JuliaElementFType.julia_type" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">julia_type</span><span class="p">()</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
-  </span>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return the Julia type used for elements with this ftype.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">julia_type</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Return the Julia type used for elements with this ftype.</span>
-<span class="sd">    """</span>
-    <span class="o">...</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="finch.compile_jl.types.JuliaElementFType.julia_value" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">julia_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
-  </span>
-
-</h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Convert a Python value with this ftype into a Julia element value.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">julia_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Convert a Python value with this ftype into a Julia element value.</span>
-<span class="sd">    """</span>
-    <span class="o">...</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
 
 <div class="doc doc-object doc-function">
 
@@ -6040,32 +5797,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
-<span class="normal">317</span>
-<span class="normal">318</span>
-<span class="normal">319</span>
-<span class="normal">320</span>
-<span class="normal">321</span>
-<span class="normal">322</span>
-<span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
-<span class="normal">333</span>
-<span class="normal">334</span>
-<span class="normal">335</span>
-<span class="normal">336</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
 <span class="normal">337</span>
 <span class="normal">338</span>
 <span class="normal">339</span>
@@ -6126,13 +5858,38 @@ embedding directly in generated kernel source (see compiler.py).</p>
 <span class="normal">394</span>
 <span class="normal">395</span>
 <span class="normal">396</span>
-<span class="normal">397</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia source text constructing a minimal instance of `ftype`, for</span>
 <span class="sd">    embedding directly in generated kernel source (see compiler.py)."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">ScalarFType</span><span class="p">):</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">_julia_literal</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[]))"</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">_buffer_ctor_str</span><span class="p">(</span><span class="n">elem_t</span><span class="p">)</span><span class="si">}</span><span class="s2">))"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">FiberTensorFType</span><span class="p">):</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">_level_constructor_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ftype</span><span class="p">,</span> <span class="n">BufferizedNDArrayFType</span><span class="p">):</span>
@@ -6141,7 +5898,7 @@ embedding directly in generated kernel source (see compiler.py).</p>
         <span class="c1"># (regardless of the ftype's own dimension_type).</span>
         <span class="n">elem_t</span> <span class="o">=</span> <span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">element_type</span><span class="p">)</span>
         <span class="n">fill</span> <span class="o">=</span> <span class="n">_julia_literal</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">fill_type</span><span class="p">)</span>
-        <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">elem_t</span><span class="si">}</span><span class="s2">[])"</span>
+        <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.ElementLevel(</span><span class="si">{</span><span class="n">fill</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">_buffer_ctor_str</span><span class="p">(</span><span class="n">elem_t</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
         <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ftype</span><span class="o">.</span><span class="n">ndim</span><span class="p">):</span>
             <span class="n">ctor</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Finch.DenseLevel(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">, 1)"</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Tensor(</span><span class="si">{</span><span class="n">ctor</span><span class="si">}</span><span class="s2">)"</span>
@@ -6235,16 +5992,16 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">403</span>
-<span class="normal">404</span>
-<span class="normal">405</span>
-<span class="normal">406</span>
-<span class="normal">407</span>
-<span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span>
-<span class="normal">411</span>
-<span class="normal">412</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ftype_to_jl_type_str</span><span class="p">(</span><span class="n">ftype</span><span class="p">:</span> <span class="n">FType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Julia type as source text (e.g. for a cache key). Cached per ftype."""</span>
     <span class="n">cached</span> <span class="o">=</span> <span class="n">_TYPE_STR_CACHE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ftype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -6276,9 +6033,9 @@ embedding directly in generated kernel source (see compiler.py).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scalar_type_str</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">element_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scalar_type_str</span><span class="p">(</span><span class="n">fill</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">element_type</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""The Julia type of a Finch scalar with the given fill and element type."""</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">"Finch.Scalar</span><span class="se">{{</span><span class="si">{</span><span class="n">_julia_literal</span><span class="p">(</span><span class="n">fill</span><span class="p">)</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">_leaf_type_str</span><span class="p">(</span><span class="n">element_type</span><span class="p">)</span><span class="si">}</span><span class="se">}}</span><span class="s2">"</span>
 </code></pre></div></td></tr></table></div>
@@ -6304,19 +6061,19 @@ type, or finch FType into the corresponding finch FType.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/types.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_fl_dtype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_fl_dtype</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FType</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Normalize a Julia DataType, numpy dtype/scalar type, Python builtin</span>
 <span class="sd">    type, or finch FType into the corresponding finch FType."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">FType</span><span class="p">):</span>

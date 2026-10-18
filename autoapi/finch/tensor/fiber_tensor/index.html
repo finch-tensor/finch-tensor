@@ -6249,7 +6249,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_numpy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
         <span class="c1"># TODO: temporary for dense only. TBD in sparse_level PR</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">to_scipy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">.level</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -6273,7 +6273,7 @@
                 <span class="n">tbl</span><span class="o">=</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">),</span>
             <span class="p">):</span>
                 <span class="k">return</span> <span class="n">sps</span><span class="o">.</span><span class="n">coo_array</span><span class="p">(</span>
-                    <span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="n">col</span><span class="o">.</span><span class="n">arr</span><span class="p">)),</span>
+                    <span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">col</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())),</span>
                     <span class="n">shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
                     <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="p">)</span>
@@ -6286,7 +6286,7 @@
                 <span class="p">)</span>
             <span class="p">):</span>
                 <span class="k">return</span> <span class="n">sps</span><span class="o">.</span><span class="n">csr_array</span><span class="p">(</span>
-                    <span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="n">idx</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="n">ptr</span><span class="o">.</span><span class="n">arr</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">idx</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(),</span> <span class="n">ptr</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()),</span>
                     <span class="n">shape</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
                     <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="p">)</span>

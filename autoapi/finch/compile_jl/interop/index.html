@@ -5783,17 +5783,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">425</span>
 <span class="normal">426</span>
 <span class="normal">427</span>
 <span class="normal">428</span>
@@ -5821,7 +5811,17 @@
 <span class="normal">450</span>
 <span class="normal">451</span>
 <span class="normal">452</span>
-<span class="normal">453</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">JuliaBufferContext</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Keep Julia-owned tensor buffers alive across kernel invocations."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -5901,7 +5901,8 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 80</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 79</span>
+<span class="normal"> 80</span>
 <span class="normal"> 81</span>
 <span class="normal"> 82</span>
 <span class="normal"> 83</span>
@@ -5981,7 +5982,10 @@
 <span class="normal">157</span>
 <span class="normal">158</span>
 <span class="normal">159</span>
-<span class="normal">160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">level_to_jl</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="n">Level</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Convert a level to its Julia counterpart, optionally pinning its fill."""</span>
     <span class="k">match</span> <span class="n">level</span><span class="p">:</span>
         <span class="k">case</span> <span class="n">ElementLevel</span><span class="p">():</span>
@@ -6000,8 +6004,8 @@
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseListLevel</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
                 <span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">)),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">idx</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">SparseByteMapLevel</span><span class="p">(</span>
             <span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="n">dimension</span><span class="p">,</span> <span class="n">ptr</span><span class="o">=</span><span class="n">ptr</span><span class="p">,</span> <span class="n">tbl</span><span class="o">=</span><span class="n">tbl</span><span class="p">,</span> <span class="n">srt</span><span class="o">=</span><span class="n">srt</span>
@@ -6010,12 +6014,13 @@
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                     <span class="s2">"SparseByteMapLevel must have ptr, tbl, and srt buffers"</span>
                 <span class="p">)</span>
-            <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseByteMapLevel</span><span class="p">(</span>
+            <span class="n">constructor</span> <span class="o">=</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseByteMapLevel</span><span class="p">[</span><span class="n">jl_dtypes</span><span class="o">.</span><span class="n">to_jl_type</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="n">dimension</span><span class="p">))]</span>
+            <span class="k">return</span> <span class="n">constructor</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
                 <span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
                 <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">tbl</span><span class="p">)),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">srt</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">srt</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">SparseCOOLevel</span><span class="p">(</span><span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span> <span class="n">coo_shape</span><span class="o">=</span><span class="n">coo_shape</span><span class="p">,</span> <span class="n">ptr</span><span class="o">=</span><span class="n">ptr</span><span class="p">,</span> <span class="n">tbl</span><span class="o">=</span><span class="n">tbl</span><span class="p">):</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tbl</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
@@ -6023,8 +6028,8 @@
             <span class="k">return</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseCOOLevel</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
                 <span class="nb">tuple</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">coo_shape</span><span class="p">)),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">ptr</span><span class="p">),</span>
-                <span class="nb">tuple</span><span class="p">(</span><span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">tbl</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">ptr</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+                <span class="nb">tuple</span><span class="p">(</span><span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">tbl</span><span class="p">)),</span>
             <span class="p">)</span>
         <span class="k">case</span> <span class="n">SparseHashLevel</span><span class="p">(</span>
             <span class="n">lvl</span><span class="o">=</span><span class="n">lvl</span><span class="p">,</span>
@@ -6032,33 +6037,36 @@
             <span class="n">ptr</span><span class="o">=</span><span class="n">ptr</span><span class="p">,</span>
             <span class="n">tbl_ctrl</span><span class="o">=</span><span class="n">tbl_ctrl</span><span class="p">,</span>
             <span class="n">tbl</span><span class="o">=</span><span class="n">tbl</span><span class="p">,</span>
-            <span class="n">pool</span><span class="o">=</span><span class="n">pool</span><span class="p">,</span>
+            <span class="n">key</span><span class="o">=</span><span class="n">key</span><span class="p">,</span>
             <span class="n">perm</span><span class="o">=</span><span class="n">perm</span><span class="p">,</span>
+            <span class="n">tbl_count</span><span class="o">=</span><span class="n">tbl_count</span><span class="p">,</span>
             <span class="n">subtables</span><span class="o">=</span><span class="n">subtables</span><span class="p">,</span>
-            <span class="n">single_writer</span><span class="o">=</span><span class="n">single_writer</span><span class="p">,</span>
+            <span class="n">pos_multiplier</span><span class="o">=</span><span class="n">pos_multiplier</span><span class="p">,</span>
         <span class="p">):</span>
             <span class="k">if</span> <span class="p">(</span>
                 <span class="n">ptr</span> <span class="ow">is</span> <span class="kc">None</span>
                 <span class="ow">or</span> <span class="n">tbl_ctrl</span> <span class="ow">is</span> <span class="kc">None</span>
                 <span class="ow">or</span> <span class="n">tbl</span> <span class="ow">is</span> <span class="kc">None</span>
-                <span class="ow">or</span> <span class="n">pool</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="ow">or</span> <span class="n">key</span> <span class="ow">is</span> <span class="kc">None</span>
                 <span class="ow">or</span> <span class="n">perm</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="ow">or</span> <span class="n">tbl_count</span> <span class="ow">is</span> <span class="kc">None</span>
             <span class="p">):</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="s2">"SparseHashLevel must have ptr, tbl_ctrl, tbl, pool, and perm "</span>
-                    <span class="s2">"buffers"</span>
+                    <span class="s2">"SparseHashLevel must have ptr, tbl_ctrl, tbl, key, perm, "</span>
+                    <span class="s2">"and tbl_count buffers"</span>
                 <span class="p">)</span>
-            <span class="n">dimension</span> <span class="o">=</span> <span class="n">_as_julia_scalar</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span><span class="o">.</span><span class="n">item</span><span class="p">())</span>
-            <span class="n">constructor</span> <span class="o">=</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseHashLevel</span><span class="p">[(</span><span class="n">jl</span><span class="o">.</span><span class="n">typeof</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span> <span class="n">single_writer</span><span class="p">)]</span>
+            <span class="n">constructor</span> <span class="o">=</span> <span class="n">jl</span><span class="o">.</span><span class="n">SparseHashLevel</span><span class="p">[</span><span class="n">jl_dtypes</span><span class="o">.</span><span class="n">to_jl_type</span><span class="p">(</span><span class="n">ftype</span><span class="p">(</span><span class="n">dimension</span><span class="p">))]</span>
             <span class="k">return</span> <span class="n">constructor</span><span class="p">(</span>
                 <span class="n">level_to_jl</span><span class="p">(</span><span class="n">lvl</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">),</span>
-                <span class="n">dimension</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">dimension</span><span class="p">),</span>
                 <span class="nb">int</span><span class="p">(</span><span class="n">subtables</span><span class="p">),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">)),</span>
+                <span class="n">pos_multiplier</span><span class="p">,</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">ptr</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
                 <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">tbl_ctrl</span><span class="p">)),</span>
                 <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">tbl</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
-                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">pool</span><span class="p">)),</span>
-                <span class="n">_plus_one_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">perm</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">key</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">index_fields</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">perm</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+                <span class="n">_buffer_to_jl</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">Buffer</span><span class="p">,</span> <span class="n">tbl_count</span><span class="p">)),</span>
             <span class="p">)</span>
         <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported Finch level type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">level</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -6084,15 +6092,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/compile_jl/interop.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
-<span class="normal">364</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
 <span class="normal">367</span>
@@ -6119,7 +6119,15 @@
 <span class="normal">388</span>
 <span class="normal">389</span>
 <span class="normal">390</span>
-<span class="normal">391</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tensor_to_jl</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">pin_fill</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Convert a tensor to its Julia counterpart, optionally pinning its fill."""</span>
     <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">"raw_julia_obj"</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">raw_julia_obj</span>
