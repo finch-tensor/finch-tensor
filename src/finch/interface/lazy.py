@@ -39,6 +39,7 @@ from finch.algebra.ftypes import (
     np_dtype,
 )
 from finch.autoschedule.tensor_stats import StatsInterpreter
+from finch.codegen.buffers.numpy_buffer import NumpyBuffer
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -49,6 +50,7 @@ from finch.finch_logic import (
     MapJoin,
     Plan,
     Query,
+    Reformat,
     Reorder,
     StatsFactory,
     Table,
@@ -75,8 +77,198 @@ from finch.tensor import (
     RollTensor,
     UpperTriangleTensor,
 )
+from finch.tensor.level import (
+    DenseLevel,
+    ElementLevel,
+    SparseCOOLevel,
+    SparseListLevel,
+    dense,
+    element,
+    sparse_list,
+)
 from finch.tensor.override_tensor import OverrideTensor
 from finch.tensor.scalar import ConstantScalar, Scalar
+
+
+def _from_numpy(arr: np.ndarray, *, device=None, copy=None) -> BufferizedNDArray:
+    """Zero-copy constructor from a NumPy array."""
+    if copy is True:
+        arr = arr.copy()
+    return BufferizedNDArray.from_numpy(arr, device=device)
+
+
+def _from_scipy(obj: sps.spmatrix | sps.sparray, *, device=None, dtype=None, copy=None):
+    """Zero-copy constructor from a SciPy sparse matrix or array."""
+    obj: Any = obj
+    if obj.format == "csc":  # CSC has no native Finch layout yet
+        if dtype is not None or copy is True:
+            raise NotImplementedError(
+                "asarray cannot honor dtype or copy for CSC input; "
+                "convert to CSR or COO first."
+            )
+        return obj
+    if copy is False and not (
+        obj.format in ("coo", "csr") and obj.has_canonical_format
+    ):
+        raise ValueError("Unable to avoid copy while creating an array as requested.")
+    if obj.format not in ("coo", "csr"):
+        obj = obj.asformat("coo")
+
+    if dtype is not None:
+        if copy is False:
+            obj = obj.astype(dtype, copy=False)
+        else:
+            obj = obj.astype(dtype, copy=True)
+    elif copy is True:
+        obj = obj.copy()
+
+    if not obj.has_canonical_format:
+        obj = obj.copy()
+        obj.sum_duplicates()
+
+    match obj.format:
+        case "csr":
+            return FiberTensor.from_scipy_csr(obj, device=device)
+        case "coo":
+            return FiberTensor.from_scipy_coo(obj, device=device)
+    raise ValueError(f"Unexpected SciPy format after normalization: {obj.format}")
+
+
+def _is_pydata_sparse(obj: Any) -> bool:
+    return (
+        type(obj).__module__.split(".")[0] == "sparse"
+        and hasattr(obj, "coords")
+        and hasattr(obj, "data")
+        and hasattr(obj, "shape")
+    )
+
+
+def _from_pydata(
+    obj: Any,
+    *,
+    device=None,
+    dtype=None,
+    copy=None,
+) -> FiberTensor:
+    """Zero-copy constructor from a pydata/sparse.COO array."""
+    try:
+        import sparse as pydata_sparse
+    except ImportError as exc:
+        raise ImportError(
+            "pydata/sparse is not installed. Please install it to use this feature."
+        ) from exc
+    if not isinstance(obj, pydata_sparse.COO):
+        raise TypeError(
+            f"Expected pydata/sparse.COO, got {type(obj).__name__}. "
+            "GCXS and other pydata formats are not supported."
+        )
+
+    if dtype is not None:
+        if copy is False:
+            obj = obj.astype(dtype, copy=False)
+        else:
+            obj = obj.astype(dtype, copy=True)
+    elif copy is True:
+        obj = obj.copy()
+
+    return FiberTensor.from_pydata_coo(obj, device=device)
+
+
+def _from_parts_csr(data, indices, indptr, shape, *, device=None) -> FiberTensor:
+    """
+    Constructs a FiberTensor from CSR parts.
+    """
+    if len(shape) != 2:
+        raise ValueError(f"Expected 2D shape for CSR parts, got {shape}.")
+    if len(indptr) != shape[0] + 1:
+        raise ValueError(
+            f"Expected indptr length {shape[0] + 1} for CSR parts, got {len(indptr)}."
+        )
+
+    if len(indices) != len(data):
+        raise ValueError(
+            f"Expected indices length {len(data)} for CSR parts, got {len(indices)}."
+        )
+    element_lvl = element(
+        fill_value=np.zeros((), dtype=data.dtype)[()],
+        element_type=ftype(data.dtype),
+        position_type=ftype(indices.dtype),
+    )
+    sparse_lvl = sparse_list(element_lvl, dimension_type=ftype(indptr.dtype))
+    dense_lvl = dense(sparse_lvl, dimension_type=ftype(indices.dtype))
+    return FiberTensor(
+        DenseLevel(
+            SparseListLevel(
+                ElementLevel(
+                    _format=element_lvl,
+                    _val=NumpyBuffer(data),
+                ),
+                dimension=sparse_lvl.dimension_type(shape[1]),
+                ptr=NumpyBuffer(indptr),
+                idx=NumpyBuffer(indices),
+            ),
+            dimension=dense_lvl.dimension_type(shape[0]),
+        ),
+        _device=device,
+    )
+
+
+def _from_parts_coo(coords, data, shape, *, device=None) -> FiberTensor:
+    """
+    Constructs a FiberTensor from COO parts.
+    """
+    if coords.ndim != 2:
+        raise ValueError(f"Expected 2D coords for COO parts, got {coords.ndim}D.")
+    ndim = coords.shape[0]
+    if len(shape) != ndim:
+        raise ValueError(f"Expected {ndim}D shape for COO parts, got {shape}.")
+    if coords.shape[1] != len(data):
+        raise ValueError(
+            f"Expected coords second dimension {len(data)} "
+            f"for COO parts, got {coords.shape[1]}."
+        )
+    index_type = ftype(coords.dtype)
+
+    element_lvl = element(
+        fill_value=np.zeros((), dtype=data.dtype)[()],
+        element_type=ftype(data.dtype),
+        position_type=index_type,
+    )
+    tbl = tuple(NumpyBuffer(coords[d]) for d in range(ndim))
+
+    return FiberTensor(
+        SparseCOOLevel(
+            ElementLevel(
+                _format=element_lvl,
+                _val=NumpyBuffer(data),
+            ),
+            shape=tuple(index_type(d) for d in shape),
+            tbl=tbl,
+        ),
+        _device=device,
+    )
+
+
+def reformat(tensor: LazyTensor, format: LazyTensorFType) -> LazyTensor:
+    """Reformat a lazy tensor to a different format using FinchLogic query."""
+
+    out = Alias(gensym("A"))
+    idxs = tuple(Field(gensym("i")) for _ in range(tensor.ndim))
+    expr = Reformat(
+        Table(out, idxs),
+        Table(tensor.data, idxs),
+        format,
+    )
+
+    data, ctx = tensor.ctx.eval(expr)
+    return LazyTensor(
+        data,
+        ctx,
+        tensor.shape,
+        format.fill_value,
+        format.element_type,
+        tensor.device,
+    )
 
 
 def _shape_size(shape: tuple) -> int:
@@ -461,43 +653,13 @@ def asarray(
                 return obj.to_device(device)
             return obj
         if isinstance(obj, np.ndarray):
-            if copy is True:
-                obj = obj.copy()
-            return BufferizedNDArray.from_numpy(obj, device=device)
+            return _from_numpy(obj, device=device, copy=copy)
         if sps.issparse(obj):
-            if obj.format == "csc":  # CSC has no native Finch layout yet
-                if dtype is not None or copy is True:
-                    raise NotImplementedError(
-                        "asarray cannot honor dtype or copy for CSC input; "
-                        "convert to CSR or COO first."
-                    )
-                return obj
-            if copy is False and not (
-                obj.format in ("coo", "csr") and obj.has_canonical_format
-            ):
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
-            if obj.format not in ("coo", "csr"):
-                obj = obj.asformat("coo")
+            return _from_scipy(obj, device=device, dtype=dtype, copy=copy)
 
-            if dtype is not None:
-                if copy is False:
-                    obj = obj.astype(dtype, copy=False)
-                else:
-                    obj = obj.astype(dtype, copy=True)
-            elif copy is True:
-                obj = obj.copy()
-
-            if not obj.has_canonical_format:
-                obj = obj.copy()
-                obj.sum_duplicates()
-
-            match obj.format:
-                case "csr":
-                    return FiberTensor.from_scipy_csr(obj, device=device)
-                case "coo":
-                    return FiberTensor.from_scipy_coo(obj, device=device)
+        # check pydata import to see if they have an is sparse function
+        if _is_pydata_sparse(obj):
+            return _from_pydata(obj, device=device, dtype=dtype, copy=copy)
 
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
@@ -517,7 +679,12 @@ def asarray(
             pass
         return obj
 
-    out = format.from_numpy(obj) if isinstance(obj, np.ndarray) else format(obj)
+    # Where def format would be called
+    # Should be left hand side a table, right hand side a table
+    # Going on scipy, numpy to FiberTensor csr, coo
+    # out = format.from_numpy(obj) if isinstance(obj, np.ndarray) else format(obj)
+    tensor = asarray(obj, dtype=dtype, device=device, copy=copy)
+    out = reformat(tensor, format)
     return out.to_device(device) if explicit_device else out
 
 
