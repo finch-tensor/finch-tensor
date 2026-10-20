@@ -31,8 +31,7 @@ class EinsumNode(Term):
 class EinsumTree(EinsumNode, TermTree):
     @property
     @abstractmethod
-    def children(self) -> list[EinsumNode]:  # type: ignore[override]
-        ...
+    def children(self) -> list[EinsumNode]: ...
 
 
 class EinsumExpression(EinsumNode, ABC):

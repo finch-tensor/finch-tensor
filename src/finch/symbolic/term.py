@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from inspect import isbuiltin, isclass, isfunction
 from typing import Any, Generic, Self, TypeVar
@@ -81,7 +81,7 @@ class ExpressionTerm(Term, FTyped, ABC):
 class TermTree(Term, ABC):
     @property
     @abstractmethod
-    def children(self) -> list[Term]:
+    def children(self) -> Sequence[Term]:
         """Return the children (AKA tail) of the S-expression."""
         ...
 
@@ -95,6 +95,7 @@ class LiteralTerm(Term, Generic[T]):
     val: T
 
 
+@dataclass(frozen=True, eq=True)
 class CallTerm(TermTree, ABC):
     """
     A tree term which applies the operator computed by the expression `op` to `args`.

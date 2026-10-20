@@ -1,6 +1,7 @@
 from .dataflow import BasicBlock, ControlFlowGraph, DataFlowAnalysis
 from .environment import Context, NamedTerm, Namespace, Reflector, ScopedDict
 from .gensym import gensym
+from .hashcons import HashCons
 from .rewriters import (
     Chain,
     Fixpoint,
@@ -32,6 +33,7 @@ __all__ = [
     "ExpressionTerm",
     "Fixpoint",
     "Form",
+    "HashCons",
     "LiteralTerm",
     "Memo",
     "NamedTerm",

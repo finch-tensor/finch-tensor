@@ -202,7 +202,7 @@ class Tensor(FTyped[TensorFType[FT]], ABC):
 
     @property
     @abstractmethod
-    def shape(self) -> tuple[np.intp, ...]:
+    def shape(self) -> tuple[int, ...]:
         """Shape of the tensor."""
         ...
 

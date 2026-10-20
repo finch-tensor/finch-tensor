@@ -73,7 +73,7 @@ class AssemblyExpression(AssemblyNode, ExpressionTerm):
 
     @property
     @abstractmethod
-    def result_type(self) -> BufferFType:
+    def result_type(self) -> FType:
         """Returns the type of the expression."""
         ...
 
