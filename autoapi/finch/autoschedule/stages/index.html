@@ -4950,6 +4950,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../symbolic/hashcons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    hashcons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../symbolic/rewriters/" class="md-nav__link">
         
   
@@ -6236,12 +6264,12 @@ equality-constrained loops to read arg in storage order. Fields absent from
 lhs_idxs are reduced by overwriting.)
 2) reductions
     Query(Table(lhs, lhs_idxs),
-          Aggregate(op, init, Reorder(arg, loop_order), <em>))
+          Aggregate(op, init, Reorder(arg, loop_order), _))
 (lhs is reset to init, a 0-D expression without aggregates or reorders,
 and arg is folded into it with op.)
 There are two valid kinds of update:
 1) initializations
-    QueryInto(Table(lhs, </em>), overwrite, Literal(init))
+    QueryInto(Table(lhs, _), overwrite, Literal(init))
 (Every element of lhs is set to init.)
 2) folds
     QueryInto(Table(lhs, lhs_idxs), op, Reorder(arg, loop_order))
@@ -7279,11 +7307,11 @@ There are four valid forms for a query in LoopOrderedForm:
     1) transpose queries
         Query(Table(<em>, output_order), Table(</em>, <em>))
     2) aggregate queries
-        Query(Table(</em>, output_order), Aggregate(<em>, </em>, Reorder(arg, loop_order), <em>))
+        Query(Table(</em>, output_order), Aggregate(_, _, Reorder(arg, loop_order), <em>))
     3) in-place queries
-        QueryInto(Table(</em>, lhs_idxs), <em>, Reorder(arg, loop_order))
+        QueryInto(Table(</em>, lhs<em>idxs), _, Reorder(arg, loop_order))
     4) in-place initializations
-        QueryInto(Table(</em>, <em>), </em>, Literal(_))
+        QueryInt</em>(Table(<em>, _), _, L</em>teral(_))
 For aggregate and in-place queries, the loop order includes every lhs
 field and visits those fields in order. The Tables of arg follow the loop
 order, except that an in-place query of a single Table may read it in
@@ -7487,10 +7515,10 @@ already been optimized for this query. There are three valid kinds of input quer
 1) transpose queries
     Query(Table(<em>, output_order), Table(</em>, <em>))
 2) aggregate queries
-    Query(Table(</em>, output_order), Aggregate(<em>, init, arg, </em>))
+    Query(Table(</em>, output_order), Aggregate(_, init, arg, <em>))
 (init is a 0-D expression without aggregates or reorders.)
 3) in-place queries
-    QueryInto(Table(_, output_order), op, arg)
+    QueryInto(Table(</em>, output_order), op, arg)
 (Here, arg has no aggregates. The fields of arg which are not in
 output_order are reduced with op.)</p>
 

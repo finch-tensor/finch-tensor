@@ -4701,6 +4701,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../hashcons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    hashcons
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../rewriters/" class="md-nav__link">
         
   
@@ -5912,7 +5940,9 @@
 <span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
-<span class="normal">104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CallTerm</span><span class="p">(</span><span class="n">TermTree</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
+<span class="normal">104</span>
+<span class="normal">105</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CallTerm</span><span class="p">(</span><span class="n">TermTree</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A tree term which applies the operator computed by the expression `op` to `args`.</span>
 <span class="sd">    """</span>
@@ -6208,7 +6238,7 @@ children. This function should satisfy
 <span class="k">class</span><span class="w"> </span><span class="nc">TermTree</span><span class="p">(</span><span class="n">Term</span><span class="p">,</span> <span class="n">ABC</span><span class="p">):</span>
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Term</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">children</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Term</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Return the children (AKA tail) of the S-expression."""</span>
         <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
