@@ -271,12 +271,7 @@ def declare(tns, init, op, shape):
 
 
 def np_declare(tns, init, op, shape):
-    for dim in shape:
-        if dim.start != 0:
-            raise ValueError(
-                f"Invalid dimension start value {dim.start} for ndarray declaration."
-            )
-    shape = tuple(dim.end for dim in shape)
+    shape = tuple(int(dim) for dim in shape)
     tns.fill(init)
     if tns.shape != shape:
         tns = np.broadcast_to(tns, shape).copy()

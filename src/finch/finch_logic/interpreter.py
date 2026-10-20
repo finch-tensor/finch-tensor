@@ -66,22 +66,26 @@ class MockFusedTensor:
     while preserving the values a fused loop would pass between statements.
     """
 
-    def __init__(self, shape, n, fill_value, dtype, *, make_tensor=make_tensor):
+    def __init__(self, shape, n, fill, dtype, *, make_tensor=make_tensor):
         self.shape = tuple(shape)
         if not 0 <= n <= len(self.shape):
             raise ValueError("The fused dimension count exceeds the tensor rank")
         self.n = n
         self.outer_shape = self.shape[:n]
         self.inner_shape = self.shape[n:]
-        self.fill_value = fill_value
+        self.fill = as_fill(fill)
         self.element_type = ftype(dtype)
         self.make_tensor = make_tensor
         self.store_tns = {}
 
+    @property
+    def fill_value(self):
+        return self.fill.value
+
     def slot(self, outer_crds):
         if outer_crds not in self.store_tns:
             self.store_tns[outer_crds] = self.make_tensor(
-                self.inner_shape, self.fill_value, dtype=self.element_type
+                self.inner_shape, self.fill, dtype=self.element_type
             )
         return self.store_tns[outer_crds]
 
@@ -251,23 +255,21 @@ class LogicMachine:
                         ffuncs.same(self.bindings[key].fill_value, rhs.tns.fill_value)
                     )
                 ):
+                    # Whether the fill is dynamic belongs to the stored tensor,
+                    # so every view of it keeps a dynamic fill.
+                    fill = rhs.tns.fill
+                    if key in self.bindings and is_dynamic(self.bindings[key].fill):
+                        fill = fill.as_dynamic()
                     match var:
                         case FusedAlias(_, n):
                             self.bindings[key] = MockFusedTensor(
                                 rhs.tns.shape,
                                 n,
-                                rhs.tns.fill_value,
+                                fill,
                                 rhs.tns.element_type,
                                 make_tensor=self.make_tensor,
                             )
                         case Alias():
-                            fill = rhs.tns.fill
-                            if (
-                                key in self.bindings
-                                and self.view(var) == var
-                                and is_dynamic(self.bindings[key].fill)
-                            ):
-                                fill = fill.as_dynamic()
                             self.bindings[key] = self.make_tensor(
                                 rhs.tns.shape,
                                 fill,
