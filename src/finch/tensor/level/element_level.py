@@ -27,8 +27,9 @@ from .level import Level, LevelFType
 
 @dataclass(unsafe_hash=True)
 class ElementLevelFType(LevelFType, MutableStructFType):
-    fill_type: AbstractFillFType | None = None
-    element_type: FType | None = None
+    # None only as constructor input, __post_init__ always resolves these.
+    fill_type: AbstractFillFType | None = None  # ty: ignore[invalid-property-type-override]
+    element_type: FType | None = None  # ty: ignore[invalid-property-type-override]
     position_type: FType | None = None
     buffer_factory: Any = NumpyBufferFType
     buffer_type: Any = None

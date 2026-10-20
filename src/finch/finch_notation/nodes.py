@@ -65,8 +65,7 @@ class NotationNode(Term, ABC):
 class NotationTree(NotationNode, TermTree):
     @property
     @abstractmethod
-    def children(self) -> list[NotationNode]:  # type: ignore[override]
-        ...
+    def children(self) -> list[NotationNode]: ...
 
 
 class NotationExpression(NotationNode, ExpressionTerm):

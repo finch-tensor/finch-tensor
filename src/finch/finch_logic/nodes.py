@@ -200,8 +200,7 @@ class LogicNode(Term, ABC):
 class LogicTree(LogicNode, TermTree, ABC):
     @property
     @abstractmethod
-    def children(self) -> list[LogicNode]:  # type: ignore[override]
-        ...
+    def children(self) -> list[LogicNode]: ...
 
 
 T = TypeVar("T")

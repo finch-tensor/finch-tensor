@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from typing import Any
 
-import numpy as np
-
 from finch import finch_logic as lgc
 from finch.algebra import is_dynamic, np_dtype
 from finch.algebra.tensor import Tensor, TensorFType
@@ -93,7 +91,28 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         }
         mod, binding_ftypes = self._load_cached(stmt, arg_ftypes, bindings)
 
-        bindings = dict(zip(binding_ftypes.keys(), bindings.values(), strict=False))
+        input_bindings = dict(
+            zip(binding_ftypes.keys(), bindings.values(), strict=False)
+        )
+        bindings = input_bindings.copy()
+
+        binding_shapes = dict[lgc.Field | None, int]()
+        for var, tns in bindings.items():
+            for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
+                if idx is not None:
+                    binding_shapes[idx] = dim
+
+        # Dynamic output fills resolve at bind time against the actual
+        # argument fills, mirroring the shape resolution above.
+        fill_map: dict[lgc.Alias, AbstractFill] | None = None
+        if any(
+            is_dynamic(tns_ftype.fill_type)
+            for var, tns_ftype in binding_ftypes.items()
+            if var not in bindings
+        ):
+            fill_map = final_prgm.infer_fill_value(
+                {var: tns.fill for var, tns in input_bindings.items()}
+            )
 
         for var, tns_ftype in binding_ftypes.items():
             if var not in bindings:
