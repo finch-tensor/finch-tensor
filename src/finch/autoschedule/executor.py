@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from typing import Any
 
-import numpy as np
-
 from finch import finch_logic as lgc
 from finch.algebra import AbstractFill, is_dynamic
 from finch.algebra.tensor import Tensor, TensorFType
@@ -100,7 +98,7 @@ class LogicExecutor(UnvalidatedForm, LogicEvaluator):
         )
         bindings = input_bindings.copy()
 
-        binding_shapes = dict[lgc.Field | None, np.intp]()
+        binding_shapes = dict[lgc.Field | None, int]()
         for var, tns in bindings.items():
             for idx, dim in zip(binding_idxs[var], tns.shape, strict=True):
                 if idx is not None:
