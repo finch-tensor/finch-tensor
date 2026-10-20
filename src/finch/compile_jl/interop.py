@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, cast
 
 import numpy as np
@@ -25,6 +26,7 @@ from finch.tensor.patterns import (
     ChunkMaskTensor,
     EyeTensor,
     FillTensor,
+    IndexTensor,
     LowerTriangleTensor,
     OddEvenMergeSortLowerMaskTensor,
     OddEvenMergeSortPartnerMaskTensor,
@@ -385,6 +387,12 @@ def tensor_to_jl(obj, pin_fill: bool = False):
         return scalar_to_jl(obj.val, pin_fill=pin_fill)
     if isinstance(obj, PatternTensor):
         return _pattern_tensor_to_jl(obj)
+    if isinstance(obj, IndexTensor):
+        # Finch has no linear index tensor, so it is passed as a dense array.
+        dtype = np.asarray(obj.element_type(0)).dtype
+        arr = np.arange(math.prod(obj.shape), dtype=dtype).reshape(obj.shape)
+        fill = obj.element_type(0) if pin_fill else obj.fill_value
+        return _ndarray_to_jl_tensor(arr, fill)
     if isinstance(obj, FillTensor):
         # A fill tensor is its fill everywhere, and its extents are passed to
         # kernels separately, so it is passed as a Finch scalar.

@@ -25,6 +25,7 @@ from finch.tensor.patterns import (
     ChunkMaskTensor,
     EyeTensor,
     FillTensorFType,
+    IndexTensorFType,
     LowerTriangleTensor,
     OddEvenMergeSortLowerMaskTensor,
     OddEvenMergeSortPartnerMaskTensor,
@@ -342,7 +343,7 @@ def ftype_to_jl_constructor_str(ftype: FType) -> str:
         return f"Finch.Tensor(Finch.ElementLevel({fill}, {_buffer_ctor_str(elem_t)}))"
     if isinstance(ftype, FiberTensorFType):
         return f"Finch.Tensor({_level_constructor_str(ftype.lvl_t)})"
-    if isinstance(ftype, BufferizedNDArrayFType):
+    if isinstance(ftype, (BufferizedNDArrayFType, IndexTensorFType)):
         # Matches interop.py's _ndarray_to_jl_tensor: a plain dense buffer
         # wrapped in `ndim` nested DenseLevels, each with plain Int64 shape
         # (regardless of the ftype's own dimension_type).

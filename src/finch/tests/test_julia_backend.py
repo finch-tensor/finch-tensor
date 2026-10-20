@@ -1114,6 +1114,57 @@ def test_minus_one_buffer_to_numpy_shifts_every_tuple_field():
     np.testing.assert_array_equal(raw["element_1"], [1, 2, 3])
 
 
+def test_compile_julia_eager_eye():
+    # Eager eye computes a kernel that only returns its pattern mask.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    matrix = np.arange(1.0, 10.0).reshape(3, 3)
+    with with_default_scheduler(COMPILE_JULIA):
+        eye = ft.eye(3, k=1)
+        assert isinstance(eye, EyeTensor)
+        result = ft.add(ft.asarray(matrix), eye)
+
+    np.testing.assert_array_equal(result.to_numpy(), matrix + np.eye(3, k=1))
+
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        lambda a: ft.argmin(a, axis=0),
+        lambda a: ft.argmin(a, axis=1),
+        lambda a: ft.argmax(a, axis=1),
+        ft.linalg.vector_norm,
+        lambda a: ft.linalg.vector_norm(a, axis=1),
+    ],
+    ids=["argmin_axis0", "argmin_axis1", "argmax_axis1", "norm", "norm_axis1"],
+)
+def test_compile_julia_tuple_reductions_match_interpreter(op):
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA, INTERPRET_NOTATION
+
+    arg = np.array([[3.0, 1.0, 1.0], [-2.0, 5.0, -2.0], [0.0, 0.0, 1e200]])
+    with with_default_scheduler(INTERPRET_NOTATION):
+        expected = ft.compute(op(ft.defer(arg))).to_numpy()
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg))).to_numpy()
+
+    np.testing.assert_array_equal(result, expected)
+
+
+@pytest.mark.parametrize("op, np_op", [(ft.argmin, np.argmin), (ft.argmax, np.argmax)])
+def test_compile_julia_index_tensor(op, np_op):
+    # Reducing over every axis reads linear indices from an IndexTensor.
+    _requires_julia_backend()
+    from finch.autoschedule import COMPILE_JULIA
+
+    arg = np.array([[3.0, 1.0, 1.0], [-2.0, 5.0, -2.0]])
+    with with_default_scheduler(COMPILE_JULIA):
+        result = ft.compute(op(ft.defer(arg)))
+
+    assert result.item() == np_op(arg)
+
+
 def test_register_julia_op_maps_and_defines_once():
     _requires_julia_backend()
     from finch.compile_jl import compiler
