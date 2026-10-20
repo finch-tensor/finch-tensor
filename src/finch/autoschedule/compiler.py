@@ -411,17 +411,12 @@ class NotationContext:
                 read_idxs.append(new_idx)
                 read_idx = next(pending, None)
         assert read_idx is None
-        # The enclosing fused loops iterate over their fields already.
+        # Every field of the loop order is fused, so the enclosing fused loops
+        # iterate over them already, and only the revisits need new indices.
         fused = {loop.idx: loop.var for loop in self.fused}
-        loops = {
-            idx: fused[idx]
-            if idx in fused
-            else ntn.Variable(
-                gensym(idx.name),
-                shape_type.get(idx) or shape_type[remap_idxs[idx]],
-            )
-            for idx in loop_idxs
-        }
+        loops = {idx: fused[idx] for idx in loop_order}
+        for new_idx, idx in remap_idxs.items():
+            loops[new_idx] = ntn.Variable(gensym(new_idx.name), shape_type[idx])
         ctx = PointwiseContext(self)
         rhs = ctx(lgc.Table(arg.tns, tuple(read_idxs)), loops)
         lhs_access = ntn.Access(
@@ -429,31 +424,20 @@ class NotationContext:
             ntn.Update(ntn.Literal(op)),
             tuple(loops[idx] for idx in self.stored_idxs(query_lhs, output_idxs)),
         )
-        body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
-        for idx in reversed(loop_idxs):
-            if idx in fused:
-                continue
-            stop = shapes.get(idx) or shapes[remap_idxs[idx]]
+        # A transposed read revisits a field after its predecessor in storage
+        # order, before any deeper enclosing Fuse loops.
+        for new_idx, idx in reversed(remap_idxs.items()):
+            stop = shapes[idx]
             ext = ntn.Call(
                 ntn.Literal(make_extent),
                 (ntn.Literal(stop.result_type(0)), stop),
             )
-            if idx in remap_idxs:
-                # A transposed read revisits this field after its predecessor
-                # in storage order, before any deeper enclosing Fuse loops.
-                preceding = loop_idxs[: loop_idxs.index(idx)]
-                parent = next(
-                    loop for loop in reversed(self.fused) if loop.idx in preceding
-                )
-                parent.revisits.insert(0, (loops[idx], ext, loops[remap_idxs[idx]]))
-                continue
-            body = ntn.Loop(
-                loops[idx],
-                ext,
-                body,
+            preceding = loop_idxs[: loop_idxs.index(new_idx)]
+            parent = next(
+                loop for loop in reversed(self.fused) if loop.idx in preceding
             )
-
-        return body
+            parent.revisits.insert(0, (loops[new_idx], ext, loops[idx]))
+        return ntn.Increment(lhs_access, rhs)
 
     def _lower_query_of_aggregate(
         self,
@@ -461,30 +445,12 @@ class NotationContext:
         agg_op: FinchOperator,
         arg: lgc.LogicExpression,
         output_idxs: tuple[lgc.Field, ...],
-        loop_idxs: tuple[lgc.Field, ...],
+        loop_order: tuple[lgc.Field, ...],
     ):
-        # The loop order holds every field of the output, and the argument is
-        # broadcast over the fields only the output has.
-        arg_dims = arg.dimmap(merge_shapes, self.shapes)
-        shapes_map = {
-            **dict(zip(output_idxs, self.shapes[query_lhs], strict=True)),
-            **dict(zip(arg.fields(), arg_dims, strict=True)),
-        }
-        shapes = {idx: shapes_map.get(idx) or ntn.Literal(1) for idx in loop_idxs}
-        arg_types = arg.shape_type(self.shape_types)
-        shape_type_map = {
-            **dict(zip(output_idxs, self.shape_types[query_lhs], strict=True)),
-            **dict(zip(arg.fields(), arg_types, strict=True)),
-        }
-        shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_idxs}
-        # The enclosing fused loops iterate over their fields already.
+        # Every field of the loop order is fused, so the enclosing fused loops
+        # iterate over them already.
         fused = {loop.idx: loop.var for loop in self.fused}
-        loops = {
-            idx: fused[idx]
-            if idx in fused
-            else ntn.Variable(gensym(idx.name), shape_type[idx])
-            for idx in loop_idxs
-        }
+        loops = {idx: fused[idx] for idx in loop_order}
         ctx = PointwiseContext(self)
         rhs = ctx(arg, loops)
         lhs_access = ntn.Access(
@@ -492,20 +458,40 @@ class NotationContext:
             ntn.Update(ntn.Literal(agg_op)),
             tuple(loops[idx] for idx in self.stored_idxs(query_lhs, output_idxs)),
         )
-        body: ntn.NotationStatement = ntn.Increment(lhs_access, rhs)
-        for idx in reversed(loop_idxs):
+        return ntn.Increment(lhs_access, rhs)
+
+    def overwrite_elements(
+        self, var: lgc.Alias, idxs: tuple[lgc.Field, ...], init: ntn.Literal
+    ) -> ntn.NotationStatement:
+        """Overwrite every stored element of `var` with `init`. An
+        initialization doesn't get wrapped in fused nods, so this loops
+        over the fields which the enclosing fused loops don't."""
+        fused = {loop.idx: loop.var for loop in self.fused}
+        shapes = dict(zip(idxs, self.shapes[var], strict=True))
+        shape_types = {
+            idx: shape_type or ftypes.intp
+            for idx, shape_type in zip(idxs, self.shape_types[var], strict=True)
+        }
+        loops = {
+            idx: fused[idx]
+            if idx in fused
+            else ntn.Variable(gensym(idx.name), shape_types[idx])
+            for idx in idxs
+        }
+        lhs_access = ntn.Access(
+            self.slots[var],
+            ntn.Update(ntn.Literal(ffuncs.overwrite)),
+            tuple(loops[idx] for idx in self.stored_idxs(var, idxs)),
+        )
+        body: ntn.NotationStatement = ntn.Increment(lhs_access, init)
+        for idx in reversed(idxs):
             if idx in fused:
                 continue
             ext = ntn.Call(
                 ntn.Literal(make_extent),
-                (ntn.Literal(shape_type[idx](0)), shapes[idx]),
+                (ntn.Literal(shape_types[idx](0)), shapes[idx] or ntn.Literal(1)),
             )
-            body = ntn.Loop(
-                loops[idx],
-                ext,
-                body,
-            )
-
+            body = ntn.Loop(loops[idx], ext, body)
         return body
 
     def fused_fields(
@@ -666,9 +652,7 @@ class NotationContext:
                     # A static fill can't change, so lhs is declared with its
                     # fill, and then every element is overwritten with init.
                     stmts = self.declare(lhs, ntn.Literal(fill.value), op)
-                    body = self._lower_query_of_aggregate(
-                        lhs, ffuncs.overwrite, lgc.Literal(init), idxs, idxs
-                    )
+                    body = self.overwrite_elements(lhs, idxs, ntn.Literal(init))
                     return ntn.Block((*stmts, body))
                 return ntn.Block(self.declare(lhs, ntn.Literal(init), op))
             case lgc.QueryInto(
