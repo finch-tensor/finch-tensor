@@ -290,8 +290,11 @@ def test_sparse_level_construct_initializes_empty_storage():
     np.testing.assert_array_equal(hash_level.ptr.arr, np.zeros(4, dtype=np.intp))
     assert hash_level.tbl_ctrl.length() == 0
     assert hash_level.tbl.length() == 0
-    assert hash_level.pool.length() == 0
+    assert hash_level.key.length() == 0
     assert hash_level.perm.length() == 0
+    np.testing.assert_array_equal(hash_level.tbl_count.arr, np.zeros(1, dtype=np.intp))
+    assert hash_level.pos_multiplier.dtype == np.dtype(np.uintp)
+    assert int(hash_level.pos_multiplier) & 1
     assert hash_level.lvl.val.length() == 0
 
     coo_level = finch.sparse_coo(elem_t, 2, finch.intp).construct((4, 5), pos=3)
@@ -305,6 +308,44 @@ def test_sparse_level_construct_initializes_empty_storage():
     np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
     assert bytemap_level.srt.length() == 0
     assert bytemap_level.lvl.val.length() == 12
+
+
+def test_sparse_hash_fields_preserve_table_metadata():
+    child = element(0.0).construct((), pos=0)
+    level = finch.SparseHashLevel(
+        child, np.int32(4), subtables=4, pos_multiplier=np.uintp(17)
+    )
+    assert (
+        level.tbl_count is not None and level.tbl is not None and level.key is not None
+    )
+    np.testing.assert_array_equal(level.tbl_count.arr, np.zeros(4, dtype=np.intp))
+    assert level.tbl.element_type == finch.intp
+    assert level.key.element_type.struct_fieldtypes == [
+        finch.intp,
+        finch.int32,
+        finch.uint8,
+    ]
+    fields = [getattr(level, name) for name, _ in level.ftype.struct_fields]
+    rebuilt = level.ftype.from_fields(*fields)
+    assert rebuilt.ftype == level.ftype
+    assert rebuilt.subtables == 4
+    assert rebuilt.pos_multiplier == 17
+    for name in ("ptr", "tbl_ctrl", "tbl", "key", "perm", "tbl_count"):
+        assert getattr(rebuilt, name) is getattr(level, name)
+
+
+@pytest.mark.parametrize("subtables", [0, -1, 3, 1.5])
+def test_sparse_hash_rejects_invalid_subtables(subtables):
+    child = element(0.0).construct((), pos=0)
+    with pytest.raises(ValueError, match="positive power of two"):
+        finch.SparseHashLevel(child, np.intp(4), subtables=subtables)
+
+
+@pytest.mark.parametrize("pos_multiplier", [0, 2, 1.5])
+def test_sparse_hash_rejects_invalid_position_multiplier(pos_multiplier):
+    child = element(0.0).construct((), pos=0)
+    with pytest.raises(ValueError, match="odd integer"):
+        finch.SparseHashLevel(child, np.intp(4), pos_multiplier=pos_multiplier)
 
 
 def test_bufferized_ndarray_level_format_properties():

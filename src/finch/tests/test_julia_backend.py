@@ -516,36 +516,6 @@ def test_compile_julia_blocked_uniform_grid_lowering(monkeypatch, file_regressio
     file_regression.check("\n\n".join(compiler.sources), extension=".jl")
 
 
-def test_julia_element_ftype_can_customize_vector_lowering():
-    _requires_julia_backend()
-    from finch.compile_jl import JuliaElementFType
-    from finch.compile_jl import types as jl_dtypes
-    from finch.compile_jl.julia import jl
-
-    class PairFType(ft.FType, JuliaElementFType):
-        def __eq__(self, other):
-            return isinstance(other, PairFType)
-
-        def __hash__(self):
-            return hash(PairFType)
-
-        def __call__(self, val):
-            left, right = val
-            return int(left), int(right)
-
-        def julia_type(self):
-            return jl.Tuple[(jl.Int64, jl.Int64)]
-
-        def julia_value(self, value, *, offset: int = 0):
-            left, right = value
-            return int(left) + offset, int(right) + offset
-
-    vec = jl_dtypes.to_jl_vector(PairFType(), [(0, 3), (4, 5)], offset=1)
-
-    assert str(jl.typeof(vec)) == "Vector{Tuple{Int64, Int64}}"
-    assert [tuple(entry) for entry in vec] == [(1, 4), (5, 6)]
-
-
 def _element_level(data) -> ElementLevel:
     elem_ftype = element(DTYPE(0), ftype(DTYPE), ftype(np.intp), NumpyBufferFType)
     return ElementLevel(elem_ftype, NumpyBuffer(np.asarray(data, dtype=DTYPE)))
@@ -1077,7 +1047,7 @@ def test_julia_coo_round_trip_keeps_python_dim_order():
     back = jl_tensor_to_python(jl_obj).lvl
     assert tuple(int(s) for s in back.coo_shape) == (2, 3, 4)
     for got, want in zip(back.tbl, coords.T, strict=True):
-        np.testing.assert_array_equal(got.arr, want)
+        np.testing.assert_array_equal(got.to_numpy(), want)
 
 
 def test_julia_kernel_writes_coo_output_in_python_dim_order():
@@ -1109,7 +1079,7 @@ def test_julia_kernel_writes_coo_output_in_python_dim_order():
     )
     lvl = jl_tensor_to_python(res.raw_julia_obj).lvl
     assert tuple(int(s) for s in lvl.coo_shape) == data.shape
-    rows, cols = (np.asarray(c.arr)[: int(lvl.ptr.arr[-1])] for c in lvl.tbl)
+    rows, cols = (c.to_numpy()[: int(lvl.ptr.to_numpy()[-1])] for c in lvl.tbl)
     np.testing.assert_array_equal(rows, [0, 1, 1])
     np.testing.assert_array_equal(cols, [1, 0, 2])
 
@@ -1131,13 +1101,13 @@ def test_compute_shape_vars_accepts_broadcast_reorder():
     assert len(shape_vars[a]) == 1
 
 
-def test_minus_one_buffer_arr_shifts_every_tuple_field():
+def test_minus_one_buffer_to_numpy_shifts_every_tuple_field():
     from finch.compile_jl.buffer import MinusOneBuffer
 
     raw = np.zeros(3, dtype=[("element_1", np.intp), ("element_2", np.intp)])
     raw["element_1"] = [1, 2, 3]
     raw["element_2"] = [4, 5, 6]
-    arr = MinusOneBuffer(NumpyBuffer(raw)).arr
+    arr = MinusOneBuffer(NumpyBuffer(raw)).to_numpy()
 
     np.testing.assert_array_equal(arr["element_1"], [0, 1, 2])
     np.testing.assert_array_equal(arr["element_2"], [3, 4, 5])

@@ -79,6 +79,24 @@ class Buffer(FTyped[BufferFType[FT]], ABC):
     def store(self, idx: int, val): ...
 
     @abstractmethod
+    def to_numpy(self, *, copy: bool | None = None):
+        """Return logical values as a NumPy array.
+
+        ``copy=True`` returns independent storage, ``copy=False`` requires shared
+        storage, and ``copy=None`` shares storage when supported and copies otherwise.
+        """
+        ...
+
+    @property
+    def owner(self):
+        """Object retaining the storage, which may change on resize.
+
+        Raw pointers must be reacquired after resize. Borrowing implementations
+        retain the previous allocation for existing views when they detach.
+        """
+        return self
+
+    @abstractmethod
     def resize(self, len: int):
         """
         Resize the buffer to the new length.

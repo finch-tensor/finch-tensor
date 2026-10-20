@@ -18,7 +18,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
       - uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.71.3
+          pixi-version: v0.72.0
           environments: >-
             docs
       - name: Deploy Docs

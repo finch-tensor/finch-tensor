@@ -1,11 +1,11 @@
 # Finch kernel
 eval(let
-        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, Int64[]), 1, Finch.PlusOneVector(Int64[]), Finch.PlusOneVector(Int64[])), 1))
+        v0 = Finch.Tensor(Finch.DenseLevel(Finch.SparseListLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1, Finch.PlusOneVector(FinchInterop.Buffer(Int64[])), Finch.PlusOneVector(FinchInterop.Buffer(Int64[]))), 1))
         v1 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
         v2 = Finch.window(Finch.splitmask(1, 1), Finch.Extent(1, 1), Finch.Extent(1, 1))
-        v3 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1), 1))
-        v4 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
-        v5 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, Int64[]), 1))
+        v3 = Finch.Tensor(Finch.DenseLevel(Finch.DenseLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1), 1))
+        v4 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1))
+        v5 = Finch.Tensor(Finch.DenseLevel(Finch.ElementLevel(0, FinchInterop.Buffer(Int64[])), 1))
         v6 = 1
         v7 = 1
         v8 = 1
@@ -40,7 +40,7 @@ eval(let
 end)
 
 # Generated Julia
-function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Vector{Int64}}, PlusOneVector{Int64, Vector{Int64}}, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Vector{Int64}}}}, v6::Int64, v7::Int64, v8::Int64, v9::Int64, v10::Int64, v11::Int64)
+function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, PlusOneVector{Int64, Main.FinchInterop.Buffer{Int64}, nothing}, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v1::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v2::Finch.WindowedArray{Tuple{Finch.Extent{Int64, Int64}, Finch.Extent{Int64, Int64}}, Finch.SplitMask{Int64}}, v3::Tensor{DenseLevel{Int64, DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}}, v4::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v5::Tensor{DenseLevel{Int64, ElementLevel{0, Int64, Int64, Main.FinchInterop.Buffer{Int64}}}}, v6::Int64, v7::Int64, v8::Int64, v9::Int64, v10::Int64, v11::Int64)
     @inbounds @fastmath(begin
                 v0_lvl = v0.lvl
                 v0_lvl_stop = v0_lvl.shape
@@ -148,9 +148,9 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                         v5_lvl_2_val[v5_lvl_q] = 1 + -phase_start_15 + phase_stop_16 + v5_lvl_2_val[v5_lvl_q]
                     end
                 end
-                resize!(v5_lvl_2_val, (v2.dims[2]).stop)
-                resize!(v4_lvl_2_val, (v1.dims[2]).stop)
-                resize!(v3_lvl_3_val, (v1.dims[2]).stop * (v2.dims[2]).stop)
+                Finch.resize_if_larger!(v5_lvl_2_val, (v2.dims[2]).stop)
+                Finch.resize_if_larger!(v4_lvl_2_val, (v1.dims[2]).stop)
+                Finch.resize_if_larger!(v3_lvl_3_val, (v1.dims[2]).stop * (v2.dims[2]).stop)
                 (v3 = Tensor((DenseLevel){Int64}((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v3_lvl_3_val), (v2.dims[2]).stop), (v1.dims[2]).stop)), v4 = Tensor((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v4_lvl_2_val), (v1.dims[2]).stop)), v5 = Tensor((DenseLevel){Int64}(ElementLevel{0, Int64, Int64}(v5_lvl_2_val), (v2.dims[2]).stop)))
             end)
 end

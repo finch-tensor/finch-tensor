@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from secrets import randbits
 from typing import Any
 
 import numpy as np
@@ -8,13 +9,13 @@ from finch.algebra import FType, ImmutableStructFType, TupleFType, ffuncs, ftype
 from .level import Level, LevelFType, SingleDimensionLevel, SingleDimensionLevelFType
 
 _LOWERING_ERROR = "SparseHashLevelFType lowering is not implemented."
+_POS_MULTIPLIER = np.uintp(randbits(np.dtype(np.uintp).itemsize * 8) | 1)
 
 
 @dataclass(unsafe_hash=True)
 class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
     _lvl_t: LevelFType
     dimension_type: ftypes.FDTypeInteger = ftypes.intp
-    single_writer: bool = True
 
     def __post_init__(self) -> None:
         if not isinstance(self._lvl_t, LevelFType):
@@ -31,11 +32,13 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ("lvl", self.lvl_t),
             ("dimension", self.dimension_type),
             ("subtables", ftypes.intp),
+            ("pos_multiplier", ftype(np.uintp)),
             ("ptr", self.ptr_type),
             ("tbl_ctrl", self.tbl_ctrl_type),
             ("tbl", self.tbl_type),
-            ("pool", self.pool_type),
+            ("key", self.key_type),
             ("perm", self.perm_type),
+            ("tbl_count", self.tbl_count_type),
         ]
 
     def __str__(self) -> str:
@@ -78,22 +81,26 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         return self.buffer_factory(ftypes.uint8)
 
     @property
-    def tbl_entry_type(self) -> TupleFType:
+    def key_entry_type(self) -> TupleFType:
         return TupleFType.from_tuple(
-            (self.position_type, self.dimension_type, self.position_type)
+            (self.position_type, self.dimension_type, ftypes.uint8)
         )
 
     @property
     def tbl_type(self) -> FType:
-        return self.buffer_factory(self.tbl_entry_type)
+        return self.buffer_factory(self.position_type)
 
     @property
-    def pool_type(self) -> FType:
-        return self.buffer_factory(self.position_type)
+    def key_type(self) -> FType:
+        return self.buffer_factory(self.key_entry_type)
 
     @property
     def perm_type(self) -> FType:
         return self.buffer_factory(self.position_type)
+
+    @property
+    def tbl_count_type(self) -> FType:
+        return self.buffer_factory(ftypes.intp)
 
     @property
     def lvl_t(self) -> LevelFType:
@@ -129,9 +136,9 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             self.ptr_type(int(pos) + 1),
             self.tbl_ctrl_type(0),
             self.tbl_type(0),
-            self.pool_type(0),
+            self.key_type(0),
             self.perm_type(0),
-            single_writer=self.single_writer,
+            self.tbl_count_type(1),
         )
 
     def __call__(self, val: Any) -> "SparseHashLevel":
@@ -167,7 +174,17 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
         raise NotImplementedError(_LOWERING_ERROR)
 
     def from_fields(
-        self, lvl, dimension, subtables, ptr, tbl_ctrl, tbl, pool, perm
+        self,
+        lvl,
+        dimension,
+        subtables,
+        pos_multiplier,
+        ptr,
+        tbl_ctrl,
+        tbl,
+        key,
+        perm,
+        tbl_count,
     ) -> "SparseHashLevel":
         return SparseHashLevel(
             lvl,
@@ -175,30 +192,37 @@ class SparseHashLevelFType(SingleDimensionLevelFType, ImmutableStructFType):
             ptr,
             tbl_ctrl,
             tbl,
-            pool,
+            key,
             perm,
+            tbl_count,
             subtables=subtables,
-            single_writer=self.single_writer,
+            pos_multiplier=pos_multiplier,
         )
 
 
-def sparse_hash(lvl_t, dimension_type=None, *, single_writer: bool = True):
-    return SparseHashLevelFType(
-        lvl_t, dimension_type or ftypes.intp, single_writer=single_writer
-    )
+def sparse_hash(lvl_t, dimension_type=None):
+    return SparseHashLevelFType(lvl_t, dimension_type or ftypes.intp)
 
 
 @dataclass(init=False)
 class SparseHashLevel(SingleDimensionLevel):
+    """Hash slots map to child positions with separate ``(parent, index, state)`` keys.
+
+    Positions and indices are zero-based. Key states are free (0), pending
+    writer counts (1–127), or retained (128). The odd position multiplier must
+    be preserved with the table's buffers.
+    """
+
     lvl: Level
     dimension: np.integer
     ptr: Any | None
     tbl_ctrl: Any | None
     tbl: Any | None
-    pool: Any | None
+    key: Any | None
     perm: Any | None
+    tbl_count: Any | None
     subtables: int
-    single_writer: bool
+    pos_multiplier: np.uintp
 
     def __init__(
         self,
@@ -207,21 +231,34 @@ class SparseHashLevel(SingleDimensionLevel):
         ptr: Any | None = None,
         tbl_ctrl: Any | None = None,
         tbl: Any | None = None,
-        pool: Any | None = None,
+        key: Any | None = None,
         perm: Any | None = None,
+        tbl_count: Any | None = None,
         *,
         subtables: int = 1,
-        single_writer: bool = True,
+        pos_multiplier: int | np.integer = _POS_MULTIPLIER,
     ) -> None:
         self.lvl = lvl
         self.dimension = dimension
         self.ptr = ptr
         self.tbl_ctrl = tbl_ctrl
         self.tbl = tbl
-        self.pool = pool
+        self.key = key
         self.perm = perm
+        self.tbl_count = tbl_count
+        if not isinstance(subtables, (int, np.integer)):
+            raise ValueError(
+                "SparseHashLevel subtables must be a positive power of two"
+            )
         self.subtables = int(subtables)
-        self.single_writer = bool(single_writer)
+        if (
+            not isinstance(pos_multiplier, (int, np.integer))
+            or not int(pos_multiplier) & 1
+        ):
+            raise ValueError(
+                "SparseHashLevel position multiplier must be an odd integer"
+            )
+        self.pos_multiplier = np.uintp(pos_multiplier)
         self.__post_init__()
 
     def __post_init__(self) -> None:
@@ -234,14 +271,16 @@ class SparseHashLevel(SingleDimensionLevel):
         if self.tbl_ctrl is None:
             self.tbl_ctrl = self.lvl.buffer_factory(ftypes.uint8)(0)
         if self.tbl is None:
-            tbl_entry_type = TupleFType.from_tuple(
-                (self.lvl.position_type, ftype(self.dimension), self.lvl.position_type)
+            self.tbl = self.lvl.buffer_factory(self.lvl.position_type)(0)
+        if self.key is None:
+            key_entry_type = TupleFType.from_tuple(
+                (self.lvl.position_type, ftype(self.dimension), ftypes.uint8)
             )
-            self.tbl = self.lvl.buffer_factory(tbl_entry_type)(0)
-        if self.pool is None:
-            self.pool = self.lvl.buffer_factory(self.lvl.position_type)(0)
+            self.key = self.lvl.buffer_factory(key_entry_type)(0)
         if self.perm is None:
             self.perm = self.lvl.buffer_factory(self.lvl.position_type)(0)
+        if self.tbl_count is None:
+            self.tbl_count = self.lvl.buffer_factory(ftypes.intp)(self.subtables)
 
     @property
     def shape(self) -> tuple:
@@ -252,7 +291,6 @@ class SparseHashLevel(SingleDimensionLevel):
         return SparseHashLevelFType(
             self.lvl.ftype,
             ftype(self.dimension),
-            single_writer=self.single_writer,
         )  # type: ignore[abstract]
 
     @property

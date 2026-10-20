@@ -121,23 +121,25 @@ def _from_level(
 def _to_level(lvl: Any, depth: int) -> tuple[bsp.BinsparseLevel, tuple[int, ...]]:
     match lvl:
         case ElementLevel():
-            return bsp.ElementLevel(lvl.val.arr), ()
+            return bsp.ElementLevel(lvl.val.to_numpy()), ()
         case DenseLevel(child, dimension):
             level, shape = _to_level(child, depth + 1)
             return bsp.DenseLevel(1, level), (int(dimension), *shape)
         case SparseListLevel(child, dimension, ptr, idx):
             level, shape = _to_level(child, depth + 1)
-            pointers = None if depth == 0 else ptr.arr
+            pointers = None if depth == 0 else ptr.to_numpy()
             return (
-                bsp.SparseLevel(1, level, (idx.arr,), pointers),
+                bsp.SparseLevel(1, level, (idx.to_numpy(),), pointers),
                 (int(dimension), *shape),
             )
         case SparseCOOLevel(child, coo_shape, ptr, tbl):
             rank = len(coo_shape)
             level, shape = _to_level(child, depth + rank)
-            pointers = None if depth == 0 else ptr.arr
+            pointers = None if depth == 0 else ptr.to_numpy()
             return (
-                bsp.SparseLevel(rank, level, tuple(idx.arr for idx in tbl), pointers),
+                bsp.SparseLevel(
+                    rank, level, tuple(idx.to_numpy() for idx in tbl), pointers
+                ),
                 (*(int(size) for size in coo_shape), *shape),
             )
         case _:
