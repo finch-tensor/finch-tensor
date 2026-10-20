@@ -218,7 +218,6 @@ class FormatCostModel(CostModel[LevelChoice]):
         bindings: Mapping[Alias, Sequence[LevelOption]],
         machine: StatsMachine[NS],
     ) -> Iterator[LevelChoice]:
-        machine(term)
         # bindings name no position type, so positions are intp.
         pos_size = np_dtype(ftypes.intp).itemsize
         for alias, options in bindings.items():
@@ -234,6 +233,9 @@ class FormatCostModel(CostModel[LevelChoice]):
                     )
                     for (stats, over), n in zip(blocks, num_pos, strict=True)
                 )
+        # The levels are priced over the whole of term from the stats before
+        # it, so the machine is advanced past term only after every level.
+        machine(term)
 
 
 class LevelCostModel(FormatCostModel, LoopOrderedForm):

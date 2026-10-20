@@ -319,10 +319,12 @@ class CostFormatter(LogicFormatter):
                     )
 
         formatter(prgm)
-        # Each alias is formatted for all of its blocks in the program.
+        # Each alias is formatted for all of its blocks in the program, which
+        # are replayed from the stats before it.
+        initial = StatsMachine(stats_factory, OrderedDict(stats))
         for alias, shape_type in stored_shape_types.items():
             bindings[alias] = self.get_tensor_ftype(
-                alias, prgm, machine, fill_types[alias], shape_type
+                alias, prgm, initial, fill_types[alias], shape_type
             )
 
         logger.debug(prgm)
