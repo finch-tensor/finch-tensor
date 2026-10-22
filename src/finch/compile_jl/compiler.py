@@ -52,6 +52,10 @@ _JULIA_OPS = {
     ffuncs.greater.ftype: ">",
     ffuncs.ge.ftype: ">=",
     ffuncs.greater_equal.ftype: ">=",
+    # @finch_kernel runs under @fastmath, which folds == and != as though no
+    # value is Inf or NaN, but leaves isequal alone.
+    ffuncs.same.ftype: "isequal",
+    ffuncs.not_same.ftype: "!isequal",
     # bitwise / logical
     ffuncs.and_.ftype: "&",
     ffuncs.or_.ftype: "|",

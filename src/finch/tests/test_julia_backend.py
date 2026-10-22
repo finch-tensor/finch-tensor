@@ -918,6 +918,31 @@ def test_compile_julia_evaluates_variadic_and_or_call(
 
 
 
+@pytest.mark.parametrize(
+    "op, args, expected_code, expected",
+    [
+        (ffuncs.same, (np.inf, np.inf), "isequal(Inf,Inf)", True),
+        (ffuncs.not_same, (1.0, np.inf), "!isequal(1.0,Inf)", True),
+        (ffuncs.not_same, (np.inf, np.inf), "!isequal(Inf,Inf)", False),
+    ],
+)
+def test_compile_julia_same_compares_inf_under_fastmath(
+    op, args, expected_code, expected
+):
+    _requires_julia_backend()
+    from finch.compile_jl.compiler import FinchJLGenerator
+
+    call = ntn.Call(
+        ntn.Literal(op),
+        tuple(ntn.Literal(arg) for arg in args),
+    )
+    generated = FinchJLGenerator().generate_julia(call)
+    assert generated == expected_code
+
+    # Kernels run under @fastmath, where != would always find Inf unequal.
+    assert jl.seval(f"@fastmath {generated}") == expected
+
+
 def test_compile_julia_size_reads_the_length_of_a_mode():
     _requires_julia_backend()
     from finch.compile_jl.compiler import FinchJLGenerator
