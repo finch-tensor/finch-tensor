@@ -20,6 +20,13 @@ def matmul(C: BufferizedNDArray, A: BufferizedNDArray, B: BufferizedNDArray) -> 
     m: finch.int64 = A__shape_element_0
     n: finch.int64 = B__shape_element_1
     p: finch.int64 = A__shape_element_1
+    setattr(C_, shape, make_tuple(m, n))
+    C__shape_element_0: finch.int64 = C_.shape.element_0
+    C__shape_element_1: finch.int64 = C_.shape.element_1
+    setattr(C_, strides, make_tuple(mul(n, 1), 1))
+    C__strides_element_0: finch.int64 = C_.strides.element_0
+    C__strides_element_1: finch.int64 = C_.strides.element_1
+    resize(slot(C__val_slot, np_buf_t(float64)), mul(m, mul(n, 1)))
     for i in range(0, length(slot(C__val_slot, np_buf_t(float64)))):
         store(slot(C__val_slot, np_buf_t(float64)), i, 0.0)
     for i in range(0, m):

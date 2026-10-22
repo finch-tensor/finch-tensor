@@ -367,6 +367,16 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
     """
     op_type = op.result_type
     match op_type:
+        case ffuncs._MakeTupleFType():
+            values = []
+            for i, arg in enumerate(args):
+                value = ctx.cache("tuple_element", arg)
+                if c_type(arg.result_type) is not None:
+                    values.append(f".element_{i} = {ctx(value)}")
+            if not values:
+                return "((void)0)"
+            type_ = c_type(op_type.return_type(*(arg.result_type for arg in args)))
+            return f"({ctx.ctype_name(type_)}){{{', '.join(values)}}}"
         case ffuncs._CastFType(dtype=dtype):
             return f"(({ctx.ctype_name(c_type(dtype))})({ctx(args[0])}))"
         case asm.AssemblyKernelFType():
@@ -467,6 +477,10 @@ def c_literal(ctx: Any, val: Any) -> str:
             return f'"{val}"'
         case algebra.ftypes.FDTypeNumpy():
             return numpy_c_literal(fmt, val, ctx)
+        case TupleFType():
+            return c_function_call(
+                asm.Literal(ffuncs.make_tuple), ctx, *(asm.Literal(v) for v in val)
+            )
         case _:
             if hasattr(val, "c_literal"):
                 return val.c_literal(ctx)
@@ -789,7 +803,7 @@ class CContext(Context):
                 obj_t = obj.result_type
                 if not isinstance(obj_t, StructFType):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
-                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
+                if val.result_type != obj_t.struct_attrtype(attr.val):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
                         f"{obj_t.struct_attrtype(attr.val)}"

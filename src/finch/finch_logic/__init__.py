@@ -9,6 +9,9 @@ from .nodes import (
     Alias,
     Field,
     FillTable,
+    Fuse,
+    FusedAlias,
+    HardAlias,
     Literal,
     LogicExpression,
     LogicNode,
@@ -32,7 +35,6 @@ from .simplification import LogicSimplify
 from .stages import (
     LogicEvaluator,
     LogicLoader,
-    compute_shape_vars,
 )
 from .tensor_stats import StatsFactory, TensorStats
 
@@ -41,6 +43,9 @@ __all__ = [
     "Alias",
     "Field",
     "FillTable",
+    "Fuse",
+    "FusedAlias",
+    "HardAlias",
     "Literal",
     "LogicEvaluator",
     "LogicExpression",
@@ -66,7 +71,6 @@ __all__ = [
     "TableValueFType",
     "TensorStats",
     "Value",
-    "compute_shape_vars",
     "fill_expression",
     "is_fill_expression",
 ]

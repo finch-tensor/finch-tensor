@@ -168,6 +168,11 @@ class ElementLevelFType(LevelFType, MutableStructFType):
             ctx.exec(asm.SetAttr(tns, asm.Literal("fill"), init))
             init = asm.GetAttr(tns, asm.Literal("fill"))
         buf = asm.GetAttr(tns, asm.Literal("val"))
+        if pos.result_type != self.buffer_type.length_type:
+            pos = asm.Call(
+                asm.Literal(ffuncs.astype(self.buffer_type.length_type)), (pos,)
+            )
+        ctx.exec(asm.Resize(buf, pos))
         i_var = asm.Variable("i", self.buffer_type.length_type)
         body = asm.Store(buf, i_var, init)
         ctx.exec(asm.ForLoop(i_var, asm.Literal(np.intp(0)), asm.Length(buf), body))

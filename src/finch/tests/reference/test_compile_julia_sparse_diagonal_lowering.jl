@@ -44,13 +44,13 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 v2_lvl_2_qos_stop = 0
                 v2_lvl_2_pending = 0
                 v2_lvl_2_free_head = zero(Int64)
-                for v9_5 = 1:v0_lvl_stop
-                    v2_lvl_x = Finch.sparse_hash_hash(1, v9_5, v2_lvl.pos_multiplier)
+                for v11_5 = 1:v0_lvl_stop
+                    v2_lvl_x = Finch.sparse_hash_hash(1, v11_5, v2_lvl.pos_multiplier)
                     v2_lvl_b = Finch.sparse_hash_hash_subtable(v2_lvl_x, v2_lvl.subtables)
                     if 2 * v2_lvl.subtables * (v2_lvl_tbl_count[v2_lvl_b] + 1) > length(v2_lvl_tbl_ctrl)
                         Finch.sparse_hash_resize!(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, max(2 * length(v2_lvl_tbl_ctrl), 4 * v2_lvl.subtables), v2_lvl.subtables, v2_lvl.pos_multiplier, v2_lvl_qos_stop)
                     end
-                    v2_lvl_h = Finch.sparse_hash_find(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, 1, v9_5, v2_lvl_x, v2_lvl.subtables)
+                    v2_lvl_h = Finch.sparse_hash_find(v2_lvl_tbl_ctrl, v2_lvl_tbl, v2_lvl_key, 1, v11_5, v2_lvl_x, v2_lvl.subtables)
                     v2_lvl_s = true
                     if v2_lvl_tbl_ctrl[v2_lvl_h] == Finch.SPARSE_HASH_CTRL_EMPTY
                         v2_lvl_tbl_count[v2_lvl_b] += 1
@@ -64,7 +64,7 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                             v2_lvl_q_stop = max(2 * length(v2_lvl_key), v2_lvl_qos)
                             resize!(v2_lvl_key, v2_lvl_q_stop)
                         end
-                        v2_lvl_key[v2_lvl_qos] = (1, v9_5, 0x01)
+                        v2_lvl_key[v2_lvl_qos] = (1, v11_5, 0x01)
                         v2_lvl_tbl_ctrl[v2_lvl_h] = Finch.sparse_hash_hash_ctrl(v2_lvl_x)
                         v2_lvl_tbl[v2_lvl_h] = v2_lvl_qos
                     else
@@ -74,7 +74,7 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                     end
                     v2_lvl_s && (v2_lvl_pending += 1)
                     v2_lvl_dirty = false
-                    v0_lvl_q = (1 - 1) * v0_lvl_stop + v9_5
+                    v0_lvl_q = (1 - 1) * v0_lvl_stop + v11_5
                     v0_lvl_2_q = v0_lvl_2_ptr[v0_lvl_q]
                     v0_lvl_2_q_stop = v0_lvl_2_ptr[v0_lvl_q + 1]
                     if v0_lvl_2_q < v0_lvl_2_q_stop
@@ -82,9 +82,9 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                     else
                         v0_lvl_2_i1 = 0
                     end
-                    phase_stop = min(v0_lvl_2_stop, v9_5, v0_lvl_2_i1)
+                    phase_stop = min(v0_lvl_2_stop, v11_5, v0_lvl_2_i1)
                     if phase_stop >= 1
-                        if phase_stop < v9_5
+                        if phase_stop < v11_5
                         else
                             if v0_lvl_2_idx[v0_lvl_2_q] < phase_stop
                                 v0_lvl_2_q = Finch.scansearch(v0_lvl_2_idx, phase_stop, v0_lvl_2_q, v0_lvl_2_q_stop - 1)

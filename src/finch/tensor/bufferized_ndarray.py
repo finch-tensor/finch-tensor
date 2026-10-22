@@ -187,6 +187,12 @@ class BufferizedNDArray(OverrideTensor):
                 f"Declaring with {init!r} would change the static fill "
                 f"{self._fill_value.value!r}"
             )
+        self._shape = tuple(
+            dim_t(dim) for dim_t, dim in zip(self.shape_type, shape, strict=True)
+        )
+        pos_t = self.val.ftype.length_type
+        self.strides = tuple(pos_t(s) for s in _get_default_strides(self._shape))
+        self.val.resize(functools.reduce(operator.mul, self._shape, pos_t(1)))
         for i in range(self.val.length()):
             self.val.store(i, init)
         return self
@@ -487,6 +493,34 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
 
     def lower_declare(self, ctx, tns: ntn.Fiber, init, op, shape):
         root = ctx(tns.lvl.root)
+        shape = tuple(
+            dim
+            if dim.result_type == dim_t
+            else asm.Call(asm.Literal(ffuncs.astype(dim_t)), (dim,))
+            for dim, dim_t in zip(shape, self.shape_type, strict=True)
+        )
+        ctx.exec(
+            asm.SetAttr(
+                root,
+                asm.Literal("shape"),
+                asm.Call(asm.Literal(ffuncs.make_tuple), shape),
+            )
+        )
+        pos_t = self.buf_t.length_type
+        size = asm.Literal(pos_t(1))
+        strides = []
+        for dim in reversed(shape):
+            strides.append(size)
+            if dim.result_type != pos_t:
+                dim = asm.Call(asm.Literal(ffuncs.astype(pos_t)), (dim,))
+            size = asm.Call(asm.Literal(ffuncs.mul), (dim, size))
+        ctx.exec(
+            asm.SetAttr(
+                root,
+                asm.Literal("strides"),
+                asm.Call(asm.Literal(ffuncs.make_tuple), tuple(reversed(strides))),
+            )
+        )
         if is_dynamic(self.fill_type):
             # The init becomes the fill of the tensor.
             if init.result_type != self.element_type:
@@ -495,6 +529,7 @@ class BufferizedNDArrayFType(FinchTensorFType, MutableStructFType):
             init = asm.GetAttr(root, asm.Literal("fill"))
         i_var = asm.Variable("i", self.buf_t.length_type)
         buf = asm.GetAttr(root, asm.Literal("val"))
+        ctx.exec(asm.Resize(buf, size))
         body = asm.Store(
             buf,
             i_var,

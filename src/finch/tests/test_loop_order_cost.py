@@ -23,16 +23,17 @@ from finch.autoschedule.loop_orderer.loop_order_greedy import (
     greedy_loop_order,
 )
 from finch.autoschedule.normalize import LogicNormalizer
-from finch.autoschedule.tensor_stats import DCStatsFactory
+from finch.autoschedule.tensor_stats import DCStats, DCStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Query,
-    Reorder,
     Table,
 )
 from finch.finch_notation.interpreter import NotationInterpreter
@@ -41,9 +42,9 @@ from finch.finch_notation.interpreter import NotationInterpreter
 def test_empty_input_cost_matches_model():
     sf = DCStatsFactory()
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
-    bindings = {
+    bindings: dict[Alias, DCStats] = {
         a: sf(fl.asarray(np.ones((4, 4))), (i, j)),
         b: sf(fl.asarray(np.zeros((4, 4))), (j, k)),
     }
@@ -52,20 +53,20 @@ def test_empty_input_cost_matches_model():
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k), (j, k, i)):
         query = Query(
-            Table(Alias("out"), (i, j, k)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Table(HardAlias("out"), (i, j, k)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(query, {}, bindings, sf)
+        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
 
 
 def test_empty_relation_cost_matches_model():
     sf = DCStatsFactory()
     # l_ is l, precommit throws bad name error otehrwise
     i, j, k, l_, m = (Field(name) for name in "ijklm")
-    a, b, c, d = (Alias(name) for name in "ABCD")
+    a, b, c, d = (HardAlias(name) for name in "ABCD")
     expr = MapJoin(
         Literal(ffuncs.mul),
         (
@@ -75,7 +76,7 @@ def test_empty_relation_cost_matches_model():
             Table(d, (l_, m)),
         ),
     )
-    bindings = OrderedDict(
+    bindings: OrderedDict[Alias, DCStats] = OrderedDict(
         {
             a: sf(fl.asarray(np.ones((2, 2))), (i, j)),
             b: sf(fl.asarray(np.ones((2, 2))), (j, k)),
@@ -88,13 +89,13 @@ def test_empty_relation_cost_matches_model():
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k, l_, m), (m, l_, k, j, i)):
         query = Query(
-            Table(Alias("out"), (i, j, k, l_, m)),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), ()),
+            Table(HardAlias("out"), (i, j, k, l_, m)),
+            Aggregate(Literal(ffuncs.add), Literal(0.0), expr, ()),
         )
         assert sum(
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
-        ) == model.predict_cost(query, {}, bindings, sf)
+        ) == model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
 
 
 def greedy_scheduler():
@@ -174,14 +175,18 @@ def test_greedy_order_breaks_ties_by_field_order():
     """
     sf = DCStatsFactory()
     i, j, k, m = (Field(name) for name in "ijkm")
-    a, b, c = Alias("A"), Alias("B"), Alias("C")
+    a, b, c = HardAlias("A"), HardAlias("B"), HardAlias("C")
     ones = fl.asarray(np.ones((4, 4)))
 
     forward = MapJoin(
         Literal(ffuncs.mul),
         (Table(a, (i, j)), Table(b, (j, k)), Table(c, (k, m))),
     )
-    forward_bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k)), c: sf(ones, (k, m))}
+    forward_bindings: dict[Alias, DCStats] = {
+        a: sf(ones, (i, j)),
+        b: sf(ones, (j, k)),
+        c: sf(ones, (k, m)),
+    }
     pigeon = PigeonCostModel()
     machine = StatsMachine(sf, dict(forward_bindings))
 
@@ -200,7 +205,11 @@ def test_greedy_order_breaks_ties_by_field_order():
         Literal(ffuncs.mul),
         (Table(c, (m, k)), Table(b, (k, j)), Table(a, (j, i))),
     )
-    reverse_bindings = {c: sf(ones, (m, k)), b: sf(ones, (k, j)), a: sf(ones, (j, i))}
+    reverse_bindings: dict[Alias, DCStats] = {
+        c: sf(ones, (m, k)),
+        b: sf(ones, (k, j)),
+        a: sf(ones, (j, i)),
+    }
     reverse_order = greedy_loop_order(reverse, sf, reverse_bindings)
     assert reverse_order[0] == m
     assert set(reverse_order) == {i, j, k, m}
@@ -215,13 +224,13 @@ def test_greedy_avoids_transposing_a_sparse_input():
     """
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     n = 16
     diagonal = np.zeros((n, n))
     diagonal[np.arange(n), np.arange(n)] = 1.0
 
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (j, i)), Table(b, (i, j))))
-    bindings = {
+    bindings: dict[Alias, DCStats] = {
         a: sf(fl.asarray(np.ones((n, n))), (j, i)),
         b: sf(fl.asarray(diagonal), (i, j)),
     }
@@ -256,10 +265,10 @@ def test_prefix_totals_match_program_cost():
     sf = DCStatsFactory()
     model = Sum(PigeonCostModel(), TransposeCostModel())
     i, j, k = Field("i"), Field("j"), Field("k")
-    a, b = Alias("A"), Alias("B")
+    a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     ones = fl.asarray(np.ones((3, 3)))
-    bindings = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
+    bindings: dict[Alias, DCStats] = {a: sf(ones, (i, j)), b: sf(ones, (j, k))}
     machine = StatsMachine(sf, dict(bindings))
 
     for output_vars in (None, (), (i, k), (k, i)):
@@ -273,11 +282,9 @@ def test_prefix_totals_match_program_cost():
                 for n in range(len(order) + 1)
             )
             query = Query(
-                Table(Alias("out"), out_idxs),
-                Aggregate(
-                    Literal(ffuncs.add), Literal(0.0), Reorder(expr, order), reduced
-                ),
+                Table(HardAlias("out"), out_idxs),
+                Aggregate(Literal(ffuncs.add), Literal(0.0), expr, reduced),
             )
             assert prefix_total == pytest.approx(
-                model.predict_cost(query, {}, bindings, sf)
+                model.predict_cost(fuse_loop_order(query, order), {}, bindings, sf)
             )

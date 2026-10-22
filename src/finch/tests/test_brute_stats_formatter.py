@@ -14,13 +14,15 @@ from finch.autoschedule.formatter.smart_formatter import (
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
-from finch.finch_logic import Alias, Field, Plan, Produces, Query, Table
+from finch.autoschedule.util import fuse_loop_order
+from finch.finch_logic import Field, HardAlias, Plan, Produces, Query, Table
+
+A, M = HardAlias("A"), HardAlias("M")
 
 
 def get_stats(matrix, fields):
     factory = DCStatsFactory()
-    M = Alias("M")
-    query = Query(Table(Alias("A"), fields), Table(M, fields))
+    query = fuse_loop_order(Query(Table(A, fields), Table(M, fields)), fields)
     machine = StatsMachine(
         factory, OrderedDict({M: factory(fl.asarray(matrix), fields)})
     )
@@ -29,11 +31,10 @@ def get_stats(matrix, fields):
 
 
 def format_cost(cost_model, query, options, machine):
-    prgm = Plan((query, Produces((query.lhs.tns,))))
-    M = query.rhs.tns
+    prgm = Plan((query, Produces((A,))))
     return cost_model.predict_cost(
         prgm,
-        {query.lhs.tns: list(options)},
+        {A: list(options)},
         {M: machine.bindings[M]},
         machine.stats_factory,
     )
@@ -89,6 +90,6 @@ def test_search_and_brute(formatter_cls, matrix):
     brute_fmt = brute_force_best(formatter, query, shape_type, machine, stats.fill_type)
 
     search_fmt = formatter.get_tensor_ftype(
-        query.lhs.tns, query, machine, stats.fill_type, shape_type
+        A, query, machine, stats.fill_type, shape_type
     ).lvl_t
     assert search_fmt == brute_fmt
