@@ -727,6 +727,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
             for k, a in enumerate(args):
                 v = ctx(a)
+                if mlir_type(a.result_type) == "index":
+                    v_i64 = ctx.new_ssa()
+                    ctx.exec(f"{ctx.feed}{v_i64} = arith.index_cast {v} : index to i64")
+                    v = v_i64
                 nxt = ctx.new_ssa()
                 ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
                 acc = nxt
@@ -737,6 +741,8 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._AndFType()
             | ffuncs._XorFType()
             | ffuncs._OrFType()
+            | ffuncs._MinFType()
+            | ffuncs._MaxFType()
         ):
             return mlir_nary_function_call(
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
@@ -748,8 +754,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._ModFType()
             | ffuncs._LShiftFType()
             | ffuncs._RShiftFType()
-            | ffuncs._MinFType()
-            | ffuncs._MaxFType()
             | ffuncs._EqFType()
             | ffuncs._NeFType()
             | ffuncs._GtFType()
@@ -946,6 +950,9 @@ def mlir_ctype(s: FType | str):
             return ctypes.POINTER(mlir_struct_ctype(s))
         case StructFType():
             return mlir_struct_ctype(s)
+        case algebra.ftypes.FDTypeNumpy() if np_dtype(s).kind == "u":
+            # MLIR integers are signless, but serialization keeps the sign.
+            return np.ctypeslib.as_ctypes_type(np_dtype(s))
         case FType():
             return mlir_ctype(mlir_type(s))
 

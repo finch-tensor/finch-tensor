@@ -310,23 +310,29 @@ def c_function_name(op: FType, ctx: Any, *args: Any) -> str:
             raise TypeError(f"{op} has no C representation.")
 
 
+def c_operand(ctx: Any, arg: Any) -> str:
+    """Parenthesize compound operands, since C's precedence isn't Finch's."""
+    code = ctx(arg)
+    return f"({code})" if isinstance(arg, asm.Call) else code
+
+
 def c_nary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for n-ary operators."""
     assert len(args) > 0
     if len(args) == 1:
-        return f"{c_symbol}{ctx(args[0])}"
-    return f" {c_symbol} ".join(map(ctx, args))
+        return f"{c_symbol}{c_operand(ctx, args[0])}"
+    return f" {c_symbol} ".join(c_operand(ctx, arg) for arg in args)
 
 
 def c_binary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for binary operators."""
     a, b = args
-    return f"{ctx(a)} {c_symbol} {ctx(b)}"
+    return f"{c_operand(ctx, a)} {c_symbol} {c_operand(ctx, b)}"
 
 
 def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for unary operators."""
-    return f"{c_symbol}{ctx(args[0])}"
+    return f"{c_symbol}{c_operand(ctx, args[0])}"
 
 
 def c_same(ctx, x, y):
@@ -408,6 +414,22 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
         case ffuncs._WhereFType():
             cond, x, y = args
             return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
+        case ffuncs._MinFType() | ffuncs._MaxFType():
+            cmp = ffuncs.lt if isinstance(op_type, ffuncs._MinFType) else ffuncs.gt
+            result = ctx.cache("arg", args[0])
+            for arg in args[1:]:
+                arg = ctx.cache("arg", arg)
+                result = ctx.cache(
+                    "extremum",
+                    asm.Call(
+                        asm.Literal(ffuncs.where),
+                        (asm.Call(asm.Literal(cmp), (arg, result)), arg, result),
+                    ),
+                )
+            return ctx(result)
+        case ffuncs._MakeTupleFType():
+            t = c_type(TupleFType.from_tuple(tuple(arg.result_type for arg in args)))
+            return f"(({ctx.ctype_name(t)}){{{', '.join(ctx(arg) for arg in args)}}})"
     c_symbol = c_function_name(op_type, ctx, *args)
     match op_type:
         case (
