@@ -18,6 +18,7 @@ from .dead_code_elimination import (
     AssemblyDeadCodeEliminationTransform,
     assembly_dead_code_elimination,
 )
+from .global_value_numbering import AssemblyGlobalValueNumbering
 from .interpreter import AssemblyInterpreter, AssemblyInterpreterKernel
 from .liveness import AssemblyLiveVariables
 from .nodes import (
@@ -70,6 +71,7 @@ __all__ = [
     "AssemblyCopyPropagation",
     "AssemblyDeadCodeEliminationTransform",
     "AssemblyExpression",
+    "AssemblyGlobalValueNumbering",
     "AssemblyInterpreter",
     "AssemblyInterpreterKernel",
     "AssemblyKernel",
