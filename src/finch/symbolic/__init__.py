@@ -21,12 +21,15 @@ from .term import (
     literal_repr,
 )
 from .traversal import PostOrderDFS, PreOrderDFS, intree, isdescendant
+from .value_numbering import Apply, Constant, Leaf, Value, ValueUniverse
 
 __all__ = [
+    "Apply",
     "BasicBlock",
     "CallTerm",
     "Chain",
     "CompilerMode",
+    "Constant",
     "Context",
     "ControlFlowGraph",
     "DataFlowAnalysis",
@@ -34,6 +37,7 @@ __all__ = [
     "Fixpoint",
     "Form",
     "HashCons",
+    "Leaf",
     "LiteralTerm",
     "Memo",
     "NamedTerm",
@@ -49,6 +53,8 @@ __all__ = [
     "Term",
     "TermTree",
     "UnvalidatedForm",
+    "Value",
+    "ValueUniverse",
     "gensym",
     "intree",
     "isdescendant",
