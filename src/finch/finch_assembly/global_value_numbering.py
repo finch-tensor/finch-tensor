@@ -1,6 +1,10 @@
 """
 global value numbering (gvn) for finch assembly.
 
+`assembly_global_value_numbering` replaces a redundant pure expression with a
+variable in scope that already holds its value. assignments are kept, copy
+propagation and dce can clean up after it.
+
 the analysis collects the values a program computes into a `ValueUniverse`:
 variables are leaves, scalar literals are constants by exact type and bits
 (`Literal` compares by value only, so `0.0 == -0.0`), and pure `ffuncs` calls on
@@ -25,6 +29,7 @@ from finch.symbolic import (
     ControlFlowGraph,
     Leaf,
     PostOrderDFS,
+    UnvalidatedForm,
     Value,
     ValueUniverse,
 )
@@ -33,6 +38,8 @@ from finch.util import qual_str
 from .cfg_builder import NumberedStatement
 from .dataflow import (
     AbstractAssemblyDataflow,
+    ScopedRewriter,
+    assembly_dataflow_run,
     has_effects,
     is_scalar_type,
     literal_constant,
@@ -41,12 +48,36 @@ from .dataflow import (
 from .nodes import (
     AssemblyExpression,
     AssemblyNode,
+    AssemblyStatement,
     AssemblyTree,
+    Assert,
     Assign,
     Call,
     Literal,
+    Module,
+    Resize,
+    Return,
+    SetAttr,
+    Store,
     Variable,
 )
+from .stages import AssemblyTransform
+
+
+def assembly_global_value_numbering(node: AssemblyNode) -> AssemblyNode:
+    """apply global value numbering to a finch assembly node"""
+    return assembly_dataflow_run(
+        node,
+        AssemblyGlobalValueNumbering,
+        lambda pre_node, ctx: _GVNRewriter(ctx)(pre_node),
+    )
+
+
+class AssemblyGlobalValueNumberingTransform(UnvalidatedForm, AssemblyTransform):
+    def lower(self, term: Module) -> Module:
+        result = assembly_global_value_numbering(term)
+        assert isinstance(result, Module)
+        return result
 
 
 class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
@@ -192,3 +223,55 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                         annotations.append((str(child), f"%{vn}"))
                 return annotations
         return []
+
+
+class _GVNRewriter(ScopedRewriter):
+    """rewrites each statement with the analysis results"""
+
+    def __init__(self, ctx: AssemblyGlobalValueNumbering):
+        super().__init__()
+        self.ctx = ctx
+        self.states = {stmt.sid: state for stmt, state in ctx.statement_states()}
+
+    def rewrite(self, stmt: AssemblyStatement, sid: int) -> AssemblyStatement:
+        state = self.states.get(sid)
+        if state is None or has_effects(stmt):
+            return stmt
+        classes = state["classes"]
+
+        # visible scalar variables by vn, outer and earlier ones first
+        candidates: dict[int, list[Variable]] = {}
+        for scope in self.scopes:
+            for var in scope.values():
+                vn = self.ctx.value_number(classes, var)
+                if vn is not None and is_scalar_type(var.result_type):
+                    candidates.setdefault(vn, []).append(var)
+
+        def replace(node, exclude=None):
+            match node:
+                case Call(op, args):
+                    vn = self.ctx.value_number(classes, node)
+                    for var in candidates.get(-1 if vn is None else vn, ()):
+                        if var != exclude and var.type == self.ctx.result_type(node):
+                            return var
+                    new_args = tuple(replace(arg) for arg in args)
+                    if any(
+                        new is not old for new, old in zip(new_args, args, strict=True)
+                    ):
+                        return Call(op, new_args)
+            return node
+
+        match stmt:
+            case Assign(lhs, rhs):
+                return Assign(lhs, replace(rhs, exclude=lhs))
+            case Store(buf, idx, val):
+                return Store(buf, replace(idx), replace(val))
+            case Resize(buf, size):
+                return Resize(buf, replace(size))
+            case SetAttr(obj, attr, val):
+                return SetAttr(obj, attr, replace(val))
+            case Return(arg):
+                return Return(replace(arg))
+            case Assert(exp):
+                return Assert(replace(exp))
+        return stmt
