@@ -12,6 +12,7 @@ from finch.symbolic import (
     PostOrderDFS,
     PostWalk,
     Rewrite,
+    UnvalidatedForm,
 )
 
 from .cfg_builder import (
@@ -38,6 +39,7 @@ from .nodes import (
     Variable,
     WhileLoop,
 )
+from .stages import AssemblyTransform
 from .utils import get_vars_in_expr
 
 # Type variable for dataflow analysis context,
@@ -244,6 +246,13 @@ class _CopyRewriter(ScopedRewriter):
             case SetAttr(obj, attr, val):
                 return SetAttr(obj, attr, rename_all(val))
         return rename_all(stmt)
+
+
+class AssemblyCopyPropagationTransform(UnvalidatedForm, AssemblyTransform):
+    def lower(self, term: Module) -> Module:
+        result = assembly_copy_propagation(term)
+        assert isinstance(result, Module)
+        return result
 
 
 class AbstractAssemblyDataflow(DataFlowAnalysis):
