@@ -1,9 +1,13 @@
+from collections import namedtuple
+
+import pytest
+
 import numpy as np
 
 import finch
 import finch.finch_assembly as asm
 from finch import ffuncs
-from finch.algebra import FinchOperator
+from finch.algebra import FinchOperator, ftype
 from finch.autoschedule import (
     CompilerFormLowerer,
     DefaultLogicFactorizer,
@@ -13,7 +17,7 @@ from finch.autoschedule import (
     LogicExecutor,
     LogicNormalizer,
 )
-from finch.codegen import NumpyBuffer
+from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler, NumpyBuffer
 from finch.compile import NotationCompiler
 from finch.finch_assembly import (
     AssemblyGlobalValueNumbering,
@@ -35,6 +39,7 @@ from .scripts.nodes import (
     create_asm_if_node,
 )
 from .test_simplification import _CaptureAssembly
+from .utils import mlir_backend
 
 
 def call(op, *args):
@@ -594,6 +599,298 @@ def test_gvn_pipeline_dense():
     out = finch.compute(a * 2 + a, ctx=ctx)
     np.testing.assert_allclose(out.to_numpy(), x * 2 + x)
     assembly_check_types(capture.last)
+
+
+def make_memory_module(second_load):
+    """loads around a store, then a resize"""
+    buf_t = NumpyBuffer(np.zeros(1)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+    i = asm.Variable("i", buf_t.length_type)
+    x, y, z = variables("x y z", finch.float64)
+    one = asm.Literal(np.intp(1))
+    return module(
+        (buf, i),
+        asm.Unpack(buf_slt, buf),
+        asm.Assign(x, asm.Load(buf_slt, i)),
+        asm.Assign(y, second_load(buf_slt, i, x)),
+        asm.Store(buf_slt, i, add(x, asm.Literal(np.float64(1.0)))),
+        asm.Assign(z, asm.Load(buf_slt, i)),
+        asm.Resize(buf_slt, add(asm.Length(buf_slt), one)),
+        asm.Store(
+            buf_slt,
+            call(ffuncs.sub, asm.Length(buf_slt), one),
+            asm.Literal(np.float64(0.0)),
+        ),
+        asm.Repack(buf_slt),
+        asm.Return(add(y, z)),
+        ret=finch.float64,
+    )
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+    ],
+)
+def test_gvn_memory_loads(compiler):
+    prgm = make_memory_module(lambda buf, i, x: asm.Load(buf, i))
+    result = assembly_global_value_numbering(prgm)
+    assert result == make_memory_module(lambda buf, i, x: x)
+    assembly_check_types(result)
+    out = NumpyBuffer(np.array([1.0, 2.0]))
+    assert compiler(result).f(out, np.intp(1)) == 5.0
+    np.testing.assert_array_equal(out.arr, [1.0, 3.0, 0.0])
+
+
+def test_gvn_memory_lengths():
+    buf_t = NumpyBuffer(np.zeros(1)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+    n, m, k = variables("n m k", buf_t.length_type)
+
+    def make(second):
+        return module(
+            (buf,),
+            asm.Unpack(buf_slt, buf),
+            asm.Assign(n, asm.Length(buf_slt)),
+            asm.Assign(m, second),
+            asm.Resize(buf_slt, add(m, asm.Literal(np.intp(1)))),
+            asm.Assign(k, asm.Length(buf_slt)),
+            asm.Repack(buf_slt),
+            asm.Return(k),
+            ret=buf_t.length_type,
+        )
+
+    assert assembly_global_value_numbering(make(asm.Length(buf_slt))) == make(n)
+
+
+def test_gvn_memory_struct_fields():
+    """
+    a field read survives buffer writes but not a setattr through an alias,
+    even on a struct type that claims to be immutable.
+    """
+    point_t = ftype(namedtuple("Point", ["x", "y"])(np.float64(1.0), np.float64(2.0)))
+    p, q = asm.Variable("p", point_t), asm.Variable("q", point_t)
+    buf_t = NumpyBuffer(np.zeros(1)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+    a, b, c, d = variables("a b c d", finch.float64)
+
+    def x_of(obj):
+        return asm.GetAttr(obj, asm.Literal("x"))
+
+    def make(second):
+        return module(
+            (p, buf),
+            asm.Assign(q, p),
+            asm.Assign(a, x_of(q)),
+            asm.Unpack(buf_slt, buf),
+            asm.Store(buf_slt, asm.Literal(np.intp(0)), a),
+            asm.Assign(b, second),
+            asm.SetAttr(p, asm.Literal("x"), asm.Literal(np.float64(5.0))),
+            asm.Assign(c, x_of(q)),
+            asm.Assign(d, x_of(p)),
+            asm.Repack(buf_slt),
+            asm.Return(add(add(b, c), d)),
+            ret=finch.float64,
+        )
+
+    assert assembly_global_value_numbering(make(x_of(p))) == make(a)
+
+
+def test_gvn_memory_setattr_with_effects():
+    """a setattr with effects still gives its target a new value, like mlir does"""
+    point_t = ftype(namedtuple("Point", ["x", "y"])(np.float64(1.0), np.float64(2.0)))
+    p, q = asm.Variable("p", point_t), asm.Variable("q", point_t)
+    a, c, d = variables("a c d", finch.float64)
+
+    def x_of(obj):
+        return asm.GetAttr(obj, asm.Literal("x"))
+
+    prgm = module(
+        (p, a),
+        asm.Assign(q, p),
+        asm.SetAttr(p, asm.Literal("x"), call(_Bump(), a, a)),
+        asm.Assign(c, x_of(q)),
+        asm.Assign(d, x_of(p)),
+        asm.Return(add(c, d)),
+        ret=finch.float64,
+    )
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+def make_setattr_in_loop():
+    """a field read before a loop that updates it, and read again after"""
+    point = namedtuple("Point", ["x", "y"])(np.float64(1.0), np.float64(2.0))
+    p = asm.Variable("p", ftype(point))
+    a, b = variables("a b", finch.float64)
+
+    def field(name):
+        return asm.GetAttr(p, asm.Literal(name))
+
+    prgm = module(
+        (p,),
+        asm.Assign(a, field("x")),
+        asm.WhileLoop(
+            lt(field("x"), asm.Literal(np.float64(10.0))),
+            asm.SetAttr(p, asm.Literal("x"), add(field("x"), field("y"))),
+        ),
+        asm.Assign(b, field("x")),
+        asm.Return(add(a, b)),
+        ret=finch.float64,
+    )
+    return prgm, point
+
+
+def test_gvn_setattr_in_loop():
+    prgm, _ = make_setattr_in_loop()
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+@mlir_backend
+def test_gvn_setattr_in_loop_mlir():
+    prgm, point = make_setattr_in_loop()
+    result = assembly_global_value_numbering(prgm)
+    assert MLIRCompiler()(result).f(point) == np.float64(12.0)
+
+
+def test_gvn_memory_slots_are_unpacked_fresh():
+    """a slot unpacked from different objects holds different values"""
+    point_t = ftype(namedtuple("Point", ["x", "y"])(np.float64(1.0), np.float64(2.0)))
+    p, q = asm.Variable("p", point_t), asm.Variable("q", point_t)
+    slot = asm.Slot("s", point_t)
+    (c,) = variables("c")
+    r, t = variables("r t", finch.float64)
+    x_of_slot = asm.GetAttr(slot, asm.Literal("x"))
+    prgm = module(
+        (p, q, c),
+        asm.Assign(r, asm.Literal(np.float64(0.0))),
+        asm.If(
+            lt(c, i64(0)),
+            asm.Block(
+                (asm.Unpack(slot, p), asm.Assign(r, x_of_slot), asm.Repack(slot))
+            ),
+        ),
+        asm.If(
+            lt(c, i64(1)),
+            asm.Block(
+                (asm.Unpack(slot, q), asm.Assign(t, x_of_slot), asm.Repack(slot))
+            ),
+        ),
+        asm.Return(r),
+        ret=finch.float64,
+    )
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+def test_gvn_memory_impure_calls_clobber():
+    buf_t = NumpyBuffer(np.zeros(1)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+    i = asm.Variable("i", buf_t.length_type)
+    (n,) = variables("n", buf_t.length_type)
+    x, y, z = variables("x y z", finch.float64)
+    bump = asm.Literal(_Bump())
+    prgm = module(
+        (buf, i, n),
+        asm.Unpack(buf_slt, buf),
+        asm.Assign(x, asm.Load(buf_slt, i)),
+        asm.Call(bump, (i, i)),
+        asm.Assign(y, asm.Load(buf_slt, i)),
+        asm.ForLoop(
+            asm.Variable("j", buf_t.length_type),
+            asm.Call(bump, (i, i)),
+            n,
+            asm.Block(()),
+        ),
+        asm.Assign(z, asm.Load(buf_slt, i)),
+        asm.Repack(buf_slt),
+        asm.Return(add(add(x, y), z)),
+        ret=finch.float64,
+    )
+    assert assembly_global_value_numbering(prgm) == prgm
+
+
+def test_gvn_memory_buffer_arguments():
+    """`scansearch` reads its buffer, so a store in between blocks reuse"""
+    buf_t = NumpyBuffer(np.zeros(1, dtype=np.intp)).ftype
+    buf = asm.Variable("buf", buf_t)
+    buf_slt = asm.Slot("buf_", buf_t)
+    v, lo, hi, x, y, z = variables("v lo hi x y z", buf_t.length_type)
+
+    def search():
+        return call(ffuncs.scansearch, buf_slt, v, lo, hi)
+
+    def make(second):
+        return module(
+            (buf, v, lo, hi),
+            asm.Unpack(buf_slt, buf),
+            asm.Assign(x, search()),
+            asm.Assign(y, second),
+            asm.Store(buf_slt, lo, v),
+            asm.Assign(z, search()),
+            asm.Repack(buf_slt),
+            asm.Return(add(add(x, y), z)),
+            ret=buf_t.length_type,
+        )
+
+    assert assembly_global_value_numbering(make(search())) == make(x)
+
+
+def test_gvn_pipeline_sparse(numba_compiler):
+    """gvn keeps a sparse kernel correct and well typed through numba"""
+    from finch import DenseLevel, ElementLevel, FiberTensor, SparseListLevel, element
+
+    def make():
+        ptr = NumpyBuffer(np.array([0, 1, 3, 4], dtype=np.intp))
+        idx = NumpyBuffer(np.array([0, 0, 1, 2], dtype=np.intp))
+        data = NumpyBuffer(np.array([1.0, 1.0, 2.0, 1.0]))
+        elem = element(
+            np.float64(0), ftype(np.float64), ftype(np.intp), type(data.ftype)
+        )
+        return FiberTensor(
+            DenseLevel(
+                SparseListLevel(ElementLevel(elem, data), np.intp(3), ptr, idx),
+                np.intp(3),
+            )
+        )
+
+    capture = _CaptureAssembly(NumbaCompiler())
+    ctx = LogicNormalizer(
+        LogicExecutor(
+            DefaultLogicFactorizer(
+                LogicSimplify(
+                    DefaultLoopOrderer(
+                        DefaultLogicFormatter(
+                            CompilerFormLowerer(
+                                LogicCompiler(
+                                    NotationCompiler(
+                                        capture,
+                                        ctx_transforms=(
+                                            LowerPackedStructSlots(),
+                                            AssemblySimplify(),
+                                            AssemblyGlobalValueNumberingTransform(),
+                                        ),
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+    a, b = make(), make()
+    out = finch.compute(finch.defer(a) * finch.defer(b), ctx=ctx)
+    np.testing.assert_array_equal(
+        out.to_numpy(), np.array([[1, 0, 0], [1, 4, 0], [0, 0, 1]], dtype=np.float64)
+    )
+    assembly_check_types(capture.last)
+    assert str(capture.last).count(".lvl.lvl.dimension") == 2
 
 
 def test_asm_dce_after_gvn(file_regression):
