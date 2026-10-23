@@ -6,15 +6,22 @@ variable in scope that already holds its value. assignments are kept, copy
 propagation and dce can clean up after it.
 
 the analysis collects the values a program computes into a `ValueUniverse`:
-variables are leaves, scalar literals are constants by exact type and bits
-(`Literal` compares by value only, so `0.0 == -0.0`), and pure `ffuncs` calls on
-scalars are applies. a state partitions the universe into classes of values that
-are equal on every path to that point, and the class of a value is its value
-number (vn). a join keeps the equalities all incoming paths share.
+variables and slots are leaves, scalar literals are constants by exact type and
+bits (`Literal` compares by value only, so `0.0 == -0.0`), and pure `ffuncs`
+calls on scalars are applies. memory reads are applies too: loads and lengths
+read the heap leaf and struct field reads the struct leaf. a state partitions
+the universe into classes of values that are equal on every path to that point,
+and the class of a value is its value number (vn). a join keeps the equalities
+all incoming paths share.
 
 an assignment writes its variable: the values that read it change, and it joins
 the class of its right-hand side. a statement with unknown effects numbers
 nothing and gives its target an unknown value.
+
+other writes give memory an unknown value: store and resize write the heap,
+setattr and unpacking a struct slot the struct fields, repack and impure calls
+both. buffer writes never touch struct fields since buffers are handles. setattr
+also writes the root of its target, since mlir rebinds it, and unpack its slot.
 
 the universe is finite, so the analysis terminates, loops included, and merged
 values need no phis.
@@ -22,7 +29,7 @@ values need no phis.
 
 from collections.abc import Iterable
 
-from finch.algebra import FType
+from finch.algebra import FType, StructFType
 from finch.symbolic import (
     Apply,
     Constant,
@@ -44,6 +51,7 @@ from .dataflow import (
     is_scalar_type,
     literal_constant,
     pure_op_key,
+    root_of,
 )
 from .nodes import (
     AssemblyExpression,
@@ -53,12 +61,18 @@ from .nodes import (
     Assert,
     Assign,
     Call,
+    GetAttr,
+    Length,
     Literal,
+    Load,
     Module,
+    Repack,
     Resize,
     Return,
     SetAttr,
+    Slot,
     Store,
+    Unpack,
     Variable,
 )
 from .stages import AssemblyTransform
@@ -78,6 +92,10 @@ class AssemblyGlobalValueNumberingTransform(UnvalidatedForm, AssemblyTransform):
         result = assembly_global_value_numbering(term)
         assert isinstance(result, Module)
         return result
+
+
+_HEAP = Leaf(("mem", "heap"))
+_STRUCT = Leaf(("mem", "struct"))
 
 
 class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
@@ -123,10 +141,32 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
         match stmt:
             case NumberedStatement(stmt, _):
                 pass
+        assign = self.universe.assign
+        if has_effects(stmt):
+            classes = assign(assign(classes, _HEAP), _STRUCT)
+            match stmt:
+                case Assign(Variable(name, _), _):
+                    return assign(classes, Leaf(("var", name)))
+        else:
+            match stmt:
+                case Assign(Variable(name, _), rhs):
+                    return assign(classes, Leaf(("var", name)), self.value(rhs))
         match stmt:
-            case Assign(Variable(name, _), rhs):
-                value = None if has_effects(stmt) else self.value(rhs)
-                return self.universe.assign(classes, Leaf(("var", name)), value)
+            case Store() | Resize():
+                classes = assign(classes, _HEAP)
+            case SetAttr(obj, _, _):
+                classes = assign(classes, _STRUCT)
+                root = self.value(root_of(obj))
+                match root:
+                    case Leaf():
+                        classes = assign(classes, root)
+            case Unpack(Slot(name, type_), _):
+                classes = assign(classes, Leaf(("slot", name)))
+                match type_:
+                    case StructFType():
+                        classes = assign(classes, _STRUCT)
+            case Repack():
+                classes = assign(assign(classes, _HEAP), _STRUCT)
         return classes
 
     def values_of(self, stmt: AssemblyNode) -> list[Value]:
@@ -161,6 +201,8 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                 return literal_constant(val)
             case Variable(name, _):
                 return Leaf(("var", name))
+            case Slot(name, _):
+                return Leaf(("slot", name))
             case Call(Literal(op), args):
                 op_key = pure_op_key(op)
                 if op_key is None or not is_scalar_type(self.result_type(node)):
@@ -168,9 +210,32 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                 arg_values = self.arg_values(args)
                 if arg_values is None:
                     return None
+                if not all(is_scalar_type(self.result_type(arg)) for arg in args):
+                    # e.g. `scansearch` reads its buffer argument
+                    arg_values += (_HEAP, _STRUCT)
                 self.op_names[op_key] = qual_str(op)
                 return Apply(op_key, arg_values)
+            case Load(buf, idx):
+                return self.read("load", (buf, idx), _HEAP)
+            case Length(buf):
+                return self.read("length", (buf,), _HEAP)
+            case GetAttr(obj, Literal(attr)):
+                return self.read(("getattr", attr), (obj,), _STRUCT)
         return None
+
+    def read(
+        self, op: object, args: tuple[AssemblyNode, ...], memory: Leaf
+    ) -> Value | None:
+        """a read of `memory` by `op`"""
+        arg_values = self.arg_values(args)
+        if arg_values is None:
+            return None
+        match op:
+            case ("getattr", attr):
+                self.op_names[op] = f"getattr.{attr}"
+            case _:
+                self.op_names[op] = str(op)
+        return Apply(op, (*arg_values, memory))
 
     def arg_values(self, args: Iterable[AssemblyNode]) -> tuple[Value, ...] | None:
         """the values of `args`, or None if one isn't numbered"""
@@ -249,16 +314,23 @@ class _GVNRewriter(ScopedRewriter):
 
         def replace(node, exclude=None):
             match node:
-                case Call(op, args):
+                case Call() | Load() | Length() | GetAttr():
                     vn = self.ctx.value_number(classes, node)
                     for var in candidates.get(-1 if vn is None else vn, ()):
                         if var != exclude and var.type == self.ctx.result_type(node):
                             return var
+            # never rewrite buffer operands or getattr objects
+            match node:
+                case Call(op, args):
                     new_args = tuple(replace(arg) for arg in args)
                     if any(
                         new is not old for new, old in zip(new_args, args, strict=True)
                     ):
                         return Call(op, new_args)
+                case Load(buf, idx):
+                    new_idx = replace(idx)
+                    if new_idx is not idx:
+                        return Load(buf, new_idx)
             return node
 
         match stmt:
