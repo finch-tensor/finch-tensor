@@ -3195,14 +3195,45 @@ def test_estimate_non_fill_values_over_uniform(fields):
         ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J)
     )
     assert sampling.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
-    for factory in (DCStatsFactory(), LPStatsFactory()):
-        stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
-        total = stats.estimate_non_fill_values()
-        assert stats.estimate_non_fill_values(over=fields) == pytest.approx(
-            total / slices
-        )
-    # Three rows and five columns hold a non-fill value.
-    nonempty = {(): 1, (_OVER_I,): 3, (_OVER_J,): 5, (_OVER_I, _OVER_J): 7}
-    vp = VPStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
-    expected = 7 / nonempty.get(tuple(fields), 1)
-    assert vp.estimate_non_fill_values(over=fields) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+@pytest.mark.parametrize("factory", [DCStatsFactory(), LPStatsFactory()])
+def test_estimate_non_fill_values_over_max_degrees(factory, fields):
+    # Max degrees bound the largest slice, rather than an average one, and are
+    # tight for a single matrix.
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert stats.estimate_non_fill_values(over=fields) == pytest.approx(
+        _largest_slice(fields)
+    )
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+def test_estimate_non_fill_values_over_distinct_values(fields):
+    # A slice holds at most one value for each combination of the distinct
+    # values of the indices it doesn't fix: three rows and five columns.
+    stats = VPStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    expected = {(_OVER_I,): 5, (_OVER_J,): 3, (_OVER_I, _OVER_J): 1}
+    assert stats.estimate_non_fill_values(over=fields) == expected.get(
+        tuple(fields), 7
+    )
+    assert stats.estimate_non_fill_values(over=fields) >= _largest_slice(fields)
+
+
+def test_exact_idempotent_reduction_of_fills_is_fill():
+    # A max of fills is the output fill, even with an init.
+    i, j = Field("i"), Field("j")
+    node = Aggregate(
+        Literal(ffuncs.max),
+        Literal(0.0),
+        Table(Literal(ft.asarray(np.zeros((2, 3)))), (i, j)),
+        (j,),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == 0.0

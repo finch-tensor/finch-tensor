@@ -7,7 +7,13 @@ from typing import Any
 
 import numpy as np
 
-from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
+from finch.algebra import (
+    FinchOperator,
+    ffuncs,
+    is_annihilator,
+    is_idempotent,
+    is_identity,
+)
 from finch.autoschedule.default_schedulers import get_default_scheduler
 from finch.finch_logic import (
     Aggregate,
@@ -63,9 +69,11 @@ class ExactStatsFactory(
         if is_identity(op.ftype, f):
             bool_op, bool_init = ffuncs.or_, False
         elif not is_annihilator(op.ftype, f) and not is_identity(op.ftype, f):
-            # Without an init, a fold of fills is the new fill, so an output is
-            # fill when all of its inputs are, as for an identity.
-            bool_op, bool_init = ffuncs.or_, init is not None
+            # A reduction of fills is the new fill, so an output is fill when
+            # all of its inputs are, unless the init joins a fill which repeats
+            # once for each reduced element, as in a sum.
+            bool_op = ffuncs.or_
+            bool_init = init is not None and not is_idempotent(op.ftype)
         else:
             bool_op, bool_init = ffuncs.and_, True
 

@@ -193,10 +193,11 @@ class VPStats(NumericStats):
         self.V = dict(V)
 
     def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
-        # Non-fill values are spread evenly over the slices which hold any.
+        # The largest slice which fixes `over` holds at most one non-fill value
+        # for each combination of the distinct values of the other indices.
         fields = set(over) & set(self.index_order)
-        slices = min(math.prod(self.V[idx] for idx in fields), self.nnz)
-        return self.nnz / slices if slices >= 1 else self.nnz
+        rest = math.prod(self.V[idx] for idx in self.index_order if idx not in fields)
+        return float(min(self.nnz, rest))
 
     def get_embedding(self):
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
