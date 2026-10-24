@@ -16,7 +16,7 @@ from finch.autoschedule import (
 from finch.autoschedule.stages import CompilerForm, FormattedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import fuse_loop_order
-from finch.codegen import CCompiler, NumbaCompiler
+from finch.codegen import CCompiler, MLIRCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
 from finch.compile_jl.analyze import reset_argument_positions
 from finch.finch_logic import (
@@ -294,10 +294,15 @@ def test_compiler_form_lowerer_keeps_definitions():
 @pytest.mark.parametrize(
     "compiler",
     [
-        ntn.NotationInterpreter,
-        NotationCompiler,
+        pytest.param(ntn.NotationInterpreter, id="notation"),
+        pytest.param(NotationCompiler, id="assembly"),
         pytest.param(
-            lambda: NotationCompiler(CCompiler()), marks=pytest.mark.c_backend
+            lambda: NotationCompiler(CCompiler()), id="c", marks=pytest.mark.c_backend
+        ),
+        pytest.param(
+            lambda: NotationCompiler(MLIRCompiler()),
+            id="mlir",
+            marks=pytest.mark.mlir_backend,
         ),
     ],
 )
@@ -323,10 +328,15 @@ def test_transpose_keeps_output_in_loop_order(axes, compiler):
 @pytest.mark.parametrize(
     "compiler",
     [
-        ntn.NotationInterpreter,
-        NotationCompiler,
+        pytest.param(ntn.NotationInterpreter, id="notation"),
+        pytest.param(NotationCompiler, id="assembly"),
         pytest.param(
-            lambda: NotationCompiler(CCompiler()), marks=pytest.mark.c_backend
+            lambda: NotationCompiler(CCompiler()), id="c", marks=pytest.mark.c_backend
+        ),
+        pytest.param(
+            lambda: NotationCompiler(MLIRCompiler()),
+            id="mlir",
+            marks=pytest.mark.mlir_backend,
         ),
     ],
 )
@@ -387,6 +397,11 @@ def test_guarded_overwrite_keeps_previous_values_for_julia():
         pytest.param(lambda: NotationCompiler(NumbaCompiler()), id="numba"),
         pytest.param(
             lambda: NotationCompiler(CCompiler()), id="c", marks=pytest.mark.c_backend
+        ),
+        pytest.param(
+            lambda: NotationCompiler(MLIRCompiler()),
+            id="mlir",
+            marks=pytest.mark.mlir_backend,
         ),
     ],
 )

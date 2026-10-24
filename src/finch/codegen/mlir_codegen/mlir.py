@@ -738,6 +738,8 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._AndFType()
             | ffuncs._XorFType()
             | ffuncs._OrFType()
+            | ffuncs._MinFType()
+            | ffuncs._MaxFType()
         ):
             return mlir_nary_function_call(
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
@@ -749,8 +751,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._ModFType()
             | ffuncs._LShiftFType()
             | ffuncs._RShiftFType()
-            | ffuncs._MinFType()
-            | ffuncs._MaxFType()
             | ffuncs._EqFType()
             | ffuncs._NeFType()
             | ffuncs._GtFType()
