@@ -12,8 +12,6 @@ from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import NumbaCompiler
 from finch.compile import CompilerMode, NotationCompiler
-from finch.compile.lower import AssemblyGenerator
-from finch.symbolic import PostOrderDFS
 from finch.tensor import BufferizedNDArray
 
 

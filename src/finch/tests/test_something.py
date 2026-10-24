@@ -10,7 +10,10 @@ from finch.autoschedule.stages import CompilerForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.compile import CompilerMode, NotationCompiler
 
-@pytest.mark.parametrize("widths", [(3, 3), (3, 5)], ids=["same_width", "different_width"])
+
+@pytest.mark.parametrize(
+    "widths", [(3, 3), (3, 5)], ids=["same_width", "different_width"]
+)
 def test_fused_workspace_reuse_with_copies(widths):
     i, j, k = map(lgc.Field, "ijk")
     a, b, w, c, d = map(lgc.HardAlias, "abwcd")

@@ -280,9 +280,11 @@ class LoopOrderedForm(SingleAggregateForm):
                     validate(body, (*loop_order, idx))
                 case Produces() | QueryInto(Table(), _, Literal()):
                     return
-                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | Query(
-                    Table(_, lhs_idxs), arg
-                ) | QueryInto(Table(_, lhs_idxs), _, arg):
+                case (
+                    Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _))
+                    | Query(Table(_, lhs_idxs), arg)
+                    | QueryInto(Table(_, lhs_idxs), _, arg)
+                ):
                     validate_query(lhs_idxs, arg, loop_order)
                     validate(arg, loop_order)
                 case MapJoin(_, args):

@@ -15,7 +15,7 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsInterpreter
 from finch.autoschedule.util import fuse_loop_order
 from finch.codegen import MLIRCompiler, NumbaCompiler, NumbaGenerator
-from finch.compile import CompilerMode, NotationCompiler
+from finch.compile import NotationCompiler
 from finch.finch_logic.interpreter import MockFusedTensor
 from finch.finch_notation.nodes import NotationTree
 from finch.symbolic import Reflector
