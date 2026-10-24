@@ -242,28 +242,14 @@ class SingleAggregateForm(AliasedForm):
 
 class LoopOrderedForm(SingleAggregateForm):
     """
-    LoopOrderedForm assumes that the input query has had its loop order set.
-    The loop order of a query is the fields of its enclosing Fuse nodes, from
-    outermost to innermost, which include every field of the query. There are
-    four valid forms for a query in LoopOrderedForm:
-        1) transpose queries
-            Query(Table(_, output_order), Table(_, _))
-        2) aggregate queries
-            Query(Table(_, output_order), Aggregate(_, _, arg, _))
-        3) in-place queries
-            QueryInto(Table(_, lhs_idxs), _, arg)
-        4) in-place initializations
-            QueryInto(Table(_, _), _, Literal(_))
-    Initializations need no loop order. Otherwise, the loop order visits the
-    lhs fields in order, and the Tables of arg follow the loop order, except
-    that a transpose query, or an in-place query of a single Table, may read
-    its Table in another order. Queries have no Reorder nodes.
+    LoopOrderedForm assumes that each query has its loop order: the fields of
+    its enclosing Fuse nodes, from outermost to innermost, which include every
+    field of the query. A query is a copy Query(lhs, Table), a reduction
+    Query(lhs, Aggregate), an update QueryInto(lhs, op, arg), or an
+    initialization QueryInto(lhs, op, Literal), which needs no loop order.
+    Tables may be read and written in any order. Queries have no Reorder
+    nodes.
     """
-
-    @staticmethod
-    def _check_loop_order(idxs, loop_order):
-        rel_loop_order = [idx for idx in loop_order if idx in idxs]
-        return tuple(rel_loop_order) == tuple(idxs)
 
     @classmethod
     def validate_inputs(
@@ -284,8 +270,6 @@ class LoopOrderedForm(SingleAggregateForm):
                     f"nodes, which must include every field, so {names} need "
                     "Fuse nodes."
                 )
-            if not cls._check_loop_order(lhs_idxs, loop_order):
-                raise ValueError("Table index order does not match loop order.")
 
         def validate(node, loop_order):
             match node:
@@ -296,28 +280,21 @@ class LoopOrderedForm(SingleAggregateForm):
                     validate(body, (*loop_order, idx))
                 case Produces() | QueryInto(Table(), _, Literal()):
                     return
-                case Query(Table(_, lhs_idxs), Table() as arg) | QueryInto(
-                    Table(_, lhs_idxs), _, Table() as arg
-                ):
-                    validate_query(lhs_idxs, arg, loop_order)
-                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | QueryInto(
-                    Table(_, lhs_idxs), _, arg
-                ):
+                case Query(Table(_, lhs_idxs), Aggregate(_, _, arg, _)) | Query(
+                    Table(_, lhs_idxs), arg
+                ) | QueryInto(Table(_, lhs_idxs), _, arg):
                     validate_query(lhs_idxs, arg, loop_order)
                     validate(arg, loop_order)
                 case MapJoin(_, args):
                     for arg in args:
                         validate(arg, loop_order)
-                case Table(_, idxs):
-                    if not cls._check_loop_order(idxs, loop_order):
-                        raise ValueError("Table index order does not match loop order.")
                 case Reorder():
                     raise ValueError(
                         "Queries with loop orders can't have Reorder nodes, "
                         "since Fuse nodes give the loop order and the left-hand "
                         "tables order the results."
                     )
-                case Literal() | FillTable():
+                case Table() | Literal() | FillTable():
                     return
                 case _:
                     raise ValueError(f"Unsupported query type: {node}")
@@ -388,38 +365,19 @@ class FormattedForm(LoopOrderedForm):
 class CompilerForm(FormattedForm):
     """
     CompilerForm is the input of the notation lowerer. It is a FormattedForm
-    where every statement but the final Produces is a definition or an update.
-    There are two valid kinds of definition:
-    1) copies
-        Query(Table(lhs, lhs_idxs), Table(arg, idxs))
-    (lhs is reset to its fill value, and arg is written into it. A different
-    storage order represents a transpose; notation lowering inserts
-    equality-constrained loops to read arg in storage order. Fields absent from
-    lhs_idxs are reduced by overwriting.)
-    2) reductions
-        Query(Table(lhs, lhs_idxs), Aggregate(op, init, arg, _))
-    (lhs is reset to init, a 0-D expression without aggregates or reorders,
-    and arg is folded into it with op.)
-    There are two valid kinds of update:
-    1) initializations
+    whose statements, but the final Produces, are queries or Fuse nodes whose
+    bodies are Plans of them in FusedForm:
+        Query(Table(lhs, idxs), Table(arg, _))
+            copies arg into lhs, from the fill of arg.
+        Query(Table(lhs, idxs), Aggregate(op, init, arg, _))
+            reduces arg into lhs with op, from init, a 0-D expression without
+            aggregates or reorders.
         QueryInto(Table(lhs, _), overwrite, Literal(init))
-    (Every element of lhs is set to init.)
-    2) folds
-        QueryInto(Table(lhs, lhs_idxs), op, arg)
-    (arg is folded into lhs with op. A fold which overwrites lhs resets it to
-    its fill value first.)
-    A statement may also be a Fuse, whose body is a Plan of these statements
-    and Fuse nodes, without a Produces, in FusedForm. It runs its body once for
-    each value of its field. Within Fuse nodes, a FusedAlias may store only the
-    dimensions after its fused ones, as a workspace for each fused iteration.
-
-    In reductions and folds, arg is made of Tables, Literals, and MapJoins. The
-    loop order contains each field once and visits all fields of lhs_idxs in
-    order. Tables in a MapJoin must also follow loop order, but a single Table
-    argument may have a different storage order, as in a copy. Fields absent
-    from lhs_idxs are reduced with op. Every alias must have a TensorFType in
-    the bindings, and a statement can't read the alias it writes. The loop
-    order is the fields of the enclosing Fuse nodes.
+            sets every element of lhs to init.
+        QueryInto(Table(lhs, idxs), op, arg)
+            reduces arg into lhs with op.
+    The fields of arg which idxs lacks are reduced. arg is made of Tables,
+    Literals, and MapJoins, and a query can't read the alias it writes.
     """
 
     @classmethod
@@ -432,8 +390,8 @@ class CompilerForm(FormattedForm):
     ) -> None:
         super().validate_inputs(term, bindings, stats, stats_factory)
 
-        # FormattedForm has checked the grammar of each fold, its bindings,
-        # and that it visits the lhs and its Tables in loop order.
+        # FormattedForm has checked the grammar of each query, its bindings,
+        # and that its fields are fused.
         match term:
             case Plan((*bodies, Produces())):
                 pass
@@ -477,10 +435,9 @@ class FusedForm(Form):
     its field, or reduces it into, so they cannot occur on both lhs and rhs in
     its body, and only one statement of its body may reduce into a tensor. A
     definition which broadcasts the Fuse field, which its rhs lacks, has extent
-    1 in it, so it is the only statement of its body. A statement which reads a
-    Table out of loop order revisits its fields, so it shares no Fuse node
-    with other statements. Different alias views refer to the same tensor for
-    these checks, which apply independently of the query's lowering stage.
+    1 in it, so it is the only statement of its body. Different alias views
+    refer to the same tensor for these checks, which apply independently of
+    the query's lowering stage.
     """
 
     @classmethod
@@ -561,27 +518,16 @@ class FusedForm(Form):
                     "extent 1 and needs a Fuse of its own."
                 )
 
-        def validate(node, fused_idxs, alone):
-            """Validate node within Fuse nodes of fused_idxs, whose bodies have
-            only one statement when alone is true."""
+        def validate(node, fused_idxs):
+            """Validate node within Fuse nodes of fused_idxs."""
             match node:
                 case Fuse(idx, body):
                     if idx in fused_idxs:
                         raise ValueError(
                             f"Fuse({idx}) is nested in another Fuse of {idx}."
                         )
-                    stmts = _fused_statements(body)
-                    validate_body(idx, stmts)
-                    validate(body, (*fused_idxs, idx), alone and len(stmts) == 1)
-                case Query(_, Table(_, arg_idxs) as rhs) | QueryInto(
-                    _, _, Table(_, arg_idxs) as rhs
-                ) if not alone and tuple(
-                    idx for idx in arg_idxs if idx in fused_idxs
-                ) != tuple(idx for idx in fused_idxs if idx in arg_idxs):
-                    raise ValueError(
-                        f"{node} reads {rhs} out of loop order, which revisits "
-                        "its fields, so it needs Fuse nodes of its own."
-                    )
+                    validate_body(idx, _fused_statements(body))
+                    validate(body, (*fused_idxs, idx))
                 case Table(FusedAlias(tns, n), idxs):
                     if n > len(fused_idxs) or idxs[:n] != fused_idxs[:n]:
                         raise ValueError(
@@ -590,9 +536,9 @@ class FusedForm(Form):
                         )
                 case LogicTree():
                     for child in node.children:
-                        validate(child, fused_idxs, alone)
+                        validate(child, fused_idxs)
 
-        validate(term, (), True)
+        validate(term, ())
 
 
 class LogicFactorizer(AliasedForm, LogicLoader):

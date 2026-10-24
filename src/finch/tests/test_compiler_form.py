@@ -430,7 +430,7 @@ def test_sparse_transpose(compiler):
         ((j,), None),
         ((i, j), None),
         ((), None),
-        ((j, i), "Table index order does not match loop order"),
+        ((j, i), None),
         ((i, Field("k")), "k need Fuse nodes"),
     ],
 )

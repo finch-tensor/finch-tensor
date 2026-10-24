@@ -711,9 +711,9 @@ def test_hoisted_reset_cant_read_a_fill_its_fuse_defines():
         CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
-def test_transposed_read_needs_its_own_fuse():
-    # A transposed read revisits a field of its Fuse nodes, which would run the
-    # other statements of their bodies again.
+def test_transposed_read_shares_its_fuse():
+    # Concordization selects a transposed index around its own statement, so a
+    # transposed read may share its Fuse nodes with other statements.
     i, j = lgc.Field("i"), lgc.Field("j")
     a, b, x, y = map(lgc.HardAlias, "abxy")
     body = lgc.Plan(
@@ -723,11 +723,23 @@ def test_transposed_read_needs_its_own_fuse():
         )
     )
     plan = lgc.Plan((fuse_loop_order(body, (i, j)), lgc.Produces((x, y))))
-    ftypes: dict[lgc.Alias, TensorFType] = {
-        var: ftype(ft.asarray(np.ones((2, 2)))) for var in (a, b, x, y)
+    data_a = np.arange(6.0).reshape(3, 2)
+    data_b = np.arange(6.0).reshape(2, 3) + 10
+    bindings = {
+        a: ft.asarray(data_a),
+        b: ft.asarray(data_b),
+        x: ft.asarray(np.zeros((2, 3))),
+        y: ft.asarray(np.zeros((2, 3))),
     }
-    with pytest.raises(ValueError, match="out of loop order"):
-        CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    ftypes: dict[lgc.Alias, TensorFType] = {
+        var: ftype(val) for var, val in bindings.items()
+    }
+    CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
+    program = NotationGenerator()(plan, ftypes, {}, None)
+    kernel = ntn.NotationInterpreter()(program).main
+    result_x, result_y = kernel(*with_workspaces(program, *bindings.values()))
+    np.testing.assert_array_equal(result_x.to_numpy(), data_a.T)
+    np.testing.assert_array_equal(result_y.to_numpy(), data_b)
 
 
 def test_compiler_form_checks_fuse_bodies():
