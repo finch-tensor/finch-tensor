@@ -90,8 +90,6 @@ class FusedLoop:
     var: ntn.Variable
     # The statements which run before the loop, rather than in each iteration.
     hoisted: list[ntn.NotationStatement] = field(default_factory=list)
-    # The modes of the tensors which hoisted statements declare.
-    modes: dict[lgc.Alias, ntn.AccessMode] = field(default_factory=dict)
 
 
 def merge_shapes(a: ntn.Variable | None, b: ntn.Variable | None) -> ntn.Variable | None:
@@ -131,12 +129,6 @@ class NotationContext:
         if epilogue is None:
             epilogue = ()
         self.epilogue = epilogue
-        # The mode of each tensor at the current statement: frozen tensors are
-        # Read, and thawed tensors are Updated with the op they were thawed
-        # with.
-        self.modes: dict[lgc.Alias, ntn.AccessMode] = {
-            var: ntn.Read() for var in bindings
-        }
         # The enclosing fused loops, from outermost to innermost.
         self.fused: list[FusedLoop] = []
 
@@ -170,42 +162,13 @@ class NotationContext:
                 return level
         return None
 
-    def hoist(
-        self, level: int, var: lgc.Alias, stmts: tuple[ntn.NotationStatement, ...]
-    ) -> None:
-        self.fused[level].hoisted.extend(stmts)
-        for loop in self.fused[level:]:
-            loop.modes[var] = self.modes[var]
-
-    def freeze(self, var: lgc.Alias) -> tuple[ntn.NotationStatement, ...]:
-        """Statements which leave `var` frozen, so that it can be read."""
-        match self.modes[var]:
-            case ntn.Update(op):
-                self.modes[var] = ntn.Read()
-                return (ntn.Freeze(self.slots[var], op),)
-        return ()
-
-    def thaw(
-        self, var: lgc.Alias, op: ntn.Literal
-    ) -> tuple[ntn.NotationStatement, ...]:
-        """Statements which leave `var` thawed, so that it can be updated with
-        `op`."""
-        if self.modes[var] == ntn.Update(op):
-            return ()
-        stmts = self.freeze(var)
-        self.modes[var] = ntn.Update(op)
-        return (*stmts, ntn.Thaw(self.slots[var], op))
-
     def declare(
         self, var: lgc.Alias, init: ntn.NotationExpression, op: ntn.Literal
-    ) -> tuple[ntn.NotationStatement, ...]:
-        """Statements which reset `var` to `init`, leaving it thawed, so that it
-        can be updated with `op`."""
-        stmts = self.freeze(var)
-        self.modes[var] = ntn.Update(op)
+    ) -> ntn.NotationStatement:
+        """Reset `var` to `init`, so that it can be updated with `op`."""
         shape = cast(tuple[ntn.NotationExpression, ...], self.shapes[var])
         shape = shape[len(shape) - self.bindings[var].ndim :]
-        return (*stmts, ntn.Declare(self.slots[var], init, op, shape))
+        return ntn.Declare(self.slots[var], init, op, shape)
 
     def lower_init(self, init: lgc.LogicExpression) -> ntn.NotationExpression:
         """The value of `init`, a zero-dimensional expression. A fill expression
@@ -279,13 +242,6 @@ class NotationContext:
                     merge(lhs_dims[idx], dim)
         return tuple(checks)
 
-    def freeze_reads(self, expr: lgc.LogicNode) -> tuple[ntn.NotationStatement, ...]:
-        """Statements which leave every tensor that `expr` reads frozen."""
-        reads = dict.fromkeys(
-            node.unfused for node in PostOrderDFS(expr) if isinstance(node, lgc.Alias)
-        )
-        return tuple(stmt for var in reads for stmt in self.freeze(var))
-
     def overwrite(
         self,
         var: lgc.Alias,
@@ -326,11 +282,7 @@ class NotationContext:
         level = self.fused_level(var, idxs, reduced)
         assert level is not None
         op = ntn.Literal(ffuncs.overwrite)
-        reset = (
-            *self.thaw(var, op),
-            ntn.If(cond, ntn.Block(self.declare(var, init, op))),
-        )
-        self.hoist(level, var, reset)
+        self.fused[level].hoisted.append(ntn.If(cond, self.declare(var, init, op)))
         return self.fold(var, idxs, ffuncs.overwrite, arg, loop_order, None)
 
     def fold(
@@ -344,24 +296,21 @@ class NotationContext:
     ) -> ntn.NotationStatement:
         """Fold `arg` into `var` with `op` in `loop_order`, after resetting `var`
         to `init` unless it is None."""
-        stmts = self.freeze_reads(arg)
         reduced = tuple(idx for idx in loop_order if idx not in idxs)
-        if init is None:
-            reset = self.thaw(var, ntn.Literal(op))
-        else:
+        reset: tuple[ntn.NotationStatement, ...] = ()
+        if init is not None:
             match init:
                 case ntn.Literal(val) if op == ffuncs.overwrite and not reduced:
                     op = ffuncs.init_write(val)
-            reset = self.declare(var, init, ntn.Literal(op))
+            reset = (self.declare(var, init, ntn.Literal(op)),)
+        body = self._lower_query(var, op, arg, idxs, loop_order)
         # The reset spans the fused loops over the fields which var stores or
         # which are reduced into it, so it runs before them.
         level = self.fused_level(var, idxs, reduced)
         if level is None:
-            stmts += reset
-        else:
-            self.hoist(level, var, reset)
-        body = self._lower_query(var, op, arg, idxs, loop_order)
-        return ntn.Block((*stmts, body))
+            return ntn.Block((*reset, body))
+        self.fused[level].hoisted.extend(reset)
+        return body
 
     def _lower_query(
         self,
@@ -474,42 +423,11 @@ class NotationContext:
                     extent_checks.append(check)
         checks = self.hoist_invariant(tuple(extent_checks))
         loop = FusedLoop(idx, ntn.Variable(gensym(idx.name), dim.result_type))
-        # The tensors which the body only reads are frozen before the loop,
-        # rather than in each iteration.
-        written = set()
-        for node in PostOrderDFS(body):
-            match node:
-                case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
-                    lgc.Table(lgc.Alias() as lhs, _), _, _
-                ):
-                    written.add(lhs.unfused)
-        reads = dict.fromkeys(
-            node.unfused
-            for node in PostOrderDFS(body)
-            if isinstance(node, lgc.Alias) and node.unfused not in written
-        )
-        frozen = tuple(stmt for var in reads for stmt in self.freeze(var))
         self.fused.append(loop)
-        start = dict(self.modes)
-        stmts = [self(body)]
-        # Each iteration leaves every tensor in the mode the next one expects.
-        for var, mode in {**start, **loop.modes}.items():
-            match mode:
-                case ntn.Read():
-                    stmts += self.freeze(var)
-                case ntn.Update(ntn.Literal() as op):
-                    stmts += self.thaw(var, op)
+        body_2 = self(body)
         self.fused.pop()
         ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(dim.result_type(0)), dim))
-        # Hoisted declarations may read the frozen tensors in their inits.
-        return ntn.Block(
-            (
-                *frozen,
-                *loop.hoisted,
-                *checks,
-                ntn.Loop(loop.var, ext, ntn.Block(tuple(stmts))),
-            )
-        )
+        return ntn.Block((*loop.hoisted, *checks, ntn.Loop(loop.var, ext, body_2)))
 
     def __call__(self, prgm: lgc.LogicStatement) -> ntn.NotationStatement:
         """
@@ -544,9 +462,7 @@ class NotationContext:
                 lgc.Aggregate(lgc.Literal(op), init, arg, _) as rhs,
             ):
                 loop_order = self.fused_fields(table, arg)
-                stmts = self.query_shape(lhs.unfused, idxs, rhs) + self.freeze_reads(
-                    init
-                )
+                stmts = self.query_shape(lhs.unfused, idxs, rhs)
                 body = self.fold(
                     lhs.unfused, idxs, op, arg, loop_order, self.lower_init(init)
                 )
@@ -566,15 +482,17 @@ class NotationContext:
                             f"Initializing {lhs} across fused iterations to a "
                             "value other than its static fill"
                         )
-                    self.hoist(level, lhs, self.declare(lhs, ntn.Literal(init), op))
+                    self.fused[level].hoisted.append(
+                        self.declare(lhs, ntn.Literal(init), op)
+                    )
                     return ntn.Block(())
                 if is_static(fill) and not bool(ffuncs.same(init, fill.value)):
                     # A static fill can't change, so lhs is declared with its
                     # fill, and then every element is overwritten with init.
-                    stmts = self.declare(lhs, ntn.Literal(fill.value), op)
+                    reset = self.declare(lhs, ntn.Literal(fill.value), op)
                     body = self.overwrite_elements(lhs, idxs, ntn.Literal(init))
-                    return ntn.Block((*stmts, body))
-                return ntn.Block(self.declare(lhs, ntn.Literal(init), op))
+                    return ntn.Block((reset, body))
+                return self.declare(lhs, ntn.Literal(init), op)
             case lgc.QueryInto(
                 lgc.Table(lgc.Alias() as lhs, idxs) as table, lgc.Literal(op), arg
             ):
@@ -592,7 +510,6 @@ class NotationContext:
                     vars.append(var.unfused)
                 return ntn.Block(
                     (
-                        *(stmt for var in self.bindings for stmt in self.freeze(var)),
                         *self.epilogue,
                         ntn.Return(
                             ntn.Call(
@@ -682,6 +599,9 @@ class NotationGenerator(LogicNotationLowerer):
         mask_args = tuple(
             ntn.Variable(gensym("eye"), mask.result_type) for mask in masks
         )
+        body = enforce_lifecycles(
+            ntn.Block((*map(ntn.Unpack, masks, mask_args), body))
+        )
         func_args = (*args.values(), *mask_args)
         ret_t = None
         for node in PostOrderDFS(body):
@@ -701,7 +621,7 @@ class NotationGenerator(LogicNotationLowerer):
                         ),
                     ),
                     func_args,
-                    ntn.Block((*map(ntn.Unpack, masks, mask_args), body)),
+                    body,
                 ),
             )
         )
@@ -796,13 +716,9 @@ def concordize(
                     if isinstance(x, ntn.Access) and x.idxs[:1] == (idx,)
                 }
                 decls = [
-                    stmt
+                    ntn.Declare(eye, ntn.Literal(np.False_), op, (dim, dim))
                     for dim, eye in masks.items()
                     if eye in unfurled
-                    for stmt in (
-                        ntn.Declare(eye, ntn.Literal(np.False_), op, (dim, dim)),
-                        ntn.Freeze(eye, op),
-                    )
                 ]
                 if decls:
                     node = ntn.Block((*decls, node))
@@ -849,3 +765,82 @@ def concordize(
 
     root, _ = visit(root, ())
     return root, list(masks.values())
+
+
+def enforce_lifecycles(root: ntn.NotationStatement) -> ntn.NotationStatement:
+    """
+    Insert the freezes and thaws which put each tensor in the mode that each
+    statement needs. A tensor is read and declared while frozen, and updated
+    while thawed with the op of the update. A loop or if statement may repeat
+    or skip its body, so each tensor is put in the mode its body leaves it in
+    beforehand, and its body leaves it in the mode it started in.
+    """
+
+    def uses(stmt: Any) -> list[tuple[Any, ntn.AccessMode | None, ntn.AccessMode]]:
+        """The tensors of a statement, in order, with the mode they need and the
+        mode they are left in."""
+        read = ntn.Read()
+        reads: list[tuple[Any, ntn.AccessMode | None, ntn.AccessMode]] = [
+            (x.tns, read, read)
+            for x in PostOrderDFS(stmt)
+            if isinstance(x, ntn.Access) and x.mode == read
+        ]
+        match stmt:
+            case ntn.Increment(ntn.Access(tns, mode, _), _):
+                return [*reads, (tns, mode, mode)]
+            case ntn.Declare(tns, _, op, _):
+                return [*reads, (tns, read, ntn.Update(op))]
+            case ntn.Unpack(tns, _):
+                return [(tns, None, read)]
+            case ntn.Repack(tns, _):
+                return [(tns, read, read)]
+        return reads
+
+    def ends(node: Any) -> dict[Any, ntn.AccessMode]:
+        """The mode each tensor of `node` is left in."""
+        match node:
+            case ntn.Block(bodies):
+                return {tns: mode for body in bodies for tns, mode in ends(body).items()}
+            case ntn.Loop(_, _, body):
+                return ends(body)
+            case ntn.If(cond, body):
+                return {**ends(cond), **ends(body)}
+        return {tns: after for tns, _, after in uses(node)}
+
+    modes: dict[Any, ntn.AccessMode] = {}
+
+    def transition(tns: Any, mode: ntn.AccessMode) -> list[ntn.NotationStatement]:
+        stmts: list[ntn.NotationStatement] = []
+        match modes.get(tns, ntn.Read()):
+            case ntn.Update(op) if mode != ntn.Update(op):
+                stmts.append(ntn.Freeze(tns, op))
+        match mode:
+            case ntn.Update(op) if modes.get(tns, ntn.Read()) != mode:
+                stmts.append(ntn.Thaw(tns, op))
+        modes[tns] = mode
+        return stmts
+
+    def visit(node: Any) -> Any:
+        match node:
+            case ntn.Block(bodies):
+                return ntn.Block(tuple(visit(body) for body in bodies))
+            case ntn.Loop() | ntn.If():
+                stmts = [
+                    stmt
+                    for tns, mode in ends(node).items()
+                    for stmt in transition(tns, mode)
+                ]
+                match node:
+                    case ntn.Loop(idx, ext, body):
+                        node = ntn.Loop(idx, ext, visit(body))
+                    case ntn.If(cond, body):
+                        node = ntn.If(cond, visit(body))
+            case _:
+                stmts = []
+                for tns, need, after in uses(node):
+                    if need is not None:
+                        stmts += transition(tns, need)
+                    modes[tns] = after
+        return ntn.Block((*stmts, node)) if stmts else node
+
+    return visit(root)

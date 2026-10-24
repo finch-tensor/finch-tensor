@@ -242,6 +242,13 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
         __c_12_lvl_lvl_ptr_slot_arr[numpy.int64((_i_15__pos_2 + 1))] = (__c_12_lvl_lvl_ptr_slot_arr[numpy.int64((_i_15__pos_2 + 1))] + (qos - __c_12_lvl_lvl_qos_fill))
         __c_12[0].lvl.qos_fill = qos
         __c_12_lvl_lvl_qos_fill = __c_12[0].lvl.qos_fill
+    __a_1_lvl_lvl_lvl_val_slot[0] = __a_1_lvl_lvl_lvl_val_slot_arr
+    __a_1_lvl_lvl_ptr_slot[0] = __a_1_lvl_lvl_ptr_slot_arr
+    __a_1_lvl_lvl_idx_slot[0] = __a_1_lvl_lvl_idx_slot_arr
+    __b_5_lvl_lvl_lvl_val_slot[0] = __b_5_lvl_lvl_lvl_val_slot_arr
+    __b_5_lvl_lvl_ptr_slot[0] = __b_5_lvl_lvl_ptr_slot_arr
+    __b_5_lvl_lvl_idx_slot[0] = __b_5_lvl_lvl_idx_slot_arr
+    __w_9_val_slot[0] = __w_9_val_slot_arr
     pos_stop_2: int64 = numpy.int64((1 * __c_12_lvl_dimension))
     __c_12_lvl_lvl_ptr_slot_arr = numpy.resize(__c_12_lvl_lvl_ptr_slot_arr, (pos_stop_2 + 1))
     if (__c_12_lvl_lvl_frozen == False):
@@ -257,13 +264,6 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
     __c_12_lvl_lvl_frozen = __c_12[0].lvl.frozen
     if (len(__c_12_lvl_lvl_lvl_val_slot_arr) != numpy.int64(__c_12_lvl_lvl_qos_fill)):
         __c_12_lvl_lvl_lvl_val_slot_arr = numpy.resize(__c_12_lvl_lvl_lvl_val_slot_arr, numpy.int64(__c_12_lvl_lvl_qos_fill))
-    __a_1_lvl_lvl_lvl_val_slot[0] = __a_1_lvl_lvl_lvl_val_slot_arr
-    __a_1_lvl_lvl_ptr_slot[0] = __a_1_lvl_lvl_ptr_slot_arr
-    __a_1_lvl_lvl_idx_slot[0] = __a_1_lvl_lvl_idx_slot_arr
-    __b_5_lvl_lvl_lvl_val_slot[0] = __b_5_lvl_lvl_lvl_val_slot_arr
-    __b_5_lvl_lvl_ptr_slot[0] = __b_5_lvl_lvl_ptr_slot_arr
-    __b_5_lvl_lvl_idx_slot[0] = __b_5_lvl_lvl_idx_slot_arr
-    __w_9_val_slot[0] = __w_9_val_slot_arr
     __c_12_lvl_lvl_lvl_val_slot[0] = __c_12_lvl_lvl_lvl_val_slot_arr
     __c_12_lvl_lvl_ptr_slot[0] = __c_12_lvl_lvl_ptr_slot_arr
     __c_12_lvl_lvl_idx_slot[0] = __c_12_lvl_lvl_idx_slot_arr

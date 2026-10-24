@@ -15,8 +15,8 @@ def main(#A0#1: BufferizedNDArray, #A1#2: BufferizedNDArray, #A2#3: BufferizedND
         loop(#i1#16, make_extent(0, #A0_dim_1#6)):
             loop(#i2#17, make_extent(0, #A1_dim_1#9)):
                 increment(update(#_A2#10, ['#i0#15', '#i2#17'], add), mul(unwrap(read(#_A0#4, ['#i0#15', '#i1#16'])), unwrap(read(#_A1#7, ['#i1#16', '#i2#17']))))
-    freeze(#_A2#10, add)
     repack(#_A0#4, #A0#1)
     repack(#_A1#7, #A1#2)
+    freeze(#_A2#10, add)
     repack(#_A2#10, #A2#3)
     return make_tuple(#A2#3)
