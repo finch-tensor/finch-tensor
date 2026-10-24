@@ -102,6 +102,13 @@ class ElementLevelFType(LevelFType, MutableStructFType):
         if len(shape) != 0:
             raise ValueError("ElementLevelFType must be called with an empty shape.")
         val = self.buffer_type(len=pos)
+        # Unstored slots must hold the fill: Finch.jl resets only stored slots.
+        if is_static(self.fill_type) and pos and self.fill_type.value != 0:
+            try:
+                val.to_numpy(copy=False)[:] = self.fill_type.value
+            except ValueError:
+                for i in range(pos):
+                    val.store(i, self.fill_type.value)
         return ElementLevel(self, val)
 
     def __call__(self, val: Any) -> "ElementLevel":
