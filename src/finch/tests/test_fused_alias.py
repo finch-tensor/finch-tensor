@@ -730,35 +730,6 @@ def test_transposed_read_needs_its_own_fuse():
         CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
 
 
-@pytest.mark.parametrize("size", [2, 3])
-def test_fused_statements_check_their_extents(size):
-    i = lgc.Field("i")
-    a, b, c, d = map(lgc.HardAlias, "abcd")
-    body = lgc.Plan(
-        (
-            lgc.Query(lgc.Table(c, (i,)), lgc.Table(a, (i,))),
-            lgc.Query(lgc.Table(d, (i,)), lgc.Table(b, (i,))),
-        )
-    )
-    plan = lgc.Plan((lgc.Fuse(i, body), lgc.Produces((c, d))))
-    bindings = {
-        a: ft.asarray(np.arange(2.0)),
-        b: ft.asarray(np.arange(size, dtype=np.float64)),
-        c: ft.asarray(np.zeros(0)),
-        d: ft.asarray(np.zeros(0)),
-    }
-    ftypes = {var: val.ftype for var, val in bindings.items()}
-    program = NotationGenerator(mode=CompilerMode(safe=True))(plan, ftypes, {}, None)
-    kernel = ntn.NotationInterpreter()(program).main
-    if size != 2:
-        with pytest.raises(AssertionError, match="Finch assertion failed"):
-            kernel(*bindings.values())
-        return
-    result_c, result_d = kernel(*bindings.values())
-    np.testing.assert_array_equal(result_c.to_numpy(), np.arange(2.0))
-    np.testing.assert_array_equal(result_d.to_numpy(), np.arange(2.0))
-
-
 def test_compiler_form_checks_fuse_bodies():
     # A Fuse can't both read and write a tensor along its field.
     i = lgc.Field("i")
