@@ -123,6 +123,7 @@ class FinchJLKernel(AssemblyKernel):
         func_name: str,
         dynamic_args: tuple[int, ...] = (),
         extents: tuple[tuple[int, int, tuple[ffuncs._Cast, ...]], ...] = (),
+        declares: tuple[tuple[int, tuple], ...] = (),
     ):
         super().__init__(type_)
         # We store this code so that we can verify it in pytest
@@ -133,6 +134,9 @@ class FinchJLKernel(AssemblyKernel):
         self.dynamic_args = dynamic_args
         # The input dimension and casts used to compute each trailing extent.
         self.extents = extents
+        # The position of each mask argument, and the dimensions it's declared
+        # with, which are computed like extents or are constant.
+        self.declares = declares
 
     def __call__(self, *args):
         return self.runtime.kernel_call(self.func_name, self, args)
@@ -169,6 +173,7 @@ class FinchJLGenerator:
         self.extents: list[tuple[str, int, int, tuple[ffuncs._Cast, ...]]] = []
         self.used_extents: set[str] = set()
         self.constants: dict[str, ntn.Literal] = {}
+        self.declares: list[tuple[int, tuple]] = []
 
     def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
@@ -178,6 +183,7 @@ class FinchJLGenerator:
         self.extents.clear()
         self.used_extents.clear()
         self.constants.clear()
+        self.declares.clear()
         return self.generate_julia(prgm)
 
     def emit_name(self, sym: str) -> str:
@@ -280,6 +286,26 @@ class FinchJLGenerator:
                 raise NotImplementedError(
                     "Julia lowering only supports shape variable bindings"
                 )
+
+            case ntn.Declare(ntn.Slot(name, type_), _, _, shape) if isinstance(
+                type_, PatternTensorFType
+            ):
+                # Masks are declared in Python before the kernel call, with
+                # dimensions measured like loop extents.
+                dims = []
+                for dim in shape:
+                    match self.resolve_constant(dim), self.shape_extent(dim):
+                        case ntn.Literal(value), _:
+                            dims.append(int(value))
+                        case None, None:
+                            raise NotImplementedError(
+                                "Julia lowering only supports mask shapes of "
+                                "argument dimensions"
+                            )
+                        case None, extent:
+                            dims.append(extent)
+                self.declares.append((self.slot_args[name], tuple(dims)))
+                return ""
 
             case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
@@ -480,6 +506,7 @@ class FinchJLCompiler(NotationCompiler):
             extents = tuple(
                 (pos, axis, casts) for _, pos, axis, casts in generator.extents
             )
+            declares = tuple(generator.declares)
             arg_type_strs = tuple(
                 ftype_to_jl_type_str(arg.type_)
                 for arg in func.args
@@ -487,7 +514,7 @@ class FinchJLCompiler(NotationCompiler):
             )
             # Flat key: source, argument types, pinned fills, and extents all
             # vary independently, so none may be folded into another.
-            key = (generated_prgm, arg_type_strs, dynamic_args, extents)
+            key = (generated_prgm, arg_type_strs, dynamic_args, extents, declares)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
                 func_name = f"kernel_{uuid.uuid4().hex}"
@@ -501,6 +528,7 @@ class FinchJLCompiler(NotationCompiler):
                     func_name,
                     dynamic_args,
                     extents,
+                    declares,
                 )
                 self.runtime.cache_kernel(key, kernel)
             elif kernel.ftype != func.name.result_type:
@@ -512,6 +540,7 @@ class FinchJLCompiler(NotationCompiler):
                     kernel.func_name,
                     dynamic_args,
                     extents,
+                    declares,
                 )
                 self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel

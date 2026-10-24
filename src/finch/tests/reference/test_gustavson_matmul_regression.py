@@ -102,8 +102,38 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
         if (q < q_stop):
             i_stop = __a_1_lvl_lvl_idx_slot_arr[q]
             i_last = __a_1_lvl_lvl_idx_slot_arr[(q_stop - 1)]
-        if (__a_1_lvl_lvl_idx_slot_arr[q] < 0):
-            q = scansearch(__a_1_lvl_lvl_idx_slot, 0, q, (q_stop - 1))
+        if (q < q_stop):
+            if (__a_1_lvl_lvl_idx_slot_arr[q] < 0):
+                lo: int32 = q
+                d: int32 = 1
+                hi: int32 = (q + d)
+                go: bool = (hi < q_stop)
+                while go:
+                    if (__a_1_lvl_lvl_idx_slot_arr[hi] < 0):
+                        lo = hi
+                        d = (d + d)
+                        hi = (hi + d)
+                        hi = min(hi, q_stop)
+                        go = (hi < q_stop)
+                    else:
+                        go = False
+                m: int32 = (lo + 1)
+                go = (m < hi)
+                while go:
+                    m = (hi - lo)
+                    m = (m >> 1)
+                    m = (lo + m)
+                    if (__a_1_lvl_lvl_idx_slot_arr[m] < 0):
+                        lo = m
+                    else:
+                        hi = m
+                    m = (lo + 1)
+                    go = (m < hi)
+                q = hi
+        if (q < q_stop):
+            i_stop = __a_1_lvl_lvl_idx_slot_arr[q]
+        else:
+            i_stop = __a_1_lvl_lvl_dimension
         i_start: int32 = 0
         while (min(i_stop) < min(_a_dim_1_3, (i_last + 1))):
             if (min(i_stop) == i_stop):
@@ -121,8 +151,38 @@ def main(_a_0: builtins.tuple, _b_4: builtins.tuple, _w_8: Numba_BufferizedNDArr
                     if (q_2 < q_stop_2):
                         i_stop_2 = __b_5_lvl_lvl_idx_slot_arr[q_2]
                         i_last_2 = __b_5_lvl_lvl_idx_slot_arr[(q_stop_2 - 1)]
-                    if (__b_5_lvl_lvl_idx_slot_arr[q_2] < 0):
-                        q_2 = scansearch(__b_5_lvl_lvl_idx_slot, 0, q_2, (q_stop_2 - 1))
+                    if (q_2 < q_stop_2):
+                        if (__b_5_lvl_lvl_idx_slot_arr[q_2] < 0):
+                            lo_2: int32 = q_2
+                            d_2: int32 = 1
+                            hi_2: int32 = (q_2 + d_2)
+                            go_2: bool = (hi_2 < q_stop_2)
+                            while go_2:
+                                if (__b_5_lvl_lvl_idx_slot_arr[hi_2] < 0):
+                                    lo_2 = hi_2
+                                    d_2 = (d_2 + d_2)
+                                    hi_2 = (hi_2 + d_2)
+                                    hi_2 = min(hi_2, q_stop_2)
+                                    go_2 = (hi_2 < q_stop_2)
+                                else:
+                                    go_2 = False
+                            m_2: int32 = (lo_2 + 1)
+                            go_2 = (m_2 < hi_2)
+                            while go_2:
+                                m_2 = (hi_2 - lo_2)
+                                m_2 = (m_2 >> 1)
+                                m_2 = (lo_2 + m_2)
+                                if (__b_5_lvl_lvl_idx_slot_arr[m_2] < 0):
+                                    lo_2 = m_2
+                                else:
+                                    hi_2 = m_2
+                                m_2 = (lo_2 + 1)
+                                go_2 = (m_2 < hi_2)
+                            q_2 = hi_2
+                    if (q_2 < q_stop_2):
+                        i_stop_2 = __b_5_lvl_lvl_idx_slot_arr[q_2]
+                    else:
+                        i_stop_2 = __b_5_lvl_lvl_dimension
                     i_start_2: int32 = 0
                     while (min(i_stop_2) < min(_b_dim_1_7, (i_last_2 + 1))):
                         if (min(i_stop_2) == i_stop_2):

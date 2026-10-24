@@ -62,10 +62,70 @@ def main(#A_9#1: FiberTensorFType(DenseLevelFType(SparseListLevelFType(ElementLe
         if lt(q_2, q_stop_2):
             i_stop_2: finch.int64 = load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), q_2)
             i_last_2: finch.int64 = load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), sub(q_stop_2, 1))
-        if lt(load(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), q), 0):
-            q: finch.int64 = scansearch(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), 0, q, sub(q_stop, 1))
-        if lt(load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), q_2), 0):
-            q_2: finch.int64 = scansearch(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), 0, q_2, sub(q_stop_2, 1))
+        if lt(q, q_stop):
+            if lt(load(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), q), 0):
+                lo: finch.int64 = q
+                d: finch.int64 = 1
+                hi: finch.int64 = add(q, d)
+                go: finch.bool = lt(hi, q_stop)
+                while go:
+                    if lt(load(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), hi), 0):
+                        lo: finch.int64 = hi
+                        d: finch.int64 = add(d, d)
+                        hi: finch.int64 = add(hi, d)
+                        hi: finch.int64 = min(hi, q_stop)
+                        go: finch.bool = lt(hi, q_stop)
+                    else:
+                        go: finch.bool = False
+                m: finch.int64 = add(1, lo)
+                go: finch.bool = lt(m, hi)
+                while go:
+                    m: finch.int64 = sub(hi, lo)
+                    m: finch.int64 = rshift(m, 1)
+                    m: finch.int64 = add(lo, m)
+                    if lt(load(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), m), 0):
+                        lo: finch.int64 = m
+                    else:
+                        hi: finch.int64 = m
+                    m: finch.int64 = add(1, lo)
+                    go: finch.bool = lt(m, hi)
+                q: finch.int64 = hi
+        if lt(q, q_stop):
+            i_stop: finch.int64 = load(slot(#_A_9#4_lvl_lvl_idx_slot, np_buf_t(int64)), q)
+        else:
+            i_stop: finch.int64 = #_A_9#4_lvl_lvl_dimension
+        if lt(q_2, q_stop_2):
+            if lt(load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), q_2), 0):
+                lo_2: finch.int64 = q_2
+                d_2: finch.int64 = 1
+                hi_2: finch.int64 = add(q_2, d_2)
+                go_2: finch.bool = lt(hi_2, q_stop_2)
+                while go_2:
+                    if lt(load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), hi_2), 0):
+                        lo_2: finch.int64 = hi_2
+                        d_2: finch.int64 = add(d_2, d_2)
+                        hi_2: finch.int64 = add(hi_2, d_2)
+                        hi_2: finch.int64 = min(hi_2, q_stop_2)
+                        go_2: finch.bool = lt(hi_2, q_stop_2)
+                    else:
+                        go_2: finch.bool = False
+                m_2: finch.int64 = add(1, lo_2)
+                go_2: finch.bool = lt(m_2, hi_2)
+                while go_2:
+                    m_2: finch.int64 = sub(hi_2, lo_2)
+                    m_2: finch.int64 = rshift(m_2, 1)
+                    m_2: finch.int64 = add(lo_2, m_2)
+                    if lt(load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), m_2), 0):
+                        lo_2: finch.int64 = m_2
+                    else:
+                        hi_2: finch.int64 = m_2
+                    m_2: finch.int64 = add(1, lo_2)
+                    go_2: finch.bool = lt(m_2, hi_2)
+                q_2: finch.int64 = hi_2
+        if lt(q_2, q_stop_2):
+            i_stop_2: finch.int64 = load(slot(#_A_10#7_lvl_lvl_idx_slot, np_buf_t(int64)), q_2)
+        else:
+            i_stop_2: finch.int64 = #_A_10#7_lvl_lvl_dimension
         i_start: finch.int64 = 0
         while lt(min(i_stop, i_stop_2), min(#A_10_dim_1#9, add(1, i_last), add(1, i_last_2))):
             if eq(min(i_stop, i_stop_2), i_stop):

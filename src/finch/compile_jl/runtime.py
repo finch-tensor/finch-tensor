@@ -167,6 +167,18 @@ class _KernalMetadata:
     returned_positions: tuple[int, ...]
 
 
+def _measure(args, dim):
+    """The size of a dimension, which is constant or the axis of an argument,
+    cast like the kernel does."""
+    if isinstance(dim, int):
+        return dim
+    pos, axis, casts = dim
+    size = args[pos].shape[axis]
+    for cast in casts:
+        size = cast(size)
+    return size
+
+
 class FinchJLRuntime(ABC):
     """Runtime services used by the Julia compiler and its kernels."""
 
@@ -202,6 +214,10 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
     def kernel_call(self, func_name, kernel, args):
         metadata = self._kernel_metadata[id(kernel)]
 
+        # Masks take the shapes they're declared with before they're passed.
+        for pos, dims in getattr(kernel, "declares", ()):
+            args[pos].declare(None, None, tuple(_measure(args, dim) for dim in dims))
+
         # Lease Julia storage only for resettable compiler-created outputs.
         julia_buf_args: list[JuliaOwnedTensor] = []
         for position, tensor in enumerate(args):
@@ -227,11 +243,9 @@ class DefaultFinchJLRuntime(FinchJLRuntime):
             julia_buf_args.append(julia_buf)
 
         raw_args = [arg.raw_julia_obj for arg in julia_buf_args]
-        for pos, axis, casts in getattr(kernel, "extents", ()):
-            size = args[pos].shape[axis]
-            for cast in casts:
-                size = cast(size)
-            raw_args.append(int(size))
+        raw_args.extend(
+            int(_measure(args, extent)) for extent in getattr(kernel, "extents", ())
+        )
         raw_results = jl.values(getattr(jl, func_name)(*raw_args))
 
         # Finch returns new tensor headers when declarations change dimensions.

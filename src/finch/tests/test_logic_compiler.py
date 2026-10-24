@@ -30,6 +30,7 @@ from finch.tensor.bufferized_ndarray import (
 )
 
 from .conftest import finch_assert_equal, reset_name_counts
+from .utils import with_workspaces
 
 
 @pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
@@ -86,7 +87,7 @@ def test_generated_init_write(kind, init, compiler):
         None,
     )
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
-    result = compiler()(program).main(*bindings.values())
+    result = compiler()(program).main(*with_workspaces(program, *bindings.values()))
     finch_assert_equal(result[0].to_numpy(), expected)
 
 
@@ -144,7 +145,9 @@ def test_logic_compiler(file_regression):
         basename="test_logic_compiler_program",
     )
 
-    result = ntn.NotationInterpreter()(program).main(*bindings.values())
+    result = ntn.NotationInterpreter()(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
 
     expected = np.matmul(
         bindings[HardAlias(name="A0")].to_numpy(),
@@ -205,7 +208,9 @@ def test_logic_compiler_inplace(file_regression):
         basename="test_logic_compiler_inplace_program",
     )
 
-    result = ntn.NotationInterpreter()(program).main(*bindings.values())
+    result = ntn.NotationInterpreter()(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
 
     expected = np.ones_like(bindings[HardAlias(name="A2")].to_numpy()) + np.matmul(
         bindings[HardAlias(name="A0")].to_numpy(),

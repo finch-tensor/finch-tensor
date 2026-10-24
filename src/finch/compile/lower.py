@@ -129,8 +129,11 @@ class ExtentFType(ImmutableStructFType):
     def from_fields(self, start, end) -> Extent:
         return Extent(start, end)
 
-    def __call__(self, *args):
-        raise TypeError(f"{self.struct_name} is not callable")
+    def __call__(self, val):
+        match val:
+            case Extent():
+                return val
+        raise TypeError(f"Cannot convert {val!r} to {self.struct_name}")
 
     def lower_loop(
         self,
@@ -284,6 +287,8 @@ class SymbolicExtent(FTyped[ExtentFType]):
                 op.result_type, _MakeExtentFType
             ):
                 return SymbolicExtent(start, end)
+            case ntn.Literal(Extent(start, end)):
+                return SymbolicExtent(ntn.Literal(start), ntn.Literal(end))
             case _:
                 raise Exception(node)
 
@@ -436,9 +441,10 @@ class AssemblyContext(Context):
             pos_t = fields["pos"]
         elif "val" in fields and hasattr(fields["val"], "length_type"):
             pos_t = fields["val"].length_type
-        elif getattr(type_, "shape_type", None) == ():
+        elif getattr(type_, "shape_type", None) == () or "val" not in fields:
             # 0-d tensors store their value directly rather than in a
-            # positioned buffer; the cursor position is unused.
+            # positioned buffer, and pattern tensors store no values; the
+            # cursor position is unused.
             pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")

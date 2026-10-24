@@ -33,4 +33,15 @@ class LoopletSimplify(UnvalidatedForm, NotationTransform):
                         ):
                             if is_annihilator(op_type, val):
                                 return ntn.Unwrap(ntn.Access(tns, ntn.Read(), idxs))
+            case ntn.If(
+                ntn.Unwrap(
+                    ntn.Access(
+                        ntn.Looplet(looplets.Run(ntn.Full(ntn.Literal(val))), _),
+                        ntn.Read(),
+                        _,
+                    )
+                ),
+                body,
+            ):
+                return body if val else ntn.Block(())
         return None

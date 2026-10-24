@@ -1,6 +1,7 @@
 import ctypes
 import json
 import logging
+import re
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -27,10 +28,19 @@ from finch.algebra import (
     ftype,
     is_dynamic,
     is_static,
+    np_dtype,
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import CompilerMode, Context, Namespace, ScopedDict, UnvalidatedForm
+from finch.symbolic import (
+    CompilerMode,
+    Context,
+    Namespace,
+    PostWalk,
+    Rewrite,
+    ScopedDict,
+    UnvalidatedForm,
+)
 from finch.util import config, file_cache
 from finch.util.logging import LOG_BACKEND_C
 
@@ -241,7 +251,7 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, func_type), _, _):
-                    kern = CKernel(getattr(lib, func_name), func_type)
+                    kern = CKernel(getattr(lib, c_identifier(func_name)), func_type)
                     kernels[func_name] = kern
                 case _:
                     raise NotImplementedError(
@@ -418,6 +428,23 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
         case ffuncs._WhereFType():
             cond, x, y = args
             return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
+        case ffuncs._MinFType() | ffuncs._MaxFType():
+            # Like np.minimum and np.maximum, a NaN argument wins. Only a NaN
+            # on the left needs a check, since comparisons with NaN are false.
+            cmp = "<" if op_type == ffuncs.min.ftype else ">"
+            result_type = op_type.return_type(*(arg.result_type for arg in args))
+            type_code = ctx.ctype_name(c_type(result_type))
+            result = ctx(ctx.cache("extremum", args[0]))
+            left_type = args[0].result_type
+            for arg in args[1:]:
+                x = ctx(ctx.cache("extremum", arg))
+                cond = f"{result} {cmp} {x}"
+                if np.issubdtype(np_dtype(left_type), np.floating):
+                    cond = f"({result} != {result}) || ({cond})"
+                var = ctx.freshen("extremum")
+                ctx.exec(f"{ctx.feed}{type_code} {var} = ({cond}) ? {result} : {x};")
+                result, left_type = var, result_type
+            return result
     c_symbol = c_function_name(op_type, ctx, *args)
     match op_type:
         case (
@@ -593,10 +620,44 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
+C_RESERVED = frozenset(
+    {
+        "auto", "break", "case", "char", "const", "continue", "default", "do",
+        "double", "else", "enum", "extern", "float", "for", "goto", "if",
+        "inline", "int", "long", "main", "register", "restrict", "return",
+        "short", "signed", "sizeof", "static", "struct", "switch", "typedef",
+        "union", "unsigned", "void", "volatile", "while", "bool", "true",
+        "false",
+    }
+)  # fmt: skip
+
+
+def c_identifier(name: str) -> str:
+    """A C identifier for a name, such as the generated `#A#0`, which isn't one.
+    Names which C reserves, like `main`, get a trailing underscore."""
+    name = re.sub(r"\W", "_", name)
+    return f"{name}_" if name in C_RESERVED else name
+
+
+def c_identifiers(prgm: asm.AssemblyNode) -> asm.AssemblyNode:
+    """Rename the variables and slots of a program to C identifiers."""
+
+    def rename(node):
+        match node:
+            case asm.Variable(name, type_) if c_identifier(name) != name:
+                return asm.Variable(c_identifier(name), type_)
+            case asm.Slot(name, type_) if c_identifier(name) != name:
+                return asm.Slot(c_identifier(name), type_)
+        return None
+
+    return Rewrite(PostWalk(rename))(prgm)
+
+
 class CGenerator(UnvalidatedForm, CLowerer):
     def lower(
         self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
     ) -> CCode:
+        prgm = c_identifiers(prgm)
         ctx = CContext(mode=mode)
         if ctx.mode.debug:
             ctx.namespace = Namespace(prgm)

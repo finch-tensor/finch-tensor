@@ -16,6 +16,7 @@ from finch.autoschedule import (
 from finch.autoschedule.stages import CompilerForm, FormattedForm, LoopOrderedForm
 from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import fuse_loop_order
+from finch.codegen import CCompiler, NumbaCompiler
 from finch.compile import NotationCompiler
 from finch.compile_jl.analyze import reset_argument_positions
 from finch.finch_logic import (
@@ -35,6 +36,7 @@ from finch.symbolic import PostOrderDFS
 from finch.tensor import BufferizedNDArray
 
 from .conftest import finch_assert_equal
+from .utils import with_workspaces
 
 i, j = Field("i"), Field("j")
 A, B, C, D = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("D")
@@ -79,7 +81,11 @@ def lifecycle(program):
 
 
 def run(program, binds):
-    return ntn.NotationInterpreter()(program).main(*binds.values())[0].to_numpy()
+    return (
+        ntn.NotationInterpreter()(program)
+        .main(*with_workspaces(program, *binds.values()))[0]
+        .to_numpy()
+    )
 
 
 def sum_rows(lhs, arg, init=0.0):
@@ -285,7 +291,16 @@ def test_compiler_form_lowerer_keeps_definitions():
 
 
 @pytest.mark.parametrize("axes", list(permutations(range(3))))
-@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        ntn.NotationInterpreter,
+        NotationCompiler,
+        pytest.param(
+            lambda: NotationCompiler(CCompiler()), marks=pytest.mark.c_backend
+        ),
+    ],
+)
 def test_transpose_keeps_output_in_loop_order(axes, compiler):
     data = np.arange(24.0).reshape(2, 3, 4)
     data[data % 3 != 0] = 0
@@ -301,11 +316,20 @@ def test_transpose_keeps_output_in_loop_order(axes, compiler):
         plan, {A: source.ftype, C: output.ftype}, {}, DenseStatsFactory()
     )
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
-    result = compiler()(program).main(source, output)
+    result = compiler()(program).main(*with_workspaces(program, source, output))
     finch_assert_equal(result[0].to_numpy(), expected)
 
 
-@pytest.mark.parametrize("compiler", [ntn.NotationInterpreter, NotationCompiler])
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        ntn.NotationInterpreter,
+        NotationCompiler,
+        pytest.param(
+            lambda: NotationCompiler(CCompiler()), marks=pytest.mark.c_backend
+        ),
+    ],
+)
 def test_transposed_fold_broadcasts_and_reduces(compiler):
     k = Field("k")
     data = np.arange(6.0).reshape(2, 3)
@@ -318,7 +342,7 @@ def test_transposed_fold_broadcasts_and_reduces(compiler):
         )
     )
     program = lower(plan, {A: source, C: output})
-    result = compiler()(program).main(source, output)
+    result = compiler()(program).main(*with_workspaces(program, source, output))
     finch_assert_equal(
         result[0].to_numpy(), 1 + np.broadcast_to(data.sum(axis=0)[:, None], (3, 4))
     )
@@ -337,7 +361,7 @@ def test_overwriting_with_an_empty_reduction_keeps_values(compiler, n):
         )
     )
     program = lower(plan, {A: source, C: output})
-    result = compiler()(program).main(source, output)
+    result = compiler()(program).main(*with_workspaces(program, source, output))
     # Overwriting along j keeps the last value, and an empty j writes nothing.
     expected = data[:, -1] if n else np.array([1.0, 2.0])
     finch_assert_equal(result[0].to_numpy(), expected)
@@ -356,7 +380,17 @@ def test_guarded_overwrite_keeps_previous_values_for_julia():
     assert resets(Table(A, (i, j)), (i, j)) == set()
 
 
-def test_sparse_transpose():
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        pytest.param(NotationCompiler, id="assembly"),
+        pytest.param(lambda: NotationCompiler(NumbaCompiler()), id="numba"),
+        pytest.param(
+            lambda: NotationCompiler(CCompiler()), id="c", marks=pytest.mark.c_backend
+        ),
+    ],
+)
+def test_sparse_transpose(compiler):
     import scipy.sparse as sps
 
     data = np.array([[0.0, 1.0, 0.0], [2.0, 0.0, 3.0]])
@@ -367,7 +401,7 @@ def test_sparse_transpose():
     plan = Plan((transpose, Produces((C,))))
     CompilerFormLowerer(capture)(plan, {A: source.ftype, C: output.ftype}, {}, None)
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
-    result = NotationCompiler()(program).main(source, output)
+    result = compiler()(program).main(*with_workspaces(program, source, output))
     finch_assert_equal(result[0].to_scipy().toarray(), data.T)
 
 

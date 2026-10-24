@@ -22,6 +22,8 @@ from finch.symbolic import Reflector
 from finch.symbolic.gensym import SymbolGenerator
 from finch.tensor import BufferizedNDArray
 
+from .utils import with_workspaces
+
 
 def test_fused_alias_node():
     alias = lgc.HardAlias("scratch")
@@ -301,7 +303,9 @@ def test_fused_alias_compilation(compiler, n):
     bindings[scratch] = capture.last_bindings[scratch].construct((2, 2))
     bindings[materialized] = capture.last_bindings[materialized].construct((2, 2))
     bindings[out] = capture.last_bindings[out].construct((2, 2))
-    result, intermediate = compiler()(program).main(*bindings.values())
+    result, intermediate = compiler()(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
     np.testing.assert_array_equal(result.to_numpy(), (data_a @ data_b).T)
     np.testing.assert_array_equal(intermediate.to_numpy(), data_a @ data_b)
 
@@ -406,7 +410,9 @@ def test_compiling_a_redefined_view(compiler, n):
         (out2, (3, 2)),
     ):
         bindings[var] = capture.last_bindings[var].construct(shape)
-    result, result2 = compiler()(program).main(*bindings.values())
+    result, result2 = compiler()(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
     np.testing.assert_array_equal(result.to_numpy(), data.T)
     np.testing.assert_array_equal(result2.to_numpy(), 2 * data.T)
 
@@ -496,7 +502,7 @@ def test_fuse_compilation_uses_a_workspace(compiler):
     program = NotationGenerator()(plan, ftypes, {}, None)
     # The workspace is reset for each row, and the output only once.
     assert declare_depths(program) == {"w": [1], "c": [0]}
-    (result,) = compiler()(program).main(*bindings.values())
+    (result,) = compiler()(program).main(*with_workspaces(program, *bindings.values()))
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
     assert bindings[w].shape == (2,)
 
@@ -547,7 +553,7 @@ def test_fuse_compilation_with_full_storage(compiler):
     program = NotationGenerator()(capture.last_prgm, capture.last_bindings, {}, None)
     for var in (w, c):
         bindings[var] = capture.last_bindings[var].construct((0, 0))
-    (result,) = compiler()(program).main(*bindings.values())
+    (result,) = compiler()(program).main(*with_workspaces(program, *bindings.values()))
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
 
 
@@ -608,7 +614,9 @@ def test_nested_fuse_with_scalar_workspaces(compiler):
     }
     CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
     program = NotationGenerator()(plan, ftypes, {}, None)
-    result_c, result_d = compiler()(program).main(*bindings.values())
+    result_c, result_d = compiler()(program).main(
+        *with_workspaces(program, *bindings.values())
+    )
     np.testing.assert_array_equal(result_c.to_numpy(), 2 * data)
     np.testing.assert_array_equal(result_d.to_numpy(), 3 * data)
 
@@ -830,7 +838,7 @@ def test_fuse_nodes_give_the_loop_order(compiler):
     program = NotationGenerator()(plan, ftypes, {}, None)
     # The workspace is reset in each row, before the loop which reduces j.
     assert declare_depths(program) == {"w": [1], "c": [0]}
-    (result,) = compiler()(program).main(*bindings.values())
+    (result,) = compiler()(program).main(*with_workspaces(program, *bindings.values()))
     np.testing.assert_array_equal(result.to_numpy(), data_a @ data_b)
 
 
@@ -873,7 +881,7 @@ def test_fused_overwrite_resets_once(compiler, columns):
     }
     CompilerForm.validate_inputs(plan, ftypes, {}, DenseStatsFactory())
     program = NotationGenerator()(plan, ftypes, {}, None)
-    (result,) = compiler()(program).main(*bindings.values())
+    (result,) = compiler()(program).main(*with_workspaces(program, *bindings.values()))
     expected = data[:, -1] if columns else np.full(2, 7.0)
     np.testing.assert_array_equal(result.to_numpy(), expected)
 

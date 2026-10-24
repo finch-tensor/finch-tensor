@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Any, cast
+
+import numpy as np
 
 from finch import finch_logic as lgc
 from finch import finch_notation as ntn
@@ -25,8 +27,16 @@ from finch.finch_logic import (
 )
 from finch.finch_notation import NotationInterpreter
 from finch.finch_notation.stages import NotationLoader
-from finch.symbolic import CompilerMode, gensym
+from finch.symbolic import (
+    CompilerMode,
+    Fixpoint,
+    PostWalk,
+    Rewrite,
+    TermTree,
+    gensym,
+)
 from finch.symbolic.traversal import PostOrderDFS
+from finch.tensor.patterns import EyeTensor
 from finch.util.logging import LOG_NOTATION
 
 from .stages import CompilerForm, FormattedForm, LogicNotationLowerer
@@ -89,9 +99,6 @@ class FusedLoop:
     hoisted: list[ntn.NotationStatement] = field(default_factory=list)
     # The modes of the tensors which hoisted statements declare.
     modes: dict[lgc.Alias, ntn.AccessMode] = field(default_factory=dict)
-    revisits: list[tuple[ntn.Variable, ntn.NotationExpression, ntn.Variable]] = field(
-        default_factory=list
-    )
 
 
 def merge_shapes(a: ntn.Variable | None, b: ntn.Variable | None) -> ntn.Variable | None:
@@ -360,86 +367,10 @@ class NotationContext:
             stmts += reset
         else:
             self.hoist(level, var, reset)
-        match arg:
-            case lgc.Table():
-                body = self._lower_query_of_table(var, op, arg, idxs, loop_order)
-            case _:
-                body = self._lower_query_of_aggregate(var, op, arg, idxs, loop_order)
+        body = self._lower_query(var, op, arg, idxs, loop_order)
         return ntn.Block((*stmts, body))
 
-    def _lower_query_of_table(
-        self,
-        query_lhs: lgc.Alias,
-        op: FinchOperator,
-        arg: lgc.Table,
-        output_idxs: tuple[lgc.Field, ...],
-        loop_order: tuple[lgc.Field, ...],
-    ):
-        # The table is broadcast over the fields only the output has.
-        arg_dims = arg.dimmap(merge_shapes, self.shapes)
-        shapes_map = {
-            **dict(zip(output_idxs, self.shapes[query_lhs], strict=True)),
-            **dict(zip(arg.idxs, arg_dims, strict=True)),
-        }
-        shapes = {
-            idx: shapes_map.get(idx) or ntn.Literal(ftypes.intp(1))
-            for idx in loop_order
-        }
-        arg_types = arg.shape_type(self.shape_types)
-        shape_type_map = {
-            **dict(zip(output_idxs, self.shape_types[query_lhs], strict=True)),
-            **dict(zip(arg.idxs, arg_types, strict=True)),
-        }
-        shape_type = {idx: shape_type_map.get(idx) or ftypes.intp for idx in loop_order}
-        # Visit the output in loop order. Revisit an input field with a fresh
-        # index when its storage order conflicts, restricting that loop to the
-        # original index below. This keeps sparse reads and writes concordant.
-        loop_idxs = []
-        remap_idxs = {}
-        read_idxs = []
-        pending = iter(arg.idxs)
-        read_idx = next(pending, None)
-        for idx in loop_order:
-            loop_idxs.append(idx)
-            if idx == read_idx:
-                read_idxs.append(idx)
-                read_idx = next(pending, None)
-            while read_idx is not None and read_idx in loop_idxs:
-                new_idx = lgc.Field(gensym(f"{read_idx.name}_"))
-                remap_idxs[new_idx] = read_idx
-                loop_idxs.append(new_idx)
-                read_idxs.append(new_idx)
-                read_idx = next(pending, None)
-        assert read_idx is None
-        # Every field of the loop order is fused, so the enclosing fused loops
-        # iterate over them already, and only the revisits need new indices.
-        fused = {loop.idx: loop.var for loop in self.fused}
-        loops = {idx: fused[idx] for idx in loop_order}
-        for new_idx, idx in remap_idxs.items():
-            loops[new_idx] = ntn.Variable(gensym(new_idx.name), shape_type[idx])
-        ctx = PointwiseContext(self)
-        rhs = ctx(lgc.Table(arg.tns, tuple(read_idxs)), loops)
-        lhs_access = ntn.Access(
-            self.slots[query_lhs],
-            ntn.Update(ntn.Literal(op)),
-            tuple(loops[idx] for idx in self.stored_idxs(query_lhs, output_idxs)),
-        )
-        # A transposed read revisits a field after its predecessor in storage
-        # order, before any deeper enclosing Fuse loops.
-        for new_idx, idx in reversed(remap_idxs.items()):
-            stop = shapes[idx]
-            ext = ntn.Call(
-                ntn.Literal(make_extent),
-                (ntn.Literal(stop.result_type(0)), stop),
-            )
-            preceding = loop_idxs[: loop_idxs.index(new_idx)]
-            parent = next(
-                loop for loop in reversed(self.fused) if loop.idx in preceding
-            )
-            parent.revisits.insert(0, (loops[new_idx], ext, loops[idx]))
-        return ntn.Increment(lhs_access, rhs)
-
-    def _lower_query_of_aggregate(
+    def _lower_query(
         self,
         query_lhs: lgc.Alias,
         agg_op: FinchOperator,
@@ -577,17 +508,13 @@ class NotationContext:
                     stmts += self.thaw(var, op)
         self.fused.pop()
         ext = ntn.Call(ntn.Literal(make_extent), (ntn.Literal(dim.result_type(0)), dim))
-        inner: ntn.NotationStatement = ntn.Block(tuple(stmts))
-        for var, extent, original in reversed(loop.revisits):
-            cond = ntn.Call(ntn.Literal(ffuncs.eq), (var, original))
-            inner = ntn.Loop(var, extent, ntn.If(cond, inner))
         # Hoisted declarations may read the frozen tensors in their inits.
         return ntn.Block(
             (
                 *frozen,
                 *loop.hoisted,
                 *checks,
-                ntn.Loop(loop.var, ext, inner),
+                ntn.Loop(loop.var, ext, ntn.Block(tuple(stmts))),
             )
         )
 
@@ -756,7 +683,13 @@ class NotationGenerator(LogicNotationLowerer):
             epilogue=epilogue,
             mode=self.mode,
         )
-        body = ctx(term)
+        # Concordization may add diagonal masks, which the kernel takes as
+        # workspaces after its bindings.
+        body, masks = concordize(ntn.Block((*preamble, ctx(term))), self.mode)
+        mask_args = tuple(
+            ntn.Variable(gensym("eye"), mask.result_type) for mask in masks
+        )
+        func_args = (*args.values(), *mask_args)
         ret_t = None
         for node in PostOrderDFS(body):
             match node:
@@ -770,12 +703,12 @@ class NotationGenerator(LogicNotationLowerer):
                         "main",
                         AssemblyKernelFType(
                             "main",
-                            tuple(arg.result_type for arg in args.values()),
+                            tuple(arg.result_type for arg in func_args),
                             ret_t,
                         ),
                     ),
-                    tuple(args.values()),
-                    ntn.Block((*preamble, body)),
+                    func_args,
+                    ntn.Block((*map(ntn.Unpack, masks, mask_args), body)),
                 ),
             )
         )
@@ -809,181 +742,249 @@ class LogicCompiler(CompilerForm, LogicLoader):
         mod = self.ctx_lower(prgm, bindings, stats, stats_factory)
         logger.debug(mod)
         lib = self.ctx_load(mod)
-        return lib, bindings
+        workspaces = mod.funcs[0].args[len(bindings) :]
+        return lib, {
+            **bindings,
+            **{lgc.HardAlias(arg.name): arg.result_type for arg in workspaces},
+        }
 
-struct DepthCalculator
-    rec
-end
 
-depth_calculator(root) = DepthCalculator(DepthCalculatorVisitor()(root))
+class DepthCalculator:
+    def __init__(self, rec: dict[ntn.Variable, int]):
+        self.rec = rec
 
-function (ctx::DepthCalculator)(node::FinchNode)
-    maximum(node -> get(ctx.rec, node, 0), PostOrderDFS(node))
-end
-
-@kwdef struct DepthCalculatorVisitor
-    depth = 1
-    rec = Dict()
-end
-
-function (ctx::DepthCalculatorVisitor)(node::FinchNode)
-    if node.kind === loop
-        ctx(node.ext)
-        ctx.rec[node.idx] = ctx.depth
-        ctx_2 = DepthCalculatorVisitor(; depth=(ctx.depth + 1), rec=ctx.rec)
-        ctx_2(node.body)
-    elseif node.kind === define
-        ctx.rec[node.lhs] = ctx.depth
-        ctx(node.body)
-    elseif istree(node)
-        for child in children(node)
-            ctx(child)
-        end
-    end
-    return ctx.rec
-end
-
-struct ConcordizeVisitor
-    ctx
-    scope
-end
-
-freshen(ctx::ConcordizeVisitor, tags...) = freshen(ctx.ctx, tags...)
-
-function (ctx::ConcordizeVisitor)(node::FinchNode)
-    function isbound(x::FinchNode)
-        if isconstant(x) || x in ctx.scope
-            return true
-        elseif @capture x access(~tns, ~mode, ~idxs...)
-            return getroot(tns) in ctx.scope && all(isbound, idxs)
-        elseif istree(x)
-            return all(isbound, arguments(x))
-        else
-            return false
-        end
-    end
-    isboundindex(x) = isindex(x) && isbound(x)
-    isboundnotindex(x) = !isindex(x) && isbound(x)
-
-    selects = []
-
-    if node.kind === loop || node.kind === assign || node.kind === define ||
-        node.kind === sieve
-        node = Rewrite(
-            Postwalk(
-                Fixpoint(
-                    @rule access(
-                        ~tns, ~mode, ~i..., ~j::isboundnotindex, ~k::All(isboundindex)...
-                    ) => begin
-                        j_2 = index(freshen(ctx, :s))
-                        push!(selects, j_2 => j)
-                        push!(ctx.scope, j_2)
-                        access(tns, mode, i..., j_2, k...)
-                    end
-                ),
+    def __call__(self, node: ntn.NotationNode) -> int:
+        return max(
+            (
+                self.rec.get(x, 0)
+                for x in PostOrderDFS(node)
+                if isinstance(x, ntn.Variable)
             ),
-        )(
-            node
+            default=0,
         )
-    end
 
-    if node.kind === loop
-        ctx_2 = ConcordizeVisitor(ctx.ctx, union(ctx.scope, [node.idx]))
-        node = loop(node.idx, node.ext, ctx_2(node.body))
-    elseif node.kind === define
-        ctx_2 = ConcordizeVisitor(ctx.ctx, union(ctx.scope, [node.lhs]))
-        node = define(node.lhs, node.rhs, ctx_2(node.body))
-    elseif node.kind === declare
-        push!(ctx.scope, node.tns)
-    elseif istree(node)
-        node = similarterm(node, operation(node), map(ctx, children(node)))
-    end
 
-    for (select_idx, idx_ex) in reverse(selects)
-        var = variable(freshen(ctx, :v))
+def depth_calculator(root: ntn.NotationNode) -> DepthCalculator:
+    return DepthCalculator(DepthCalculatorVisitor()(root))
 
-        node = define(var, idx_ex, loop(select_idx, VirtualExtent(var, var), node))
-    end
 
-    node
-end
+@dataclass
+class DepthCalculatorVisitor:
+    depth: int = 1
+    rec: dict[ntn.Variable, int] = field(default_factory=dict)
 
-"""
-    concordize(ctx, root)
+    def __call__(self, node: Any) -> dict[ntn.Variable, int]:
+        match node:
+            case ntn.Loop(idx, ext, body):
+                self(ext)
+                self.rec[idx] = self.depth
+                ctx_2 = DepthCalculatorVisitor(depth=self.depth + 1, rec=self.rec)
+                ctx_2(body)
+            case ntn.Assign(lhs, rhs):
+                self.rec[lhs] = self.depth
+                self(rhs)
+            case TermTree():
+                for child in node.children:
+                    self(child)
+        return self.rec
 
-A raw index is an index expression consisting of a single index node (i.e.
-`A[i]` as opposed to `A[i + 1]`). A Finch program is concordant when all indices
-are raw and column major with respect to the program loop ordering.  The
-`concordize` transformation ensures that tensor indices are concordant by
-inserting loops and lifting index expressions or transposed indices into the
-loop bounds.
 
-For example,
+@dataclass
+class ConcordizeContext:
+    """The loop indices and their extents, and the diagonal masks which
+    restrict the selected indices, one for each dimension."""
 
-```
-@finch for i = :
-    b[] += A[f(i)]
-end
-```
-becomes
-```
-@finch for i = :
-    t = f(i)
-    for s = t:t
-        b[] += A[s]
-    end
-end
-```
-
-and
-
-```
-@finch for i = :, j = :
-    b[] += A[i, j]
-end
-```
-becomes
-```
-@finch for i = :, j = :, s = i:i
-    b[] += A[s, j]
-end
-```
-"""
-function concordize(ctx::AbstractCompiler, root)
-    depth = depth_calculator(root)
-    if issafe(get_mode_flag(ctx))
-        for node in PostOrderDFS(root)
-            if @capture node access(~tns, ~mode, ~i...)
-                for n in 1:length(i)
-                    if 1 <= depth(i[n]) < maximum(depth.(i[(n + 1):end]); init=0)
-                        push_preamble!(
-                            ctx,
-                            quote
-                                @warn(
-                                    "Performance Warning: non-concordant traversal of $($(sprint(Finch.FinchNotation.display_expression, MIME"text/plain"(), node))) (hint: most arrays prefer column major or first index fast, run in fast mode to ignore this warning)"
-                                )
-                            end,
-                        )
-                    end
-                end
-            end
-        end
-    end
-    root = Rewrite(
-        Postwalk(
-            Fixpoint(
-                @rule access(~tns, ~mode, ~i..., ~j::isindex, ~k...) => begin
-                    if depth(j) <= maximum(depth.(k); init=0)
-                        access(~tns, ~mode, ~i..., call(identity, j), ~k...)
-                    end
-                end
-            ),
-        ),
-    )(
-        root
+    indices: set[ntn.NotationExpression]
+    extents: dict[ntn.NotationExpression, ntn.Call]
+    masks: dict[ntn.NotationExpression, ntn.Slot] = field(default_factory=dict)
+    # A loop unfurls the masks which it indexes, so it declares them first.
+    declares: dict[ntn.NotationExpression, dict[ntn.Slot, ntn.NotationExpression]] = (
+        field(default_factory=dict)
     )
-    tnss = unique([
-        getroot(node.tns) for node in PostOrderDFS(root) if node.kind === access
-    ])
-    ConcordizeVisitor(ctx, tnss)(root)
-end
+
+    def mask(self, dim: ntn.NotationExpression) -> ntn.Slot:
+        if dim not in self.masks:
+            eye = EyeTensor((0, 0), dtype=np.bool_)
+            self.masks[dim] = ntn.Slot(gensym("_eye"), eye.ftype)
+        return self.masks[dim]
+
+
+def declare_mask(
+    mask: ntn.Slot, dim: ntn.NotationExpression
+) -> tuple[ntn.NotationStatement, ...]:
+    op = ntn.Literal(ffuncs.overwrite)
+    fill = ntn.Literal(mask.result_type.fill_type.value)
+    return (ntn.Declare(mask, fill, op, (dim, dim)), ntn.Freeze(mask, op))
+
+
+class ConcordizeVisitor:
+    def __init__(self, ctx: ConcordizeContext, scope: set[ntn.NotationExpression]):
+        self.ctx = ctx
+        self.scope = scope
+
+    def isbound(self, x: Any) -> bool:
+        match x:
+            case ntn.Literal():
+                return True
+            case ntn.Variable() | ntn.Slot():
+                return x in self.scope
+            case ntn.Access(tns, _, idxs):
+                return tns in self.scope and all(map(self.isbound, idxs))
+            case TermTree():
+                return all(map(self.isbound, x.children))
+        return False
+
+    def isboundindex(self, x: ntn.NotationExpression) -> bool:
+        return x in self.ctx.indices and self.isbound(x)
+
+    def isboundnotindex(self, x: ntn.NotationExpression) -> bool:
+        return x not in self.ctx.indices and self.isbound(x)
+
+    def __call__(self, node: Any) -> Any:
+        selects = []
+
+        # Select the first bound expression after the bound indices of an
+        # access with a fresh index.
+        def select(x):
+            match x:
+                case ntn.Access(tns, mode, idxs):
+                    for n, j in enumerate(idxs):
+                        if self.isboundnotindex(j):
+                            j_2 = ntn.Variable(gensym("s"), j.result_type)
+                            selects.append((j_2, j, tns, n))
+                            self.scope.add(j_2)
+                            self.ctx.indices.add(j_2)
+                            return ntn.Access(
+                                tns, mode, (*idxs[:n], j_2, *idxs[n + 1 :])
+                            )
+                        if not self.isboundindex(j):
+                            break
+            return None
+
+        match node:
+            case ntn.Loop() | ntn.Increment() | ntn.Assign() | ntn.If():
+                node = Rewrite(PostWalk(Fixpoint(select)))(node)
+
+        match node:
+            case ntn.Loop(idx, ext, body):
+                ctx_2 = ConcordizeVisitor(self.ctx, self.scope | {idx})
+                node = ntn.Loop(idx, ext, ctx_2(body))
+                declares = self.ctx.declares.pop(idx, {})
+                if declares:
+                    stmts = (
+                        stmt
+                        for mask, dim in declares.items()
+                        for stmt in declare_mask(mask, dim)
+                    )
+                    node = ntn.Block((*stmts, node))
+            case ntn.Assign(var, _) | ntn.Declare(var, _, _, _):
+                self.scope.add(var)
+            case TermTree():
+                node = node.make_term(node.head(), *map(self, node.children))
+
+        # Each selected index iterates over the extent of its expression, where
+        # it agrees with the expression on the diagonal of a mask.
+        for select_idx, idx_ex, tns, n in reversed(selects):
+            stmts: tuple[ntn.NotationStatement, ...] = ()
+            match idx_ex:
+                case ntn.Call(ntn.Literal(ffuncs.identity), (var,)) if (
+                    var in self.ctx.extents
+                ):
+                    ext = self.ctx.extents[var]
+                    dim = ext.args[1]
+                    mask = self.ctx.mask(dim)
+                    self.ctx.declares.setdefault(var, {})[mask] = dim
+                case _:
+                    var = ntn.Variable(gensym("v"), idx_ex.result_type)
+                    dim = ntn.Dimension(tns, ntn.Literal(n))
+                    ext = ntn.Call(
+                        ntn.Literal(make_extent),
+                        (ntn.Literal(select_idx.result_type(0)), dim),
+                    )
+                    mask = self.ctx.mask(dim)
+                    stmts = (ntn.Assign(var, idx_ex), *declare_mask(mask, dim))
+            cond = ntn.Unwrap(ntn.Access(mask, ntn.Read(), (var, select_idx)))
+            node = ntn.Block((*stmts, ntn.Loop(select_idx, ext, ntn.If(cond, node))))
+
+        return node
+
+
+def concordize(
+    root: ntn.NotationStatement, mode: CompilerMode
+) -> tuple[ntn.NotationStatement, list[ntn.Slot]]:
+    """
+    A raw index is an index expression consisting of a single index node (i.e.
+    `A[i]` as opposed to `A[i + 1]`). A Finch program is concordant when all
+    indices are raw and row major with respect to the program loop ordering.
+    The `concordize` transformation ensures that tensor indices are concordant
+    by inserting loops over selected indices, which a diagonal mask restricts
+    to the lifted index expressions or transposed indices. It returns the
+    masks, which the program takes as workspaces.
+
+    For example,
+
+    ```
+    for i in extent(0, n):
+        b[] += A[f(i)]
+    ```
+    becomes
+    ```
+    for i in extent(0, n):
+        v = f(i)
+        for s in extent(0, dim(A, 0)):
+            if eye[v, s]:
+                b[] += A[s]
+    ```
+
+    and
+
+    ```
+    for i in extent(0, n):
+        for j in extent(0, m):
+            b[] += A[j, i]
+    ```
+    becomes
+    ```
+    for i in extent(0, n):
+        for j in extent(0, m):
+            for s in extent(0, n):
+                if eye[i, s]:
+                    b[] += A[j, s]
+    ```
+    """
+    depth = depth_calculator(root)
+    if mode.safe:
+        for node in PostOrderDFS(root):
+            match node:
+                case ntn.Access(_, _, idxs):
+                    for n, idx in enumerate(idxs):
+                        if 1 <= depth(idx) < max(map(depth, idxs[:n]), default=0):
+                            logger.warning(
+                                "Performance Warning: non-concordant traversal of "
+                                "%s (hint: most arrays prefer row major or last "
+                                "index fast, run in fast mode to ignore this "
+                                "warning)",
+                                node,
+                            )
+    extents: dict[ntn.NotationExpression, ntn.Call] = {}
+    for node in PostOrderDFS(root):
+        match node:
+            case ntn.Loop(idx, ntn.Call() as ext, _):
+                extents[idx] = ext
+
+    def transpose(node):
+        match node:
+            case ntn.Access(tns, mode, idxs):
+                for n, j in enumerate(idxs):
+                    if j in extents and depth(j) <= max(
+                        map(depth, idxs[:n]), default=0
+                    ):
+                        j_2 = ntn.Call(ntn.Literal(ffuncs.identity), (j,))
+                        return ntn.Access(tns, mode, (*idxs[:n], j_2, *idxs[n + 1 :]))
+        return None
+
+    root = Rewrite(PostWalk(Fixpoint(transpose)))(root)
+    tnss = {node.tns for node in PostOrderDFS(root) if isinstance(node, ntn.Access)}
+    ctx = ConcordizeContext(set(extents), extents)
+    root = ConcordizeVisitor(ctx, tnss)(root)
+    return root, list(ctx.masks.values())

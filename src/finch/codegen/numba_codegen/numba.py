@@ -35,7 +35,6 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {
-    "scansearch": numba.njit(ffuncs.scansearch._func),
     "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
 }
 
@@ -109,8 +108,6 @@ def numba_function_name(op, ctx, *args: Any) -> str:
             return "min"
         case ffuncs._MaxFType():
             return "max"
-        case ffuncs._ScansearchFType():
-            return "scansearch"
         case ffuncs._ResizeIfSmallerFType():
             return "resize_if_smaller"
         case NumbaOperator():
@@ -254,12 +251,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return numba_binary_function_call(numba_name, ctx, *args)
         case ffuncs._NotFType() | ffuncs._InvertFType():
             return numba_unary_function_call(numba_name, ctx, *args)
-        case (
-            ffuncs._MinFType()
-            | ffuncs._MaxFType()
-            | ffuncs._ScansearchFType()
-            | ffuncs._ResizeIfSmallerFType()
-        ):
+        case ffuncs._MinFType() | ffuncs._MaxFType() | ffuncs._ResizeIfSmallerFType():
             return numba_call_function_call(numba_name, ctx, *args)
         case _:
             raise TypeError(f"{op} has no Numba representation.")
