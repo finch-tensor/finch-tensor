@@ -194,7 +194,7 @@ def test_folding_into_a_tensor_without_initializing_it_thaws_it():
     [
         (QueryInto(Table(C, (i,)), OVERWRITE, Literal(0.0)), True),
         (fold(Table(C, (i,)), ADD, Table(A, (i, j)), (i, j)), True),
-        # A transpose has a loop order, which visits the lhs in order.
+        # A transpose has a loop order, which may visit its tables in any order.
         (fold(Table(D, (j, i)), OVERWRITE, Table(A, (i, j)), (j, i)), True),
         (QueryInto(Table(C, (i,)), OVERWRITE, Table(A, (j, i))), False),
         (QueryInto(Table(C, (i,)), ADD, Table(A, (i, j))), False),
@@ -242,9 +242,9 @@ def test_folding_into_a_tensor_without_initializing_it_thaws_it():
             ),
             False,
         ),
-        # Folds need a loop order, which visits the output in order.
+        # Folds need a loop order, which may write the output out of order.
         (QueryInto(Table(C, (i,)), ADD, MapJoin(ADD, (Table(A, (i, j)),))), False),
-        (fold(Table(D, (j, i)), ADD, Table(A, (i, j)), (i, j)), False),
+        (fold(Table(D, (j, i)), ADD, Table(A, (i, j)), (i, j)), True),
     ],
 )
 def test_compiler_form(stmt, valid):
