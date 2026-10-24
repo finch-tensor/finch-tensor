@@ -3214,9 +3214,7 @@ def test_estimate_non_fill_values_over_distinct_values(fields):
     # values of the indices it doesn't fix: three rows and five columns.
     stats = VPStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
     expected = {(_OVER_I,): 5, (_OVER_J,): 3, (_OVER_I, _OVER_J): 1}
-    assert stats.estimate_non_fill_values(over=fields) == expected.get(
-        tuple(fields), 7
-    )
+    assert stats.estimate_non_fill_values(over=fields) == expected.get(tuple(fields), 7)
     assert stats.estimate_non_fill_values(over=fields) >= _largest_slice(fields)
 
 
