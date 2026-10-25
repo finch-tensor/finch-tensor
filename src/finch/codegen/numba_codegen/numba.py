@@ -7,6 +7,7 @@ import numpy as np
 
 import numba
 import numba.core.types
+from numba.experimental.jitclass.base import JitClassType
 
 from finch import algebra
 from finch import finch_assembly as asm
@@ -35,7 +36,6 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
-numba_structnames = Namespace()
 
 
 @numba.njit
@@ -385,7 +385,8 @@ def assembly_struct_numba_type(ftype_: StructFType) -> type:
         (name, numba_jitclass_type(field_type))
         for (name, field_type) in ftype_.struct_fields
     ]
-    class_name = numba_structnames.freshen("Numba", ftype_.struct_name)
+    # Generated code names the class itself, see NumbaContext.struct_name.
+    class_name = f"Numba_{ftype_.struct_name}"
     # Dynamically define __init__ based on spec, unrolling the arguments
     field_names = [name for name, _ in spec]
     # Build the argument list for __init__
@@ -398,16 +399,12 @@ def assembly_struct_numba_type(ftype_: StructFType) -> type:
         class {class_name}:
             def __init__(self, {arg_list}):
                 {body if body else "pass"}
-            @staticmethod
-            def numba_name():
-                return '{class_name}'
         """
     )
     ns: dict[str, type] = {}
     exec(class_src, ns)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[ftype_] = new_struct
-    numba_globals[new_struct.__name__] = new_struct
     # logger.debug(f"Numba class:\njitclass({spec})\n{class_src}")
     return new_struct
 
@@ -636,9 +633,10 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
     def lower(
         self, prgm: asm.Module, *, mode: CompilerMode | None = None
     ) -> NumbaLibrary:
-        numba_code = self.ctx(prgm, mode=mode).code
+        code = self.ctx(prgm, mode=mode)
+        numba_code = code.code
         logger.debug(f"Executing Numba code:\n{numba_code}")
-        _globals = {**globals(), **numba_globals}
+        _globals = {**globals(), **numba_globals, **code.structs}
         try:
             exec(numba_code, _globals, None)
         except Exception as e:
@@ -671,7 +669,8 @@ class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
         if ctx.mode.debug:
             ctx.namespace = Namespace(prgm)
         ctx(prgm)
-        return NumbaCode(ctx.emit_global())
+        structs = {name: cls for cls, name in ctx.structs.items()}
+        return NumbaCode(ctx.emit_global(), structs)
 
 
 class NumbaContext(Context):
@@ -687,6 +686,7 @@ class NumbaContext(Context):
         self.indent = indent
         self.types = types
         self.slots = slots
+        self.structs: dict[Any, str] = {}
 
         self.imports = [
             "import _operator, builtins",
@@ -715,6 +715,7 @@ class NumbaContext(Context):
         blk.tab = self.tab
         blk.types = self.types
         blk.slots = self.slots
+        blk.structs = self.structs
         return blk
 
     def subblock(self):
@@ -741,10 +742,20 @@ class NumbaContext(Context):
             case _:
                 raise ValueError(f"Expected Slot, got: {type(node)}")
 
-    @staticmethod
-    def full_name(val: Any) -> str:
+    def struct_name(self, cls: JitClassType) -> str:
+        # Structs are numbered per module, so the code doesn't depend on which
+        # jitclasses were made before.
+        name = self.structs.get(cls)
+        if name is None:
+            name = self.freshen(cls.__name__)
+            self.structs[cls] = name
+        return name
+
+    def full_name(self, val: Any) -> str:
         if isinstance(val, algebra.ftypes.FType):
             val = numba_type(val)
+        if isinstance(val, JitClassType):
+            return self.struct_name(val)
         if hasattr(val, "numba_name"):
             return val.numba_name()
         if hasattr(val, "name"):

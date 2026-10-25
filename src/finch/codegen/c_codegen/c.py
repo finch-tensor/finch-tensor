@@ -568,7 +568,6 @@ def c_type(t: FType) -> Any:
 
 
 c_structs: dict[Any, Any] = {}
-c_structnames = Namespace()
 
 
 def struct_c_type(fmt: StructFType):
@@ -583,8 +582,9 @@ def struct_c_type(fmt: StructFType):
     # Empty mutable structs still need storage for their pointer representation.
     if not fields:
         fields = [("_padding", ctypes.c_ubyte)]
+    # Generated code names the struct itself, see CContext.ctype_name.
     new_struct = type(
-        c_structnames.freshen("C", fmt.struct_name),
+        f"C_{fmt.struct_name}",
         (ctypes.Structure,),
         {"_fields_": fields},
     )
@@ -703,6 +703,7 @@ class CContext(Context):
         if fptr is None:
             fptr = {}
         self.fptr = fptr
+        self.structs: dict[Any, str] = {}
         self.types = types
         self.slots = slots
         self.buffer_methods: dict[Any, Any] = {}
@@ -732,17 +733,22 @@ class CContext(Context):
             and isinstance(t, type)
             and issubclass(t, ctypes.Structure)
         ):  # type: ignore[attr-defined]
-            name = t.__name__
-            args = [
-                f"{self.ctype_name(f_type)} {f_name}"
-                for (f_name, f_type, *_) in t._fields_
-            ]
-            header = (
-                f"struct {name} {{\n"
-                + "\n".join(f"{self.tab}{arg};" for arg in args)
-                + "\n};"
-            )
-            self.add_header(header)
+            # Structs are numbered per module, so the code doesn't depend on
+            # which ctypes structs were made before.
+            name = self.structs.get(t)
+            if name is None:
+                name = self.freshen(t.__name__)
+                self.structs[t] = name
+                args = [
+                    f"{self.ctype_name(f_type)} {f_name}"
+                    for (f_name, f_type, *_) in t._fields_
+                ]
+                header = (
+                    f"struct {name} {{\n"
+                    + "\n".join(f"{self.tab}{arg};" for arg in args)
+                    + "\n};"
+                )
+                self.add_header(header)
             return f"struct {name}"
         if (
             hasattr(ctypes, "_Pointer")
@@ -783,6 +789,7 @@ class CContext(Context):
         blk.types = self.types
         blk.slots = self.slots
         blk.fptr = self.fptr
+        blk.structs = self.structs
         return blk
 
     def subblock(self):
