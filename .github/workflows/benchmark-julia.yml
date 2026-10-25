@@ -18,4 +18,9 @@ jobs:
         run: pixi run benchmark-julia -vvv -m "not slow"
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
