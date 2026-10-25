@@ -4746,6 +4746,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.symbolic.dataflow.DataFlowAnalysis.boundary_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        boundary_state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.symbolic.dataflow.DataFlowAnalysis.direction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5901,6 +5912,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#finch.symbolic.dataflow.DataFlowAnalysis.boundary_state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        boundary_state
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#finch.symbolic.dataflow.DataFlowAnalysis.direction" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6025,9 +6047,7 @@ order; no internal branching occurs within a BasicBlock.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 5</span>
-<span class="normal"> 6</span>
-<span class="normal"> 7</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
 <span class="normal">10</span>
@@ -6064,7 +6084,9 @@ order; no internal branching occurs within a BasicBlock.</p>
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
-<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BasicBlock</span><span class="p">:</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BasicBlock</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Linear sequence of statements with a single entry and exit.</span>
 
 <span class="sd">    Successor/predecessor lists encode the CFG edges. Statements execute in</span>
@@ -6136,9 +6158,7 @@ order; no internal branching occurs within a BasicBlock.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
@@ -6152,7 +6172,9 @@ order; no internal branching occurs within a BasicBlock.</p>
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
-<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""String representation of BasicBlock in LLVM style."""</span>
     <span class="n">lines</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -6211,9 +6233,7 @@ block mapping used by dataflow analyses.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
@@ -6246,7 +6266,9 @@ block mapping used by dataflow analyses.</p>
 <span class="normal">79</span>
 <span class="normal">80</span>
 <span class="normal">81</span>
-<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ControlFlowGraph</span><span class="p">:</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ControlFlowGraph</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Collection of BasicBlocks plus explicit ENTRY and EXIT nodes.</span>
 
 <span class="sd">    Provides helpers to allocate uniquely named blocks and holds the global</span>
@@ -6314,13 +6336,13 @@ block mapping used by dataflow analyses.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">78</span>
 <span class="normal">79</span>
 <span class="normal">80</span>
 <span class="normal">81</span>
-<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Print the CFG in LLVM style format."""</span>
     <span class="n">blocks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
 
@@ -6362,13 +6384,20 @@ block mapping used by dataflow analyses.</p>
 <p>This abstract class implements a generic work-list algorithm that can run either
 in a "forward" or "backward" direction. Subclasses must provide IR-specific
 semantics by implementing the abstract methods: transfer, join, stmt_str and
-direction.</p>
+direction, and may override boundary_state.</p>
+<p>only blocks reachable from the boundary block (ENTRY for forward, EXIT for
+backward) are visited, and joins skip neighbors that weren't processed yet.
+so loops start optimistic and dead blocks (e.g. after a <code>return</code>) never get
+joined in. <code>transfer</code> must not mutate its input.</p>
+<p>blocks are visited in reverse postorder, so a block is joined after the
+neighbors before it.</p>
 <p>Key attributes
 - cfg: the ControlFlowGraph to analyze.
-- input_states: a mapping from basic block id to the lattice state that holds
-    at the entry of the block.
-- output_states: a mapping from basic block id to the lattice state that holds
-    at the exit of the block.</p>
+- input_states: a mapping from basic block id to the state flowing into the
+    block's transfer (its entry for forward, its exit for backward).
+- output_states: a mapping from basic block id to the state the block's
+    transfer produces.
+- reached: ids of the blocks visited by <code>analyze</code>.</p>
 
 
 
@@ -6379,9 +6408,7 @@ direction.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 85</span>
-<span class="normal"> 86</span>
-<span class="normal"> 87</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 87</span>
 <span class="normal"> 88</span>
 <span class="normal"> 89</span>
 <span class="normal"> 90</span>
@@ -6539,31 +6566,30 @@ direction.</p>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataFlowAnalysis</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataFlowAnalysis</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Base class for performing data flow analyses over a ControlFlowGraph.</span>
 
 <span class="sd">    This abstract class implements a generic work-list algorithm that can run either</span>
 <span class="sd">    in a "forward" or "backward" direction. Subclasses must provide IR-specific</span>
 <span class="sd">    semantics by implementing the abstract methods: transfer, join, stmt_str and</span>
-<span class="sd">    direction.</span>
+<span class="sd">    direction, and may override boundary_state.</span>
+
+<span class="sd">    only blocks reachable from the boundary block (ENTRY for forward, EXIT for</span>
+<span class="sd">    backward) are visited, and joins skip neighbors that weren't processed yet.</span>
+<span class="sd">    so loops start optimistic and dead blocks (e.g. after a `return`) never get</span>
+<span class="sd">    joined in. `transfer` must not mutate its input.</span>
+
+<span class="sd">    blocks are visited in reverse postorder, so a block is joined after the</span>
+<span class="sd">    neighbors before it.</span>
 
 <span class="sd">    Key attributes</span>
 <span class="sd">    - cfg: the ControlFlowGraph to analyze.</span>
-<span class="sd">    - input_states: a mapping from basic block id to the lattice state that holds</span>
-<span class="sd">        at the entry of the block.</span>
-<span class="sd">    - output_states: a mapping from basic block id to the lattice state that holds</span>
-<span class="sd">        at the exit of the block.</span>
+<span class="sd">    - input_states: a mapping from basic block id to the state flowing into the</span>
+<span class="sd">        block's transfer (its entry for forward, its exit for backward).</span>
+<span class="sd">    - output_states: a mapping from basic block id to the state the block's</span>
+<span class="sd">        transfer produces.</span>
+<span class="sd">    - reached: ids of the blocks visited by `analyze`.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cfg</span><span class="p">:</span> <span class="n">ControlFlowGraph</span><span class="p">):</span>
@@ -6574,6 +6600,7 @@ direction.</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
         <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reached</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
@@ -6588,40 +6615,29 @@ direction.</p>
 <span class="sd">                &lt;stmt_representation_for_first_stmt&gt;</span>
 <span class="sd">                &lt;stmt_representation_for_second_stmt&gt;</span>
 <span class="sd">                ...</span>
+
+<span class="sd">        statements are annotated with the state flowing into their transfer</span>
+<span class="sd">        (before them for forward, after them for backward), statements of</span>
+<span class="sd">        unreached blocks without annotations.</span>
 <span class="sd">        """</span>
         <span class="n">lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">blocks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="n">forward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span>
 
-        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
-            <span class="c1"># get successors of the block</span>
-            <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-                <span class="n">succ_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">]</span>
-                <span class="n">succ_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"#succs=[</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">succ_names</span><span class="p">)</span><span class="si">}</span><span class="s2">]"</span>
+        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">succ_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">]</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: #succs=[</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">succ_names</span><span class="p">)</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span><span class="p">:</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">stmt</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">succ_str</span> <span class="o">=</span> <span class="s2">"#succs=[]"</span>
-
-            <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">succ_str</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-
-            <span class="c1"># get the input state for this block</span>
-            <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span><span class="p">:</span>
-                <span class="c1"># deep copy the input_state, otherwise original state</span>
-                <span class="c1"># in the input_states will be changed,</span>
-                <span class="c1"># which can lead to errors in future</span>
-                <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">input_state</span><span class="p">)</span>
-
-                <span class="c1"># print each statement using subclasses stmt_str method</span>
-                <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">:</span>
-                    <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-                    <span class="c1"># advance state with current statement</span>
+                <span class="c1"># deep copy, so printing never changes the stored states</span>
+                <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">])</span>
+                <span class="n">stmts</span> <span class="o">=</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">annotated</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">stmts</span><span class="p">:</span>
+                    <span class="n">annotated</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">([</span><span class="n">stmt</span><span class="p">],</span> <span class="n">state</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># TODO: implement "backward" direction printing</span>
-                <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">input_state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-                    <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span>
-                <span class="p">)</span>
+                <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">annotated</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">annotated</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
 
             <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
 
@@ -6659,67 +6675,56 @@ direction.</p>
 <span class="sd">        """</span>
         <span class="o">...</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""state at the cfg boundary: out of ENTRY (forward) or into EXIT (backward)"""</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Perform the data flow analysis on the control flow graph.</span>
-<span class="sd">        This method initializes the work list and processes each block.</span>
-<span class="sd">        """</span>
-        <span class="n">work_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span><span class="p">:</span>
-            <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
-                <span class="n">block</span> <span class="o">=</span> <span class="n">work_list</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""run the work list until the states of all reached blocks are stable"""</span>
+        <span class="n">forward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">entry_block</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">exit_block</span>
 
-                <span class="c1"># get current input state based on the predecessors output states</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span><span class="p">:</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="p">{}</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">pred_outputs</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pred</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-                        <span class="k">for</span> <span class="n">pred</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span>
-                    <span class="p">]</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="n">pred_outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                    <span class="k">for</span> <span class="n">pred_output</span> <span class="ow">in</span> <span class="n">pred_outputs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-                        <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">pred_output</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">upstream</span><span class="p">(</span><span class="n">block</span><span class="p">:</span> <span class="n">BasicBlock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span>
 
-                <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">downstream</span><span class="p">(</span><span class="n">block</span><span class="p">:</span> <span class="n">BasicBlock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span>
 
-                <span class="c1"># perform transfer based on the statements in the current basic block</span>
-                <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="n">_depth_first</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">downstream</span><span class="p">)</span>
 
-                <span class="c1"># check if output_state changed</span>
-                <span class="k">if</span> <span class="n">output_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{}):</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
+        <span class="n">work_list</span> <span class="o">=</span> <span class="p">[(</span><span class="n">rank</span><span class="p">[</span><span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">],</span> <span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">)]</span>
+        <span class="n">queued</span> <span class="o">=</span> <span class="p">{</span><span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+        <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">block_id</span> <span class="o">=</span> <span class="n">heapq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="n">work_list</span><span class="p">)</span>
+            <span class="n">queued</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">block_id</span><span class="p">)</span>
+            <span class="n">block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="p">[</span><span class="n">block_id</span><span class="p">]</span>
 
-                    <span class="k">for</span> <span class="n">successor</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="n">successor</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">work_list</span><span class="p">:</span>
-                            <span class="n">work_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">successor</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
-                <span class="n">block</span> <span class="o">=</span> <span class="n">work_list</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="c1"># join the states of processed upstream neighbors</span>
+            <span class="n">states</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">upstream</span><span class="p">(</span><span class="n">block</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="n">block</span> <span class="ow">is</span> <span class="n">start</span><span class="p">:</span>
+                <span class="n">states</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_state</span><span class="p">())</span>
+            <span class="n">input_state</span> <span class="o">=</span> <span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
 
-                <span class="c1"># get current input state based on the successors output states</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="p">{}</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">succ_outputs</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span>
-                    <span class="p">]</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="n">succ_outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                    <span class="k">for</span> <span class="n">succ_output</span> <span class="ow">in</span> <span class="n">succ_outputs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-                        <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">succ_output</span><span class="p">)</span>
+            <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">block</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span>
+                <span class="ow">and</span> <span class="n">output_state</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+            <span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reached</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
 
-                <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
-
-                <span class="c1"># perform trasnfer based on the statements in the current basic block</span>
-                <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
-
-                <span class="c1"># check if output state changed</span>
-                <span class="k">if</span> <span class="n">output_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{}):</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
-
-                    <span class="k">for</span> <span class="n">predecessor</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="n">predecessor</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">work_list</span><span class="p">:</span>
-                            <span class="n">work_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">predecessor</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">neighbor</span> <span class="ow">in</span> <span class="n">downstream</span><span class="p">(</span><span class="n">block</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">neighbor</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">queued</span><span class="p">:</span>
+                    <span class="n">queued</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                    <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">work_list</span><span class="p">,</span> <span class="p">(</span><span class="n">rank</span><span class="p">[</span><span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">],</span> <span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6757,23 +6762,14 @@ For every block the printed form is:</p>
     &lt;stmt_representation_for_second_stmt&gt;
     ...
 </code></pre>
+<p>statements are annotated with the state flowing into their transfer
+(before them for forward, after them for backward), statements of
+unreached blocks without annotations.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
@@ -6811,7 +6807,8 @@ For every block the printed form is:</p>
 <span class="normal">158</span>
 <span class="normal">159</span>
 <span class="normal">160</span>
-<span class="normal">161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">161</span>
+<span class="normal">162</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return a string representation describing the current dataflow</span>
 <span class="sd">    analysis state over the control-flow graph (CFG).</span>
@@ -6824,40 +6821,29 @@ For every block the printed form is:</p>
 <span class="sd">            &lt;stmt_representation_for_first_stmt&gt;</span>
 <span class="sd">            &lt;stmt_representation_for_second_stmt&gt;</span>
 <span class="sd">            ...</span>
+
+<span class="sd">    statements are annotated with the state flowing into their transfer</span>
+<span class="sd">    (before them for forward, after them for backward), statements of</span>
+<span class="sd">    unreached blocks without annotations.</span>
 <span class="sd">    """</span>
     <span class="n">lines</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">blocks</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">forward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span>
 
-    <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="n">blocks</span><span class="p">:</span>
-        <span class="c1"># get successors of the block</span>
-        <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-            <span class="n">succ_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">]</span>
-            <span class="n">succ_str</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"#succs=[</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">succ_names</span><span class="p">)</span><span class="si">}</span><span class="s2">]"</span>
+    <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">succ_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">]</span>
+        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: #succs=[</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">succ_names</span><span class="p">)</span><span class="si">}</span><span class="s2">]"</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">block</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span><span class="p">:</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">stmt</span><span class="si">}</span><span class="s2">"</span> <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">succ_str</span> <span class="o">=</span> <span class="s2">"#succs=[]"</span>
-
-        <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">succ_str</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-
-        <span class="c1"># get the input state for this block</span>
-        <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span><span class="p">:</span>
-            <span class="c1"># deep copy the input_state, otherwise original state</span>
-            <span class="c1"># in the input_states will be changed,</span>
-            <span class="c1"># which can lead to errors in future</span>
-            <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">input_state</span><span class="p">)</span>
-
-            <span class="c1"># print each statement using subclasses stmt_str method</span>
-            <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">:</span>
-                <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-                <span class="c1"># advance state with current statement</span>
+            <span class="c1"># deep copy, so printing never changes the stored states</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">])</span>
+            <span class="n">stmts</span> <span class="o">=</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">annotated</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">stmts</span><span class="p">:</span>
+                <span class="n">annotated</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                 <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">([</span><span class="n">stmt</span><span class="p">],</span> <span class="n">state</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># TODO: implement "backward" direction printing</span>
-            <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">stmt_str</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span><span class="w"> </span><span class="n">input_state</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
-                <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span>
-            <span class="p">)</span>
+            <span class="n">lines</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">annotated</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">annotated</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
 
         <span class="n">lines</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">""</span><span class="p">)</span>
 
@@ -6879,18 +6865,12 @@ For every block the printed form is:</p>
 
     <div class="doc doc-contents ">
 
-        <p>Perform the data flow analysis on the control flow graph.
-This method initializes the work list and processes each block.</p>
+        <p>run the work list until the states of all reached blocks are stable</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">200</span>
 <span class="normal">201</span>
 <span class="normal">202</span>
 <span class="normal">203</span>
@@ -6935,77 +6915,79 @@ This method initializes the work list and processes each block.</p>
 <span class="normal">242</span>
 <span class="normal">243</span>
 <span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Perform the data flow analysis on the control flow graph.</span>
-<span class="sd">    This method initializes the work list and processes each block.</span>
-<span class="sd">    """</span>
-    <span class="n">work_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span><span class="p">:</span>
-        <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
-            <span class="n">block</span> <span class="o">=</span> <span class="n">work_list</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="normal">245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">analyze</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""run the work list until the states of all reached blocks are stable"""</span>
+    <span class="n">forward</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">direction</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"forward"</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">entry_block</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">exit_block</span>
 
-            <span class="c1"># get current input state based on the predecessors output states</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span><span class="p">:</span>
-                <span class="n">input_state</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pred_outputs</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pred</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-                    <span class="k">for</span> <span class="n">pred</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span>
-                <span class="p">]</span>
-                <span class="n">input_state</span> <span class="o">=</span> <span class="n">pred_outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                <span class="k">for</span> <span class="n">pred_output</span> <span class="ow">in</span> <span class="n">pred_outputs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">pred_output</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">upstream</span><span class="p">(</span><span class="n">block</span><span class="p">:</span> <span class="n">BasicBlock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span>
 
-            <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">downstream</span><span class="p">(</span><span class="n">block</span><span class="p">:</span> <span class="n">BasicBlock</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">BasicBlock</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span> <span class="k">if</span> <span class="n">forward</span> <span class="k">else</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span>
 
-            <span class="c1"># perform transfer based on the statements in the current basic block</span>
-            <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">_depth_first</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">downstream</span><span class="p">)</span>
 
-            <span class="c1"># check if output_state changed</span>
-            <span class="k">if</span> <span class="n">output_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{}):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
+    <span class="n">work_list</span> <span class="o">=</span> <span class="p">[(</span><span class="n">rank</span><span class="p">[</span><span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">],</span> <span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">)]</span>
+    <span class="n">queued</span> <span class="o">=</span> <span class="p">{</span><span class="n">start</span><span class="o">.</span><span class="n">id</span><span class="p">}</span>
+    <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">block_id</span> <span class="o">=</span> <span class="n">heapq</span><span class="o">.</span><span class="n">heappop</span><span class="p">(</span><span class="n">work_list</span><span class="p">)</span>
+        <span class="n">queued</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">block_id</span><span class="p">)</span>
+        <span class="n">block</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="p">[</span><span class="n">block_id</span><span class="p">]</span>
 
-                <span class="k">for</span> <span class="n">successor</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="n">successor</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">work_list</span><span class="p">:</span>
-                        <span class="n">work_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">successor</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">while</span> <span class="n">work_list</span><span class="p">:</span>
-            <span class="n">block</span> <span class="o">=</span> <span class="n">work_list</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="c1"># join the states of processed upstream neighbors</span>
+        <span class="n">states</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">b</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">upstream</span><span class="p">(</span><span class="n">block</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">b</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span>
+        <span class="p">]</span>
+        <span class="k">if</span> <span class="n">block</span> <span class="ow">is</span> <span class="n">start</span><span class="p">:</span>
+            <span class="n">states</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">boundary_state</span><span class="p">())</span>
+        <span class="n">input_state</span> <span class="o">=</span> <span class="n">states</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">states</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
 
-            <span class="c1"># get current input state based on the successors output states</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span><span class="p">:</span>
-                <span class="n">input_state</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">succ_outputs</span> <span class="o">=</span> <span class="p">[</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">succ</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span> <span class="k">for</span> <span class="n">succ</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">successors</span>
-                <span class="p">]</span>
-                <span class="n">input_state</span> <span class="o">=</span> <span class="n">succ_outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-                <span class="k">for</span> <span class="n">succ_output</span> <span class="ow">in</span> <span class="n">succ_outputs</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-                    <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">input_state</span><span class="p">,</span> <span class="n">succ_output</span><span class="p">)</span>
+        <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">block</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">reached</span>
+            <span class="ow">and</span> <span class="n">output_state</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="k">continue</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reached</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
 
-            <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_state</span>
+        <span class="k">for</span> <span class="n">neighbor</span> <span class="ow">in</span> <span class="n">downstream</span><span class="p">(</span><span class="n">block</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">neighbor</span><span class="o">.</span><span class="n">id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">queued</span><span class="p">:</span>
+                <span class="n">queued</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="n">work_list</span><span class="p">,</span> <span class="p">(</span><span class="n">rank</span><span class="p">[</span><span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">],</span> <span class="n">neighbor</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
 
-            <span class="c1"># perform trasnfer based on the statements in the current basic block</span>
-            <span class="n">output_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">,</span> <span class="n">input_state</span><span class="p">)</span>
+</div>
 
-            <span class="c1"># check if output state changed</span>
-            <span class="k">if</span> <span class="n">output_state</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{}):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">output_states</span><span class="p">[</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_state</span>
+<div class="doc doc-object doc-function">
 
-                <span class="k">for</span> <span class="n">predecessor</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">predecessors</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="n">predecessor</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">work_list</span><span class="p">:</span>
-                        <span class="n">work_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">predecessor</span><span class="p">)</span>
+
+<h3 id="finch.symbolic.dataflow.DataFlowAnalysis.boundary_state" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">boundary_state</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>state at the cfg boundary: out of ENTRY (forward) or into EXIT (backward)</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">boundary_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""state at the cfg boundary: out of ENTRY (forward) or into EXIT (backward)"""</span>
+    <span class="k">return</span> <span class="p">{}</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7033,13 +7015,13 @@ This should be implemented by subclasses.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">187</span>
-<span class="normal">188</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">188</span>
 <span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">193</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">direction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the direction of the data flow analysis, either "forward" or "backward".</span>
@@ -7073,13 +7055,13 @@ This should be implemented by subclasses.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">179</span>
-<span class="normal">180</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">180</span>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
 <span class="normal">184</span>
-<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">185</span>
+<span class="normal">186</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">state_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Join function for the data flow analysis.</span>
@@ -7113,13 +7095,13 @@ Implement in subclasses or IR-specific abstract bases.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
-<span class="normal">164</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
 <span class="normal">167</span>
 <span class="normal">168</span>
-<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">169</span>
+<span class="normal">170</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">stmt_str</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Format a single statement given the current lattice state.</span>
@@ -7153,13 +7135,13 @@ This should be implemented by subclasses.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/symbolic/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">171</span>
-<span class="normal">172</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
 <span class="normal">176</span>
-<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="normal">177</span>
+<span class="normal">178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">transfer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Transfer function for the data flow analysis.</span>

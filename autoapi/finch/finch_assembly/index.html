@@ -7272,22 +7272,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span>
-<span class="normal">131</span>
-<span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span>
-<span class="normal">141</span>
-<span class="normal">142</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
 <span class="normal">143</span>
 <span class="normal">144</span>
 <span class="normal">145</span>
@@ -7437,14 +7422,7 @@
 <span class="normal">289</span>
 <span class="normal">290</span>
 <span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
-<span class="normal">297</span>
-<span class="normal">298</span>
-<span class="normal">299</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyCopyPropagation</span><span class="p">(</span><span class="n">AbstractAssemblyDataflow</span><span class="p">):</span>
+<span class="normal">292</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyCopyPropagation</span><span class="p">(</span><span class="n">AbstractAssemblyDataflow</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Copy propagation for FinchAssembly.</span>
 
 <span class="sd">    Lattice:</span>
@@ -7459,6 +7437,9 @@
 <span class="w">        </span><span class="sd">"""Copy propagation is a forward analysis."""</span>
         <span class="k">return</span> <span class="s2">"forward"</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">boundary_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="p">{}}</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">collect_copy_replacements</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">"""Collect per-statement copy replacements.</span>
 
@@ -7468,20 +7449,10 @@
 <span class="sd">                statement ``stmt_id`` based on copy-propagation facts.</span>
 <span class="sd">        """</span>
         <span class="n">replacements</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-            <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">input_state</span><span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">:</span>
-                <span class="n">sid</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="s2">"sid"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">sid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lattice_value</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">):</span>
-                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
-                            <span class="n">replacements</span><span class="p">[(</span><span class="n">sid</span><span class="p">,</span> <span class="n">name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-                <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">([</span><span class="n">stmt</span><span class="p">],</span> <span class="n">state</span><span class="p">)</span>
-
+        <span class="k">for</span> <span class="n">stmt</span><span class="p">,</span> <span class="n">state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">statement_states</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lattice_value</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
+                    <span class="n">replacements</span><span class="p">[(</span><span class="n">stmt</span><span class="o">.</span><span class="n">sid</span><span class="p">,</span> <span class="n">name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">replacements</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_lattice_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]:</span>
@@ -7496,7 +7467,7 @@
             <span class="k">case</span><span class="w"> </span><span class="n">Assign</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
                 <span class="n">target</span> <span class="o">=</span> <span class="n">rhs</span>
 
-        <span class="n">copies</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"copies"</span><span class="p">,</span> <span class="p">{})</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="n">copies</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
 
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
@@ -7522,7 +7493,6 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            dict: The outgoing lattice mapping after processing ``stmts``.</span>
 <span class="sd">        """</span>
-        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
         <span class="n">new_state</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="n">state</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="n">state</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()}</span>
 
         <span class="n">defs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_state</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
@@ -7568,14 +7538,10 @@
 <span class="sd">        - copies join: keep a copy only if both agree exactly, and it remains</span>
 <span class="sd">          consistent with the joined defs.</span>
 <span class="sd">        """</span>
-
-        <span class="n">s1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state_1</span><span class="p">)</span>
-        <span class="n">s2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state_2</span><span class="p">)</span>
-
-        <span class="n">defs_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
-        <span class="n">defs_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">s2</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
-        <span class="n">copies_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
-        <span class="n">copies_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">s2</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
+        <span class="n">defs_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">state_1</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
+        <span class="n">defs_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">state_2</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
+        <span class="n">copies_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_1</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
+        <span class="n">copies_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_2</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
 
         <span class="n">joined_defs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">defs_1</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">defs_2</span><span class="p">):</span>
@@ -7592,16 +7558,6 @@
         <span class="n">joined_copies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prune_inconsistent_copies</span><span class="p">(</span><span class="n">joined_defs</span><span class="p">,</span> <span class="n">joined_copies</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="n">joined_defs</span><span class="p">,</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="n">joined_copies</span><span class="p">}</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">state</span><span class="p">:</span>
-            <span class="k">return</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="p">{},</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="p">{}}</span>
-
-        <span class="k">if</span> <span class="s2">"defs"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">state</span> <span class="ow">or</span> <span class="s2">"copies"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">state</span><span class="p">:</span>
-            <span class="c1"># allow old/empty shapes; upgrade in place</span>
-            <span class="k">return</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"defs"</span><span class="p">,</span> <span class="p">{}),</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"copies"</span><span class="p">,</span> <span class="p">{})}</span>
-
-        <span class="k">return</span> <span class="n">state</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_unpack_stmt</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmt</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="n">NumberedStatement</span><span class="p">):</span>
@@ -7674,30 +7630,20 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">160</span>
 <span class="normal">161</span>
 <span class="normal">162</span>
 <span class="normal">163</span>
 <span class="normal">164</span>
-<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">collect_copy_replacements</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">collect_copy_replacements</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""Collect per-statement copy replacements.</span>
 
 <span class="sd">    Returns:</span>
@@ -7706,20 +7652,10 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 <span class="sd">            statement ``stmt_id`` based on copy-propagation facts.</span>
 <span class="sd">    """</span>
     <span class="n">replacements</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-    <span class="k">for</span> <span class="n">block</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">blocks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-        <span class="n">input_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">block</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="p">{})</span>
-        <span class="n">state</span> <span class="o">=</span> <span class="n">copy</span><span class="o">.</span><span class="n">deepcopy</span><span class="p">(</span><span class="n">input_state</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">stmt</span> <span class="ow">in</span> <span class="n">block</span><span class="o">.</span><span class="n">statements</span><span class="p">:</span>
-            <span class="n">sid</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">stmt</span><span class="p">,</span> <span class="s2">"sid"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">sid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lattice_value</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">):</span>
-                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
-                        <span class="n">replacements</span><span class="p">[(</span><span class="n">sid</span><span class="p">,</span> <span class="n">name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-            <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transfer</span><span class="p">([</span><span class="n">stmt</span><span class="p">],</span> <span class="n">state</span><span class="p">)</span>
-
+    <span class="k">for</span> <span class="n">stmt</span><span class="p">,</span> <span class="n">state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">statement_states</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_lattice_value</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="p">:</span>
+                <span class="n">replacements</span><span class="p">[(</span><span class="n">stmt</span><span class="o">.</span><span class="n">sid</span><span class="p">,</span> <span class="n">name</span><span class="p">)]</span> <span class="o">=</span> <span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">return</span> <span class="n">replacements</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7743,9 +7679,9 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">138</span>
-<span class="normal">139</span>
-<span class="normal">140</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">direction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">direction</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Copy propagation is a forward analysis."""</span>
     <span class="k">return</span> <span class="s2">"forward"</span>
 </code></pre></div></td></tr></table></div>
@@ -7770,15 +7706,7 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
 <span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
@@ -7791,7 +7719,15 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 <span class="normal">185</span>
 <span class="normal">186</span>
 <span class="normal">187</span>
-<span class="normal">188</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_lattice_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]:</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_lattice_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">stmt</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""Collect lattice annotations for variables used in a stmt or expr."""</span>
     <span class="n">annotated</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">target</span> <span class="o">=</span> <span class="n">stmt</span>
@@ -7803,7 +7739,7 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
         <span class="k">case</span><span class="w"> </span><span class="n">Assign</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">rhs</span><span class="p">):</span>
             <span class="n">target</span> <span class="o">=</span> <span class="n">rhs</span>
 
-    <span class="n">copies</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"copies"</span><span class="p">,</span> <span class="p">{})</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="n">copies</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
 
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">PostOrderDFS</span><span class="p">(</span><span class="n">target</span><span class="p">):</span>
         <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
@@ -7840,14 +7776,7 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
 <span class="normal">252</span>
 <span class="normal">253</span>
 <span class="normal">254</span>
@@ -7870,21 +7799,20 @@ statement <code>stmt_id</code> based on copy-propagation facts.</p>
 <span class="normal">271</span>
 <span class="normal">272</span>
 <span class="normal">273</span>
-<span class="normal">274</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">state_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">join</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">state_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Meet operator for must copy-propagation.</span>
 
 <span class="sd">    - defs join: keep a def id only if both agree, else None.</span>
 <span class="sd">    - copies join: keep a copy only if both agree exactly, and it remains</span>
 <span class="sd">      consistent with the joined defs.</span>
 <span class="sd">    """</span>
-
-    <span class="n">s1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state_1</span><span class="p">)</span>
-    <span class="n">s2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state_2</span><span class="p">)</span>
-
-    <span class="n">defs_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
-    <span class="n">defs_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">s2</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
-    <span class="n">copies_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
-    <span class="n">copies_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">s2</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
+    <span class="n">defs_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">state_1</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
+    <span class="n">defs_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">state_2</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
+    <span class="n">copies_1</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_1</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
+    <span class="n">copies_2</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="n">state_2</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span>
 
     <span class="n">joined_defs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">defs_1</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">defs_2</span><span class="p">):</span>
@@ -7997,15 +7925,7 @@ invalidated first.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">198</span>
 <span class="normal">199</span>
 <span class="normal">200</span>
 <span class="normal">201</span>
@@ -8049,7 +7969,14 @@ invalidated first.</p>
 <span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
-<span class="normal">242</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transfer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transfer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stmts</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Transfer function over a sequence of statements.</span>
 
 <span class="sd">    Applies copy-propagation effects of each statement in order, returning</span>
@@ -8064,7 +7991,6 @@ invalidated first.</p>
 <span class="sd">    Returns:</span>
 <span class="sd">        dict: The outgoing lattice mapping after processing ``stmts``.</span>
 <span class="sd">    """</span>
-    <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
     <span class="n">new_state</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"defs"</span><span class="p">:</span> <span class="n">state</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span> <span class="s2">"copies"</span><span class="p">:</span> <span class="n">state</span><span class="p">[</span><span class="s2">"copies"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()}</span>
 
     <span class="n">defs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_state</span><span class="p">[</span><span class="s2">"defs"</span><span class="p">]</span>
@@ -14984,7 +14910,8 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 59</span>
+<span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -15026,8 +14953,7 @@ Returns:
 <span class="normal"> 99</span>
 <span class="normal">100</span>
 <span class="normal">101</span>
-<span class="normal">102</span>
-<span class="normal">103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_copy_propagation</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AssemblyNode</span><span class="p">:</span>
+<span class="normal">102</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_copy_propagation</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AssemblyNode</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Apply copy-propagation to a FinchAssembly node.</span>
 <span class="sd">    Args:</span>
@@ -15116,7 +15042,8 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">31</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
+<span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
@@ -15128,8 +15055,7 @@ Returns:
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_analyze</span><span class="p">(</span>
+<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_analyze</span><span class="p">(</span>
     <span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">,</span> <span class="n">analysis_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">AnalysisT</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">AnalysisT</span><span class="p">,</span> <span class="n">AssemblyNode</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -15165,7 +15091,8 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/dataflow.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">47</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
+<span class="normal">47</span>
 <span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
@@ -15174,8 +15101,7 @@ Returns:
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_run</span><span class="p">(</span>
+<span class="normal">56</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assembly_dataflow_run</span><span class="p">(</span>
     <span class="n">node</span><span class="p">:</span> <span class="n">AssemblyNode</span><span class="p">,</span>
     <span class="n">analysis_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">AnalysisT</span><span class="p">],</span>
     <span class="n">apply</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">AssemblyNode</span><span class="p">,</span> <span class="n">AnalysisT</span><span class="p">],</span> <span class="n">AssemblyNode</span><span class="p">],</span>
