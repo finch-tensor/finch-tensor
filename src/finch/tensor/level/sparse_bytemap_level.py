@@ -146,6 +146,11 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
         l_t = self.ptr_type.length_type
+        dimension = shape[0]
+        if dimension.result_type != self.dimension_type:
+            dimension = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
+            )
         pos_stop, dim, q_stop, n_dirty, p, q, r, ptr_len, tbl_len = (
             self._var(ctx, name)
             for name in (
@@ -161,11 +166,11 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             )
         )
         # Dirty positions are sorted, so visiting them streams through memory;
-        # past about 1/16 of the positions, clearing them all is cheaper.
+        # past about 1/16 of the positions, clearing them all is cheaper. Dirty
+        # positions are found with the old dimension, before it is resized.
         expr = """finch
         pos_stop = to_len(pos)
         dim = to_len(tns.dimension)
-        q_stop = mul(pos_stop, dim)
         n_dirty = to_len(tns.qos_fill)
         if (mul(n_dirty, 16) > n_tbl)
             for (p in 0:n_ptr)
@@ -184,6 +189,9 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
             end
         end
         tns.qos_fill = zero
+        tns.dimension = dimension
+        dim = to_len(tns.dimension)
+        q_stop = mul(pos_stop, dim)
         ptr_len = n_ptr
         if (ptr_len < add(pos_stop, 1))
             resize(ptr, add(pos_stop, 1))
@@ -205,7 +213,7 @@ class SparseByteMapLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
         child = asm.GetAttr(tns, asm.Literal("lvl"))
         child_pos = asm.Call(asm.Literal(ffuncs.mul), (pos, dim))
-        self.lvl_t.level_lower_declare(ctx, child, init, op, shape, child_pos)
+        self.lvl_t.level_lower_declare(ctx, child, init, op, shape[1:], child_pos)
         self.lvl_t.level_lower_assemble(ctx, child, tbl_len, q_stop)
 
     def level_lower_assemble(self, ctx, lvl, start, stop):

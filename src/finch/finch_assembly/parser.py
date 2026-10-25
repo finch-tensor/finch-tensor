@@ -53,12 +53,11 @@ assembly_parser = Lark(
     attribute: reference "." CNAME
     access: reference "[" access_expr "]"
     call: CNAME "(" expr ("," expr)* ")"
-    ?expr: reference | INT | DECIMAL | access | scansearch | bin_op | call | expr INFIX_OP expr
+    ?expr: reference | INT | DECIMAL | access | bin_op | call | expr INFIX_OP expr
     ?lhs: reference | access
     assign: lhs "=" expr
     increment: lhs INFIX_OP "=" expr
     resize: "resize" "(" reference "," expr ")"
-    scansearch: "scansearch" "(" CNAME "," expr "," expr "," expr ")"
     bin_op: OP "(" expr "," expr ")"
     for_loop: "for" "(" CNAME "in" access_expr ":" access_expr ")" _NEWLINE+ block _NEWLINE+ "end"
     while_loop: "while" "(" expr ")" _NEWLINE+ block _NEWLINE+ "end"
@@ -78,6 +77,7 @@ _OPS = {
     ">=": ffuncs.ge,
     "==": ffuncs.eq,
     "!=": ffuncs.ne,
+    ">>": ffuncs.rshift,
     "min": ffuncs.min,
     "max": ffuncs.max,
     "add": ffuncs.add,
@@ -172,10 +172,6 @@ def parse_assembly(
                 )
             case Tree("call", [op, *args]):
                 return asm.Call(ctx(op), tuple(ctx(arg) for arg in args))
-            case Tree("scansearch", [arr, x, lo, hi]):
-                return asm.Call(
-                    asm.Literal(ffuncs.scansearch), (ctx(arr), ctx(x), ctx(lo), ctx(hi))
-                )
             case Tree("bin_op", [op, expr1, expr2]):
                 return asm.Call(asm.Literal(ctx(op)), (ctx(expr1), ctx(expr2)))
             case Tree("assign", [lhs, expr]):

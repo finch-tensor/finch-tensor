@@ -48,9 +48,9 @@ class MonoLogicFormatter(LogicFormatter):
         stats_factory: StatsFactory,
     ):
         bindings = bindings.copy()
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
         fill_types = prgm.infer_fill_type(
             {var: val.fill_type for var, val in bindings.items()}
         )
@@ -60,9 +60,13 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     new_bodies = tuple(formatter(body) for body in bodies)
                     return lgc.Plan(new_bodies)
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body))
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
+                    node.infer_shape_type(shape_types)
+                    lhs = lhs.unfused
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)

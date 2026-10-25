@@ -545,12 +545,18 @@ class SparseHashLevelFType(SingleDimensionLevelFType, MutableStructFType):
                 )
             ),
         )
+        dimension = shape[0]
+        if dimension.result_type != self.dimension_type:
+            dimension = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
         return self.lvl_t.level_lower_declare(
             ctx,
             asm.GetAttr(tns, asm.Literal("lvl")),
             init,
             op,
-            shape,
+            shape[1:],
             asm.Literal(self.position_type(0)),
         )
 

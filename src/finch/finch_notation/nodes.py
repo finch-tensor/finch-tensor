@@ -466,6 +466,17 @@ class IfElse(NotationTree, NotationStatement):
 
 
 @dataclass(eq=True, frozen=True)
+class Assert(NotationTree, NotationStatement):
+    """Check that an expression is true at runtime."""
+
+    exp: NotationExpression
+
+    @property
+    def children(self):
+        return [self.exp]
+
+
+@dataclass(eq=True, frozen=True)
 class Assign(NotationTree, NotationStatement):
     """
     Notation AST statement that defines `lhs` as having the value `rhs`.
@@ -647,8 +658,8 @@ class Repack(NotationTree, NotationStatement):
 class Declare(NotationTree, NotationStatement):
     """
     Notation AST statement that declares `tns` with an initial value `init` reduced
-    with `op` in the current scope. A tensor with a dynamic fill takes `init` as
-    its fill.
+    with `op` in the current scope, resizing it to `shape`. A tensor with a
+    dynamic fill takes `init` as its fill.
     """
 
     tns: NotationExpression
@@ -858,6 +869,9 @@ class NotationPrinterContext(Context):
                 tns_e = self(tns)
                 val_e = self(val)
                 self.exec(f"{feed}increment({tns_e}, {val_e})")
+                return None
+            case Assert(exp):
+                self.exec(f"{feed}assert({self(exp)})")
                 return None
             case Block(bodies):
                 ctx_2 = self.block()

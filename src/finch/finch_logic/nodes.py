@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Self, TypeVar
 
 from finch.algebra import (
@@ -113,8 +113,8 @@ entities that index the dimensions of a tensor. This naming convention helps
 clarify the relationships between different tensors and their dimensions during
 operations such as mapping, aggregation, reordering, and relabeling.
 
-Fields may not be used to represent different dimension sizes within the same
-logic program.
+Fields represent matching dimension sizes within an expression. Redefining an
+alias may change those sizes for subsequent statements.
 
 Tables may be referenced using "aliases", which are symbolic names that refer to
 specific tables within the program. Evaluators for Finch logic may accept a list
@@ -446,15 +446,17 @@ class Field(LogicNode, NamedTerm):
 
 @dataclass(eq=True, frozen=True)
 class Alias(LogicNode, NamedTerm):
-    """
-    Represents a logical AST expression for an alias named `name`. Aliases are used to
-    refer to tables in the program.
-
-    Attributes:
-        name: The name of the alias.
-    """
+    """Shared base for hard and fused aliases referring to tensors."""
 
     name: str
+
+    @property
+    @abstractmethod
+    def unfused(self) -> Alias: ...
+
+    @property
+    @abstractmethod
+    def nfused(self) -> int: ...
 
     @property
     def symbol(self) -> str:
@@ -471,9 +473,9 @@ class Alias(LogicNode, NamedTerm):
         op: Callable,
         dim_bindings: dict[Alias, tuple[T | None, ...]],
     ) -> tuple[T | None, ...]:
-        if dim_bindings is None or self not in dim_bindings:
+        if dim_bindings is None or self.unfused not in dim_bindings:
             raise NotImplementedError(f"Cannot resolve dims of Alias {self.name}")
-        return dim_bindings[self]
+        return dim_bindings[self.unfused]
 
     def valmap(
         self,
@@ -482,9 +484,60 @@ class Alias(LogicNode, NamedTerm):
         h: Callable,
         bindings: dict[Alias, T],
     ) -> T:
-        if bindings is None or self not in bindings:
+        if bindings is None or self.unfused not in bindings:
             raise NotImplementedError(f"Cannot resolve value of Alias {self.name}")
-        return bindings[self]
+        return bindings[self.unfused]
+
+
+@dataclass(eq=True, frozen=True)
+class HardAlias(Alias):
+    """A named tensor alias whose dimensions are all materialized."""
+
+    @property
+    def unfused(self) -> Alias:
+        return self
+
+    @property
+    def nfused(self) -> int:
+        return 0
+
+
+@dataclass(eq=True, frozen=True, init=False)
+class FusedAlias(Alias):
+    """An alias whose first `n` dimensions index independent scratch tensors.
+
+    The remaining dimensions are materialized within each scratch tensor.
+    Bindings use the wrapped alias and describe the full logical shape.
+    """
+
+    __match_args__ = ("alias", "n")
+    name: str = field(init=False, repr=False)
+    alias: HardAlias
+    n: int
+
+    def __init__(self, alias: HardAlias, n: int):
+        match alias:
+            case FusedAlias():
+                raise ValueError("FusedAlias must wrap an unfused HardAlias")
+            case HardAlias():
+                pass
+            case _:
+                raise TypeError("FusedAlias must wrap a HardAlias")
+        if not isinstance(n, int) or isinstance(n, bool):
+            raise TypeError("The fused dimension count must be an integer")
+        if n < 0:
+            raise ValueError("The fused dimension count must be nonnegative")
+        object.__setattr__(self, "name", alias.name)
+        object.__setattr__(self, "alias", alias)
+        object.__setattr__(self, "n", n)
+
+    @property
+    def unfused(self) -> HardAlias:
+        return self.alias
+
+    @property
+    def nfused(self) -> int:
+        return self.n
 
 
 @dataclass(eq=True, frozen=True)
@@ -500,6 +553,11 @@ class Table(LogicTree, LogicExpression):
 
     tns: Literal | Alias
     idxs: tuple[Field, ...]
+
+    def __post_init__(self):
+        match self.tns:
+            case FusedAlias(_, n) if n > len(self.idxs):
+                raise ValueError("The fused dimension count exceeds the table rank")
 
     @property
     def children(self):
@@ -859,12 +917,9 @@ class Query(LogicTree, LogicStatement):
         will be stored in the dictionary passed to the method."""
         var = self.lhs.tns
         assert isinstance(var, Alias)
-        dims = Reorder(self.rhs, self.lhs.idxs).dimmap(op, dim_bindings)
-        if var in dim_bindings:
-            for dim1, dim2 in zip(dims, dim_bindings[var], strict=True):
-                op(dim1, dim2)
-        else:
-            dim_bindings[var] = dims
+        dim_bindings[var.unfused] = Reorder(self.rhs, self.lhs.idxs).dimmap(
+            op, dim_bindings
+        )
         return dim_bindings
 
     def infer_valmap(
@@ -878,6 +933,7 @@ class Query(LogicTree, LogicStatement):
         will be stored in the dictionary passed to the method."""
         var = self.lhs.tns
         assert isinstance(var, Alias)
+        var = var.unfused
         if var in bindings:
             val = self.rhs.valmap(f, g, h, bindings)
             prev = bindings[var]
@@ -894,10 +950,11 @@ class QueryInto(LogicTree, LogicStatement):
     """
     Represents a logical AST statement that updates the table `lhs` in place,
     using the reduction operator `op` to fold each element of `rhs` into the
-    matching element of `lhs`. The alias `lhs.tns` must already be bound. The
-    fields of `rhs` which are not in `lhs.idxs` are reduced with `op`, and `rhs`
-    is broadcast over the fields of `lhs` which it lacks, so a `QueryInto` is
-    equivalent to the aggregate which starts from `lhs`,
+    matching element of `lhs`. The alias `lhs.tns` must already be bound, and
+    its shape is preserved. The fields of `rhs` which are not in `lhs.idxs`
+    are reduced with `op`, and `rhs` is broadcast over the fields of `lhs`
+    which it lacks, so a `QueryInto` is equivalent to the aggregate which
+    starts from `lhs`,
     `Query(lhs, Aggregate(op, lhs, rhs, setdiff(rhs.fields(), lhs.idxs)))`.
 
     Attributes:
@@ -927,7 +984,13 @@ class QueryInto(LogicTree, LogicStatement):
     ) -> dict[Alias, tuple[T | None, ...]]:
         """Infers dimmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
-        return self.as_query().infer_dimmap(op, dim_bindings)
+        var = self.lhs.tns
+        assert isinstance(var, Alias)
+        previous = dim_bindings[var.unfused]
+        dims = Reorder(self.as_query().rhs, self.lhs.idxs).dimmap(op, dim_bindings)
+        for old, new in zip(previous, dims, strict=True):
+            op(old, new)
+        return dim_bindings
 
     def infer_valmap(
         self,
@@ -939,6 +1002,41 @@ class QueryInto(LogicTree, LogicStatement):
         """Infers valmaps for all aliases defined in the statement. The results
         will be stored in the dictionary passed to the method."""
         return self.as_query().infer_valmap(f, g, h, bindings)
+
+
+@dataclass(eq=True, frozen=True)
+class Fuse(LogicTree, LogicStatement):
+    """
+    Executes `body` together for each value of `idx`. Enclosing Fuse nodes,
+    from outermost to innermost, bind the leading indices of FusedAlias tables.
+
+    Attributes:
+        idx: The field over which to fuse the body.
+        body: The statement to execute for each value of the field.
+    """
+
+    idx: Field
+    body: LogicStatement
+
+    @property
+    def children(self):
+        return [self.idx, self.body]
+
+    def infer_dimmap(
+        self,
+        op: Callable,
+        dim_bindings: dict[Alias, tuple[T | None, ...]],
+    ) -> dict[Alias, tuple[T | None, ...]]:
+        return self.body.infer_dimmap(op, dim_bindings)
+
+    def infer_valmap(
+        self,
+        f: Callable,
+        g: Callable,
+        h: Callable,
+        bindings: dict[Alias, T],
+    ) -> dict[Alias, T]:
+        return self.body.infer_valmap(f, g, h, bindings)
 
 
 @dataclass(eq=True, frozen=True)
@@ -1062,11 +1160,22 @@ class LogicPrinterContext(Context):
                 return self(ex)
             case Field(name):
                 return str(name)
+            case FusedAlias(alias, n):
+                return f"FusedAlias({self(alias)}, {n})"
             case Alias(name):
                 return str(name)
             case Table(tns, idxs):
-                idxs_e = ", ".join([self(idx) for idx in idxs])
-                return f"Table({self(tns)}, {idxs_e})"
+                idxs_e = [self(idx) for idx in idxs]
+                match tns:
+                    case FusedAlias(alias, n):
+                        return (
+                            f"{self(alias)}({', '.join(idxs_e[:n])})"
+                            f"[{', '.join(idxs_e[n:])}]"
+                        )
+                    case Alias():
+                        return f"{self(tns)}[{', '.join(idxs_e)}]"
+                    case _:
+                        return f"Table({self(tns)}, {', '.join(idxs_e)})"
             case MapJoin(op, args):
                 args_e = ", ".join([self(arg) for arg in args])
                 return f"MapJoin({self(op)}, {args_e})"
@@ -1083,13 +1192,16 @@ class LogicPrinterContext(Context):
                 idxs_e = ", ".join([self(idx) for idx in idxs])
                 arg = self(arg)
                 return f"Reorder({self(arg)}, {idxs_e})"
-            case Query(Table(Alias() as tns, idxs), rhs):
-                idxs_e = ", ".join([self(idx) for idx in idxs])
-                self.exec(f"{feed}{self(tns)}[{idxs_e}] = {self(rhs)}")
+            case Query(Table(Alias(), _) as lhs, rhs):
+                self.exec(f"{feed}{self(lhs)} = {self(rhs)}")
                 return None
-            case QueryInto(Table(tns, idxs), op, rhs):
-                idxs_e = ", ".join([self(idx) for idx in idxs])
-                self.exec(f"{feed}{self(tns)}[{idxs_e}] <<{self(op)}>>= {self(rhs)}")
+            case QueryInto(Table() as lhs, op, rhs):
+                self.exec(f"{feed}{self(lhs)} <<{self(op)}>>= {self(rhs)}")
+                return None
+            case Fuse(idx, body):
+                ctx_2 = self.subblock()
+                ctx_2(body)
+                self.exec(f"{feed}fuse({self(idx)}):\n{ctx_2.emit()}")
                 return None
             case Plan(bodies):
                 ctx_2 = self.block()

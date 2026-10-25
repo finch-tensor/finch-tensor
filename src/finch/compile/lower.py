@@ -81,7 +81,8 @@ class FinchTensorFType(TensorFType[FT], ABC):
     @abstractmethod
     def lower_declare(self, ctx, tns, init, op, shape):
         """
-        Declare a tensor. A tensor with a dynamic fill takes `init` as its fill.
+        Resize a tensor to `shape` and initialize it. A tensor with a dynamic
+        fill takes `init` as its fill.
         """
 
     def lower_fill(self, ctx, obj):
@@ -128,12 +129,11 @@ class ExtentFType(ImmutableStructFType):
     def from_fields(self, start, end) -> Extent:
         return Extent(start, end)
 
-    def __call__(self, *args):
-        match args:
-            # Folding `make_extent` on literals converts its result to this type.
-            case (Extent() as ext,):
-                return ext
-        raise TypeError(f"{self.struct_name} is not callable")
+    def __call__(self, val):
+        match val:
+            case Extent():
+                return val
+        raise TypeError(f"Cannot convert {val!r} to {self.struct_name}")
 
     def lower_loop(
         self,
@@ -369,6 +369,7 @@ class NotationCompiler(UnvalidatedForm, NotationLoader):
             ctx_transforms = (LowerPackedStructSlots(),)
         self.ctx_transforms = ctx_transforms
         self.ctx_lower: NotationLowerer = ctx_lower
+        self.mode = ctx_lower.mode
 
     def lower(self, prgm: ntn.Module) -> AssemblyLibrary:
         asm_code = self.ctx_lower(prgm)
@@ -440,9 +441,10 @@ class AssemblyContext(Context):
             pos_t = fields["pos"]
         elif "val" in fields and hasattr(fields["val"], "length_type"):
             pos_t = fields["val"].length_type
-        elif getattr(type_, "shape_type", None) == ():
+        elif getattr(type_, "shape_type", None) == () or "val" not in fields:
             # 0-d tensors store their value directly rather than in a
-            # positioned buffer; the cursor position is unused.
+            # positioned buffer, and pattern tensors store no values; the
+            # cursor position is unused.
             pos_t = np.intp
         else:
             raise TypeError(f"Cannot create an assembly cursor for {type_}")
@@ -549,6 +551,9 @@ class AssemblyContext(Context):
         node.
         """
         match prgm:
+            case ntn.Assert(exp):
+                self.exec(asm.Assert(self(exp)))
+                return None
             case ntn.Literal(value):
                 return asm.Literal(value)
             case ntn.Value(expr, _):
@@ -654,9 +659,27 @@ class AssemblyContext(Context):
                         f"Declaring {tns} with {init} would change its static "
                         f"fill {fill.value!r}"
                     )
+                # Evaluate initializers and shapes before changing tensor fields.
                 init_e = self(init)
+                match init_e:
+                    case asm.Literal() | asm.Variable():
+                        pass
+                    case _:
+                        var = asm.Variable(self.freshen("init"), init_e.result_type)
+                        self.exec(asm.Assign(var, init_e))
+                        init_e = var
                 op_e = self(op)
-                shape_e = [self(s) for s in shape]
+                shape_e = []
+                for dim in shape:
+                    dim_e = self(dim)
+                    match dim_e:
+                        case asm.Literal() | asm.Variable():
+                            pass
+                        case _:
+                            var = asm.Variable(self.freshen("dim"), dim_e.result_type)
+                            self.exec(asm.Assign(var, dim_e))
+                            dim_e = var
+                    shape_e.append(dim_e)
                 return tns.result_type.lower_declare(self, tns, init_e, op_e, shape_e)
             case ntn.Freeze(tns, op):
                 self._freeze_tensor(tns.name, op)

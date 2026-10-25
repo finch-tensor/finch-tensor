@@ -19,8 +19,8 @@ from finch.autoschedule.tensor_stats import DenseStatsFactory
 from finch.autoschedule.util import propagate_copy_queries, resugar_query_into
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -34,7 +34,13 @@ from finch.tensor import BufferizedNDArray
 from .conftest import finch_assert_equal
 
 i, j, k = Field("i"), Field("j"), Field("k")
-A, B, C, D, V = Alias("A"), Alias("B"), Alias("C"), Alias("D"), Alias("V")
+A, B, C, D, V = (
+    HardAlias("A"),
+    HardAlias("B"),
+    HardAlias("C"),
+    HardAlias("D"),
+    HardAlias("V"),
+)
 
 A_DATA = np.array([[1.0, 2.0], [3.0, 4.0]])
 B_DATA = np.array([[5.0, 6.0], [7.0, 8.0]])
@@ -90,7 +96,7 @@ def test_query_into_update_is_visible_to_later_queries(scheduler):
 
 def test_query_into_printer():
     stmt = QueryInto(Table(A, (i, j)), Literal(ffuncs.add), Table(B, (j, i)))
-    assert str(stmt) == "A[i, j] <<add>>= Table(B, j, i)"
+    assert str(stmt) == "A[i, j] <<add>>= B[j, i]"
 
 
 def test_query_into_as_query():
