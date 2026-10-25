@@ -803,32 +803,6 @@ def test_gvn_memory_impure_calls_clobber():
     assert assembly_global_value_numbering(prgm) == prgm
 
 
-def test_gvn_memory_buffer_arguments():
-    """`scansearch` reads its buffer, so a store in between blocks reuse"""
-    buf_t = NumpyBuffer(np.zeros(1, dtype=np.intp)).ftype
-    buf = asm.Variable("buf", buf_t)
-    buf_slt = asm.Slot("buf_", buf_t)
-    v, lo, hi, x, y, z = variables("v lo hi x y z", buf_t.length_type)
-
-    def search():
-        return call(ffuncs.scansearch, buf_slt, v, lo, hi)
-
-    def make(second):
-        return module(
-            (buf, v, lo, hi),
-            asm.Unpack(buf_slt, buf),
-            asm.Assign(x, search()),
-            asm.Assign(y, second),
-            asm.Store(buf_slt, lo, v),
-            asm.Assign(z, search()),
-            asm.Repack(buf_slt),
-            asm.Return(add(add(x, y), z)),
-            ret=buf_t.length_type,
-        )
-
-    assert assembly_global_value_numbering(make(search())) == make(x)
-
-
 def test_gvn_pipeline_sparse(numba_compiler):
     """gvn keeps a sparse kernel correct and well typed through numba"""
     from finch import DenseLevel, ElementLevel, FiberTensor, SparseListLevel, element

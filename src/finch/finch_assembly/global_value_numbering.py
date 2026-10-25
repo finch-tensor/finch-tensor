@@ -211,7 +211,7 @@ class AssemblyGlobalValueNumbering(AbstractAssemblyDataflow):
                 if arg_values is None:
                     return None
                 if not all(is_scalar_type(self.result_type(arg)) for arg in args):
-                    # e.g. `scansearch` reads its buffer argument
+                    # the op may read its buffer arguments
                     arg_values += (_HEAP, _STRUCT)
                 self.op_names[op_key] = qual_str(op)
                 return Apply(op_key, arg_values)
