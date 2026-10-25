@@ -1465,6 +1465,51 @@ def test_c_min_max(operator, values):
     np.testing.assert_equal(result, expected)
 
 
+@pytest.mark.c_backend
+@pytest.mark.parametrize("operator", [ffuncs.truediv, ffuncs.floordiv, ffuncs.mod])
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.int64(7), np.int64(2)),
+        (np.int64(-7), np.int64(2)),
+        (np.int64(7), np.int64(-2)),
+        (np.int64(-7), np.int64(-2)),
+        (np.int64(-6), np.int64(3)),
+        (np.int8(-7), np.int32(2)),
+        (np.uint64(7), np.uint64(2)),
+        (np.float64(-7.5), np.float64(2.0)),
+        (np.float64(7.5), np.float64(-2.0)),
+        (np.float64(6.0), np.float64(-3.0)),
+        (np.float32(-7.5), np.float32(2.0)),
+    ],
+)
+def test_c_division(operator, values):
+    """c rounds and signs division and mod like numpy, not like c"""
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "divide",
+                    asm.AssemblyKernelFType(
+                        "divide",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = CCompiler()(program).divide(*values)
+    expected = operator(*values)
+    assert type(result) is type(expected)
+    np.testing.assert_equal(result, expected)
+
+
 @mlir_backend
 @pytest.mark.parametrize(
     "condition,expected",

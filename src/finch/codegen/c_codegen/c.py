@@ -282,10 +282,6 @@ def c_function_name(op: FType, ctx: Any, *args: Any) -> str:
             return "*"
         case ffuncs._SubFType():
             return "-"
-        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
-            return "/"
-        case ffuncs._ModFType():
-            return "%"
         case ffuncs._LShiftFType():
             return "<<"
         case ffuncs._RShiftFType():
@@ -434,6 +430,8 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
         case ffuncs._WhereFType():
             cond, x, y = args
             return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
+        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType() | ffuncs._ModFType():
+            return c_division(ctx, op_type, *args)
         case ffuncs._MinFType() | ffuncs._MaxFType():
             # Like np.minimum and np.maximum, a NaN argument wins. Only a NaN
             # on the left needs a check, since comparisons with NaN are false.
@@ -463,9 +461,6 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
             return c_nary_function_call(c_symbol, ctx, *args)
         case (
             ffuncs._SubFType()
-            | ffuncs._TrueDivFType()
-            | ffuncs._FloorDivFType()
-            | ffuncs._ModFType()
             | ffuncs._LShiftFType()
             | ffuncs._RShiftFType()
             | ffuncs._EqFType()
@@ -485,6 +480,46 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
             return op_type.c_function_call(op, ctx, *args)
         case _:
             raise TypeError(f"{op} has no C representation.")
+
+
+def c_division(
+    ctx: Any, op_type: ffuncs.BinaryFinchOperatorFType, a: Any, b: Any
+) -> str:
+    """
+    truediv, floordiv and mod like numpy: c's `/` and `%` truncate ints toward
+    zero, `/` on two ints isn't a true division and `%` doesn't take floats.
+    """
+    result_type = op_type.return_type(a.result_type, b.result_type)
+    type_code = ctx.ctype_name(c_type(result_type))
+    x, y = (f"(({type_code}){ctx(ctx.cache('div', arg))})" for arg in (a, b))
+    dtype = np_dtype(result_type)
+    rem = ctx.freshen("rem")
+    if np.issubdtype(dtype, np.floating):
+        ctx.add_header("#include <math.h>")
+        match op_type:
+            case ffuncs._TrueDivFType():
+                return f"({x} / {y})"
+            case ffuncs._FloorDivFType():
+                return f"(({type_code})floor({x} / {y}))"
+        # the remainder takes the sign of the divisor, even when it's zero
+        ctx.exec(f"{ctx.feed}{type_code} {rem} = ({type_code})fmod({x}, {y});")
+        return (
+            f"({rem} != 0 ? ((({rem} < 0) != ({y} < 0)) ? {rem} + {y} : {rem})"
+            f" : ({type_code})copysign(0.0, {y}))"
+        )
+    match op_type:
+        case ffuncs._TrueDivFType() | ffuncs._FloorDivFType():
+            symbol = "/"
+        case _:
+            symbol = "%"
+    if not np.issubdtype(dtype, np.signedinteger):
+        return f"({x} {symbol} {y})"
+    # round toward negative infinity, so the remainder has the sign of the divisor
+    ctx.exec(f"{ctx.feed}{type_code} {rem} = {x} % {y};")
+    floored = f"({rem} != 0 && (({rem} < 0) != ({y} < 0)))"
+    if symbol == "/":
+        return f"({x} / {y} - {floored})"
+    return f"({rem} + ({floored} ? {y} : 0))"
 
 
 def c_literal(ctx: Any, val: Any) -> str:
