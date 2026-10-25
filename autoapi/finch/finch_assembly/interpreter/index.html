@@ -5913,9 +5913,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 58</span>
-<span class="normal"> 59</span>
-<span class="normal"> 60</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
 <span class="normal"> 61</span>
 <span class="normal"> 62</span>
 <span class="normal"> 63</span>
@@ -6241,7 +6239,13 @@
 <span class="normal">383</span>
 <span class="normal">384</span>
 <span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">AssemblyLoader</span><span class="p">):</span>
+<span class="normal">386</span>
+<span class="normal">387</span>
+<span class="normal">388</span>
+<span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreter</span><span class="p">(</span><span class="n">UnvalidatedForm</span><span class="p">,</span> <span class="n">AssemblyLoader</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    An interpreter for FinchAssembly.</span>
 <span class="sd">    """</span>
@@ -6413,6 +6417,10 @@
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
                 <span class="n">f_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
                 <span class="n">args_e</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prgm</span><span class="o">.</span><span class="n">result_type</span><span class="p">,</span> <span class="n">FDTypeUnsignedInteger</span><span class="p">):</span>
+                    <span class="c1"># Unsigned arithmetic wraps, as in compiled code.</span>
+                    <span class="k">with</span> <span class="n">np</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">over</span><span class="o">=</span><span class="s2">"ignore"</span><span class="p">):</span>
+                        <span class="k">return</span> <span class="n">f_e</span><span class="p">(</span><span class="o">*</span><span class="n">args_e</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">f_e</span><span class="p">(</span><span class="o">*</span><span class="n">args_e</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Load</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
                 <span class="n">buf_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">buf</span><span class="p">)</span>
@@ -6435,7 +6443,7 @@
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Length</span><span class="p">(</span><span class="n">buf</span><span class="p">):</span>
                 <span class="n">buf_e</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">buf</span><span class="p">)</span>
-                <span class="k">return</span> <span class="n">buf_e</span><span class="o">.</span><span class="n">length</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">buf</span><span class="o">.</span><span class="n">result_type</span><span class="o">.</span><span class="n">length_type</span><span class="p">(</span><span class="n">buf_e</span><span class="o">.</span><span class="n">length</span><span class="p">())</span>
             <span class="k">case</span> <span class="n">asm</span><span class="o">.</span><span class="n">Block</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">:</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">should_halt</span><span class="p">():</span>
@@ -6608,13 +6616,13 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
-<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Run the program.</span>
 <span class="sd">    """</span>
@@ -6644,9 +6652,7 @@ This allows for nested scopes and variable shadowing.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 89</span>
-<span class="normal"> 90</span>
-<span class="normal"> 91</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 91</span>
 <span class="normal"> 92</span>
 <span class="normal"> 93</span>
 <span class="normal"> 94</span>
@@ -6678,7 +6684,9 @@ This allows for nested scopes and variable shadowing.</p>
 <span class="normal">120</span>
 <span class="normal">121</span>
 <span class="normal">122</span>
-<span class="normal">123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">scope</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">bindings</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">slots</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -6737,9 +6745,7 @@ statement is encountered.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">127</span>
 <span class="normal">128</span>
 <span class="normal">129</span>
 <span class="normal">130</span>
@@ -6748,7 +6754,9 @@ statement is encountered.</p>
 <span class="normal">133</span>
 <span class="normal">134</span>
 <span class="normal">135</span>
-<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">should_halt</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Check if the interpreter should halt execution.</span>
 <span class="sd">    This is used to stop execution in loops or when a return</span>
@@ -6803,9 +6811,7 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
@@ -6814,7 +6820,9 @@ This is a simple interpreter that executes the assembly code.</p>
 <span class="normal">22</span>
 <span class="normal">23</span>
 <span class="normal">24</span>
-<span class="normal">25</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreterKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreterKernel</span><span class="p">(</span><span class="n">AssemblyKernel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A kernel for interpreting FinchAssembly code.</span>
 <span class="sd">    This is a simple interpreter that executes the assembly code.</span>
@@ -6878,9 +6886,7 @@ This is a simple interpreter that executes the assembly code.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
@@ -6893,7 +6899,9 @@ This is a simple interpreter that executes the assembly code.</p>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
-<span class="normal">43</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreterLibrary</span><span class="p">(</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AssemblyInterpreterLibrary</span><span class="p">(</span><span class="n">AssemblyLibrary</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent an interpreted module of FinchAssembly.</span>
 <span class="sd">    """</span>
@@ -6965,16 +6973,16 @@ what the return value is if applicable.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_assembly/interpreter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">48</span>
 <span class="normal">49</span>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
-<span class="normal">55</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">HaltState</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class to represent the halt state of an assembly program.</span>

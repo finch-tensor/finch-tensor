@@ -5771,7 +5771,10 @@
 
         <p>Byte map with sorted, zero-based packed child positions in <code>srt</code>.</p>
 <p>Each child position is <code>parent * dimension + index</code>; <code>ptr</code> groups
-these positions by parent, and <code>tbl</code> marks the stored children.</p>
+these positions by parent, and <code>tbl</code> marks the stored children. An
+occupied parent <code>p</code> owns <code>srt[ptr[p]:ptr[p + 1]]</code>, while an unoccupied
+parent's <code>ptr[p]</code> is -1. While assembling, <code>srt[:qos_fill]</code> lists the
+stored children in insertion order, and <code>qos_stop</code> is its capacity.</p>
 
 
 
@@ -5782,47 +5785,62 @@ these positions by parent, and <code>tbl</code> marks the stored children.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/sparse_bytemap_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
-<span class="normal">153</span>
-<span class="normal">154</span>
-<span class="normal">155</span>
-<span class="normal">156</span>
-<span class="normal">157</span>
-<span class="normal">158</span>
-<span class="normal">159</span>
-<span class="normal">160</span>
-<span class="normal">161</span>
-<span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseByteMapLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Byte map with sorted, zero-based packed child positions in ``srt``.</span>
 
 <span class="sd">    Each child position is ``parent * dimension + index``; ``ptr`` groups</span>
-<span class="sd">    these positions by parent, and ``tbl`` marks the stored children.</span>
+<span class="sd">    these positions by parent, and ``tbl`` marks the stored children. An</span>
+<span class="sd">    occupied parent ``p`` owns ``srt[ptr[p]:ptr[p + 1]]``, while an unoccupied</span>
+<span class="sd">    parent's ``ptr[p]`` is -1. While assembling, ``srt[:qos_fill]`` lists the</span>
+<span class="sd">    stored children in insertion order, and ``qos_stop`` is its capacity.</span>
 <span class="sd">    """</span>
 
     <span class="n">lvl</span><span class="p">:</span> <span class="n">Level</span>
@@ -5830,6 +5848,8 @@ these positions by parent, and <code>tbl</code> marks the stored children.</p>
     <span class="n">ptr</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">tbl</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">srt</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">qos_fill</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">qos_stop</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ptr</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -5838,6 +5858,13 @@ these positions by parent, and <code>tbl</code> marks the stored children.</p>
             <span class="bp">self</span><span class="o">.</span><span class="n">tbl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">buffer_factory</span><span class="p">(</span><span class="n">ftypes</span><span class="o">.</span><span class="n">bool_</span><span class="p">)(</span><span class="mi">0</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">srt</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">srt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">buffer_factory</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">position_type</span><span class="p">)(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">p_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">position_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qos_fill</span> <span class="o">=</span> <span class="n">p_t</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">srt</span><span class="o">.</span><span class="n">length</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qos_fill</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">qos_fill</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qos_stop</span> <span class="o">=</span> <span class="n">p_t</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">srt</span><span class="o">.</span><span class="n">length</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">qos_stop</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">qos_stop</span>
+        <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
