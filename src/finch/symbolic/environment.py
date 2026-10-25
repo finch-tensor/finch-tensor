@@ -40,7 +40,7 @@ class Namespace:
         Generate a fresh variable name based on the provided tags.
         """
         name = "_".join(str(tag) for tag in tags)
-        m = re.match(r"^(.*)_(\d*)$", name)
+        m = re.match(r"^(.*)_(\d+)$", name)
         if m is None:
             tag = name
             n = 1

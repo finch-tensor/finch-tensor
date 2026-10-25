@@ -2,7 +2,7 @@
 Julia backend benchmarks: sparse-sparse matmul on Boeing ct20stif and statistics
 construction on the full-size datasets shared with the accuracy regression.
 
-The matmul and sampling scan benchmarks fetch Boeing ct20stif via ssgetpy.
+The matmul and sampling scan benchmarks use the bundled Boeing ct20stif.
 Statistics construction uses bundled matrices and seeded synthetic inputs.
 
 Run: ``pixi run --environment=benchmark-julia pytest --codspeed
@@ -16,8 +16,6 @@ excluded because its block extraction builds large dense selectors.
 The sampling scan benchmark constructs fresh stats and scans the sketch each
 iteration, using fixed sample masks and excluding Julia compilation.
 """
-
-from pathlib import Path
 
 import pytest
 
@@ -41,7 +39,7 @@ from finch.autoschedule.tensor_stats import (
 from finch.autoschedule.tensor_stats.exact_stats import ExactStatsFactory
 from finch.compile_jl.julia import julia_available
 from finch.finch_logic import Field
-from finch.tests.stats_cases import DATASETS
+from finch.tests.stats_cases import DATA_DIR, DATASETS
 
 pytestmark = pytest.mark.skipif(
     not julia_available(),
@@ -51,11 +49,7 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="session")
 def boeing_tensor():
-    ssgetpy = pytest.importorskip("ssgetpy")
-    matrix_info = ssgetpy.search(name="ct20stif", group="Boeing")[0]
-    localdestpath, _ = matrix_info.download(format="MM", extract=True)
-    mtx_path = Path(localdestpath) / "ct20stif.mtx"
-    matrix = scipy.io.mmread(mtx_path).tocsr()
+    matrix = scipy.io.mmread(DATA_DIR / "ct20stif.mtx").tocsr()
     return ft.asarray(matrix)
 
 
