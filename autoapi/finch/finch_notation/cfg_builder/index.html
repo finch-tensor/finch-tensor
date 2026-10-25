@@ -2518,34 +2518,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5877,9 +5849,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
 <span class="normal">173</span>
 <span class="normal">174</span>
 <span class="normal">175</span>
@@ -6016,7 +5986,10 @@
 <span class="normal">306</span>
 <span class="normal">307</span>
 <span class="normal">308</span>
-<span class="normal">309</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationCFGBuilder</span><span class="p">:</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NotationCFGBuilder</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Incrementally builds control-flow graph for Finch Notation IR."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -6058,6 +6031,7 @@
                     <span class="bp">self</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">break_block</span><span class="p">,</span> <span class="n">return_block</span><span class="p">)</span>
             <span class="k">case</span> <span class="p">(</span>
                 <span class="n">Assign</span><span class="p">()</span>
+                <span class="o">|</span> <span class="n">Assert</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Increment</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Unpack</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Repack</span><span class="p">()</span>
@@ -6217,8 +6191,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
 <span class="normal">32</span>
@@ -6229,7 +6202,8 @@
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
-<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">40</span>
+<span class="normal">41</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">eq</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">NumberedStatement</span><span class="p">(</span><span class="n">NotationStatement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Wrapper for NotationStatement that assigns a unique id to each statement."""</span>
 
@@ -6289,8 +6263,7 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">44</span>
 <span class="normal">45</span>
 <span class="normal">46</span>
 <span class="normal">47</span>
@@ -6304,7 +6277,8 @@ Returns:
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_build_cfg</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
+<span class="normal">58</span>
+<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_build_cfg</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ControlFlowGraph</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build control-flow graph for a FinchNotation node.</span>
 <span class="sd">    Args:</span>
@@ -6347,9 +6321,7 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">150</span>
-<span class="normal">151</span>
-<span class="normal">152</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">152</span>
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
@@ -6364,7 +6336,9 @@ Returns:
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
-<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_dataflow_postprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NotationNode</span><span class="p">:</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_dataflow_postprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NotationNode</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Postprocess a FinchNotation node after</span>
 <span class="sd">    dataflow analysis (remove numbering).</span>
@@ -6409,8 +6383,7 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">116</span>
-<span class="normal">117</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">117</span>
 <span class="normal">118</span>
 <span class="normal">119</span>
 <span class="normal">120</span>
@@ -6440,7 +6413,9 @@ Returns:
 <span class="normal">144</span>
 <span class="normal">145</span>
 <span class="normal">146</span>
-<span class="normal">147</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_dataflow_preprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NotationNode</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_dataflow_preprocess</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">NotationNode</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Preprocess a FinchNotation node for dataflow analysis (number statements).</span>
 <span class="sd">    Args:</span>
@@ -6462,6 +6437,7 @@ Returns:
                 <span class="o">|</span> <span class="n">Freeze</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Thaw</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Assign</span><span class="p">()</span>
+                <span class="o">|</span> <span class="n">Assert</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Increment</span><span class="p">()</span>
                 <span class="o">|</span> <span class="n">Return</span><span class="p">()</span>
             <span class="p">):</span>
@@ -6499,8 +6475,7 @@ Returns:
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_notation/cfg_builder.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
@@ -6551,7 +6526,8 @@ Returns:
 <span class="normal">110</span>
 <span class="normal">111</span>
 <span class="normal">112</span>
-<span class="normal">113</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_desugar</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NotationNode</span><span class="p">:</span>
+<span class="normal">113</span>
+<span class="normal">114</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">notation_desugar</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">NotationNode</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NotationNode</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Lower surface syntax to a core AST shape before CFG construction.</span>
 

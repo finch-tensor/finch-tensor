@@ -2654,34 +2654,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5901,7 +5873,8 @@
 
         <p>A cost model where each loop prefix, including the empty prefix, is a component.
 components yields prefixes in query order, from the shortest prefix to the
-longest, and get_component_features returns one row for each prefix.
+longest, and get_component_features returns one row for each prefix. The
+loop order of a query is the fields of its enclosing Fuse nodes.
 Predictors used with branch-and-bound loop search must predict nonnegative
 component costs.</p>
 
@@ -5953,11 +5926,13 @@ component costs.</p>
 <span class="normal">77</span>
 <span class="normal">78</span>
 <span class="normal">79</span>
-<span class="normal">80</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LoopCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">Prefix</span><span class="p">]):</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">LoopCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">Prefix</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A cost model where each loop prefix, including the empty prefix, is a component.</span>
 <span class="sd">    components yields prefixes in query order, from the shortest prefix to the</span>
-<span class="sd">    longest, and get_component_features returns one row for each prefix.</span>
+<span class="sd">    longest, and get_component_features returns one row for each prefix. The</span>
+<span class="sd">    loop order of a query is the fields of its enclosing Fuse nodes.</span>
 <span class="sd">    Predictors used with branch-and-bound loop search must predict nonnegative</span>
 <span class="sd">    component costs.</span>
 <span class="sd">    """</span>
@@ -5967,31 +5942,31 @@ component costs.</p>
         <span class="n">term</span><span class="p">:</span> <span class="n">LogicStatement</span><span class="p">,</span>
         <span class="n">bindings</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
         <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
+        <span class="n">loop_order</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">Prefix</span><span class="p">]:</span>
         <span class="k">match</span> <span class="n">term</span><span class="p">:</span>
             <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">:</span>
-                    <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">components</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">machine</span><span class="p">)</span>
+                    <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">components</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="k">case</span> <span class="n">Fuse</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+                <span class="n">loop_order</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">loop_order</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+                <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">components</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">loop_order</span><span class="p">)</span>
                 <span class="k">return</span>
             <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(),</span> <span class="k">_</span><span class="p">,</span> <span class="n">Literal</span><span class="p">()):</span>
                 <span class="n">machine</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
                 <span class="k">return</span>
             <span class="k">case</span> <span class="n">Produces</span><span class="p">():</span>
                 <span class="k">return</span>
-            <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">Table</span><span class="p">()</span> <span class="k">as</span> <span class="n">expr</span><span class="p">):</span>
-                <span class="n">idxs</span> <span class="o">=</span> <span class="n">lhs_idxs</span>
-            <span class="k">case</span> <span class="n">Query</span><span class="p">(</span>
-                <span class="n">Table</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span>
-                <span class="n">Aggregate</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">)</span> <span class="k">as</span> <span class="n">expr</span><span class="p">,</span>
-            <span class="p">):</span>
+            <span class="k">case</span><span class="w"> </span><span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">expr</span><span class="p">):</span>
                 <span class="k">pass</span>
-            <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">Reorder</span><span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">idxs</span><span class="p">)):</span>
+            <span class="k">case</span><span class="w"> </span><span class="n">QueryInto</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">):</span>
                 <span class="n">expr</span> <span class="o">=</span> <span class="n">term</span><span class="o">.</span><span class="n">as_query</span><span class="p">()</span><span class="o">.</span><span class="n">rhs</span>
             <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported statement type: </span><span class="si">{</span><span class="n">term</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">idxs</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
-            <span class="k">yield</span> <span class="n">Prefix</span><span class="p">(</span><span class="n">idxs</span><span class="p">[:</span><span class="n">n</span><span class="p">],</span> <span class="n">expr</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">loop_order</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="n">Prefix</span><span class="p">(</span><span class="n">loop_order</span><span class="p">[:</span><span class="n">n</span><span class="p">],</span> <span class="n">expr</span><span class="p">,</span> <span class="n">lhs_idxs</span><span class="p">)</span>
         <span class="n">machine</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6046,8 +6021,7 @@ prefixes. By default, allocations are weighted 10x reads and operations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 83</span>
-<span class="normal"> 84</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 84</span>
 <span class="normal"> 85</span>
 <span class="normal"> 86</span>
 <span class="normal"> 87</span>
@@ -6129,7 +6103,8 @@ prefixes. By default, allocations are weighted 10x reads and operations.</p>
 <span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
-<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PigeonCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PigeonCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    PigeonCostModel counts iteration, operation, and output costs across loop</span>
 <span class="sd">    prefixes. By default, allocations are weighted 10x reads and operations.</span>
@@ -6249,8 +6224,7 @@ including the empty one, gives the query's features.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">100</span>
-<span class="normal">101</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">101</span>
 <span class="normal">102</span>
 <span class="normal">103</span>
 <span class="normal">104</span>
@@ -6315,7 +6289,8 @@ including the empty one, gives the query's features.</p>
 <span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
-<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
+<span class="normal">166</span>
+<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="n">Prefix</span><span class="p">,</span>
     <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>
@@ -6498,8 +6473,7 @@ output_vars orders the output of the query, when there is one.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">169</span>
-<span class="normal">170</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
 <span class="normal">171</span>
 <span class="normal">172</span>
 <span class="normal">173</span>
@@ -6548,7 +6522,8 @@ output_vars orders the output of the query, when there is one.</p>
 <span class="normal">216</span>
 <span class="normal">217</span>
 <span class="normal">218</span>
-<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TransposeCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
+<span class="normal">219</span>
+<span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TransposeCostModel</span><span class="p">(</span><span class="n">LoopCostModel</span><span class="p">,</span> <span class="n">LoopOrderedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Count dense and sparse transposed entries, charging each input once per query.</span>
 <span class="sd">    """</span>
@@ -6634,8 +6609,7 @@ have no transposition cost.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/cost_models/loop_cost_models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">185</span>
-<span class="normal">186</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">186</span>
 <span class="normal">187</span>
 <span class="normal">188</span>
 <span class="normal">189</span>
@@ -6668,7 +6642,8 @@ have no transposition cost.</p>
 <span class="normal">216</span>
 <span class="normal">217</span>
 <span class="normal">218</span>
-<span class="normal">219</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
+<span class="normal">219</span>
+<span class="normal">220</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_component_features</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">component</span><span class="p">:</span> <span class="n">Prefix</span><span class="p">,</span>
     <span class="n">machine</span><span class="p">:</span> <span class="n">StatsMachine</span><span class="p">[</span><span class="n">NS</span><span class="p">],</span>

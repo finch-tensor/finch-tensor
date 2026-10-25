@@ -2518,34 +2518,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5804,7 +5776,8 @@
 
 
 
-        <p>Safe mode checks tensor extents; debug also checks buffer accesses.</p>
+        <p>Safe mode checks shared dimensions and tensor extents; debug also checks
+buffer accesses.</p>
 
 
 
@@ -5820,9 +5793,11 @@
 <span class="normal"> 7</span>
 <span class="normal"> 8</span>
 <span class="normal"> 9</span>
-<span class="normal">10</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">10</span>
+<span class="normal">11</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">CompilerMode</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Safe mode checks tensor extents; debug also checks buffer accesses."""</span>
+<span class="w">    </span><span class="sd">"""Safe mode checks shared dimensions and tensor extents; debug also checks</span>
+<span class="sd">    buffer accesses."""</span>
 
     <span class="n">safe</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
@@ -5881,8 +5856,7 @@ validate their inputs.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/stage.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">25</span>
-<span class="normal">26</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
 <span class="normal">29</span>
@@ -5890,7 +5864,8 @@ validate their inputs.</p>
 <span class="normal">31</span>
 <span class="normal">32</span>
 <span class="normal">33</span>
-<span class="normal">34</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Form</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="normal">34</span>
+<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Form</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A Form represents the invariants that must hold for the inputs to be valid</span>
 <span class="sd">    for a given stage. It will typically be a combination of a grammar and a</span>
@@ -5953,14 +5928,14 @@ This is essentially a to-do for validation and should be replaced.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/symbolic/stage.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">37</span>
-<span class="normal">38</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">38</span>
 <span class="normal">39</span>
 <span class="normal">40</span>
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
-<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnvalidatedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
+<span class="normal">44</span>
+<span class="normal">45</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">UnvalidatedForm</span><span class="p">(</span><span class="n">Form</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    UnvalidatedForm does not perform any validation on the input logic.</span>
 <span class="sd">    This is essentially a to-do for validation and should be replaced.</span>

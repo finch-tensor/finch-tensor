@@ -2643,34 +2643,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5886,8 +5858,7 @@ sample_probs : per-dimension probabilities in index_order</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">583</span>
-<span class="normal">584</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">584</span>
 <span class="normal">585</span>
 <span class="normal">586</span>
 <span class="normal">587</span>
@@ -6047,7 +6018,14 @@ sample_probs : per-dimension probabilities in index_order</p>
 <span class="normal">741</span>
 <span class="normal">742</span>
 <span class="normal">743</span>
-<span class="normal">744</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
+<span class="normal">744</span>
+<span class="normal">745</span>
+<span class="normal">746</span>
+<span class="normal">747</span>
+<span class="normal">748</span>
+<span class="normal">749</span>
+<span class="normal">750</span>
+<span class="normal">751</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStats</span><span class="p">(</span><span class="n">NumericStats</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    sketch : materialized table over bound dimensions</span>
 <span class="sd">    remainder_size : product of sizes of dimensions aggregated out of the sketch</span>
@@ -6137,7 +6115,7 @@ sample_probs : per-dimension probabilities in index_order</p>
             <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">mask</span> <span class="o">=</span> <span class="n">RandomMaskTensor</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="n">prob</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">)</span>
-            <span class="n">out</span> <span class="o">=</span> <span class="n">Alias</span><span class="p">(</span><span class="s2">"sampled_count"</span><span class="p">)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">HardAlias</span><span class="p">(</span><span class="s2">"sampled_count"</span><span class="p">)</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span>
                 <span class="n">Table</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="p">()),</span>
                 <span class="n">Aggregate</span><span class="p">(</span>
@@ -6156,8 +6134,12 @@ sample_probs : per-dimension probabilities in index_order</p>
             <span class="k">return</span> <span class="n">d_n_raw</span>
         <span class="k">return</span> <span class="n">d_n_raw</span> <span class="o">/</span> <span class="n">coverage</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">"""Correct reduced-dimension sampling, then scale to all output coordinates."""</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">over</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""</span>
+<span class="sd">        Correct reduced-dimension sampling, then scale to all output coordinates.</span>
+<span class="sd">        Non-fill values are assumed to be spread evenly over the slices which fix</span>
+<span class="sd">        the fields of `over`.</span>
+<span class="sd">        """</span>
         <span class="n">q_output</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_probs</span><span class="p">)</span>
         <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">remainder_prob</span>
         <span class="n">needs_freq</span> <span class="o">=</span> <span class="p">(</span>
@@ -6201,7 +6183,9 @@ sample_probs : per-dimension probabilities in index_order</p>
                 <span class="sa">f</span><span class="s2">"Choose from: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">SAMPLING_ESTIMATORS</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
             <span class="p">)</span>
 
-        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">bound_size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">formula_est</span><span class="p">)</span> <span class="o">/</span> <span class="n">q_output</span><span class="p">))</span>
+        <span class="n">total</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">bound_size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">formula_est</span><span class="p">)</span> <span class="o">/</span> <span class="n">q_output</span><span class="p">)</span>
+        <span class="n">slices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dim_space_size</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">over</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">)</span> <span class="o">/</span> <span class="n">slices</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">get_embedding</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
         <span class="n">sizes</span> <span class="o">=</span> <span class="p">[</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">f</span><span class="p">])</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">]</span>
@@ -6229,20 +6213,21 @@ sample_probs : per-dimension probabilities in index_order</p>
 
 
 <h3 id="finch.autoschedule.tensor_stats.sampling_stats.SamplingStats.estimate_non_fill_values" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">estimate_non_fill_values</span><span class="p">()</span></code>
+            <code class="highlight language-python"><span class="n">estimate_non_fill_values</span><span class="p">(</span><span class="n">over</span><span class="o">=</span><span class="p">())</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Correct reduced-dimension sampling, then scale to all output coordinates.</p>
+        <p>Correct reduced-dimension sampling, then scale to all output coordinates.
+Non-fill values are assumed to be spread evenly over the slices which fix
+the fields of <code>over</code>.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">692</span>
-<span class="normal">693</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">693</span>
 <span class="normal">694</span>
 <span class="normal">695</span>
 <span class="normal">696</span>
@@ -6286,8 +6271,19 @@ sample_probs : per-dimension probabilities in index_order</p>
 <span class="normal">734</span>
 <span class="normal">735</span>
 <span class="normal">736</span>
-<span class="normal">737</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Correct reduced-dimension sampling, then scale to all output coordinates."""</span>
+<span class="normal">737</span>
+<span class="normal">738</span>
+<span class="normal">739</span>
+<span class="normal">740</span>
+<span class="normal">741</span>
+<span class="normal">742</span>
+<span class="normal">743</span>
+<span class="normal">744</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">over</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""</span>
+<span class="sd">    Correct reduced-dimension sampling, then scale to all output coordinates.</span>
+<span class="sd">    Non-fill values are assumed to be spread evenly over the slices which fix</span>
+<span class="sd">    the fields of `over`.</span>
+<span class="sd">    """</span>
     <span class="n">q_output</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sample_probs</span><span class="p">)</span>
     <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">remainder_prob</span>
     <span class="n">needs_freq</span> <span class="o">=</span> <span class="p">(</span>
@@ -6331,7 +6327,9 @@ sample_probs : per-dimension probabilities in index_order</p>
             <span class="sa">f</span><span class="s2">"Choose from: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">SAMPLING_ESTIMATORS</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
-    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="n">bound_size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">formula_est</span><span class="p">)</span> <span class="o">/</span> <span class="n">q_output</span><span class="p">))</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">bound_size</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="n">d_n</span><span class="p">,</span> <span class="n">formula_est</span><span class="p">)</span> <span class="o">/</span> <span class="n">q_output</span><span class="p">)</span>
+    <span class="n">slices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dim_space_size</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">over</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_order</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">total</span><span class="p">)</span> <span class="o">/</span> <span class="n">slices</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6372,8 +6370,7 @@ sample_probs : per-dimension probabilities in index_order</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">276</span>
-<span class="normal">277</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">277</span>
 <span class="normal">278</span>
 <span class="normal">279</span>
 <span class="normal">280</span>
@@ -6676,7 +6673,8 @@ sample_probs : per-dimension probabilities in index_order</p>
 <span class="normal">577</span>
 <span class="normal">578</span>
 <span class="normal">579</span>
-<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span>
+<span class="normal">580</span>
+<span class="normal">581</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SamplingStatsFactory</span><span class="p">(</span>
     <span class="n">BaseTensorStatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">],</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="s2">"SamplingStats"</span><span class="p">]</span>
 <span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sample_nnz</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10_000</span><span class="p">,</span> <span class="n">estimator</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"sh3"</span><span class="p">):</span>
@@ -7015,8 +7013,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">479</span>
-<span class="normal">480</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">480</span>
 <span class="normal">481</span>
 <span class="normal">482</span>
 <span class="normal">483</span>
@@ -7078,7 +7075,8 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 <span class="normal">539</span>
 <span class="normal">540</span>
 <span class="normal">541</span>
-<span class="normal">542</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
+<span class="normal">542</span>
+<span class="normal">543</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">aggregate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span>
     <span class="n">init</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -7164,8 +7162,7 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/sampling_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">357</span>
-<span class="normal">358</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">358</span>
 <span class="normal">359</span>
 <span class="normal">360</span>
 <span class="normal">361</span>
@@ -7184,7 +7181,8 @@ otherwise : N(B)_i = prod(l in k)n_l * exists(N(A)_j)</p>
 <span class="normal">374</span>
 <span class="normal">375</span>
 <span class="normal">376</span>
-<span class="normal">377</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">remask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats</span><span class="p">:</span> <span class="n">SamplingStats</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SamplingStats</span><span class="p">:</span>
+<span class="normal">377</span>
+<span class="normal">378</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">remask</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stats</span><span class="p">:</span> <span class="n">SamplingStats</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SamplingStats</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""Halve the largest nonzero projection until the sketch fits the budget."""</span>
     <span class="k">if</span> <span class="p">(</span>
         <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">dim_sizes</span><span class="p">[</span><span class="n">f</span><span class="p">])</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">)</span>

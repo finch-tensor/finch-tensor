@@ -1485,6 +1485,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.smart_formatter.SmartFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SmartFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SmartFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.smart_formatter.SmartFormatter.get_tensor_ftype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_tensor_ftype
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2567,34 +2595,6 @@
     
   
     mlir
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
   
 
     
@@ -5695,6 +5695,34 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.smart_formatter.SmartFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SmartFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="SmartFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#finch.autoschedule.formatter.smart_formatter.SmartFormatter.get_tensor_ftype" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        get_tensor_ftype
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -5762,7 +5790,8 @@
 
         <p>CostFormatter chooses the format of each alias from the level options with
 the lowest cost under cost_model, memoizing the best format for each depth and
-input position count.</p>
+input position count. The cost of a level is summed over the blocks of its
+alias in the program.</p>
 
 
 
@@ -5773,23 +5802,7 @@ input position count.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/formatter/smart_formatter.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
@@ -5850,11 +5863,39 @@ input position count.</p>
 <span class="normal">302</span>
 <span class="normal">303</span>
 <span class="normal">304</span>
-<span class="normal">305</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CostFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span>
+<span class="normal">331</span>
+<span class="normal">332</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CostFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    CostFormatter chooses the format of each alias from the level options with</span>
 <span class="sd">    the lowest cost under cost_model, memoizing the best format for each depth and</span>
-<span class="sd">    input position count.</span>
+<span class="sd">    input position count. The cost of a level is summed over the blocks of its</span>
+<span class="sd">    alias in the program.</span>
 <span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -5892,29 +5933,32 @@ input position count.</p>
     <span class="p">):</span>
         <span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">machine</span> <span class="o">=</span> <span class="n">StatsMachine</span><span class="p">(</span><span class="n">stats_factory</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">stats</span><span class="p">))</span>
-        <span class="n">shape_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_shape_type</span><span class="p">(</span>
-            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">shape_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
-        <span class="p">)</span>
+        <span class="n">shape_types</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">shape_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
         <span class="n">fill_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_fill_type</span><span class="p">(</span>
             <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
         <span class="p">)</span>
+        <span class="c1"># The dimensions each new alias stores, at its first definition.</span>
+        <span class="n">stored_shape_types</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">formatter</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">):</span>
             <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
                 <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">:</span>
                         <span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Fuse</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+                    <span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">)</span>
                 <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">_</span><span class="p">)</span> <span class="o">|</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
                     <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span>
                 <span class="p">):</span>
+                    <span class="n">node</span><span class="o">.</span><span class="n">infer_shape_type</span><span class="p">(</span><span class="n">shape_types</span><span class="p">)</span>
                     <span class="n">machine</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">lhs</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
-                        <span class="n">shape_type</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                    <span class="n">alias</span><span class="p">,</span> <span class="n">nfused</span> <span class="o">=</span> <span class="n">lhs</span><span class="o">.</span><span class="n">unfused</span><span class="p">,</span> <span class="n">lhs</span><span class="o">.</span><span class="n">nfused</span>
+                    <span class="k">if</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span> <span class="ow">and</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">stored_shape_types</span><span class="p">:</span>
+                        <span class="n">stored_shape_types</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
                             <span class="n">ftype</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
-                            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape_types</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span>
-                        <span class="p">)</span>
-                        <span class="n">bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tensor_ftype</span><span class="p">(</span>
-                            <span class="n">lhs</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">machine</span><span class="p">,</span> <span class="n">fill_types</span><span class="p">[</span><span class="n">lhs</span><span class="p">],</span> <span class="n">shape_type</span>
+                            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape_types</span><span class="p">[</span><span class="n">alias</span><span class="p">][</span><span class="n">nfused</span><span class="p">:]</span>
                         <span class="p">)</span>
                 <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">():</span>
                     <span class="k">return</span>
@@ -5924,6 +5968,13 @@ input position count.</p>
                     <span class="p">)</span>
 
         <span class="n">formatter</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+        <span class="c1"># Each alias is formatted for all of its blocks in the program, which</span>
+        <span class="c1"># are replayed from the stats before it.</span>
+        <span class="n">initial</span> <span class="o">=</span> <span class="n">StatsMachine</span><span class="p">(</span><span class="n">stats_factory</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">stats</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">shape_type</span> <span class="ow">in</span> <span class="n">stored_shape_types</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">bindings</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tensor_ftype</span><span class="p">(</span>
+                <span class="n">alias</span><span class="p">,</span> <span class="n">prgm</span><span class="p">,</span> <span class="n">initial</span><span class="p">,</span> <span class="n">fill_types</span><span class="p">[</span><span class="n">alias</span><span class="p">],</span> <span class="n">shape_type</span>
+            <span class="p">)</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
 
@@ -5943,6 +5994,259 @@ input position count.</p>
 
 
 
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="finch.autoschedule.formatter.smart_formatter.SmartFormatter" class="doc doc-heading">
+            <code>SmartFormatter</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="LogicFormatter (finch.autoschedule.formatter.formatter.LogicFormatter)" href="../#finch.autoschedule.formatter.LogicFormatter">LogicFormatter</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>src/finch/autoschedule/formatter/smart_formatter.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SmartFormatter</span><span class="p">(</span><span class="n">LogicFormatter</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">loader</span><span class="p">:</span> <span class="n">LogicLoader</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">loader</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">loader</span> <span class="o">=</span> <span class="n">MockLogicLoader</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">loader</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span>
+        <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="n">TensorStats</span><span class="p">,</span>
+        <span class="n">over</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The format of a tensor with the given stats. If `over` lists</span>
+<span class="sd">        fields, each tensor stores one slice which fixes those fields."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">prgm</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
+        <span class="n">stats</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TS</span><span class="p">],</span>
+        <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">bindings</span> <span class="o">=</span> <span class="n">bindings</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">stats_bindings</span><span class="p">:</span> <span class="n">OrderedDict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TS</span><span class="p">]</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span><span class="n">stats</span><span class="p">)</span>
+        <span class="n">stats_interpreter</span> <span class="o">=</span> <span class="n">StatsInterpreter</span><span class="p">(</span><span class="n">stats_factory</span><span class="o">=</span><span class="n">stats_factory</span><span class="p">)</span>
+        <span class="n">shape_types</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">shape_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="n">fill_types</span> <span class="o">=</span> <span class="n">prgm</span><span class="o">.</span><span class="n">infer_fill_type</span><span class="p">(</span>
+            <span class="p">{</span><span class="n">var</span><span class="p">:</span> <span class="n">val</span><span class="o">.</span><span class="n">fill_type</span> <span class="k">for</span> <span class="n">var</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">bindings</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">formatter</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">lgc</span><span class="o">.</span><span class="n">LogicStatement</span><span class="p">:</span>
+            <span class="k">match</span> <span class="n">node</span><span class="p">:</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Plan</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">)</span> <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">))</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Fuse</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Fuse</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">formatter</span><span class="p">(</span><span class="n">body</span><span class="p">))</span>
+                <span class="k">case</span><span class="w"> </span><span class="n">lgc</span><span class="o">.</span><span class="n">Query</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="k">_</span><span class="p">),</span> <span class="n">_</span><span class="p">)</span> <span class="o">|</span> <span class="n">lgc</span><span class="o">.</span><span class="n">QueryInto</span><span class="p">(</span>
+                    <span class="n">lgc</span><span class="o">.</span><span class="n">Table</span><span class="p">(</span><span class="n">lgc</span><span class="o">.</span><span class="n">Alias</span><span class="p">()</span> <span class="k">as</span> <span class="n">lhs</span><span class="p">,</span> <span class="n">_</span><span class="p">),</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span>
+                <span class="p">):</span>
+                    <span class="n">node</span><span class="o">.</span><span class="n">infer_shape_type</span><span class="p">(</span><span class="n">shape_types</span><span class="p">)</span>
+                    <span class="c1"># Evaluating the query gives the stats of the stored result,</span>
+                    <span class="c1"># in the order of its left-hand table.</span>
+                    <span class="n">rhs_stats</span> <span class="o">=</span> <span class="n">stats_interpreter</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs_stats</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Expected query RHS to produce TensorStats."</span><span class="p">)</span>
+                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rhs_stats</span><span class="p">,</span> <span class="n">TensorStats</span><span class="p">)</span>
+                    <span class="n">stats_bindings</span><span class="p">[</span><span class="n">lhs</span><span class="p">]</span> <span class="o">=</span> <span class="n">rhs_stats</span>  <span class="c1"># ty: ignore[invalid-assignment]</span>
+
+                    <span class="n">alias</span><span class="p">,</span> <span class="n">nfused</span> <span class="o">=</span> <span class="n">lhs</span><span class="o">.</span><span class="n">unfused</span><span class="p">,</span> <span class="n">lhs</span><span class="o">.</span><span class="n">nfused</span>
+                    <span class="k">if</span> <span class="n">alias</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">bindings</span><span class="p">:</span>
+                        <span class="n">shape_type</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+                            <span class="n">ftype</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
+                            <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">shape_types</span><span class="p">[</span><span class="n">alias</span><span class="p">][</span><span class="n">nfused</span><span class="p">:]</span>
+                        <span class="p">)</span>
+                        <span class="n">bindings</span><span class="p">[</span><span class="n">alias</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_tensor_ftype</span><span class="p">(</span>
+                            <span class="n">fill_types</span><span class="p">[</span><span class="n">alias</span><span class="p">],</span>
+                            <span class="n">shape_type</span><span class="p">,</span>
+                            <span class="n">rhs_stats</span><span class="p">,</span>
+                            <span class="n">rhs_stats</span><span class="o">.</span><span class="n">index_order</span><span class="p">[:</span><span class="n">nfused</span><span class="p">],</span>
+                        <span class="p">)</span>
+
+                    <span class="k">return</span> <span class="n">node</span>
+                <span class="k">case</span> <span class="n">lgc</span><span class="o">.</span><span class="n">Produces</span><span class="p">():</span>
+                    <span class="k">return</span> <span class="n">node</span>
+                <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"Unsupported logic statement for formatting: </span><span class="si">{</span><span class="n">node</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="p">)</span>
+
+        <span class="n">prgm</span> <span class="o">=</span> <span class="n">formatter</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">prgm</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">prgm</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">stats_bindings</span><span class="p">,</span> <span class="n">stats_factory</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="finch.autoschedule.formatter.smart_formatter.SmartFormatter.get_tensor_ftype" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">get_tensor_ftype</span><span class="p">(</span><span class="n">fill_type</span><span class="p">,</span> <span class="n">shape_type</span><span class="p">,</span> <span class="n">stats</span><span class="p">,</span> <span class="n">over</span><span class="o">=</span><span class="p">())</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>The format of a tensor with the given stats. If <code>over</code> lists
+fields, each tensor stores one slice which fixes those fields.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/finch/autoschedule/formatter/smart_formatter.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_tensor_ftype</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span><span class="p">,</span>
+    <span class="n">shape_type</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">FType</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">stats</span><span class="p">:</span> <span class="n">TensorStats</span><span class="p">,</span>
+    <span class="n">over</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">lgc</span><span class="o">.</span><span class="n">Field</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(),</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TensorFType</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""The format of a tensor with the given stats. If `over` lists</span>
+<span class="sd">    fields, each tensor stores one slice which fixes those fields."""</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
 
 
 

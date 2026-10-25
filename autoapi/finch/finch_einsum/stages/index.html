@@ -2518,34 +2518,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -6032,13 +6004,27 @@
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumLoader</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span>
+        <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">defined</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
 <span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">        single method called `main` which implements the logic. Also return a</span>
 <span class="sd">        dictionary including additional tables needed to run the kernel.</span>
+<span class="sd">        Aliases in `defined` are defined by the program and have no input value.</span>
 <span class="sd">        """</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -6060,7 +6046,7 @@
 
 
 <h3 id="finch.finch_einsum.stages.EinsumLoader.lower" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">lower</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">lower</span><span class="p">(</span><span class="n">term</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">defined</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -6073,7 +6059,8 @@
 
         <p>Generate Finch Library from the given logic and input types, with a
 single method called <code>main</code> which implements the logic. Also return a
-dictionary including additional tables needed to run the kernel.</p>
+dictionary including additional tables needed to run the kernel.
+Aliases in <code>defined</code> are defined by the program and have no input value.</p>
 
 
             <details class="mkdocstrings-source">
@@ -6084,12 +6071,26 @@ dictionary including additional tables needed to run the kernel.</p>
 <span class="normal">26</span>
 <span class="normal">27</span>
 <span class="normal">28</span>
-<span class="normal">29</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]):</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span>
+    <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">defined</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Generate Finch Library from the given logic and input types, with a</span>
 <span class="sd">    single method called `main` which implements the logic. Also return a</span>
 <span class="sd">    dictionary including additional tables needed to run the kernel.</span>
+<span class="sd">    Aliases in `defined` are defined by the program and have no input value.</span>
 <span class="sd">    """</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6131,14 +6132,14 @@ dictionary including additional tables needed to run the kernel.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/finch_einsum/stages.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumTransform</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">EinsumTransform</span><span class="p">(</span><span class="n">Stage</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
@@ -6182,13 +6183,13 @@ dictionary including additional tables needed to run the kernel.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/finch_einsum/stages.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">lower</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">term</span><span class="p">:</span> <span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="n">bindings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">EinsumStatement</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">ein</span><span class="o">.</span><span class="n">Alias</span><span class="p">,</span> <span class="n">TensorFType</span><span class="p">]]:</span>

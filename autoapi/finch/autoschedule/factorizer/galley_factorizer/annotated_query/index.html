@@ -2990,34 +2990,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -6577,8 +6549,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 44</span>
-<span class="normal"> 45</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 45</span>
 <span class="normal"> 46</span>
 <span class="normal"> 47</span>
 <span class="normal"> 48</span>
@@ -7397,7 +7368,8 @@
 <span class="normal">861</span>
 <span class="normal">862</span>
 <span class="normal">863</span>
-<span class="normal">864</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">864</span>
+<span class="normal">865</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">AnnotatedQuery</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">TS</span><span class="p">]):</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">]</span>
     <span class="n">output_name</span><span class="p">:</span> <span class="n">Alias</span>
@@ -8074,7 +8046,7 @@
             <span class="n">stats_cache</span><span class="p">[</span><span class="n">query_expr</span><span class="o">.</span><span class="n">arg</span><span class="p">],</span>
         <span class="p">)</span>
 
-        <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="o">.</span><span class="n">fields</span><span class="p">()),</span> <span class="n">query_expr</span><span class="p">)</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">HardAlias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="o">.</span><span class="n">fields</span><span class="p">()),</span> <span class="n">query_expr</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
@@ -8262,8 +8234,7 @@ cost_model : CostModel, optional
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 62</span>
 <span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
@@ -8452,7 +8423,8 @@ cost_model : CostModel, optional
 <span class="normal">248</span>
 <span class="normal">249</span>
 <span class="normal">250</span>
-<span class="normal">251</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">251</span>
+<span class="normal">252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">stats_factory</span><span class="p">:</span> <span class="n">StatsFactory</span><span class="p">[</span><span class="n">TS</span><span class="p">],</span>
     <span class="n">q</span><span class="p">:</span> <span class="n">Query</span><span class="p">,</span>
@@ -8665,8 +8637,7 @@ cost_model : CostModel, optional
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">253</span>
-<span class="normal">254</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">254</span>
 <span class="normal">255</span>
 <span class="normal">256</span>
 <span class="normal">257</span>
@@ -8690,7 +8661,8 @@ cost_model : CostModel, optional
 <span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
-<span class="normal">278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"AnnotatedQuery"</span><span class="p">:</span>
+<span class="normal">278</span>
+<span class="normal">279</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"AnnotatedQuery"</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Make a structured copy of an AnnotatedQuery.</span>
 <span class="sd">    """</span>
@@ -8761,8 +8733,7 @@ base : Path
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">508</span>
-<span class="normal">509</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">509</span>
 <span class="normal">510</span>
 <span class="normal">511</span>
 <span class="normal">512</span>
@@ -8824,7 +8795,8 @@ base : Path
 <span class="normal">568</span>
 <span class="normal">569</span>
 <span class="normal">570</span>
-<span class="normal">571</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">571</span>
+<span class="normal">572</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">find_lowest_roots</span><span class="p">(</span>
     <span class="n">op</span><span class="p">:</span> <span class="n">FinchOperator</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="n">LogicExpression</span><span class="p">,</span> <span class="n">base</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="p">()</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
@@ -8917,8 +8889,7 @@ base : Path
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">846</span>
-<span class="normal">847</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">847</span>
 <span class="normal">848</span>
 <span class="normal">849</span>
 <span class="normal">850</span>
@@ -8935,7 +8906,8 @@ base : Path
 <span class="normal">861</span>
 <span class="normal">862</span>
 <span class="normal">863</span>
-<span class="normal">864</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_cost_of_reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="normal">864</span>
+<span class="normal">865</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_cost_of_reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Get the estimated cost of reducing `reduce_idx` in the current `aq`.</span>
 
@@ -8993,8 +8965,7 @@ connected_idxs : Dict[Field, Iterable[Field]]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">317</span>
-<span class="normal">318</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
 <span class="normal">321</span>
@@ -9085,7 +9056,8 @@ connected_idxs : Dict[Field, Iterable[Field]]
 <span class="normal">406</span>
 <span class="normal">407</span>
 <span class="normal">408</span>
-<span class="normal">409</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">409</span>
+<span class="normal">410</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_idx_connected_components</span><span class="p">(</span>
     <span class="n">parent_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
     <span class="n">connected_idxs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Field</span><span class="p">,</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]],</span>
@@ -9217,8 +9189,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">573</span>
-<span class="normal">574</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
 <span class="normal">577</span>
@@ -9366,7 +9337,8 @@ reduced_idxs : list[Field]
 <span class="normal">719</span>
 <span class="normal">720</span>
 <span class="normal">721</span>
-<span class="normal">722</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reduce_query</span><span class="p">(</span>
+<span class="normal">722</span>
+<span class="normal">723</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reduce_query</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Query</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]]:</span>
 <span class="w">    </span><span class="sd">"""</span>
@@ -9514,7 +9486,7 @@ reduced_idxs : list[Field]
         <span class="n">stats_cache</span><span class="p">[</span><span class="n">query_expr</span><span class="o">.</span><span class="n">arg</span><span class="p">],</span>
     <span class="p">)</span>
 
-    <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">Alias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="o">.</span><span class="n">fields</span><span class="p">()),</span> <span class="n">query_expr</span><span class="p">)</span>
+    <span class="n">query</span> <span class="o">=</span> <span class="n">Query</span><span class="p">(</span><span class="n">Table</span><span class="p">(</span><span class="n">HardAlias</span><span class="p">(</span><span class="n">gensym</span><span class="p">(</span><span class="s2">"A"</span><span class="p">)),</span> <span class="n">query_expr</span><span class="o">.</span><span class="n">fields</span><span class="p">()),</span> <span class="n">query_expr</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">query</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">,</span> <span class="n">reduced_idxs</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -9544,8 +9516,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">280</span>
-<span class="normal">281</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">281</span>
 <span class="normal">282</span>
 <span class="normal">283</span>
 <span class="normal">284</span>
@@ -9560,7 +9531,8 @@ reduced_idxs : list[Field]
 <span class="normal">293</span>
 <span class="normal">294</span>
 <span class="normal">295</span>
-<span class="normal">296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
+<span class="normal">296</span>
+<span class="normal">297</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Indices eligible to be reduced immediately (no parents).</span>
 
@@ -9605,8 +9577,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
-<span class="normal">299</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">299</span>
 <span class="normal">300</span>
 <span class="normal">301</span>
 <span class="normal">302</span>
@@ -9622,7 +9593,8 @@ reduced_idxs : list[Field]
 <span class="normal">312</span>
 <span class="normal">313</span>
 <span class="normal">314</span>
-<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs_for_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
+<span class="normal">315</span>
+<span class="normal">316</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_reducible_idxs_for_component</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">component</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Field</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Indices in this component that have no parents (reducible now).</span>
 
@@ -9663,8 +9635,7 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">830</span>
-<span class="normal">831</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">831</span>
 <span class="normal">832</span>
 <span class="normal">833</span>
 <span class="normal">834</span>
@@ -9677,7 +9648,8 @@ reduced_idxs : list[Field]
 <span class="normal">841</span>
 <span class="normal">842</span>
 <span class="normal">843</span>
-<span class="normal">844</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_remaining_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+<span class="normal">844</span>
+<span class="normal">845</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_remaining_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Build a final `Query` from the remaining pointwise expression in `aq`.</span>
 
@@ -9718,15 +9690,15 @@ reduced_idxs : list[Field]
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">411</span>
-<span class="normal">412</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">412</span>
 <span class="normal">413</span>
 <span class="normal">414</span>
 <span class="normal">415</span>
 <span class="normal">416</span>
 <span class="normal">417</span>
 <span class="normal">418</span>
-<span class="normal">419</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">419</span>
+<span class="normal">420</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">node_at</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">LogicNode</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Return the node at `path`, a sequence of child indices from `root`.</span>
@@ -9777,8 +9749,7 @@ do_condense : bool.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">724</span>
-<span class="normal">725</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">725</span>
 <span class="normal">726</span>
 <span class="normal">727</span>
 <span class="normal">728</span>
@@ -9881,7 +9852,8 @@ do_condense : bool.</p>
 <span class="normal">825</span>
 <span class="normal">826</span>
 <span class="normal">827</span>
-<span class="normal">828</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+<span class="normal">828</span>
+<span class="normal">829</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">reduce_idx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reduce_idx</span><span class="p">:</span> <span class="n">Field</span><span class="p">,</span> <span class="n">do_condense</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Perform a single reduction rewrite over `reduce_idx`, restructuring `aq`</span>
 <span class="sd">    so that the portion of the expression dependent on `reduce_idx` becomes</span>
@@ -10030,8 +10002,7 @@ expression that contains it safe.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">421</span>
-<span class="normal">422</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">422</span>
 <span class="normal">423</span>
 <span class="normal">424</span>
 <span class="normal">425</span>
@@ -10089,7 +10060,8 @@ expression that contains it safe.</p>
 <span class="normal">477</span>
 <span class="normal">478</span>
 <span class="normal">479</span>
-<span class="normal">480</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">480</span>
+<span class="normal">481</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_at</span><span class="p">(</span>
     <span class="n">root</span><span class="p">:</span> <span class="n">LogicNode</span><span class="p">,</span>
     <span class="n">transforms</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">LogicNode</span><span class="p">],</span> <span class="n">LogicNode</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]],</span>
@@ -10180,8 +10152,7 @@ behind it.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/factorizer/galley_factorizer/annotated_query.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">482</span>
-<span class="normal">483</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">483</span>
 <span class="normal">484</span>
 <span class="normal">485</span>
 <span class="normal">486</span>
@@ -10204,7 +10175,8 @@ behind it.</p>
 <span class="normal">503</span>
 <span class="normal">504</span>
 <span class="normal">505</span>
-<span class="normal">506</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
+<span class="normal">506</span>
+<span class="normal">507</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@staticmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">splice_paths</span><span class="p">(</span>
     <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">replace_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">removal_paths</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>

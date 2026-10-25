@@ -2518,34 +2518,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -6989,7 +6961,13 @@
 <span class="normal">268</span>
 <span class="normal">269</span>
 <span class="normal">270</span>
-<span class="normal">271</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArray</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArray</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">val</span><span class="p">:</span> <span class="n">NumpyBuffer</span><span class="p">,</span>
@@ -7132,6 +7110,12 @@
                 <span class="sa">f</span><span class="s2">"Declaring with </span><span class="si">{</span><span class="n">init</span><span class="si">!r}</span><span class="s2"> would change the static fill "</span>
                 <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
             <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">dim_t</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim_t</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">pos_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">length_type</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">strides</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">pos_t</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">_get_default_strides</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">functools</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">mul</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">,</span> <span class="n">pos_t</span><span class="p">(</span><span class="mi">1</span><span class="p">)))</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">length</span><span class="p">()):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span>
@@ -7335,13 +7319,7 @@ This allows for indexing into the bufferized array.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">219</span>
 <span class="normal">220</span>
 <span class="normal">221</span>
 <span class="normal">222</span>
@@ -7371,7 +7349,13 @@ This allows for indexing into the bufferized array.</p>
 <span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
-<span class="normal">249</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Get an item from the bufferized NDArray.</span>
 <span class="sd">    This allows for indexing into the bufferized array.</span>
@@ -7431,15 +7415,15 @@ This allows for indexing into the bufferized array.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">257</span>
 <span class="normal">258</span>
-<span class="normal">259</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__setitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Set an item in the bufferized NDArray.</span>
 <span class="sd">    This allows for indexing into the bufferized array.</span>
@@ -7487,7 +7471,13 @@ operation, and shape.</p>
 <span class="normal">189</span>
 <span class="normal">190</span>
 <span class="normal">191</span>
-<span class="normal">192</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Declare a bufferized NDArray with the given initialization value,</span>
 <span class="sd">    operation, and shape.</span>
@@ -7501,6 +7491,12 @@ operation, and shape.</p>
             <span class="sa">f</span><span class="s2">"Declaring with </span><span class="si">{</span><span class="n">init</span><span class="si">!r}</span><span class="s2"> would change the static fill "</span>
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_fill_value</span><span class="o">.</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span>
         <span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+        <span class="n">dim_t</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim_t</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">pos_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">length_type</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">strides</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">pos_t</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">_get_default_strides</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">))</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">resize</span><span class="p">(</span><span class="n">functools</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">mul</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">,</span> <span class="n">pos_t</span><span class="p">(</span><span class="mi">1</span><span class="p">)))</span>
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">length</span><span class="p">()):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">val</span><span class="o">.</span><span class="n">store</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
     <span class="k">return</span> <span class="bp">self</span>
@@ -7581,13 +7577,7 @@ This includes the fill value, element type, and shape type.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">280</span>
 <span class="normal">281</span>
 <span class="normal">282</span>
 <span class="normal">283</span>
@@ -7850,7 +7840,42 @@ This includes the fill value, element type, and shape type.</p>
 <span class="normal">540</span>
 <span class="normal">541</span>
 <span class="normal">542</span>
-<span class="normal">543</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFType</span><span class="p">(</span><span class="n">FinchTensorFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">BufferizedNDArrayFType</span><span class="p">(</span><span class="n">FinchTensorFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A ftype for bufferized NumPy arrays that provides metadata about the array.</span>
 <span class="sd">    This includes the fill value, element type, and shape type.</span>
@@ -8066,6 +8091,34 @@ This includes the fill value, element type, and shape type.</p>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">:</span> <span class="n">ntn</span><span class="o">.</span><span class="n">Fiber</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
         <span class="n">root</span> <span class="o">=</span> <span class="n">ctx</span><span class="p">(</span><span class="n">tns</span><span class="o">.</span><span class="n">lvl</span><span class="o">.</span><span class="n">root</span><span class="p">)</span>
+        <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="n">dim</span>
+            <span class="k">if</span> <span class="n">dim</span><span class="o">.</span><span class="n">result_type</span> <span class="o">==</span> <span class="n">dim_t</span>
+            <span class="k">else</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">dim_t</span><span class="p">)),</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+            <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim_t</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape_type</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span>
+                <span class="n">root</span><span class="p">,</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"shape"</span><span class="p">),</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">make_tuple</span><span class="p">),</span> <span class="n">shape</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">pos_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buf_t</span><span class="o">.</span><span class="n">length_type</span>
+        <span class="n">size</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">pos_t</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">strides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+            <span class="n">strides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dim</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="n">pos_t</span><span class="p">:</span>
+                <span class="n">dim</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">pos_t</span><span class="p">)),</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">mul</span><span class="p">),</span> <span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">size</span><span class="p">))</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span>
+            <span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span>
+                <span class="n">root</span><span class="p">,</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"strides"</span><span class="p">),</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">make_tuple</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">strides</span><span class="p">))),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="n">is_dynamic</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fill_type</span><span class="p">):</span>
             <span class="c1"># The init becomes the fill of the tensor.</span>
             <span class="k">if</span> <span class="n">init</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">element_type</span><span class="p">:</span>
@@ -8074,6 +8127,7 @@ This includes the fill value, element type, and shape type.</p>
             <span class="n">init</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">))</span>
         <span class="n">i_var</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"i"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">buf_t</span><span class="o">.</span><span class="n">length_type</span><span class="p">)</span>
         <span class="n">buf</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">size</span><span class="p">))</span>
         <span class="n">body</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Store</span><span class="p">(</span>
             <span class="n">buf</span><span class="p">,</span>
             <span class="n">i_var</span><span class="p">,</span>
@@ -8185,13 +8239,7 @@ This includes the fill value, element type, and shape type.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/bufferized_ndarray.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
-<span class="normal">397</span>
-<span class="normal">398</span>
-<span class="normal">399</span>
-<span class="normal">400</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">400</span>
 <span class="normal">401</span>
 <span class="normal">402</span>
 <span class="normal">403</span>
@@ -8199,7 +8247,13 @@ This includes the fill value, element type, and shape type.</p>
 <span class="normal">405</span>
 <span class="normal">406</span>
 <span class="normal">407</span>
-<span class="normal">408</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">val</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BufferizedNDArray</span><span class="p">:</span>
@@ -8259,34 +8313,34 @@ its indices. The last chunk may be shorter.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">609</span>
-<span class="normal">610</span>
-<span class="normal">611</span>
-<span class="normal">612</span>
-<span class="normal">613</span>
-<span class="normal">614</span>
-<span class="normal">615</span>
-<span class="normal">616</span>
-<span class="normal">617</span>
-<span class="normal">618</span>
-<span class="normal">619</span>
-<span class="normal">620</span>
-<span class="normal">621</span>
-<span class="normal">622</span>
-<span class="normal">623</span>
-<span class="normal">624</span>
-<span class="normal">625</span>
-<span class="normal">626</span>
-<span class="normal">627</span>
-<span class="normal">628</span>
-<span class="normal">629</span>
-<span class="normal">630</span>
-<span class="normal">631</span>
-<span class="normal">632</span>
-<span class="normal">633</span>
-<span class="normal">634</span>
-<span class="normal">635</span>
-<span class="normal">636</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChunkMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">821</span>
+<span class="normal">822</span>
+<span class="normal">823</span>
+<span class="normal">824</span>
+<span class="normal">825</span>
+<span class="normal">826</span>
+<span class="normal">827</span>
+<span class="normal">828</span>
+<span class="normal">829</span>
+<span class="normal">830</span>
+<span class="normal">831</span>
+<span class="normal">832</span>
+<span class="normal">833</span>
+<span class="normal">834</span>
+<span class="normal">835</span>
+<span class="normal">836</span>
+<span class="normal">837</span>
+<span class="normal">838</span>
+<span class="normal">839</span>
+<span class="normal">840</span>
+<span class="normal">841</span>
+<span class="normal">842</span>
+<span class="normal">843</span>
+<span class="normal">844</span>
+<span class="normal">845</span>
+<span class="normal">846</span>
+<span class="normal">847</span>
+<span class="normal">848</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ChunkMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Map ``n`` indices to chunks of size ``b``.</span>
 
 <span class="sd">    ``shape`` is ``(ceil(n / b), n)``, and row ``j`` holds the indices of chunk</span>
@@ -8458,29 +8512,7 @@ specialize on the value (and recompile per distinct value), unlike plain
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/dense_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">253</span>
 <span class="normal">254</span>
 <span class="normal">255</span>
 <span class="normal">256</span>
@@ -8491,7 +8523,29 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
-<span class="normal">264</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span>
+<span class="normal">270</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span>
+<span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DenseLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing dense level.</span>
@@ -8784,7 +8838,29 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">221</span>
 <span class="normal">222</span>
 <span class="normal">223</span>
-<span class="normal">224</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">DenseLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
     <span class="n">dimension_type</span><span class="p">:</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeInteger</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
@@ -8898,13 +8974,35 @@ specialize on the value (and recompile per distinct value), unlike plain
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+        <span class="n">dimension</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">dimension</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">:</span>
+            <span class="n">dimension</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)),</span> <span class="p">(</span><span class="n">dimension</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">),</span> <span class="n">dimension</span><span class="p">))</span>
         <span class="n">pos</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
             <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">mul</span><span class="p">),</span>
             <span class="p">(</span><span class="n">pos</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">))),</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span>
-        <span class="p">)</span>
+        <span class="n">child</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">child</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">pos</span><span class="p">)</span>
+        <span class="c1"># Compiled structs store the stride, so refresh it after sizing the child.</span>
+        <span class="k">match</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="p">:</span>
+            <span class="k">case</span> <span class="n">DenseLevelFType</span><span class="p">():</span>
+                <span class="n">stride</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
+                    <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">mul</span><span class="p">),</span>
+                    <span class="p">(</span>
+                        <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">)),</span>
+                        <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"stride"</span><span class="p">)),</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
+            <span class="k">case</span><span class="w"> </span><span class="k">_</span><span class="p">:</span>
+                <span class="n">stride</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">stride</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">:</span>
+            <span class="n">stride</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)),</span> <span class="p">(</span><span class="n">stride</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"stride"</span><span class="p">),</span> <span class="n">stride</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_freeze</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
         <span class="n">pos</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
@@ -9301,12 +9399,7 @@ specialize on the value (and recompile per distinct value), unlike plain
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">311</span>
-<span class="normal">312</span>
-<span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span>
-<span class="normal">316</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">316</span>
 <span class="normal">317</span>
 <span class="normal">318</span>
 <span class="normal">319</span>
@@ -9345,7 +9438,12 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">352</span>
 <span class="normal">353</span>
 <span class="normal">354</span>
-<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ElementLevel</span><span class="p">(</span><span class="n">Level</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing the leaf level of Finch tensors.</span>
@@ -9692,7 +9790,12 @@ specialize on the value (and recompile per distinct value), unlike plain
 <span class="normal">268</span>
 <span class="normal">269</span>
 <span class="normal">270</span>
-<span class="normal">271</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">271</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span>
+<span class="normal">276</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">ElementLevelFType</span><span class="p">(</span><span class="n">LevelFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
     <span class="c1"># None only as constructor input, __post_init__ always resolves these.</span>
     <span class="n">fill_type</span><span class="p">:</span> <span class="n">AbstractFillFType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># ty: ignore[invalid-property-type-override]</span>
@@ -9835,6 +9938,11 @@ specialize on the value (and recompile per distinct value), unlike plain
             <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">),</span> <span class="n">init</span><span class="p">))</span>
             <span class="n">init</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"fill"</span><span class="p">))</span>
         <span class="n">buf</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"val"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">pos</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="o">.</span><span class="n">length_type</span><span class="p">:</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="o">.</span><span class="n">length_type</span><span class="p">)),</span> <span class="p">(</span><span class="n">pos</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">pos</span><span class="p">))</span>
         <span class="n">i_var</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="s2">"i"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_type</span><span class="o">.</span><span class="n">length_type</span><span class="p">)</span>
         <span class="n">body</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Store</span><span class="p">(</span><span class="n">buf</span><span class="p">,</span> <span class="n">i_var</span><span class="p">,</span> <span class="n">init</span><span class="p">)</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">ForLoop</span><span class="p">(</span><span class="n">i_var</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intp</span><span class="p">(</span><span class="mi">0</span><span class="p">)),</span> <span class="n">asm</span><span class="o">.</span><span class="n">Length</span><span class="p">(</span><span class="n">buf</span><span class="p">),</span> <span class="n">body</span><span class="p">))</span>
@@ -11356,15 +11464,7 @@ shape is needed but the values are irrelevant.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">183</span>
 <span class="normal">184</span>
 <span class="normal">185</span>
 <span class="normal">186</span>
@@ -11409,7 +11509,15 @@ shape is needed but the values are irrelevant.</p>
 <span class="normal">225</span>
 <span class="normal">226</span>
 <span class="normal">227</span>
-<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FillTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FillTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A tensor that has a specific shape but contains no actual data.</span>
 <span class="sd">    Used primarily for broadcasting operations where a tensor of a specific</span>
@@ -11582,15 +11690,7 @@ to access it.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">239</span>
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
@@ -11651,7 +11751,15 @@ to access it.</p>
 <span class="normal">297</span>
 <span class="normal">298</span>
 <span class="normal">299</span>
-<span class="normal">300</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">IndexTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">IndexTensor</span><span class="p">(</span><span class="n">OverrideTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A tensor that has a specific shape and returns the linear (flattened) index used</span>
 <span class="sd">    to access it.</span>
@@ -13956,70 +14064,70 @@ The high 53 bits give a value in <code>[0, 1)</code> that is compared with <code
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">679</span>
-<span class="normal">680</span>
-<span class="normal">681</span>
-<span class="normal">682</span>
-<span class="normal">683</span>
-<span class="normal">684</span>
-<span class="normal">685</span>
-<span class="normal">686</span>
-<span class="normal">687</span>
-<span class="normal">688</span>
-<span class="normal">689</span>
-<span class="normal">690</span>
-<span class="normal">691</span>
-<span class="normal">692</span>
-<span class="normal">693</span>
-<span class="normal">694</span>
-<span class="normal">695</span>
-<span class="normal">696</span>
-<span class="normal">697</span>
-<span class="normal">698</span>
-<span class="normal">699</span>
-<span class="normal">700</span>
-<span class="normal">701</span>
-<span class="normal">702</span>
-<span class="normal">703</span>
-<span class="normal">704</span>
-<span class="normal">705</span>
-<span class="normal">706</span>
-<span class="normal">707</span>
-<span class="normal">708</span>
-<span class="normal">709</span>
-<span class="normal">710</span>
-<span class="normal">711</span>
-<span class="normal">712</span>
-<span class="normal">713</span>
-<span class="normal">714</span>
-<span class="normal">715</span>
-<span class="normal">716</span>
-<span class="normal">717</span>
-<span class="normal">718</span>
-<span class="normal">719</span>
-<span class="normal">720</span>
-<span class="normal">721</span>
-<span class="normal">722</span>
-<span class="normal">723</span>
-<span class="normal">724</span>
-<span class="normal">725</span>
-<span class="normal">726</span>
-<span class="normal">727</span>
-<span class="normal">728</span>
-<span class="normal">729</span>
-<span class="normal">730</span>
-<span class="normal">731</span>
-<span class="normal">732</span>
-<span class="normal">733</span>
-<span class="normal">734</span>
-<span class="normal">735</span>
-<span class="normal">736</span>
-<span class="normal">737</span>
-<span class="normal">738</span>
-<span class="normal">739</span>
-<span class="normal">740</span>
-<span class="normal">741</span>
-<span class="normal">742</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">891</span>
+<span class="normal">892</span>
+<span class="normal">893</span>
+<span class="normal">894</span>
+<span class="normal">895</span>
+<span class="normal">896</span>
+<span class="normal">897</span>
+<span class="normal">898</span>
+<span class="normal">899</span>
+<span class="normal">900</span>
+<span class="normal">901</span>
+<span class="normal">902</span>
+<span class="normal">903</span>
+<span class="normal">904</span>
+<span class="normal">905</span>
+<span class="normal">906</span>
+<span class="normal">907</span>
+<span class="normal">908</span>
+<span class="normal">909</span>
+<span class="normal">910</span>
+<span class="normal">911</span>
+<span class="normal">912</span>
+<span class="normal">913</span>
+<span class="normal">914</span>
+<span class="normal">915</span>
+<span class="normal">916</span>
+<span class="normal">917</span>
+<span class="normal">918</span>
+<span class="normal">919</span>
+<span class="normal">920</span>
+<span class="normal">921</span>
+<span class="normal">922</span>
+<span class="normal">923</span>
+<span class="normal">924</span>
+<span class="normal">925</span>
+<span class="normal">926</span>
+<span class="normal">927</span>
+<span class="normal">928</span>
+<span class="normal">929</span>
+<span class="normal">930</span>
+<span class="normal">931</span>
+<span class="normal">932</span>
+<span class="normal">933</span>
+<span class="normal">934</span>
+<span class="normal">935</span>
+<span class="normal">936</span>
+<span class="normal">937</span>
+<span class="normal">938</span>
+<span class="normal">939</span>
+<span class="normal">940</span>
+<span class="normal">941</span>
+<span class="normal">942</span>
+<span class="normal">943</span>
+<span class="normal">944</span>
+<span class="normal">945</span>
+<span class="normal">946</span>
+<span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span>
+<span class="normal">950</span>
+<span class="normal">951</span>
+<span class="normal">952</span>
+<span class="normal">953</span>
+<span class="normal">954</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RandomMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""A reproducible random mask with true probability ``p`` and no stored entries.</span>
 
 <span class="sd">    ``shape`` may be an integer for a vector, or a tuple (including ``()``).</span>
@@ -14138,24 +14246,24 @@ repeats. For <code>k &lt;= 0</code>, all entries are false.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">589</span>
-<span class="normal">590</span>
-<span class="normal">591</span>
-<span class="normal">592</span>
-<span class="normal">593</span>
-<span class="normal">594</span>
-<span class="normal">595</span>
-<span class="normal">596</span>
-<span class="normal">597</span>
-<span class="normal">598</span>
-<span class="normal">599</span>
-<span class="normal">600</span>
-<span class="normal">601</span>
-<span class="normal">602</span>
-<span class="normal">603</span>
-<span class="normal">604</span>
-<span class="normal">605</span>
-<span class="normal">606</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RepeatTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">801</span>
+<span class="normal">802</span>
+<span class="normal">803</span>
+<span class="normal">804</span>
+<span class="normal">805</span>
+<span class="normal">806</span>
+<span class="normal">807</span>
+<span class="normal">808</span>
+<span class="normal">809</span>
+<span class="normal">810</span>
+<span class="normal">811</span>
+<span class="normal">812</span>
+<span class="normal">813</span>
+<span class="normal">814</span>
+<span class="normal">815</span>
+<span class="normal">816</span>
+<span class="normal">817</span>
+<span class="normal">818</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RepeatTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Map each of ``n`` indices to ``k`` repeated indices.</span>
 
 <span class="sd">    ``shape`` is ``(n, n * k)``, and row ``i`` holds the repeats ``j`` of ``i``,</span>
@@ -15207,51 +15315,51 @@ be preserved with the table's buffers.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/level/sparse_list_level.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">541</span>
-<span class="normal">542</span>
-<span class="normal">543</span>
-<span class="normal">544</span>
-<span class="normal">545</span>
-<span class="normal">546</span>
-<span class="normal">547</span>
-<span class="normal">548</span>
-<span class="normal">549</span>
-<span class="normal">550</span>
-<span class="normal">551</span>
-<span class="normal">552</span>
-<span class="normal">553</span>
-<span class="normal">554</span>
-<span class="normal">555</span>
-<span class="normal">556</span>
-<span class="normal">557</span>
-<span class="normal">558</span>
-<span class="normal">559</span>
-<span class="normal">560</span>
-<span class="normal">561</span>
-<span class="normal">562</span>
-<span class="normal">563</span>
-<span class="normal">564</span>
-<span class="normal">565</span>
-<span class="normal">566</span>
-<span class="normal">567</span>
-<span class="normal">568</span>
-<span class="normal">569</span>
-<span class="normal">570</span>
-<span class="normal">571</span>
-<span class="normal">572</span>
-<span class="normal">573</span>
-<span class="normal">574</span>
-<span class="normal">575</span>
-<span class="normal">576</span>
-<span class="normal">577</span>
-<span class="normal">578</span>
-<span class="normal">579</span>
-<span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span>
-<span class="normal">583</span>
-<span class="normal">584</span>
-<span class="normal">585</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span>
+<span class="normal">612</span>
+<span class="normal">613</span>
+<span class="normal">614</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span>
+<span class="normal">627</span>
+<span class="normal">628</span>
+<span class="normal">629</span>
+<span class="normal">630</span>
+<span class="normal">631</span>
+<span class="normal">632</span>
+<span class="normal">633</span>
+<span class="normal">634</span>
+<span class="normal">635</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevel</span><span class="p">(</span><span class="n">SingleDimensionLevel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A class representing sparse list level.</span>
@@ -15860,7 +15968,57 @@ be preserved with the table's buffers.</p>
 <span class="normal">529</span>
 <span class="normal">530</span>
 <span class="normal">531</span>
-<span class="normal">532</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">unsafe_hash</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseListLevelFType</span><span class="p">(</span><span class="n">SingleDimensionLevelFType</span><span class="p">,</span> <span class="n">MutableStructFType</span><span class="p">):</span>
     <span class="n">_lvl_t</span><span class="p">:</span> <span class="n">LevelFType</span>
     <span class="n">dimension_type</span><span class="p">:</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">FDTypeInteger</span> <span class="o">=</span> <span class="n">ftypes</span><span class="o">.</span><span class="n">intp</span>
@@ -16004,6 +16162,12 @@ be preserved with the table's buffers.</p>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_declare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">tns</span><span class="p">,</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
+        <span class="n">dimension</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">dimension</span><span class="o">.</span><span class="n">result_type</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">:</span>
+            <span class="n">dimension</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Call</span><span class="p">(</span>
+                <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">ffuncs</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dimension_type</span><span class="p">)),</span> <span class="p">(</span><span class="n">dimension</span><span class="p">,)</span>
+            <span class="p">)</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">asm</span><span class="o">.</span><span class="n">SetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"dimension"</span><span class="p">),</span> <span class="n">dimension</span><span class="p">))</span>
         <span class="n">p_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ptr_type</span><span class="o">.</span><span class="n">length_type</span>
         <span class="n">p</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"p"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
         <span class="n">stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"pos_stop"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
@@ -16022,7 +16186,7 @@ be preserved with the table's buffers.</p>
 <span class="s2">        """</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">exec</span><span class="p">(</span><span class="n">parse_assembly</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="nb">locals</span><span class="p">(),</span> <span class="n">position_type</span><span class="o">=</span><span class="n">p_t</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lvl_t</span><span class="o">.</span><span class="n">level_lower_declare</span><span class="p">(</span>
-            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">zero</span>
+            <span class="n">ctx</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">GetAttr</span><span class="p">(</span><span class="n">tns</span><span class="p">,</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="s2">"lvl"</span><span class="p">)),</span> <span class="n">init</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">zero</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">level_lower_thaw</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">pos</span><span class="p">):</span>
@@ -16164,17 +16328,61 @@ be preserved with the table's buffers.</p>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">seek_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">ext</span><span class="p">):</span>
             <span class="n">start</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">ctx</span><span class="p">(</span><span class="n">ext</span><span class="o">.</span><span class="n">get_start</span><span class="p">())</span>
+            <span class="n">p_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">position_type</span>
+            <span class="n">lo</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"lo"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
+            <span class="n">hi</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"hi"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"d"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"m"</span><span class="p">),</span> <span class="n">p_t</span><span class="p">)</span>
+            <span class="n">go</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">freshen</span><span class="p">(</span><span class="s2">"go"</span><span class="p">),</span> <span class="n">ffuncs</span><span class="o">.</span><span class="n">lt</span><span class="o">.</span><span class="n">ftype</span><span class="o">.</span><span class="n">return_type</span><span class="p">(</span><span class="n">p_t</span><span class="p">,</span> <span class="n">p_t</span><span class="p">))</span>
+            <span class="n">stop</span> <span class="o">=</span> <span class="n">asm</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bool_</span><span class="p">(</span><span class="kc">False</span><span class="p">))</span>
 
-            <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"""finch</span>
-<span class="s2">            if (idx_s[q] &lt; </span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">)</span>
-<span class="s2">              q = scansearch(idx_s, </span><span class="si">{</span><span class="n">start</span><span class="si">}</span><span class="s2">, q, q_stop - 1)</span>
+            <span class="c1"># Move q to the first index of the fiber which is at least start.</span>
+            <span class="c1"># Gallop from q until an index is at least start, then bisect the</span>
+            <span class="c1"># last step. Expressions have one operation each, and loads only</span>
+            <span class="c1"># happen in bounds, since the assembly has no short circuits.</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="s2">"""finch</span>
+<span class="s2">            if (q &lt; q_stop)</span>
+<span class="s2">              if (idx_s[q] &lt; start)</span>
+<span class="s2">                lo = q</span>
+<span class="s2">                d = 1</span>
+<span class="s2">                hi = q + d</span>
+<span class="s2">                go = hi &lt; q_stop</span>
+<span class="s2">                while (go)</span>
+<span class="s2">                  if (idx_s[hi] &lt; start)</span>
+<span class="s2">                    lo = hi</span>
+<span class="s2">                    d = d + d</span>
+<span class="s2">                    hi = hi + d</span>
+<span class="s2">                    hi = min(hi, q_stop)</span>
+<span class="s2">                    go = hi &lt; q_stop</span>
+<span class="s2">                  else</span>
+<span class="s2">                    go = stop</span>
+<span class="s2">                  end</span>
+<span class="s2">                end</span>
+<span class="s2">                m = lo + 1</span>
+<span class="s2">                go = m &lt; hi</span>
+<span class="s2">                while (go)</span>
+<span class="s2">                  m = hi - lo</span>
+<span class="s2">                  m = m &gt;&gt; 1</span>
+<span class="s2">                  m = lo + m</span>
+<span class="s2">                  if (idx_s[m] &lt; start)</span>
+<span class="s2">                    lo = m</span>
+<span class="s2">                  else</span>
+<span class="s2">                    hi = m</span>
+<span class="s2">                  end</span>
+<span class="s2">                  m = lo + 1</span>
+<span class="s2">                  go = m &lt; hi</span>
+<span class="s2">                end</span>
+<span class="s2">                q = hi</span>
+<span class="s2">              end</span>
 <span class="s2">            end</span>
 <span class="s2">            """</span>
 
             <span class="k">return</span> <span class="n">parse_assembly</span><span class="p">(</span>
                 <span class="n">code</span><span class="p">,</span>
-                <span class="n">tmp_locals</span> <span class="o">|</span> <span class="n">asm</span><span class="o">.</span><span class="n">get_vars_in_expr</span><span class="p">(</span><span class="n">start</span><span class="p">),</span>
-                <span class="n">position_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">position_type</span><span class="p">,</span>
+                <span class="n">tmp_locals</span>
+                <span class="o">|</span> <span class="p">{</span><span class="s2">"start"</span><span class="p">:</span> <span class="n">start</span><span class="p">,</span> <span class="s2">"lo"</span><span class="p">:</span> <span class="n">lo</span><span class="p">,</span> <span class="s2">"hi"</span><span class="p">:</span> <span class="n">hi</span><span class="p">,</span> <span class="s2">"d"</span><span class="p">:</span> <span class="n">d</span><span class="p">,</span> <span class="s2">"m"</span><span class="p">:</span> <span class="n">m</span><span class="p">,</span> <span class="s2">"go"</span><span class="p">:</span> <span class="n">go</span><span class="p">}</span>
+                <span class="o">|</span> <span class="p">{</span><span class="s2">"stop"</span><span class="p">:</span> <span class="n">stop</span><span class="p">},</span>
+                <span class="n">position_type</span><span class="o">=</span><span class="n">p_t</span><span class="p">,</span>
             <span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">chunk_tail_fn</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
@@ -16678,31 +16886,31 @@ indices.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/tensor/patterns.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">639</span>
-<span class="normal">640</span>
-<span class="normal">641</span>
-<span class="normal">642</span>
-<span class="normal">643</span>
-<span class="normal">644</span>
-<span class="normal">645</span>
-<span class="normal">646</span>
-<span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
-<span class="normal">650</span>
-<span class="normal">651</span>
-<span class="normal">652</span>
-<span class="normal">653</span>
-<span class="normal">654</span>
-<span class="normal">655</span>
-<span class="normal">656</span>
-<span class="normal">657</span>
-<span class="normal">658</span>
-<span class="normal">659</span>
-<span class="normal">660</span>
-<span class="normal">661</span>
-<span class="normal">662</span>
-<span class="normal">663</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SplitMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">851</span>
+<span class="normal">852</span>
+<span class="normal">853</span>
+<span class="normal">854</span>
+<span class="normal">855</span>
+<span class="normal">856</span>
+<span class="normal">857</span>
+<span class="normal">858</span>
+<span class="normal">859</span>
+<span class="normal">860</span>
+<span class="normal">861</span>
+<span class="normal">862</span>
+<span class="normal">863</span>
+<span class="normal">864</span>
+<span class="normal">865</span>
+<span class="normal">866</span>
+<span class="normal">867</span>
+<span class="normal">868</span>
+<span class="normal">869</span>
+<span class="normal">870</span>
+<span class="normal">871</span>
+<span class="normal">872</span>
+<span class="normal">873</span>
+<span class="normal">874</span>
+<span class="normal">875</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SplitMaskTensor</span><span class="p">(</span><span class="n">PatternTensor</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Partition ``n`` indices into ``p`` contiguous regions of nearly equal size.</span>
 
 <span class="sd">    ``shape`` is ``(p, n)``, and row ``j`` covers ``n*j//p &lt;= i &lt; n*(j+1)//p``,</span>
@@ -16892,12 +17100,7 @@ fill.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/tensor/level/element_level.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">279</span>
 <span class="normal">280</span>
 <span class="normal">281</span>
 <span class="normal">282</span>
@@ -16926,7 +17129,12 @@ fill.</p>
 <span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
-<span class="normal">308</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">element</span><span class="p">(</span>
     <span class="n">fill_type</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">element_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">position_type</span><span class="p">:</span> <span class="n">FType</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>

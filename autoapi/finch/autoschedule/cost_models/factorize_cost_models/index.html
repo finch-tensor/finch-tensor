@@ -2609,34 +2609,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5821,8 +5793,7 @@ get_component_features returns one row for each statement.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/factorize_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">35</span>
-<span class="normal">36</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
 <span class="normal">39</span>
@@ -5843,7 +5814,10 @@ get_component_features returns one row for each statement.</p>
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FactorizeCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">Statement</span><span class="p">]):</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FactorizeCostModel</span><span class="p">(</span><span class="n">CostModel</span><span class="p">[</span><span class="n">Statement</span><span class="p">]):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A cost model where each query statement is a component, in program order.</span>
 <span class="sd">    get_component_features returns one row for each statement.</span>
@@ -5859,6 +5833,8 @@ get_component_features returns one row for each statement.</p>
             <span class="k">case</span> <span class="n">Plan</span><span class="p">(</span><span class="n">bodies</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">body</span> <span class="ow">in</span> <span class="n">bodies</span><span class="p">:</span>
                     <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">components</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">machine</span><span class="p">)</span>
+            <span class="k">case</span><span class="w"> </span><span class="n">Fuse</span><span class="p">(</span><span class="k">_</span><span class="p">,</span> <span class="n">body</span><span class="p">):</span>
+                <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">components</span><span class="p">(</span><span class="n">body</span><span class="p">,</span> <span class="n">bindings</span><span class="p">,</span> <span class="n">machine</span><span class="p">)</span>
             <span class="k">case</span> <span class="n">Query</span><span class="p">()</span> <span class="o">|</span> <span class="n">QueryInto</span><span class="p">():</span>
                 <span class="k">yield</span> <span class="n">Statement</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
                 <span class="n">machine</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
@@ -5920,10 +5896,7 @@ By default, allocations are weighted 10x iterations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/factorize_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 63</span>
 <span class="normal"> 64</span>
 <span class="normal"> 65</span>
 <span class="normal"> 66</span>
@@ -5993,7 +5966,10 @@ By default, allocations are weighted 10x iterations.</p>
 <span class="normal">130</span>
 <span class="normal">131</span>
 <span class="normal">132</span>
-<span class="normal">133</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FlopsCostModel</span><span class="p">(</span><span class="n">FactorizeCostModel</span><span class="p">,</span> <span class="n">AliasedForm</span><span class="p">):</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FlopsCostModel</span><span class="p">(</span><span class="n">FactorizeCostModel</span><span class="p">,</span> <span class="n">AliasedForm</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    FlopsCostModel counts the non-fill values in the iteration space of each</span>
 <span class="sd">    query, and in the output it materializes. Each query is a component.</span>
@@ -6121,11 +6097,11 @@ By default, allocations are weighted 10x iterations.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/cost_models/factorize_cost_models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">28</span>
-<span class="normal">29</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">29</span>
 <span class="normal">30</span>
 <span class="normal">31</span>
-<span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="normal">32</span>
+<span class="normal">33</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">Statement</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""A Query or QueryInto of a program."""</span>
 

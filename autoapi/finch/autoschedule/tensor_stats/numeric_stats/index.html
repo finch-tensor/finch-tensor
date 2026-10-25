@@ -2615,34 +2615,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../codegen/mlir_codegen/scansearch/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    scansearch
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../../codegen/mlir_codegen/stages/" class="md-nav__link">
         
   
@@ -5825,10 +5797,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/finch/autoschedule/tensor_stats/numeric_stats.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 8</span>
-<span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">11</span>
 <span class="normal">12</span>
 <span class="normal">13</span>
 <span class="normal">14</span>
@@ -5838,11 +5807,18 @@
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
-<span class="normal">21</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumericStats</span><span class="p">(</span><span class="n">BaseTensorStats</span><span class="p">):</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">NumericStats</span><span class="p">(</span><span class="n">BaseTensorStats</span><span class="p">):</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">over</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""</span>
-<span class="sd">        Return an estimate on the number of non-fill values.</span>
+<span class="sd">        Return an estimate on the number of non-fill values. If `over` lists</span>
+<span class="sd">        fields, estimate the largest number of non-fill values in any slice</span>
+<span class="sd">        which fixes those fields instead.</span>
 <span class="sd">        """</span>
         <span class="o">...</span>
 
@@ -5872,7 +5848,7 @@
 
 
 <h3 id="finch.autoschedule.tensor_stats.numeric_stats.NumericStats.estimate_non_fill_values" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">estimate_non_fill_values</span><span class="p">()</span></code>
+            <code class="highlight language-python"><span class="n">estimate_non_fill_values</span><span class="p">(</span><span class="n">over</span><span class="o">=</span><span class="p">())</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
@@ -5883,20 +5859,26 @@
 
     <div class="doc doc-contents ">
 
-        <p>Return an estimate on the number of non-fill values.</p>
+        <p>Return an estimate on the number of non-fill values. If <code>over</code> lists
+fields, estimate the largest number of non-fill values in any slice
+which fixes those fields instead.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/numeric_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
 <span class="normal">13</span>
-<span class="normal">14</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">estimate_non_fill_values</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">over</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Field</span><span class="p">]</span> <span class="o">=</span> <span class="p">())</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
-<span class="sd">    Return an estimate on the number of non-fill values.</span>
+<span class="sd">    Return an estimate on the number of non-fill values. If `over` lists</span>
+<span class="sd">    fields, estimate the largest number of non-fill values in any slice</span>
+<span class="sd">    which fixes those fields instead.</span>
 <span class="sd">    """</span>
     <span class="o">...</span>
 </code></pre></div></td></tr></table></div>
@@ -5925,12 +5907,12 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/finch/autoschedule/tensor_stats/numeric_stats.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
-<span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@abstractmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_embedding</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Returns vector embedding for the stat.</span>
