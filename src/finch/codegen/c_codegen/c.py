@@ -320,23 +320,29 @@ def c_function_name(op: FType, ctx: Any, *args: Any) -> str:
             raise TypeError(f"{op} has no C representation.")
 
 
+def c_operand(ctx: Any, arg: Any) -> str:
+    """Parenthesize compound operands, since C's precedence isn't Finch's."""
+    code = ctx(arg)
+    return f"({code})" if isinstance(arg, asm.Call) else code
+
+
 def c_nary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for n-ary operators."""
     assert len(args) > 0
     if len(args) == 1:
-        return f"{c_symbol}{ctx(args[0])}"
-    return f" {c_symbol} ".join(map(ctx, args))
+        return f"{c_symbol}{c_operand(ctx, args[0])}"
+    return f" {c_symbol} ".join(c_operand(ctx, arg) for arg in args)
 
 
 def c_binary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for binary operators."""
     a, b = args
-    return f"{ctx(a)} {c_symbol} {ctx(b)}"
+    return f"{c_operand(ctx, a)} {c_symbol} {c_operand(ctx, b)}"
 
 
 def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for unary operators."""
-    return f"{c_symbol}{ctx(args[0])}"
+    return f"{c_symbol}{c_operand(ctx, args[0])}"
 
 
 def c_same(ctx, x, y):

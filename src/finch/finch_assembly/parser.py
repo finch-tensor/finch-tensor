@@ -9,6 +9,9 @@ The extension is not yet available on VS Code marketplace. You can find
 installation file here: https://github.com/finch-tensor/vscode-finch-assembly/releases
 """
 
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
 
 from lark import Lark, Token, Tree
@@ -84,7 +87,9 @@ _OPS = {
 
 
 def parse_assembly(
-    code: str, vars: dict[str, asm.AssemblyExpression], position_type: type = np.intp
+    code: str,
+    vars: dict[str, asm.AssemblyExpression],
+    position_type: Callable[[Any], Any] = np.intp,
 ) -> asm.Block:
     """
     Parse Finch Assembly code and convert it to assembly node objects.
@@ -158,6 +163,13 @@ def parse_assembly(
                 return asm.Resize(ctx(arr), ctx(size))
             case Tree("attribute", [obj, Token("CNAME", name)]):
                 return asm.GetAttr(ctx(obj), asm.Literal(name))
+            case Tree("call", [Token("CNAME", name), *args]) if (
+                name not in vars and name in _OPS
+            ):
+                # Within an index, `add(a, b)` parses as a call rather than an OP.
+                return asm.Call(
+                    asm.Literal(_OPS[name]), tuple(ctx(arg) for arg in args)
+                )
             case Tree("call", [op, *args]):
                 return asm.Call(ctx(op), tuple(ctx(arg) for arg in args))
             case Tree("bin_op", [op, expr1, expr2]):

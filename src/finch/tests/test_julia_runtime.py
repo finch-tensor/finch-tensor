@@ -520,3 +520,28 @@ def test_default_runtime_reuses_translated_buffer_across_kernels():
     )[0]
 
     assert first is second
+
+
+@pytest.mark.parametrize("kind", ["hash", "bytemap"])
+def test_julia_reads_compiled_sparse_level(kind):
+    _requires_julia_backend()
+    from finch.codegen import NumbaCompiler
+
+    from .test_sparse_update import run_copy, tensors
+
+    rng = np.random.default_rng(0)
+    data = rng.integers(1, 9, (5, 40)) * (rng.random((5, 40)) < 0.3)
+    source, target = tensors("DH" if kind == "hash" else "DB", data)
+    tensor = run_copy(NumbaCompiler(), source, target)
+    same_values = jl.seval("(A, B) -> Array(A) == Array(B)")
+    assert same_values(tensor_to_jl(tensor), tensor_to_jl(ft.asarray(data)))
+    if kind == "hash":
+        # Julia probes for each key where the compiled kernel placed it.
+        level = level_to_jl(tensor.lvl.lvl)
+        lookup = jl.seval(
+            "(lvl, p, i) -> Finch.sparse_hash_lookup(lvl.tbl_ctrl, lvl.tbl, "
+            "lvl.key, p, i, lvl.subtables, lvl.pos_multiplier)"
+        )
+        for (p, i), value in np.ndenumerate(data):
+            q = lookup(level, p + 1, i + 1)
+            assert (q != 0) == (value != 0)

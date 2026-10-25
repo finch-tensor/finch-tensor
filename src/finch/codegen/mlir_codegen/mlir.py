@@ -942,6 +942,9 @@ def mlir_ctype(s: FType | str):
             return ctypes.POINTER(mlir_struct_ctype(s))
         case StructFType():
             return mlir_struct_ctype(s)
+        case algebra.ftypes.FDTypeNumpy() if np_dtype(s).kind == "u":
+            # MLIR integers are signless, but serialization keeps the sign.
+            return np.ctypeslib.as_ctypes_type(np_dtype(s))
         case FType():
             return mlir_ctype(mlir_type(s))
 
