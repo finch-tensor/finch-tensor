@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from abc import abstractmethod
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -58,8 +57,8 @@ class BoundStats(NumericStats):
     number of non-fill values, built from ``ell_p``-norms of degree sequences.
 
     Subclasses differ only in which ``p`` values they keep (``ps``) and how they
-    turn the constraints into an estimate (:meth:`estimate_non_fill_values`); the
-    scan and all propagation (in :class:`BoundStatsFactory`) are shared.
+    turn the constraints into an estimate (:meth:`estimate_non_fill_values`);
+    the scan and all propagation (in :class:`BoundStatsFactory`) are shared.
     """
 
     default_ps: ClassVar[tuple[float, ...]] = ()
@@ -73,9 +72,6 @@ class BoundStats(NumericStats):
         super().__init__(base)
         self.ps: tuple[float, ...] = tuple(self.default_ps if ps is None else ps)
         self.dcs = set(dcs)
-
-    @abstractmethod
-    def estimate_non_fill_values(self) -> float: ...
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]
@@ -256,15 +252,17 @@ class DCStats(BoundStats):
 
     default_ps: ClassVar[tuple[float, ...]] = (math.inf,)
 
-    def estimate_non_fill_values(self) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         """Smallest degree-constraint product covering all indices, clamped by
-        dense capacity."""
+        dense capacity. A slice which fixes `over` has one value of `over`, so
+        the product for the largest one starts from `over`."""
         idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
         if len(idx) == 0:
             return 1.0
 
-        best: dict[frozenset[Field], float] = {frozenset(): 1.0}
-        frontier: set[frozenset[Field]] = {frozenset()}
+        given = frozenset(over) & idx
+        best: dict[frozenset[Field], float] = {given: 1.0}
+        frontier: set[frozenset[Field]] = {given}
 
         while True:
             current_bound = best.get(idx, math.inf)
@@ -287,7 +285,7 @@ class DCStats(BoundStats):
                 break
             frontier = new_frontier
 
-        min_weight = float(self.get_dim_space_size(idx))
+        min_weight = float(self.get_dim_space_size(tuple(idx - given)))
         for node, weight in best.items():
             if node.issuperset(idx):
                 min_weight = min(min_weight, weight)
@@ -447,7 +445,7 @@ class LPStats(BoundStats):
 
     default_ps: ClassVar[tuple[float, ...]] = DEFAULT_PS
 
-    def estimate_non_fill_values(self) -> float:
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
         idx: frozenset[Field] = frozenset(self.dim_sizes.keys())
         if len(idx) == 0:
             return 1.0
@@ -457,8 +455,13 @@ class LPStats(BoundStats):
             if len(dc.from_indices) == 0 and dc.value == 0:
                 return 0.0
 
+        # A slice which fixes `over` meets every constraint of the tensor, and
+        # has one value of `over`, so the bound for the largest one adds that.
+        given = frozenset(over) & idx
         positive = [dc for dc in self.dcs if dc.value > 0]
-        dense_cap = float(self.get_dim_space_size(idx))
+        if given:
+            positive.append(DC(frozenset(), given, 1.0))
+        dense_cap = float(self.get_dim_space_size(tuple(idx - given)))
         sol = _flow_bound(positive, list(self.dim_sizes.keys()))
         if sol is None:
             return dense_cap

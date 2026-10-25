@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 
 import finch
+import finch.finch_logic as lgc
 from finch.algebra import ffuncs
 from finch.autoschedule.einsum import LogicEinsumLoader
 from finch.autoschedule.executor import LogicExecutor
@@ -43,6 +44,34 @@ def test_reduction_starts_from_its_init(rng, ctx, op, init, np_op):
     A = rng.random((4, 3))
     result = compute(reduce(op, defer(finch.asarray(A)), axis=1, init=init), ctx=ctx)
     finch_assert_allclose(result, np_op(init, np_op.reduce(A, axis=1)))
+
+
+def test_input_read_before_its_redefinition(ctx):
+    # The input is read before the program redefines it, so it isn't a storage
+    # placeholder.
+    i = lgc.Field("i")
+    a, b = lgc.HardAlias("a"), lgc.HardAlias("b")
+    plan = lgc.Plan(
+        (
+            lgc.Query(
+                lgc.Table(b, (i,)),
+                lgc.MapJoin(
+                    lgc.Literal(ffuncs.mul), (lgc.Table(a, (i,)), lgc.Literal(2.0))
+                ),
+            ),
+            lgc.Query(
+                lgc.Table(a, (i,)),
+                lgc.MapJoin(
+                    lgc.Literal(ffuncs.mul), (lgc.Table(b, (i,)), lgc.Literal(3.0))
+                ),
+            ),
+            lgc.Produces((b,)),
+        )
+    )
+    arr = finch.asarray(np.array([1.0, 2.0, 3.0]))
+    (result,) = ctx(plan, {a: arr})
+    finch_assert_allclose(result, np.array([2.0, 4.0, 6.0]))
+    finch_assert_allclose(arr, np.array([6.0, 12.0, 18.0]))
 
 
 def test_simple_addition(rng, ctx):

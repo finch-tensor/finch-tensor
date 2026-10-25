@@ -40,12 +40,13 @@ from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    Fuse,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
-    Reorder,
     Table,
 )
 from finch.symbolic import PostOrderDFS
@@ -614,7 +615,9 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             super().__init__(loader)
             self.output_stats = []
 
-        def get_tensor_ftype(self, fill_type, shape_type, stats) -> TensorFType:
+        def get_tensor_ftype(
+            self, fill_type, shape_type, stats, over=()
+        ) -> TensorFType:
             self.output_stats.append(stats)
             return ft.BufferizedNDArrayFType(
                 buffer_type=ft.NumpyBufferFType(fill_type.element_type),
@@ -624,10 +627,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
             )
 
     i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
+    A, B = HardAlias("A"), HardAlias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
+    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = RecordingSmartFormatter(capture)
     prgm = Plan(
@@ -651,10 +654,10 @@ def test_smart_formatter_passes_propagated_stats_to_tensor_ftype():
 
 def test_fd_formatter_uses_dense_levels_for_dense_properties():
     i, j = Field("i"), Field("j")
-    A, B = Alias("A"), Alias("B")
+    A, B = HardAlias("A"), HardAlias("B")
     tensor = ft.FillTensor((2, 3), 0)
     stats_factory = FDStatsFactory()
-    stats = {A: stats_factory(tensor, (i, j))}
+    stats: dict[Alias, FDStats] = {A: stats_factory(tensor, (i, j))}
     capture = LogicCapture()
     formatter = FDFormatter(capture)
     prgm = Plan(
@@ -1618,8 +1621,12 @@ def test_blocked_uniform_grid(shape, counts, fill_value, monkeypatch):
 
     def check_loop_order(plan):
         for query in plan.bodies[:-1]:
+            loop_order = []
+            while isinstance(query, Fuse):
+                loop_order.append(query.idx)
+                query = query.body
             match query:
-                case Query(_, Aggregate(_, _, Reorder(_, loop_order), _)):
+                case Query(_, Aggregate()):
                     for node in PostOrderDFS(query):
                         match node:
                             case Table(_, idxs):
@@ -3111,3 +3118,120 @@ def test_lp_norm_endpoints():
 def test_lpdc_is_hashable_frozen():
     dc = DC(frozenset(), frozenset({Field("i")}), 3.0, 2.0)
     assert dc in {dc}
+
+
+_OVER_DATA = np.array(
+    [
+        [1, 1, 1, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 1],
+    ],
+    dtype=float,
+)
+_OVER_I, _OVER_J = Field("i"), Field("j")
+
+
+def _largest_slice(fields):
+    axes = tuple(
+        axis for axis, idx in enumerate((_OVER_I, _OVER_J)) if idx not in fields
+    )
+    return float(np.max(np.count_nonzero(_OVER_DATA, axis=axes), initial=0))
+
+
+_OVER_FIELDS = [(), (_OVER_I,), (_OVER_J,), (_OVER_I, _OVER_J), (Field("k"),)]
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [
+        DenseStatsFactory(),
+        UniformStatsFactory(),
+        VPStatsFactory(),
+        ExactStatsFactory(),
+        SamplingStatsFactory(sample_nnz=_OVER_DATA.size),
+        BlockedUniformStatsFactory(blocks_per_dim={_OVER_I: 2, _OVER_J: 2}),
+        BlockedStatsFactory(
+            ExactStatsFactory(), blocks_per_dim={_OVER_I: 2, _OVER_J: 2}
+        ),
+        DCStatsFactory(),
+        LPStatsFactory(),
+    ],
+)
+def test_estimate_non_fill_values_over_without_tensor_fields(factory):
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    total = stats.estimate_non_fill_values()
+    assert stats.estimate_non_fill_values(over=()) == total
+    # Fields the tensor doesn't have don't split it into slices.
+    assert stats.estimate_non_fill_values(over=(Field("k"),)) == pytest.approx(total)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+@pytest.mark.parametrize(
+    "factory",
+    [
+        ExactStatsFactory(),
+        # Blocks of single elements are exact.
+        BlockedUniformStatsFactory(blocks_per_dim={_OVER_I: 4, _OVER_J: 6}),
+        BlockedStatsFactory(
+            ExactStatsFactory(), blocks_per_dim={_OVER_I: 4, _OVER_J: 6}
+        ),
+    ],
+)
+def test_estimate_non_fill_values_over_is_exact(factory, fields):
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert stats.estimate_non_fill_values(over=fields) == _largest_slice(fields)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+def test_estimate_non_fill_values_over_uniform(fields):
+    sizes = {_OVER_I: 4, _OVER_J: 6}
+    slices = math.prod(sizes[idx] for idx in fields if idx in sizes)
+    dense = DenseStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert dense.estimate_non_fill_values(over=fields) == 24 / slices
+    uniform = UniformStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert uniform.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
+    sampling = SamplingStatsFactory(sample_nnz=_OVER_DATA.size)(
+        ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J)
+    )
+    assert sampling.estimate_non_fill_values(over=fields) == pytest.approx(7 / slices)
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+@pytest.mark.parametrize("factory", [DCStatsFactory(), LPStatsFactory()])
+def test_estimate_non_fill_values_over_max_degrees(factory, fields):
+    # Max degrees bound the largest slice, rather than an average one, and are
+    # tight for a single matrix.
+    stats = factory(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    assert stats.estimate_non_fill_values(over=fields) == pytest.approx(
+        _largest_slice(fields)
+    )
+
+
+@pytest.mark.parametrize("fields", _OVER_FIELDS)
+def test_estimate_non_fill_values_over_distinct_values(fields):
+    # A slice holds at most one value for each combination of the distinct
+    # values of the indices it doesn't fix: three rows and five columns.
+    stats = VPStatsFactory()(ft.asarray(_OVER_DATA), (_OVER_I, _OVER_J))
+    expected = {(_OVER_I,): 5, (_OVER_J,): 3, (_OVER_I, _OVER_J): 1}
+    assert stats.estimate_non_fill_values(over=fields) == expected.get(tuple(fields), 7)
+    assert stats.estimate_non_fill_values(over=fields) >= _largest_slice(fields)
+
+
+def test_exact_idempotent_reduction_of_fills_is_fill():
+    # A max of fills is the output fill, even with an init.
+    i, j = Field("i"), Field("j")
+    node = Aggregate(
+        Literal(ffuncs.max),
+        Literal(0.0),
+        Table(Literal(ft.asarray(np.zeros((2, 3)))), (i, j)),
+        (j,),
+    )
+    stats = insert_statistics(
+        stats_factory=ExactStatsFactory(),
+        node=node,
+        bindings=OrderedDict(),
+        replace=False,
+        cache={},
+    )
+    assert stats.estimate_non_fill_values() == 0.0

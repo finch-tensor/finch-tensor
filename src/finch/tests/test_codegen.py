@@ -1095,7 +1095,7 @@ def mlir_kernel_under_test(caplog) -> str:
         and record.message.startswith("Compiling MLIR code:\n")
     ]
     assert kernels, "no MLIR kernel was compiled"
-    return re.sub(r"%(_A_\d+|__A)(?:_\d+)+", r"%\1", kernels[-1])
+    return re.sub(r"%(_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
 
 
 @mlir_backend
@@ -1426,6 +1426,44 @@ def test_mlir_choose(fill, values, expected):
     assert result == expected
 
 
+@pytest.mark.c_backend
+@pytest.mark.parametrize("operator", [ffuncs.min, ffuncs.max])
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.int8(3), np.int32(-2)),
+        (np.int64(4), np.int64(9), np.int64(1)),
+        (np.float64(1.5), np.float64(-0.5), np.float64(2.0)),
+        (np.float64(1.0), np.float64(np.nan)),
+        (np.float64(np.nan), np.float64(1.0)),
+    ],
+)
+def test_c_min_max(operator, values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "extremum",
+                    asm.AssemblyKernelFType(
+                        "extremum",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = CCompiler()(program).extremum(*values)
+    expected = operator(*values)
+    assert type(result) is type(expected)
+    np.testing.assert_equal(result, expected)
+
+
 @mlir_backend
 @pytest.mark.parametrize(
     "condition,expected",
@@ -1494,6 +1532,39 @@ def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
     )
 
     assert MLIRCompiler()(program).apply_mixed(*values) == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.intp(2), np.intp(3)),
+        (2, 3.5, True),
+        ((np.intp(2), np.intp(3)), np.intp(4)),
+    ],
+)
+def test_mlir_make_tuple_with_indices(values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    result = asm.Call(asm.Literal(ffuncs.make_tuple), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "make_tuple",
+                    asm.AssemblyKernelFType(
+                        "make_tuple",
+                        tuple(arg.result_type for arg in args),
+                        result.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(result),)),
+            ),
+        )
+    )
+    actual = MLIRCompiler()(program).make_tuple(*values)
+    assert actual == values
+    assert ftype(actual) == ftype(values)
 
 
 @mlir_backend
@@ -1725,37 +1796,3 @@ def test_numpy_buffer_construct_from_mlir_is_zero_copy():
     assert constructed is buf
     assert constructed.arr is arr
     assert constructed.arr.ctypes.data == arr.ctypes.data
-
-
-# test for scansearch supporting sps.random matrix
-@mlir_backend
-def test_scansearch_sps_rand(rng):
-    matrix = sps.random(8, 5, density=0.4, format="csr", random_state=rng)
-    row = np.argmax(np.diff(matrix.indptr))
-    lo = matrix.indptr[row]
-    hi = matrix.indptr[row + 1] - np.int32(1)
-    x = matrix.indices[lo + (hi - lo) // np.int32(2)]
-    indices = NumpyBuffer(matrix.indices)
-
-    arg = asm.Variable("indices", indices.ftype)
-    slot = asm.Slot("indices_", indices.ftype)
-    call = asm.Call(
-        asm.Literal(ffuncs.scansearch),
-        (slot, asm.Literal(x), asm.Literal(lo), asm.Literal(hi)),
-    )
-    prgm = asm.Module(
-        (
-            asm.Function(
-                asm.Variable(
-                    "search",
-                    asm.AssemblyKernelFType("search", (indices.ftype,), finch.int32),
-                ),
-                (arg,),
-                asm.Block((asm.Unpack(slot, arg), asm.Return(call))),
-            ),
-        )
-    )
-
-    result = MLIRCompiler().lower(prgm).search(indices)
-    expected = lo + np.searchsorted(matrix.indices[lo : hi + 1], x)
-    assert result == expected

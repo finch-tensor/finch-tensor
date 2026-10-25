@@ -167,8 +167,10 @@ class StepperPass(LoopletPass):
                     steppers.append(st)
 
         steppers = list({id(stepper): stepper for stepper in steppers}.values())
+        # A seek may move a stepper past the stop of its preamble.
         for stepper in steppers:
             ctx.exec(stepper.seek(ctx, ext))
+            ctx.exec(stepper.preamble(ctx))
 
         full_body = Rewrite(PostWalk(lambda node: stepper_body(ctx, node)))(body)
 

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from copy import deepcopy
 from functools import cached_property
 from typing import Any
 
 import numpy as np
 
-from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
+from finch.algebra import (
+    FinchOperator,
+    ffuncs,
+    is_annihilator,
+    is_idempotent,
+    is_identity,
+)
 from finch.autoschedule.default_schedulers import get_default_scheduler
 from finch.finch_logic import (
     Aggregate,
@@ -62,7 +69,11 @@ class ExactStatsFactory(
         if is_identity(op.ftype, f):
             bool_op, bool_init = ffuncs.or_, False
         elif not is_annihilator(op.ftype, f) and not is_identity(op.ftype, f):
-            bool_op, bool_init = ffuncs.or_, True
+            # A reduction of fills is the new fill, so an output is fill when
+            # all of its inputs are, unless the init joins a fill which repeats
+            # once for each reduced element, as in a sum.
+            bool_op = ffuncs.or_
+            bool_init = init is not None and not is_idempotent(op.ftype)
         else:
             bool_op, bool_init = ffuncs.and_, True
 
@@ -98,20 +109,28 @@ class ExactStats(NumericStats):
 
     @cached_property
     def nnz(self) -> float:
+        return self._max_slice_nnz(())
+
+    def _max_slice_nnz(self, fields: tuple[Field, ...]) -> float:
         if self.expr is None:
             return 0.0
 
-        expr = Aggregate(
-            Literal(ffuncs.add), Literal(np.intp(0)), self.expr, self.expr.fields()
-        )
+        rest = tuple(idx for idx in self.expr.fields() if idx not in fields)
+        expr = Aggregate(Literal(ffuncs.add), Literal(np.intp(0)), self.expr, rest)
+        fixed = tuple(idx for idx in self.expr.fields() if idx in fields)
+        if fixed:
+            expr = Aggregate(Literal(ffuncs.max), Literal(np.intp(0)), expr, fixed)
         result = get_default_scheduler()(expr)
         if not isinstance(result, TableValue):
             raise TypeError("estimate_non_fill_value expected a TableValue instance")
 
         return float(result.tns)
 
-    def estimate_non_fill_values(self) -> float:
-        return self.nnz
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        fields = tuple(over)
+        if not set(fields) & set(self.index_order):
+            return self.nnz
+        return self._max_slice_nnz(fields)
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

@@ -35,7 +35,6 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 numba_structs: dict[Any, Any] = {}
 numba_structnames = Namespace()
 numba_globals: dict[str, Any] = {
-    "scansearch": numba.njit(ffuncs.scansearch._func),
     "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
 }
 
@@ -109,8 +108,6 @@ def numba_function_name(op, ctx, *args: Any) -> str:
             return "min"
         case ffuncs._MaxFType():
             return "max"
-        case ffuncs._ScansearchFType():
-            return "scansearch"
         case ffuncs._ResizeIfSmallerFType():
             return "resize_if_smaller"
         case NumbaOperator():
@@ -201,7 +198,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             condition, x1, x2 = args
             return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
         case ffuncs._MakeTupleFType():
-            return f"({','.join([ctx(arg) for arg in args])},)"
+            return f"({','.join([ctx(arg) for arg in args])},)" if args else "()"
         case ffuncs._LastFType():
             (arg,) = args
             if not isinstance(arg.result_type, TupleFType):
@@ -254,12 +251,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return numba_binary_function_call(numba_name, ctx, *args)
         case ffuncs._NotFType() | ffuncs._InvertFType():
             return numba_unary_function_call(numba_name, ctx, *args)
-        case (
-            ffuncs._MinFType()
-            | ffuncs._MaxFType()
-            | ffuncs._ScansearchFType()
-            | ffuncs._ResizeIfSmallerFType()
-        ):
+        case ffuncs._MinFType() | ffuncs._MaxFType() | ffuncs._ResizeIfSmallerFType():
             return numba_call_function_call(numba_name, ctx, *args)
         case _:
             raise TypeError(f"{op} has no Numba representation.")
@@ -763,7 +755,15 @@ class NumbaContext(Context):
                     raise DynamicFillError(
                         "cannot emit a dynamic fill as a numba literal"
                     )
-                return str(value)
+                match value:
+                    case tuple():
+                        return numba_function_call(
+                            asm.Literal(ffuncs.make_tuple),
+                            self,
+                            *(asm.Literal(v) for v in value),
+                        )
+                    case _:
+                        return str(value)
             case asm.Variable(name, _) | asm.Slot(name, _):
                 return name.replace("#", "_")
             case asm.Assign(asm.Variable(var_n, var_t) as var, val):
@@ -794,7 +794,7 @@ class NumbaContext(Context):
                 obj_t = obj.result_type
                 if not isinstance(obj_t, StructFType):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
-                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
+                if val.result_type != obj_t.struct_attrtype(attr.val):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
                         f"{obj_t.struct_attrtype(attr.val)}"

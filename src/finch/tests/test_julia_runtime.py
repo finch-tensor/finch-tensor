@@ -393,8 +393,9 @@ def test_julia_sparse_level_round_trip(kind, copy_buffers):
 
 def _runtime(metadata):
     _requires_julia_backend()
-    for name in metadata:
-        jl.seval(f"{name}(args...) = nothing")
+    for name, info in metadata.items():
+        fields = ", ".join(f"v{pos}=args[{pos + 1}]" for pos in info.returned_positions)
+        jl.seval(f"{name}(args...) = (; {fields})")
 
     runtime = DefaultFinchJLRuntime()
     runtime._kernels = {name: object() for name in metadata}
@@ -416,6 +417,25 @@ def test_julia_owned_tensor_addition():
     )
 
     assert (ft.add(tensor, 1).to_numpy() == np.arange(1, 5)).all()
+
+
+def test_julia_cached_kernel_updates_output_shape():
+    _requires_julia_backend()
+
+    @ft.jit
+    def outputs(source):
+        return source + source, ft.sum(source, axis=0)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        for shape in ((2, 3), (0, 3), (2, 0), (4, 1), (2, 3)):
+            data = np.arange(np.prod(shape), dtype=np.int64).reshape(shape)
+            result, reduced = outputs(ft.asarray(data))
+            assert result.shape == shape
+            np.testing.assert_array_equal(result.to_numpy(), data * 2)
+            assert reduced.shape == shape[1:]
+            np.testing.assert_array_equal(reduced.to_numpy(), data.sum(axis=0))
+            del result, reduced
+            gc.collect()
 
 
 def test_default_runtime_uses_a_free_buffer():

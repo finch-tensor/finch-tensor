@@ -3138,66 +3138,6 @@ def root_scaled_negative_power(exponent: float):
     return _RootScaledNegativePower(exponent)
 
 
-class _ScansearchFType(SingletonOperatorFType):
-    @property
-    def operator(self):
-        return scansearch
-
-    arity = 4
-
-    def return_type(self, arr: FType, x: FType, lo: FType, hi: FType) -> FType:  # type: ignore[override]
-        return hi
-
-
-class _Scansearch(FinchOperator):
-    """
-    Scansearch is a search operator that performs a scan search on a sorted array.
-
-    It takes an array `arr`, a value `x`, and search bounds `lo` and `hi`, and returns
-    the index of the smallest element in `arr` that is greater than or equal to `x`.
-    If all elements in `arr` are less than `x`, it returns `hi`.
-    """
-
-    @staticmethod
-    def _func(
-        arr: np.ndarray, x: np.integer, lo: np.integer, hi: np.integer
-    ) -> np.integer:
-        dtype = np.array(lo).dtype.type
-        u = dtype(1)
-        d = dtype(1)
-        p = lo
-
-        # searching for binary search bounds
-        while p < hi and arr[p] < x:
-            d <<= 0x01
-            p += d
-        lo = p - d
-        hi = builtins.min(p, hi) + u  # type: ignore[call-overload]
-
-        # binary searching within those bounds
-        while lo < hi - u:
-            m = lo + ((hi - lo) >> 0x01)
-            if arr[m] < x:
-                lo = m
-            else:
-                hi = m
-
-        return hi
-
-    def __call__(self, *args, **kwargs):
-        return self._func(*args, **kwargs)
-
-    def __repr__(self) -> str:
-        return "scansearch"
-
-    @property
-    def ftype(self):
-        return _ScansearchFType()
-
-
-scansearch = _Scansearch()
-
-
 class _ResizeIfSmallerFType(SingletonOperatorFType):
     @property
     def operator(self):
@@ -3340,7 +3280,6 @@ __all__ = [
     "scaled_negative_power",
     "scaled_power",
     "scaled_square",
-    "scansearch",
     "sign",
     "signbit",
     "sin",

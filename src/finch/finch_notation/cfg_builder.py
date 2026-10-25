@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from finch.symbolic import BasicBlock, ControlFlowGraph, PostWalk, Rewrite
 
 from .nodes import (
+    Assert,
     Assign,
     Block,
     Declare,
@@ -135,6 +136,7 @@ def notation_dataflow_preprocess(node: NotationNode) -> tuple[NotationNode, int]
                 | Freeze()
                 | Thaw()
                 | Assign()
+                | Assert()
                 | Increment()
                 | Return()
             ):
@@ -209,6 +211,7 @@ class NotationCFGBuilder:
                     self(body, break_block, return_block)
             case (
                 Assign()
+                | Assert()
                 | Increment()
                 | Unpack()
                 | Repack()
