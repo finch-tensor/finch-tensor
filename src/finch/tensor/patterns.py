@@ -8,21 +8,29 @@ from typing import Any
 
 import numpy as np
 
+from finch import finch_assembly as asm
+from finch import finch_notation as ntn
 from finch.algebra import (
     AbstractFill,
     AbstractFillFType,
     DynamicFill,
     FType,
+    ImmutableStructFType,
+    MutableStructFType,
     StaticFill,
     StaticFillFType,
     TensorFType,
+    TupleFType,
     as_fill,
     ffuncs,
     ftype,
     is_dynamic,
     resolve_fill,
 )
+from finch.compile import looplets as lplt
+from finch.compile.lower import FinchTensorFType
 
+from .level import LevelFType
 from .override_tensor import OverrideTensor
 from .scalar import Scalar
 from .traits import (
@@ -509,6 +517,202 @@ class ReshapeMaskTensor(PatternTensor):
         )
 
 
+@dataclass(frozen=True, eq=False)
+class EyeTensorFType(PatternTensorFType, FinchTensorFType, MutableStructFType):
+    """
+    An eye tensor is passed to kernels by its shape, so that a kernel may
+    declare it as a workspace with the extents of its loops.
+    """
+
+    @property
+    def struct_name(self):
+        return "EyeTensor"
+
+    @property
+    def struct_fields(self):
+        return [("shape", TupleFType.from_tuple(self.shape_type))]
+
+    def struct_setattr(self, obj, attr, value):
+        match attr:
+            case "shape":
+                obj._shape = tuple(int(dim) for dim in value)
+            case _:
+                setattr(obj, attr, value)
+
+    def from_fields(self, shape):
+        return self.construct(shape)
+
+    @property
+    def lvl_t(self):
+        return EyeLevelFType(self)
+
+    def get_child_type(self, attr):
+        if attr != "lvl":
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def get_child(self, obj, attr):
+        self.get_child_type(attr)
+        return obj
+
+    def lower_dim(self, ctx, obj, r):
+        return self.lvl_t.level_lower_dim(ctx, ctx(obj.lvl), r)
+
+    def lower_fill(self, ctx, obj):
+        match self.fill_type:
+            case StaticFillFType() as fill_type:
+                return asm.Literal(fill_type.value)
+        raise NotImplementedError(f"Cannot lower the dynamic fill of a {self}")
+
+    def lower_unwrap(self, ctx, obj):
+        raise NotImplementedError(f"Unfurl a {self} before reading it")
+
+    def lower_increment(self, ctx, obj, op, val):
+        raise NotImplementedError(f"Cannot update a {self}")
+
+    def lower_declare(self, ctx, tns, init, op, shape):
+        shape = tuple(
+            dim
+            if dim.result_type == dim_t
+            else asm.Call(asm.Literal(ffuncs.astype(dim_t)), (dim,))
+            for dim, dim_t in zip(shape, self.shape_type, strict=True)
+        )
+        ctx.exec(
+            asm.SetAttr(
+                ctx(tns.lvl.root),
+                asm.Literal("shape"),
+                asm.Call(asm.Literal(ffuncs.make_tuple), shape),
+            )
+        )
+
+    def lower_freeze(self, ctx, tns, op):
+        return tns
+
+    def lower_thaw(self, ctx, tns, op):
+        return tns
+
+    def unfurl(self, ctx, tns, ext, mode, proto):
+        tns = ctx.resolve(tns)
+        return self.lvl_t.level_unfurl(ctx, tns, ext, mode, proto, ctx(tns.pos))
+
+
+@dataclass(unsafe_hash=True)
+class EyeLevelFType(LevelFType, ImmutableStructFType):
+    """The rows (`nind == 0`) or columns (`nind == 1`) of an eye tensor."""
+
+    tns: EyeTensorFType
+    nind: int = 0
+
+    @property
+    def struct_name(self):
+        return "EyeLevel"
+
+    @property
+    def struct_fields(self):
+        return [("tns", self.tns)]
+
+    def from_fields(self, tns):
+        raise NotImplementedError("An eye level is a view of its tensor")
+
+    def construct(self, shape, *, pos):
+        raise NotImplementedError("An eye level is a view of its tensor")
+
+    def level_get_child_type(self, attr):
+        if attr != "lvl" or self.ndim == 0:
+            raise TypeError(f"{self} does not support child {attr!r}")
+        return self.lvl_t
+
+    def level_get_child(self, obj, attr):
+        self.level_get_child_type(attr)
+        return obj
+
+    @property
+    def lvl_t(self):
+        return EyeLevelFType(self.tns, self.nind + 1)
+
+    @property
+    def ndim(self):
+        return self.tns.ndim - self.nind
+
+    @property
+    def shape_type(self):
+        return self.tns.shape_type[self.nind :]
+
+    @property
+    def fill_type(self):
+        return self.tns.fill_type
+
+    @property
+    def element_type(self):
+        return self.tns.element_type
+
+    @property
+    def position_type(self):
+        return ftype(np.intp)
+
+    @property
+    def buffer_type(self):
+        raise NotImplementedError("An eye level has no buffer")
+
+    @property
+    def buffer_factory(self):
+        raise NotImplementedError("An eye level has no buffer")
+
+    def level_format_properties(self, n):
+        raise NotImplementedError
+
+    def level_cost(self, fields, stats, stats_factory, num_pos, lvl):
+        raise NotImplementedError
+
+    def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        raise NotImplementedError("Declare the owning eye tensor instead")
+
+    def level_lower_freeze(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_thaw(self, ctx, tns, op, pos):
+        return tns
+
+    def level_lower_dim(self, ctx, obj, r):
+        return asm.GetAttr(
+            asm.GetAttr(obj, asm.Literal("shape")),
+            asm.Literal(f"element_{self.nind + r}"),
+        )
+
+    def level_lower_unwrap(self, ctx, tns, pos):
+        raise NotImplementedError("Unfurl an eye level before reading it")
+
+    def level_lower_increment(self, ctx, obj, op, val, pos):
+        raise NotImplementedError("Cannot update an eye level")
+
+    def level_unfurl(self, ctx, tns, ext, mode, proto, pos):
+        if self.nind == 0:
+            return lplt.Lookup(
+                lambda ctx, idx: lplt.Run(
+                    ntn.Fiber(ntn.Child(tns.lvl), tns.pos, (*tns.idxs, idx))
+                )
+            )
+        # A column holds the pattern only where it is offset by k from its row.
+        i = tns.idxs[-1]
+        k = dict(self.tns._constructor_kwargs)["k"]
+        diag = ntn.Call(ntn.L(ffuncs.add), (i, ntn.L(i.result_type(k)))) if k else i
+
+        def run(val):
+            return lambda ctx, idx: lplt.Run(ntn.Full(ntn.Literal(val)))
+
+        return lplt.Sequence(
+            head=run(self.fill_type.value),
+            split=lambda ctx, ext: diag,
+            tail=lambda ctx, idx: lplt.Sequence(
+                head=run(self.tns._pattern_value),
+                split=lambda ctx, ext: ntn.Call(
+                    ntn.L(ffuncs.add), (diag, ext.get_unit())
+                ),
+                tail=run(self.fill_type.value),
+            ),
+        )
+
+
 class EyeTensor(PatternTensor):
     def __init__(self, shape, *, k: int = 0, dtype=None):
         self._k = k
@@ -516,6 +720,14 @@ class EyeTensor(PatternTensor):
 
     def contains(self, i, j) -> bool:
         return j - i == self._k
+
+    @property
+    def ftype(self):
+        return EyeTensorFType(**vars(super().ftype))
+
+    def declare(self, init, op, shape):
+        self._shape = tuple(int(dim) for dim in shape)
+        return self
 
 
 class UpperTriangleTensor(PatternTensor):

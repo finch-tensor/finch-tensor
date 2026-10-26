@@ -7,6 +7,7 @@ from scipy.linalg import block_diag
 
 import finch as fl
 from finch import ffuncs
+from finch.algebra import TensorFType
 from finch.autoschedule.cost_models import (
     ByKind,
     Concat,
@@ -21,10 +22,12 @@ from finch.autoschedule.cost_models import (
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
+from finch.autoschedule.util import fuse_loop_order
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -33,6 +36,7 @@ from finch.finch_logic import (
     QueryInto,
     Reorder,
     Table,
+    TensorStats,
 )
 
 
@@ -54,9 +58,9 @@ def test_predictors_sum_component_predictions(predictor, expected):
 def test_flops_cost_retains_query_components(factory):
     sf = factory()
     i, j = Field("i"), Field("j")
-    a, b, out = Alias("a"), Alias("b"), Alias("out")
+    a, b, out = HardAlias("a"), HardAlias("b"), HardAlias("out")
     tensor = fl.asarray(np.ones((2, 3)))
-    stats = {a: sf(tensor, (i, j))}
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
     plan = Plan(
         (
             Query(
@@ -108,9 +112,9 @@ def test_empty_cost_components(cost, plan):
 def test_concat_uses_joint_nonlinear_predictor():
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
-    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
-    plan = Query(Table(out, (j, i)), Table(a, (i, j)))
+    a, out = HardAlias("a"), HardAlias("out")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    plan = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
     cost = Concat(
         PigeonCostModel(),
         TransposeCostModel(),
@@ -142,12 +146,12 @@ def test_concat_uses_joint_nonlinear_predictor():
 def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
-    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    a, out = HardAlias("a"), HardAlias("out")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Table(a, (i, j))
     machine = StatsMachine(sf, dict(stats))
     for order in ((i, j), (j, i)):
-        query = Query(Table(out, order), expr)
+        query = fuse_loop_order(Query(Table(out, order), expr), order)
         expected = sum(
             cost.predict_component_cost(Prefix(order[:n], expr, order), machine)
             for n in range(len(order) + 1)
@@ -162,16 +166,18 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
     sf = factory()
     model = PigeonCostModel()
     idxs = tuple(Field(f"i{n}") for n in range(len(shape)))
-    a, out = Alias("a"), Alias("out")
+    a, out = HardAlias("a"), HardAlias("out")
     tensor = fl.asarray(np.ones(shape))
-    stats = {a: sf(tensor, idxs)}
-    bindings = {a: tensor.ftype}
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, idxs)}
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
     table = Table(a, idxs)
     if kind == "copy":
-        query = Query(Table(out, tuple(reversed(idxs))), table)
+        order = tuple(reversed(idxs))
+        query = Query(Table(out, order), table)
     else:
+        order = idxs
         out_idxs = idxs[:-1]
-        arg = Reorder(MapJoin(Literal(ffuncs.mul), (table, table)), idxs)
+        arg = MapJoin(Literal(ffuncs.mul), (table, table))
         if kind == "aggregate":
             query = Query(
                 Table(out, out_idxs),
@@ -182,7 +188,7 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
             stats[out] = sf(output, out_idxs)
             bindings[out] = output.ftype
             query = QueryInto(Table(out, out_idxs), Literal(ffuncs.add), arg)
-    plan = Plan((query, Produces((out,))))
+    plan = Plan((fuse_loop_order(query, order), Produces((out,))))
     original_stats = dict(stats)
     original_fills = {alias: stat.fill_type for alias, stat in stats.items()}
 
@@ -206,26 +212,23 @@ def test_pigeon_cost_model_dependent_queries(factory):
     sf = factory()
     model = PigeonCostModel()
     i, j = Field("i"), Field("j")
-    a, b, out = Alias("a"), Alias("b"), Alias("out")
+    a, b, out = HardAlias("a"), HardAlias("b"), HardAlias("out")
     tensor = fl.asarray(np.ones((2, 3)))
-    stats = {a: sf(tensor, (i, j))}
-    bindings = {a: tensor.ftype}
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
     queries = (
-        Query(Table(b, (j, i)), Table(a, (i, j))),
+        fuse_loop_order(Query(Table(b, (j, i)), Table(a, (i, j))), (j, i)),
         QueryInto(Table(b, (j, i)), Literal(ffuncs.overwrite), Literal(0.0)),
-        QueryInto(
-            Table(b, (j, i)),
-            Literal(ffuncs.add),
-            Reorder(Table(a, (i, j)), (j, i)),
+        fuse_loop_order(
+            QueryInto(Table(b, (j, i)), Literal(ffuncs.add), Table(a, (i, j))),
+            (j, i),
         ),
-        Query(
-            Table(out, (j,)),
-            Aggregate(
-                Literal(ffuncs.add),
-                Literal(0.0),
-                Reorder(Table(b, (j, i)), (j, i)),
-                (i,),
+        fuse_loop_order(
+            Query(
+                Table(out, (j,)),
+                Aggregate(Literal(ffuncs.add), Literal(0.0), Table(b, (j, i)), (i,)),
             ),
+            (j, i),
         ),
     )
     plan = Plan((*queries, Produces((out,))))
@@ -277,8 +280,8 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     sf = factory()
     model = PigeonCostModel()
     i, j, k = (Field(name) for name in "ijk")
-    a, b, out = (Alias(name) for name in ("a", "b", "out"))
-    stats = {
+    a, b, out = (HardAlias(name) for name in ("a", "b", "out"))
+    stats: dict[Alias, TensorStats] = {
         a: sf(fl.asarray([[1.0, 0.0, 1.0], [0.0, 1.0, 0.0]]), (i, j)),
         b: sf(
             fl.asarray(
@@ -310,10 +313,7 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
             model.predict_component_cost(Prefix(prefix, expr, out_idxs), machine)
             for prefix in prefixes
         )
-        query = Query(
-            Table(out, out_idxs),
-            Aggregate(Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (j,)),
-        )
+        query = fuse_loop_order(Query(Table(out, out_idxs), expr), order)
 
         np.testing.assert_allclose(features.sum(axis=0), original_features)
         np.testing.assert_allclose(model.get_features(query, {}, stats, sf), features)
@@ -331,8 +331,8 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     sf = factory()
     model = PigeonCostModel()
     i = Field("i")
-    a = Alias("a")
-    stats = {a: sf(fl.asarray(np.ones(())), ())}
+    a = HardAlias("a")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones(())), ())}
     scalar = Table(a, ())
     broadcast = Reorder(scalar, (i,))
     machine = StatsMachine(sf, dict(stats))
@@ -354,20 +354,20 @@ def test_transpose_cost_model_queries(factory, sparse, transpose, inplace):
     sf = factory()
     model = TransposeCostModel()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
+    a, out = HardAlias("a"), HardAlias("out")
     tensor = fl.asarray(np.eye(16) if sparse else np.ones((16, 16)))
-    stats = {a: sf(tensor, (i, j))}
-    bindings = {a: tensor.ftype}
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
     order = (j, i) if transpose else (i, j)
     table = Table(a, (i, j))
     if inplace:
         output = fl.asarray(np.zeros((16, 16)))
         stats[out] = sf(output, order)
         bindings[out] = output.ftype
-        query = QueryInto(Table(out, order), Literal(ffuncs.add), Reorder(table, order))
+        query = QueryInto(Table(out, order), Literal(ffuncs.add), table)
     else:
         query = Query(Table(out, order), table)
-    plan = Plan((query, Produces((out,))))
+    plan = Plan((fuse_loop_order(query, order), Produces((out,))))
     original_stats = dict(stats)
     expected = (16 * 60 if sparse else 256 * 0.5) if transpose else 0
     expected_features = ([0, 16] if sparse else [256, 0]) if transpose else [0, 0]
@@ -386,8 +386,8 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
     sf = factory()
     model = TransposeCostModel()
     i, j, k = (Field(name) for name in "ijk")
-    a, b, out = (Alias(name) for name in ("a", "b", "out"))
-    stats = {
+    a, b, out = (HardAlias(name) for name in ("a", "b", "out"))
+    stats: dict[Alias, TensorStats] = {
         a: sf(fl.asarray(np.ones((2, 3))), (i, j)),
         b: sf(fl.asarray(np.ones((3, 4))), (j, k)),
     }
@@ -405,12 +405,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
             model.predict_component_cost(Prefix(order[:n], expr), machine)
             for n in range(len(order) + 1)
         )
-        query = Query(
-            Table(out, ()),
-            Aggregate(
-                Literal(ffuncs.add), Literal(0.0), Reorder(arg, order), (i, j, k)
-            ),
-        )
+        query = fuse_loop_order(Query(Table(out, ()), expr), order)
 
         assert cost == expected
         assert model.predict_cost(query, {}, stats, sf) == expected
@@ -426,23 +421,23 @@ def test_transpose_cost_model_dependent_queries(factory):
     sf = factory()
     model = TransposeCostModel()
     i, j = Field("i"), Field("j")
-    a, b, c, reduced = (Alias(name) for name in ("a", "b", "c", "reduced"))
+    a, b, c, reduced = (HardAlias(name) for name in ("a", "b", "c", "reduced"))
     tensor = fl.asarray(np.ones((2, 3)))
-    stats = {a: sf(tensor, (i, j))}
-    bindings = {a: tensor.ftype}
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
     plan = Plan(
         (
-            Query(Table(b, (j, i)), Table(a, (i, j))),
-            Query(
-                Table(reduced, (j,)),
-                Aggregate(
-                    Literal(ffuncs.add),
-                    Literal(0.0),
-                    Reorder(Table(b, (j, i)), (j, i)),
-                    (i,),
+            fuse_loop_order(Query(Table(b, (j, i)), Table(a, (i, j))), (j, i)),
+            fuse_loop_order(
+                Query(
+                    Table(reduced, (j,)),
+                    Aggregate(
+                        Literal(ffuncs.add), Literal(0.0), Table(b, (j, i)), (i,)
+                    ),
                 ),
+                (j, i),
             ),
-            Query(Table(c, (i, j)), Table(b, (j, i))),
+            fuse_loop_order(Query(Table(c, (i, j)), Table(b, (j, i))), (i, j)),
             QueryInto(Table(c, (i, j)), Literal(ffuncs.overwrite), Literal(0.0)),
             Produces((c, reduced)),
         )
@@ -460,11 +455,12 @@ def test_transpose_cost_model_dependent_queries(factory):
 def test_sum_cost_model_sums_submodels(factory):
     sf = factory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
+    a, out = HardAlias("a"), HardAlias("out")
     tensor = fl.asarray(np.ones((2, 3)))
-    stats = {a: sf(tensor, (i, j))}
-    bindings = {a: tensor.ftype}
-    plan = Plan((Query(Table(out, (j, i)), Table(a, (i, j))), Produces((out,))))
+    stats: dict[Alias, TensorStats] = {a: sf(tensor, (i, j))}
+    bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
+    copy = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
+    plan = Plan((copy, Produces((out,))))
     models = (PigeonCostModel(), TransposeCostModel())
     model = Sum(*models)
     model.validate_inputs(plan, bindings, stats, sf)
@@ -484,10 +480,10 @@ def test_sum_cost_model_sums_submodels(factory):
 def test_by_kind_dispatches_components_by_key():
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
-    a, out = Alias("a"), Alias("out")
-    stats = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
+    a, out = HardAlias("a"), HardAlias("out")
+    stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Table(a, (i, j))
-    query = Query(Table(out, (j, i)), expr)
+    query = fuse_loop_order(Query(Table(out, (j, i)), expr), (j, i))
     models = {0: PigeonCostModel(), 1: TransposeCostModel(), 2: PigeonCostModel()}
     cost = ByKind(models, key=lambda component: len(component.prefix))
     machine = StatsMachine(sf, dict(stats))

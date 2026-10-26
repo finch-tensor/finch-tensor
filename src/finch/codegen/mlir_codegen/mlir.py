@@ -30,7 +30,6 @@ from finch.finch_assembly import BufferFType
 from finch.symbolic import CompilerMode, Context, Form, Namespace, ScopedDict
 from finch.util.logging import LOG_BACKEND_MLIR
 
-from .scansearch import gen_ss
 from .stages import MLIRCode, MLIRLowerer
 
 logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_MLIR)
@@ -352,8 +351,6 @@ def mlir_function_name(op, arg: FType) -> str:
             if MLIROperator.is_unsigned(arg):
                 return "arith.maxui"
             return "arith.maxsi"
-        case ffuncs._ScansearchFType():
-            return "scansearch"
         case ffuncs._AndFType():
             return "arith.andi"
         case ffuncs._OrFType():
@@ -727,6 +724,10 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             ctx.exec(f"{ctx.feed}{acc} = llvm.mlir.undef : {st}")
             for k, a in enumerate(args):
                 v = ctx(a)
+                if mlir_type(a.result_type) == "index":
+                    cast = ctx.new_ssa()
+                    ctx.exec(f"{ctx.feed}{cast} = arith.index_cast {v} : index to i64")
+                    v = cast
                 nxt = ctx.new_ssa()
                 ctx.exec(f"{ctx.feed}{nxt} = llvm.insertvalue {v}, {acc}[{k}] : {st}")
                 acc = nxt
@@ -737,6 +738,8 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._AndFType()
             | ffuncs._XorFType()
             | ffuncs._OrFType()
+            | ffuncs._MinFType()
+            | ffuncs._MaxFType()
         ):
             return mlir_nary_function_call(
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
@@ -748,8 +751,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             | ffuncs._ModFType()
             | ffuncs._LShiftFType()
             | ffuncs._RShiftFType()
-            | ffuncs._MinFType()
-            | ffuncs._MaxFType()
             | ffuncs._EqFType()
             | ffuncs._NeFType()
             | ffuncs._GtFType()
@@ -764,11 +765,6 @@ def mlir_function_call(op, ctx, *args: Any) -> str | None:
             return mlir_new_function_call(
                 mlir_function_name(op_type, _promote_type_helper(args)), ctx, *args
             )
-        case ffuncs._ScansearchFType():
-            arr, _, _, hi = args
-            name, code = gen_ss(mlir_type(arr.result_type.element_type))
-            mlir_globals.setdefault(name, code)
-            return mlir_call_function_call(name, hi.result_type, ctx, *args)
         case _:
             raise NotImplementedError(f"{op} has no MLIR representation.")
 
@@ -946,6 +942,9 @@ def mlir_ctype(s: FType | str):
             return ctypes.POINTER(mlir_struct_ctype(s))
         case StructFType():
             return mlir_struct_ctype(s)
+        case algebra.ftypes.FDTypeNumpy() if np_dtype(s).kind == "u":
+            # MLIR integers are signless, but serialization keeps the sign.
+            return np.ctypeslib.as_ctypes_type(np_dtype(s))
         case FType():
             return mlir_ctype(mlir_type(s))
 

@@ -8,6 +8,7 @@ from typing import Any
 import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
 from finch.symbolic import PostWalk, Rewrite, TermTree
+from finch.tensor.patterns import PatternTensorFType
 
 
 def _alias_rule(node: Any, names: set[str]) -> None:
@@ -58,6 +59,11 @@ def _is_reset_before_read(node: Any, names: set[str]) -> bool | None:
                 return False
             return False if _is_reset_before_read(body, names) is False else None
         case ntn.Assign(_, ntn.Dimension()) | ntn.Unpack():
+            return None
+        case ntn.Declare(tensor, _, _, _) if isinstance(
+            tensor.result_type, PatternTensorFType
+        ):
+            # A pattern tensor has no storage to reset.
             return None
         case ntn.Declare(tensor, _, _, _) if isinstance(
             tensor, (ntn.Variable, ntn.Slot)

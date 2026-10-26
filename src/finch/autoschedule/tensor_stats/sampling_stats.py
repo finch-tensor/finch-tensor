@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from typing import Any
 
 import numpy as np
@@ -8,8 +9,8 @@ import numpy as np
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
@@ -47,7 +48,7 @@ def compute_sketch(sketch: LogicExpression) -> Table:
     from finch.autoschedule.default_schedulers import NON_RECURSIVE_SCHEDULER
 
     fields = sketch.fields()
-    out = Alias("sketch_out")
+    out = HardAlias("sketch_out")
     prgm = Plan((Query(Table(out, fields), sketch), Produces((out,))))
     (result,) = NON_RECURSIVE_SCHEDULER(prgm)
     return Table(Literal(result), fields)
@@ -670,7 +671,7 @@ class SamplingStats(NumericStats):
             if seed is None or size == 0:
                 continue
             mask = RandomMaskTensor(size, prob, seed=seed, dtype=np.intp)
-            out = Alias("sampled_count")
+            out = HardAlias("sampled_count")
             query = Query(
                 Table(out, ()),
                 Aggregate(
@@ -689,8 +690,12 @@ class SamplingStats(NumericStats):
             return d_n_raw
         return d_n_raw / coverage
 
-    def estimate_non_fill_values(self) -> float:
-        """Correct reduced-dimension sampling, then scale to all output coordinates."""
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        """
+        Correct reduced-dimension sampling, then scale to all output coordinates.
+        Non-fill values are assumed to be spread evenly over the slices which fix
+        the fields of `over`.
+        """
         q_output = math.prod(self.sample_probs)
         q = self.remainder_prob
         needs_freq = (
@@ -734,7 +739,9 @@ class SamplingStats(NumericStats):
                 f"Choose from: {', '.join(SAMPLING_ESTIMATORS)}"
             )
 
-        return float(min(bound_size, max(d_n, formula_est) / q_output))
+        total = min(bound_size, max(d_n, formula_est) / q_output)
+        slices = self.get_dim_space_size(tuple(set(over) & set(self.index_order)))
+        return float(total) / slices
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[f]) for f in self.index_order]

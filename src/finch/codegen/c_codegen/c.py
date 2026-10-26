@@ -1,6 +1,7 @@
 import ctypes
 import json
 import logging
+import re
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -27,10 +28,19 @@ from finch.algebra import (
     ftype,
     is_dynamic,
     is_static,
+    np_dtype,
 )
 from finch.algebra.ftypes import FDType
 from finch.finch_assembly import BufferFType
-from finch.symbolic import CompilerMode, Context, Namespace, ScopedDict, UnvalidatedForm
+from finch.symbolic import (
+    CompilerMode,
+    Context,
+    Namespace,
+    PostWalk,
+    Rewrite,
+    ScopedDict,
+    UnvalidatedForm,
+)
 from finch.util import config, file_cache
 from finch.util.logging import LOG_BACKEND_C
 
@@ -241,7 +251,7 @@ class CCompiler(UnvalidatedForm, asm.AssemblyLoader):
         for func in prgm.funcs:
             match func:
                 case asm.Function(asm.Variable(func_name, func_type), _, _):
-                    kern = CKernel(getattr(lib, func_name), func_type)
+                    kern = CKernel(getattr(lib, c_identifier(func_name)), func_type)
                     kernels[func_name] = kern
                 case _:
                     raise NotImplementedError(
@@ -310,23 +320,29 @@ def c_function_name(op: FType, ctx: Any, *args: Any) -> str:
             raise TypeError(f"{op} has no C representation.")
 
 
+def c_operand(ctx: Any, arg: Any) -> str:
+    """Parenthesize compound operands, since C's precedence isn't Finch's."""
+    code = ctx(arg)
+    return f"({code})" if isinstance(arg, asm.Call) else code
+
+
 def c_nary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for n-ary operators."""
     assert len(args) > 0
     if len(args) == 1:
-        return f"{c_symbol}{ctx(args[0])}"
-    return f" {c_symbol} ".join(map(ctx, args))
+        return f"{c_symbol}{c_operand(ctx, args[0])}"
+    return f" {c_symbol} ".join(c_operand(ctx, arg) for arg in args)
 
 
 def c_binary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for binary operators."""
     a, b = args
-    return f"{ctx(a)} {c_symbol} {ctx(b)}"
+    return f"{c_operand(ctx, a)} {c_symbol} {c_operand(ctx, b)}"
 
 
 def c_unary_function_call(c_symbol: str, ctx: Any, *args: Any) -> str:
     """Generate C code for unary operators."""
-    return f"{c_symbol}{ctx(args[0])}"
+    return f"{c_symbol}{c_operand(ctx, args[0])}"
 
 
 def c_same(ctx, x, y):
@@ -367,6 +383,16 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
     """
     op_type = op.result_type
     match op_type:
+        case ffuncs._MakeTupleFType():
+            values = []
+            for i, arg in enumerate(args):
+                value = ctx.cache("tuple_element", arg)
+                if c_type(arg.result_type) is not None:
+                    values.append(f".element_{i} = {ctx(value)}")
+            if not values:
+                return "((void)0)"
+            type_ = c_type(op_type.return_type(*(arg.result_type for arg in args)))
+            return f"({ctx.ctype_name(type_)}){{{', '.join(values)}}}"
         case ffuncs._CastFType(dtype=dtype):
             return f"(({ctx.ctype_name(c_type(dtype))})({ctx(args[0])}))"
         case asm.AssemblyKernelFType():
@@ -408,6 +434,23 @@ def c_function_call(op: asm.AssemblyExpression, ctx: Any, *args: Any) -> str:
         case ffuncs._WhereFType():
             cond, x, y = args
             return f"({ctx(cond)} ? {ctx(x)} : {ctx(y)})"
+        case ffuncs._MinFType() | ffuncs._MaxFType():
+            # Like np.minimum and np.maximum, a NaN argument wins. Only a NaN
+            # on the left needs a check, since comparisons with NaN are false.
+            cmp = "<" if op_type == ffuncs.min.ftype else ">"
+            result_type = op_type.return_type(*(arg.result_type for arg in args))
+            type_code = ctx.ctype_name(c_type(result_type))
+            result = ctx(ctx.cache("extremum", args[0]))
+            left_type = args[0].result_type
+            for arg in args[1:]:
+                x = ctx(ctx.cache("extremum", arg))
+                cond = f"{result} {cmp} {x}"
+                if np.issubdtype(np_dtype(left_type), np.floating):
+                    cond = f"({result} != {result}) || ({cond})"
+                var = ctx.freshen("extremum")
+                ctx.exec(f"{ctx.feed}{type_code} {var} = ({cond}) ? {result} : {x};")
+                result, left_type = var, result_type
+            return result
     c_symbol = c_function_name(op_type, ctx, *args)
     match op_type:
         case (
@@ -467,6 +510,10 @@ def c_literal(ctx: Any, val: Any) -> str:
             return f'"{val}"'
         case algebra.ftypes.FDTypeNumpy():
             return numpy_c_literal(fmt, val, ctx)
+        case TupleFType():
+            return c_function_call(
+                asm.Literal(ffuncs.make_tuple), ctx, *(asm.Literal(v) for v in val)
+            )
         case _:
             if hasattr(val, "c_literal"):
                 return val.c_literal(ctx)
@@ -521,7 +568,6 @@ def c_type(t: FType) -> Any:
 
 
 c_structs: dict[Any, Any] = {}
-c_structnames = Namespace()
 
 
 def struct_c_type(fmt: StructFType):
@@ -536,8 +582,9 @@ def struct_c_type(fmt: StructFType):
     # Empty mutable structs still need storage for their pointer representation.
     if not fields:
         fields = [("_padding", ctypes.c_ubyte)]
+    # Generated code names the struct itself, see CContext.ctype_name.
     new_struct = type(
-        c_structnames.freshen("C", fmt.struct_name),
+        f"C_{fmt.struct_name}",
         (ctypes.Structure,),
         {"_fields_": fields},
     )
@@ -579,10 +626,44 @@ ctype_to_c_name: dict[Any, tuple[str, list[str]]] = {
 }
 
 
+C_RESERVED = frozenset(
+    {
+        "auto", "break", "case", "char", "const", "continue", "default", "do",
+        "double", "else", "enum", "extern", "float", "for", "goto", "if",
+        "inline", "int", "long", "main", "register", "restrict", "return",
+        "short", "signed", "sizeof", "static", "struct", "switch", "typedef",
+        "union", "unsigned", "void", "volatile", "while", "bool", "true",
+        "false",
+    }
+)  # fmt: skip
+
+
+def c_identifier(name: str) -> str:
+    """A C identifier for a name, such as the generated `#A#0`, which isn't one.
+    Names which C reserves, like `main`, get a trailing underscore."""
+    name = re.sub(r"\W", "_", name)
+    return f"{name}_" if name in C_RESERVED else name
+
+
+def c_identifiers(prgm: asm.AssemblyNode) -> asm.AssemblyNode:
+    """Rename the variables and slots of a program to C identifiers."""
+
+    def rename(node):
+        match node:
+            case asm.Variable(name, type_) if c_identifier(name) != name:
+                return asm.Variable(c_identifier(name), type_)
+            case asm.Slot(name, type_) if c_identifier(name) != name:
+                return asm.Slot(c_identifier(name), type_)
+        return None
+
+    return Rewrite(PostWalk(rename))(prgm)
+
+
 class CGenerator(UnvalidatedForm, CLowerer):
     def lower(
         self, prgm: asm.AssemblyNode, *, mode: CompilerMode | None = None
     ) -> CCode:
+        prgm = c_identifiers(prgm)
         ctx = CContext(mode=mode)
         if ctx.mode.debug:
             ctx.namespace = Namespace(prgm)
@@ -622,6 +703,7 @@ class CContext(Context):
         if fptr is None:
             fptr = {}
         self.fptr = fptr
+        self.structs: dict[Any, str] = {}
         self.types = types
         self.slots = slots
         self.buffer_methods: dict[Any, Any] = {}
@@ -651,17 +733,22 @@ class CContext(Context):
             and isinstance(t, type)
             and issubclass(t, ctypes.Structure)
         ):  # type: ignore[attr-defined]
-            name = t.__name__
-            args = [
-                f"{self.ctype_name(f_type)} {f_name}"
-                for (f_name, f_type, *_) in t._fields_
-            ]
-            header = (
-                f"struct {name} {{\n"
-                + "\n".join(f"{self.tab}{arg};" for arg in args)
-                + "\n};"
-            )
-            self.add_header(header)
+            # Structs are numbered per module, so the code doesn't depend on
+            # which ctypes structs were made before.
+            name = self.structs.get(t)
+            if name is None:
+                name = self.freshen(t.__name__)
+                self.structs[t] = name
+                args = [
+                    f"{self.ctype_name(f_type)} {f_name}"
+                    for (f_name, f_type, *_) in t._fields_
+                ]
+                header = (
+                    f"struct {name} {{\n"
+                    + "\n".join(f"{self.tab}{arg};" for arg in args)
+                    + "\n};"
+                )
+                self.add_header(header)
             return f"struct {name}"
         if (
             hasattr(ctypes, "_Pointer")
@@ -702,6 +789,7 @@ class CContext(Context):
         blk.types = self.types
         blk.slots = self.slots
         blk.fptr = self.fptr
+        blk.structs = self.structs
         return blk
 
     def subblock(self):
@@ -789,7 +877,7 @@ class CContext(Context):
                 obj_t = obj.result_type
                 if not isinstance(obj_t, StructFType):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
-                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
+                if val.result_type != obj_t.struct_attrtype(attr.val):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
                         f"{obj_t.struct_attrtype(attr.val)}"

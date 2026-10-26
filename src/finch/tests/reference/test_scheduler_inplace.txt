@@ -1,5 +1,14 @@
-A0_2[i_1, i_0] = Table(A0, i_0, i_1)
-#A#1[i0, i2] = Aggregate(add, 0, Reorder(MapJoin(mul, Table(A0_2, i1, i0), Table(A1, i1, i2)), i1, i0, i2), i1)
-A2_5[i0, i2] = Aggregate(overwrite, MapJoin(add, FillTable(#A#1), MapJoin(add, FillTable(A2), FillTable(A1))), Reorder(MapJoin(add, Table(#A#1, i0, i2), MapJoin(add, Table(A2, i0, i2), Table(A1, i0, i2))), i0, i2), )
-A2[i_5, i_6] = Table(A2_5, i_5, i_6)
+fuse(i_1):
+    fuse(i_0):
+        A0_2[i_1, i_0] = A0[i_0, i_1]
+fuse(i1):
+    fuse(i0):
+        fuse(i2):
+            #A#1[i0, i2] = Aggregate(add, 0, MapJoin(mul, A0_2[i1, i0], A1[i1, i2]), i1)
+fuse(i0):
+    fuse(i2):
+        A2_5[i0, i2] = Aggregate(overwrite, MapJoin(add, FillTable(#A#1), MapJoin(add, FillTable(A2), FillTable(A1))), MapJoin(add, #A#1[i0, i2], MapJoin(add, A2[i0, i2], A1[i0, i2])), )
+fuse(i_5):
+    fuse(i_6):
+        A2[i_5, i_6] = A2_5[i_5, i_6]
 return A2

@@ -14,25 +14,25 @@ eval(let
         v11 = 1
     Finch.@finch_kernel function main(v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11)
         v3 .= 0
-        for v16 = 1:v8
-            for v17 = 1:v6
-                for v18 = 1:v10
-                    for v19 = 1:v7
-                        v3[v18,v16] += ((v0[v19,v17] != 0) * Int64(v1[v17,v16]) * Int64(v2[v19,v18]))
+        for v18 = 1:v8
+            for v19 = 1:v6
+                for v20 = 1:v10
+                    for v21 = 1:v7
+                        v3[v20,v18] += ((v0[v21,v19] != 0) * Int64(v1[v19,v18]) * Int64(v2[v21,v20]))
                     end
                 end
             end
         end
         v4 .= 0
-        for v20 = 1:v8
-            for v21 = 1:v9
-                v4[v20] += Int64(v1[v21,v20])
+        for v23 = 1:v8
+            for v24 = 1:v9
+                v4[v23] += Int64(v1[v24,v23])
             end
         end
         v5 .= 0
-        for v22 = 1:v10
-            for v23 = 1:v11
-                v5[v22] += Int64(v2[v23,v22])
+        for v26 = 1:v10
+            for v27 = 1:v11
+                v5[v26] += Int64(v2[v27,v26])
             end
         end
         return v3,v4,v5
@@ -85,15 +85,15 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 pos_stop = (v1.dims[2]).stop * (v2.dims[2]).stop
                 Finch.resize_if_smaller!(v3_lvl_3_val, pos_stop)
                 Finch.fill_range!(v3_lvl_3_val, 0, 1, pos_stop)
-                for v16_4 = 1:(v1.dims[2]).stop
-                    v3_lvl_q = (1 - 1) * (v1.dims[2]).stop + v16_4
-                    phase_start_2 = max(1, 1 + fld(stop * (v16_4 + -1), P))
-                    phase_stop_2 = min(v0_lvl_stop, fld(stop * v16_4, P))
+                for v18_4 = 1:(v1.dims[2]).stop
+                    v3_lvl_q = (1 - 1) * (v1.dims[2]).stop + v18_4
+                    phase_start_2 = max(1, 1 + fld(stop * (v18_4 + -1), P))
+                    phase_stop_2 = min(v0_lvl_stop, fld(stop * v18_4, P))
                     if phase_stop_2 >= phase_start_2
-                        for v17_6 = phase_start_2:phase_stop_2
-                            v0_lvl_q = (1 - 1) * v0_lvl_stop + v17_6
-                            for v18_4 = 1:(v2.dims[2]).stop
-                                v3_lvl_2_q = (v3_lvl_q - 1) * (v2.dims[2]).stop + v18_4
+                        for v19_6 = phase_start_2:phase_stop_2
+                            v0_lvl_q = (1 - 1) * v0_lvl_stop + v19_6
+                            for v20_4 = 1:(v2.dims[2]).stop
+                                v3_lvl_2_q = (v3_lvl_q - 1) * (v2.dims[2]).stop + v20_4
                                 v0_lvl_2_q = v0_lvl_2_ptr[v0_lvl_q]
                                 v0_lvl_2_q_stop = v0_lvl_2_ptr[v0_lvl_q + 1]
                                 if v0_lvl_2_q < v0_lvl_2_q_stop
@@ -101,8 +101,8 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                                 else
                                     v0_lvl_2_i1 = 0
                                 end
-                                phase_start_5 = max(1, 1 + fld(stop_2 * (-1 + v18_4), P_2))
-                                phase_stop_5 = min(v0_lvl_2_stop, v0_lvl_2_i1, fld(stop_2 * v18_4, P_2))
+                                phase_start_5 = max(1, 1 + fld(stop_2 * (-1 + v20_4), P_2))
+                                phase_stop_5 = min(v0_lvl_2_stop, v0_lvl_2_i1, fld(stop_2 * v20_4, P_2))
                                 if phase_stop_5 >= phase_start_5
                                     if v0_lvl_2_idx[v0_lvl_2_q] < phase_start_5
                                         v0_lvl_2_q = Finch.scansearch(v0_lvl_2_idx, phase_start_5, v0_lvl_2_q, v0_lvl_2_q_stop - 1)
@@ -130,20 +130,20 @@ function main(v0::Tensor{DenseLevel{Int64, SparseListLevel{Int64, PlusOneVector{
                 end
                 Finch.resize_if_smaller!(v4_lvl_2_val, (v1.dims[2]).stop)
                 Finch.fill_range!(v4_lvl_2_val, 0, 1, (v1.dims[2]).stop)
-                for v20_4 = 1:(v1.dims[2]).stop
-                    v4_lvl_q = (1 - 1) * (v1.dims[2]).stop + v20_4
-                    phase_start_12 = max(1, 1 + fld(stop * (-1 + v20_4), P))
-                    phase_stop_13 = min((v1.dims[1]).stop, fld(stop * v20_4, P))
+                for v23_4 = 1:(v1.dims[2]).stop
+                    v4_lvl_q = (1 - 1) * (v1.dims[2]).stop + v23_4
+                    phase_start_12 = max(1, 1 + fld(stop * (-1 + v23_4), P))
+                    phase_stop_13 = min((v1.dims[1]).stop, fld(stop * v23_4, P))
                     if phase_stop_13 >= phase_start_12
                         v4_lvl_2_val[v4_lvl_q] = 1 + -phase_start_12 + phase_stop_13 + v4_lvl_2_val[v4_lvl_q]
                     end
                 end
                 Finch.resize_if_smaller!(v5_lvl_2_val, (v2.dims[2]).stop)
                 Finch.fill_range!(v5_lvl_2_val, 0, 1, (v2.dims[2]).stop)
-                for v22_4 = 1:(v2.dims[2]).stop
-                    v5_lvl_q = (1 - 1) * (v2.dims[2]).stop + v22_4
-                    phase_start_15 = max(1, 1 + fld(stop_2 * (-1 + v22_4), P_2))
-                    phase_stop_16 = min((v2.dims[1]).stop, fld(stop_2 * v22_4, P_2))
+                for v26_4 = 1:(v2.dims[2]).stop
+                    v5_lvl_q = (1 - 1) * (v2.dims[2]).stop + v26_4
+                    phase_start_15 = max(1, 1 + fld(stop_2 * (-1 + v26_4), P_2))
+                    phase_stop_16 = min((v2.dims[1]).stop, fld(stop_2 * v26_4, P_2))
                     if phase_stop_16 >= phase_start_15
                         v5_lvl_2_val[v5_lvl_q] = 1 + -phase_start_15 + phase_stop_16 + v5_lvl_2_val[v5_lvl_q]
                     end

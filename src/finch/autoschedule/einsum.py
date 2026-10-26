@@ -7,6 +7,7 @@ from finch.finch_assembly.stages import AssemblyLibrary
 from finch.finch_einsum import EinsumLoader, MockEinsumLoader
 from finch.finch_logic import Alias, LogicStatement, StatsFactory
 from finch.finch_logic.stages import LogicLoader
+from finch.symbolic import PreOrderDFS
 
 from .stages import FormattedForm, LogicEinsumLowerer
 
@@ -15,6 +16,9 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
     match node:
         case lgc.Plan(bodies):
             return ein.Plan(tuple(generate_einsum_stmt(body) for body in bodies))
+        case lgc.Fuse(_, body):
+            # Einsums don't have loop orders.
+            return generate_einsum_stmt(body)
         case lgc.Query(
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Aggregate(lgc.Literal(operation), lgc.Literal(init), arg, _),
@@ -45,10 +49,8 @@ def generate_einsum_stmt(node: LogicStatement) -> ein.EinsumStatement:
             lgc.Table(lgc.Alias(name), output_idxs),
             lgc.Aggregate(lgc.Literal(ffuncs.overwrite), _, arg, _),
         ):
-            # An overwrite writes every element of the output, so its init only
-            # matters as the fill of the output, which the executor sets when
-            # it constructs the output. Einsum can't read fills, so it can't
-            # start from any other init that isn't a literal.
+            # An overwrite needs no initializing einsum. Einsum can't read fills,
+            # so other reductions require a literal init.
             return ein.Einsum(
                 op=ein.Literal(ffuncs.overwrite),
                 tns=ein.Alias(name),
@@ -89,8 +91,6 @@ def generate_einsum_expr(
     ex: lgc.LogicExpression,
 ) -> ein.EinsumExpression:
     match ex:
-        case lgc.Reorder(arg, idxs):
-            return generate_einsum_expr(arg)
         case lgc.MapJoin(lgc.Literal(operation), lgcargs):
             args = tuple([generate_einsum_expr(arg) for arg in lgcargs])
             return ein.Call(ein.Literal(operation), args)
@@ -139,16 +139,23 @@ class LogicEinsumLoader(FormattedForm, LogicLoader):
     ) -> tuple[
         AssemblyLibrary,
         dict[lgc.Alias, TensorFType],
-        dict[lgc.Alias, tuple[lgc.Field | None, ...]],
-        lgc.LogicStatement,
     ]:
         ein_prgm, ein_bindings = self.ctx_lower(prgm, bindings, stats, stats_factory)
-        mod, ein_bindings, ein_shape_vars = self.ctx_load(ein_prgm, ein_bindings)
-        lgc_bindings = {lgc.Alias(var.name): val for var, val in ein_bindings.items()}
-        lgc_shape_vars: dict[lgc.Alias, tuple[lgc.Field | None, ...]] = {
-            lgc.Alias(var.name): tuple(
-                lgc.Field(idx.name) if idx is not None else None for idx in idxs
-            )
-            for var, idxs in ein_shape_vars.items()
+        # Aliases which are defined before any other access are storage
+        # placeholders, not initialized einsum inputs. Statements come in
+        # program order, and a query's lhs before its rhs.
+        accessed = set()
+        defined = set()
+        for node in PreOrderDFS(prgm):
+            match node:
+                case lgc.Query(lgc.Table(lgc.Alias(name), _), _) if (
+                    name not in accessed
+                ):
+                    defined.add(ein.Alias(name))
+                case lgc.Alias(name):
+                    accessed.add(name)
+        mod, ein_bindings = self.ctx_load(ein_prgm, ein_bindings, defined=defined)
+        lgc_bindings: dict[lgc.Alias, TensorFType] = {
+            lgc.HardAlias(var.name): val for var, val in ein_bindings.items()
         }
-        return mod, lgc_bindings, lgc_shape_vars, prgm
+        return mod, lgc_bindings

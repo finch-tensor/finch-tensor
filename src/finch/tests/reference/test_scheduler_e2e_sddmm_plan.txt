@@ -1,3 +1,8 @@
-S_2[i_1, i_0] = Table(S, i_0, i_1)
-RES[i, j] = Aggregate(add, 0, Reorder(MapJoin(mul, MapJoin(mul, Table(A, i, k), Table(B, j, k)), Table(S_2, i, j)), i, j, k), k)
+fuse(i_1):
+    fuse(i_0):
+        S_2[i_1, i_0] = S[i_0, i_1]
+fuse(i):
+    fuse(j):
+        fuse(k):
+            RES[i, j] = Aggregate(add, 0, MapJoin(mul, MapJoin(mul, A[i, k], B[j, k]), S_2[i, j]), k)
 return RES

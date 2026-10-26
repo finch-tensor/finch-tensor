@@ -393,8 +393,9 @@ def test_julia_sparse_level_round_trip(kind, copy_buffers):
 
 def _runtime(metadata):
     _requires_julia_backend()
-    for name in metadata:
-        jl.seval(f"{name}(args...) = nothing")
+    for name, info in metadata.items():
+        fields = ", ".join(f"v{pos}=args[{pos + 1}]" for pos in info.returned_positions)
+        jl.seval(f"{name}(args...) = (; {fields})")
 
     runtime = DefaultFinchJLRuntime()
     runtime._kernels = {name: object() for name in metadata}
@@ -416,6 +417,25 @@ def test_julia_owned_tensor_addition():
     )
 
     assert (ft.add(tensor, 1).to_numpy() == np.arange(1, 5)).all()
+
+
+def test_julia_cached_kernel_updates_output_shape():
+    _requires_julia_backend()
+
+    @ft.jit
+    def outputs(source):
+        return source + source, ft.sum(source, axis=0)
+
+    with with_default_scheduler(COMPILE_JULIA):
+        for shape in ((2, 3), (0, 3), (2, 0), (4, 1), (2, 3)):
+            data = np.arange(np.prod(shape), dtype=np.int64).reshape(shape)
+            result, reduced = outputs(ft.asarray(data))
+            assert result.shape == shape
+            np.testing.assert_array_equal(result.to_numpy(), data * 2)
+            assert reduced.shape == shape[1:]
+            np.testing.assert_array_equal(reduced.to_numpy(), data.sum(axis=0))
+            del result, reduced
+            gc.collect()
 
 
 def test_default_runtime_uses_a_free_buffer():
@@ -500,3 +520,28 @@ def test_default_runtime_reuses_translated_buffer_across_kernels():
     )[0]
 
     assert first is second
+
+
+@pytest.mark.parametrize("kind", ["hash", "bytemap"])
+def test_julia_reads_compiled_sparse_level(kind):
+    _requires_julia_backend()
+    from finch.codegen import NumbaCompiler
+
+    from .test_sparse_update import run_copy, tensors
+
+    rng = np.random.default_rng(0)
+    data = rng.integers(1, 9, (5, 40)) * (rng.random((5, 40)) < 0.3)
+    source, target = tensors("DH" if kind == "hash" else "DB", data)
+    tensor = run_copy(NumbaCompiler(), source, target)
+    same_values = jl.seval("(A, B) -> Array(A) == Array(B)")
+    assert same_values(tensor_to_jl(tensor), tensor_to_jl(ft.asarray(data)))
+    if kind == "hash":
+        # Julia probes for each key where the compiled kernel placed it.
+        level = level_to_jl(tensor.lvl.lvl)
+        lookup = jl.seval(
+            "(lvl, p, i) -> Finch.sparse_hash_lookup(lvl.tbl_ctrl, lvl.tbl, "
+            "lvl.key, p, i, lvl.subtables, lvl.pos_multiplier)"
+        )
+        for (p, i), value in np.ndenumerate(data):
+            q = lookup(level, p + 1, i + 1)
+            assert (q != 0) == (value != 0)
