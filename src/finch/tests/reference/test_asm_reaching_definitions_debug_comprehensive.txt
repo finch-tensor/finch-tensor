@@ -1,0 +1,112 @@
+ENTRY_0: #succs=[compute_2, main_5]
+
+EXIT_1: #succs=[]
+
+compute_2: #succs=[compute_3]
+    [28] x: finch.int64 = x 	# x = {}
+    [29] y: finch.int64 = y 	# y = {}
+    [0] temp: finch.int64 = x 	# x = {28}
+    [1] temp: finch.int64 = add(temp, y) 	# temp = {0}, y = {29}
+    [2] return temp 	# temp = {1}
+
+compute_3: #succs=[EXIT_1]
+
+compute_4: #succs=[compute_3]
+
+main_5: #succs=[main_7, main_8]
+    [3] a: finch.int64 = 10
+    [4] b: finch.int64 = a 	# a = {3}
+    [5] c: finch.int64 = b 	# b = {4}
+    [6] d: finch.int64 = 5
+
+main_6: #succs=[EXIT_1]
+
+main_7: #succs=[main_9]
+    [30] assert(gt(c, 5)) 	# c = {5}
+    [7] a: finch.int64 = add(a, d) 	# a = {3}, d = {6}
+    [8] b: finch.int64 = a 	# a = {7}
+
+main_8: #succs=[main_9]
+    [31] assert(not_(gt(c, 5))) 	# c = {5}
+
+main_9: #succs=[main_10, main_11]
+    [9] result: finch.int64 = 0
+    j_3: finch.int64 = 0
+
+main_10: #succs=[main_12, main_13]
+    [35] assert(lt(j_3, 5)) 	# j_3 = {}
+    [32] i: finch.int64 = j_3 	# j_3 = {}
+    [10] temp: finch.int64 = i 	# i = {32}
+    [11] result: finch.int64 = add(result, temp) 	# result = {9, 11, 12}, temp = {10}
+
+main_11: #succs=[main_15, main_16]
+    [36] assert(not_(lt(j_3, 5))) 	# j_3 = {}
+
+main_12: #succs=[main_14]
+    [33] assert(eq(mod(i, 2), 0)) 	# i = {32}
+    [12] result: finch.int64 = mul(result, 2) 	# result = {11}
+
+main_13: #succs=[main_14]
+    [34] assert(not_(eq(mod(i, 2), 0))) 	# i = {32}
+
+main_14: #succs=[main_10, main_11]
+    j_3: finch.int64 = add(j_3, 1) 	# j_3 = {}
+
+main_15: #succs=[main_17]
+    [37] assert(gt(result, 20)) 	# result = {9, 11, 12}
+    [13] c: finch.int64 = result 	# result = {9, 11, 12}
+    [14] result: finch.int64 = add(c, b) 	# c = {13}, b = {4, 8}
+
+main_16: #succs=[main_17]
+    [38] assert(not_(gt(result, 20))) 	# result = {9, 11, 12}
+    [15] c: finch.int64 = b 	# b = {4, 8}
+    [16] result: finch.int64 = mul(c, 3) 	# c = {15}
+
+main_17: #succs=[main_18, main_19]
+    j_4: finch.int64 = 0
+
+main_18: #succs=[main_20, main_21]
+    [43] assert(lt(j_4, 3)) 	# j_4 = {}
+    [39] i: finch.int64 = j_4 	# j_4 = {}
+    [17] a: finch.int64 = i 	# i = {39}
+    j_5: finch.int64 = 0
+
+main_19: #succs=[main_22, main_23]
+    [44] assert(not_(lt(j_4, 3))) 	# j_4 = {}
+    [20] d: finch.int64 = result 	# result = {14, 16, 19}
+
+main_20: #succs=[main_20, main_21]
+    [41] assert(lt(j_5, 2)) 	# j_5 = {}
+    [40] j: finch.int64 = j_5 	# j_5 = {}
+    [18] b: finch.int64 = j 	# j = {40}
+    [19] result: finch.int64 = add(result, add(a, b)) 	# result = {14, 16, 19}, a = {17}, b = {18}
+    j_5: finch.int64 = add(j_5, 1) 	# j_5 = {}
+
+main_21: #succs=[main_18, main_19]
+    [42] assert(not_(lt(j_5, 2))) 	# j_5 = {}
+    j_4: finch.int64 = add(j_4, 1) 	# j_4 = {}
+
+main_22: #succs=[main_25, main_26]
+    [47] assert(lt(d, 100)) 	# d = {20}
+    [21] c: finch.int64 = d 	# d = {20}
+
+main_23: #succs=[main_24]
+    [48] assert(not_(lt(d, 100))) 	# d = {20}
+    [24] result: finch.int64 = d 	# d = {20}
+
+main_24: #succs=[main_6]
+    [25] a: finch.int64 = result 	# result = {22, 23, 24}
+    [26] b: finch.int64 = a 	# a = {25}
+    [27] return b 	# b = {26}
+
+main_25: #succs=[main_27]
+    [45] assert(gt(c, 50)) 	# c = {21}
+    [22] result: finch.int64 = mul(c, 2) 	# c = {21}
+
+main_26: #succs=[main_27]
+    [46] assert(not_(gt(c, 50))) 	# c = {21}
+    [23] result: finch.int64 = c 	# c = {21}
+
+main_27: #succs=[main_24]
+
+main_28: #succs=[main_6]

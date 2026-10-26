@@ -233,6 +233,38 @@ def test_kernels_write_tensor_fields_back(compiler):
     assert (fiber.ftype, array.ftype) == formats
 
 
+@pytest.mark.parametrize(
+    ["generator", "compiler", "prefix"],
+    [
+        pytest.param(CGenerator(), CCompiler(), "C", marks=pytest.mark.c_backend),
+        (NumbaGenerator(), NumbaCompiler(), "Numba"),
+    ],
+)
+def test_struct_names_are_numbered_per_module(generator, compiler, prefix):
+    # Generated code numbers structs in the order the module uses them, whichever
+    # structs other modules made first.
+    a = finch.BufferizedNDArray.from_numpy(np.zeros(3))
+    b = finch.BufferizedNDArray.from_numpy(np.zeros((2, 2), dtype=np.int64))
+
+    def module(*arrays):
+        args = tuple(asm.Variable(f"a{i}", arr.ftype) for i, arr in enumerate(arrays))
+        kernel_t = asm.AssemblyKernelFType(
+            "f", tuple(arr.ftype for arr in arrays), finch.intp
+        )
+        body = asm.Return(asm.Literal(np.intp(0)))
+        return asm.Module((asm.Function(asm.Variable("f", kernel_t), args, body),))
+
+    compiler(module(b)).f(b)
+    names = re.findall(
+        rf"\b{prefix}_BufferizedNDArray\w*", str(generator(module(a, b)))
+    )
+    assert list(dict.fromkeys(names)) == [
+        f"{prefix}_BufferizedNDArray",
+        f"{prefix}_BufferizedNDArray_2",
+    ]
+    assert compiler(module(a, b)).f(a, b) == 0
+
+
 @pytest.mark.c_backend
 @pytest.mark.parametrize(
     ["compiler", "buffer"],
