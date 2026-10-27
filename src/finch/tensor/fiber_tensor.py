@@ -313,7 +313,7 @@ class FiberTensor(OverrideTensor):
         index_type = ftype(coords.dtype)
 
         element_lvl = element(
-            fill_value=np.zeros((), dtype=data.dtype)[()],
+            fill_type=np.zeros((), dtype=data.dtype)[()],
             element_type=ftype(data.dtype),
             position_type=index_type,
         )

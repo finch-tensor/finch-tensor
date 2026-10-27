@@ -3,6 +3,14 @@ from finch.tensor.np_wrapper import NumPyFType, NumPyWrapper
 from finch.tensor.scalar import Scalar, ScalarFType
 
 from . import fft, linalg
+from .constructor import (
+    _from_numpy,
+    _from_parts_coo,
+    _from_parts_csr,
+    _from_pydata,
+    _from_scipy,
+    _is_pydata_sparse,
+)
 from .eager import (
     abs,
     acos,
@@ -156,6 +164,12 @@ __all__ = [
     "NumPyWrapper",
     "Scalar",
     "ScalarFType",
+    "_from_numpy",
+    "_from_parts_coo",
+    "_from_parts_csr",
+    "_from_pydata",
+    "_from_scipy",
+    "_is_pydata_sparse",
     "abs",
     "acos",
     "acosh",
@@ -211,6 +225,11 @@ __all__ = [
     "flip",
     "floor",
     "floor_divide",
+    "from_numpy",
+    "from_parts_coo",
+    "from_parts_csr",
+    "from_pydata",
+    "from_scipy",
     "full",
     "full_like",
     "fuse",
@@ -220,6 +239,7 @@ __all__ = [
     "greater_equal",
     "hypot",
     "imag",
+    "is_pydata_sparse",
     "isfinite",
     "isinf",
     "isnan",
@@ -262,6 +282,7 @@ __all__ = [
     "real",
     "reciprocal",
     "reduce",
+    "reformat",
     "remainder",
     "repeat",
     "reshape",
