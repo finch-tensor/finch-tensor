@@ -5,6 +5,7 @@ jobs:
     runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
     permissions:
       contents: read # required for actions/checkout
+      id-token: write
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v7
@@ -15,7 +16,10 @@ jobs:
           pixi-version: v0.72.0
           environments: benchmark-julia
       - name: Run Julia benchmarks
-        run: pixi run benchmark-julia -vvv -m "not slow"
+        uses: CodSpeedHQ/action@v5
+        with:
+          mode: walltime
+          run: pixi run benchmark-julia -vvv -m "not slow"
 
 on:
   push:
