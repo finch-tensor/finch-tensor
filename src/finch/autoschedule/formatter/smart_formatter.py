@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import TypeVar
 
 import numpy as np
@@ -22,10 +22,10 @@ from finch.autoschedule.cost_models import (
     CostModel,
     DenseLevelOption,
     ElementLevelOption,
+    LevelBasis,
     LevelChoice,
-    LevelCostModel,
     LevelOption,
-    LinearPredictor,
+    LinearCostModel,
     SparseHashLevelOption,
 )
 from finch.autoschedule.cost_models.format_cost_models import alias_blocks
@@ -215,28 +215,33 @@ class FDFormatter(SmartFormatter):
 
 
 def linear_level_model(
-    option_type: type[LevelOption],
-    storage: Sequence[float],
-    access: Sequence[float] = (0, 0, 0, 0),
-) -> LevelCostModel:
-    coefficients = np.array([*storage, *access], dtype=float)
-    return LevelCostModel(option_type, LinearPredictor(coefficients))
+    storage: Mapping[type[LevelOption], Sequence[float]],
+) -> LinearCostModel[LevelChoice]:
+    """
+    A linear model of the levels of each option type, from the coefficients of
+    their storage features. The accesses of the levels are free.
+    """
+    basis = ByKind(
+        {option_type.kind: LevelBasis(option_type) for option_type in storage}
+    )
+    coefficients = [[*coeffs, 0, 0, 0, 0] for coeffs in storage.values()]
+    return LinearCostModel(basis, np.concatenate(coefficients))
 
 
 # Each level option lists its storage features. The access features are
 # sequential reads, scatter reads, sequential writes, and scatter writes.
-ITER_COST_MODEL = ByKind(
+ITER_COST_MODEL = linear_level_model(
     {
-        "dense": linear_level_model(DenseLevelOption, (0, 1)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption, (1, 1, 0, 0)),
-        "element": linear_level_model(ElementLevelOption, (0, 0)),
+        DenseLevelOption: (0, 1),
+        SparseHashLevelOption: (1, 1, 0, 0),
+        ElementLevelOption: (0, 0),
     }
 )
-STORAGE_COST_MODEL = ByKind(
+STORAGE_COST_MODEL = linear_level_model(
     {
-        "dense": linear_level_model(DenseLevelOption, (0, 0)),
-        "sparse_hash": linear_level_model(SparseHashLevelOption, (0, 0, 1, 1)),
-        "element": linear_level_model(ElementLevelOption, (0, 1)),
+        DenseLevelOption: (0, 0),
+        SparseHashLevelOption: (0, 0, 1, 1),
+        ElementLevelOption: (0, 1),
     }
 )
 

@@ -1,13 +1,7 @@
 from collections.abc import Mapping, Sequence
 from typing import Generic, TypeVar
 
-from finch.autoschedule.cost_models import (
-    CostModel,
-    PigeonCostModel,
-    Prefix,
-    Sum,
-    TransposeCostModel,
-)
+from finch.autoschedule.cost_models import LOOP_COST_MODEL, CostModel, Prefix
 from finch.autoschedule.factorizer.galley_factorizer import insert_statistics
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -52,7 +46,7 @@ def greedy_loop_order(
 ) -> tuple[Field, ...]:
     """Build a loop order by appending the cheapest candidate prefix."""
     if cost_model is None:
-        cost_model = Sum(PigeonCostModel(), TransposeCostModel())
+        cost_model = LOOP_COST_MODEL
     machine = StatsMachine(stats_factory, dict(stats_bindings))
     match expr:
         case Aggregate(arg=arg):
@@ -117,11 +111,7 @@ class GreedyLoopOrderer(AbstractLoopOrderer, Generic[NS]):
         cost_model: CostModel[Prefix] | None = None,
     ):
         super().__init__(ctx)
-        self.cost_model = (
-            cost_model
-            if cost_model is not None
-            else Sum(PigeonCostModel(), TransposeCostModel())
-        )
+        self.cost_model = cost_model if cost_model is not None else LOOP_COST_MODEL
 
     def set_loop_orders(
         self,

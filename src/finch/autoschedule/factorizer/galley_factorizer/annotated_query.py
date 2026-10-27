@@ -12,7 +12,7 @@ from finch.algebra import (
     repeat_operator,
 )
 from finch.algebra.algebra import FinchOperator
-from finch.autoschedule.cost_models import CostModel, FlopsCostModel
+from finch.autoschedule.cost_models import FLOPS_COST_MODEL, CostModel
 from finch.autoschedule.tensor_stats.logic_to_stats import insert_statistics
 from finch.finch_logic import (
     Aggregate,
@@ -81,14 +81,14 @@ class AnnotatedQuery(Generic[TS]):
             Existing alias→stats environment to seed the analysis.
         cost_model : CostModel, optional
             Cost model used to estimate the cost of each reduction. Defaults
-            to `FlopsCostModel`.
+            to `FLOPS_COST_MODEL`.
         """
         assert isinstance(q, Query), (
             "Annotated Queries can only be built from queries of the form: "
             "Query(Table(lhs, idxs), rhs)"
         )
         self.stats_factory = stats_factory
-        self.cost_model = cost_model if cost_model is not None else FlopsCostModel()
+        self.cost_model = cost_model if cost_model is not None else FLOPS_COST_MODEL
         if bindings is None:
             bindings = OrderedDict()
         self.bindings = bindings

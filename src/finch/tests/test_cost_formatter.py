@@ -10,11 +10,11 @@ from finch.autoschedule.cost_models import (
     ByKind,
     DenseLevelOption,
     ElementLevelOption,
+    LevelBasis,
     LevelChoice,
-    LevelCostModel,
     LevelOption,
-    LinearPredictor,
-    QuadraticPredictor,
+    LinearCostModel,
+    Quadratic,
     SparseHashLevelOption,
 )
 from finch.autoschedule.cost_models.format_cost_models import alias_blocks, nnz_after
@@ -267,10 +267,7 @@ def test_format_access_features_separate_sequential_and_scatter():
     machine(prgm)
 
     def accessed(depth, option):
-        model = LevelCostModel(
-            type(option), LinearPredictor(np.zeros(option.n_features + 4))
-        )
-        features = model.get_component_features(
+        features = LevelBasis(type(option)).get_component_features(
             LevelChoice(prgm, A, depth, (1.0,), option, np.dtype(np.intp).itemsize),
             machine,
         )
@@ -291,19 +288,19 @@ def test_fused_alias_levels_describe_the_largest_slice():
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.eye(4)), (t, i))}
     copy = fuse_loop_order(Query(Table(fused, (t, i)), Table(a, (t, i))), (t, i))
     plan = Plan((copy, Produces((fused,))))
-    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    basis = LevelBasis(SparseHashLevelOption)
     formats: dict[Alias, list[LevelOption]] = {
         scratch: [SparseHashLevelOption(), ElementLevelOption()]
     }
     machine = StatsMachine(sf, dict(stats))
-    sparse, element = model.components(plan, formats, machine)
+    sparse, element = basis.components(plan, formats, machine)
 
     # Each slice of the diagonal stores the one entry of its row.
     assert (sparse.alias, sparse.depth, sparse.num_pos) == (scratch, 0, (1.0,))
     assert element.depth == 1
     assert element.num_pos == pytest.approx((1.0,))
     size = np.dtype(np.intp).itemsize
-    features = model.get_component_features(sparse, machine)
+    features = basis.get_component_features(sparse, machine)
     np.testing.assert_allclose(features[0, :4], [1, 1, 2 * size, size])
 
 
@@ -338,10 +335,10 @@ def test_format_costs_sum_the_union_of_each_block():
     assert [block.estimate_non_fill_values() for block, _ in blocks] == nnz
     assert all(block.fill_type == states[0].fill_type for block, _ in blocks)
 
-    model = LevelCostModel(SparseHashLevelOption, LinearPredictor(np.zeros(8)))
+    basis = LevelBasis(SparseHashLevelOption)
     size = np.dtype(np.intp).itemsize
     choice = LevelChoice(plan, out, 0, (1.0, 1.0), SparseHashLevelOption(), size)
-    features = model.get_component_features(choice, machine)
+    features = basis.get_component_features(choice, machine)
     # An allocation row for each block, then a write row for each query.
     assert features.shape == (5, 8)
     np.testing.assert_array_equal(
@@ -365,18 +362,18 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             Produces((c,)),
         )
     )
-    cost = ByKind(
-        {
-            "dense": LevelCostModel(DenseLevelOption, QuadraticPredictor(np.ones(36))),
-            "element": LevelCostModel(
-                ElementLevelOption, QuadraticPredictor(np.ones(36))
-            ),
-        }
+    bases = {
+        "dense": LevelBasis(DenseLevelOption),
+        "element": LevelBasis(ElementLevelOption),
+    }
+    basis = ByKind(bases)
+    cost = LinearCostModel(
+        ByKind({kind: Quadratic(sub) for kind, sub in bases.items()}), np.ones(72)
     )
     formats: dict[Alias, list[LevelOption]] = {
         b: [DenseLevelOption(), ElementLevelOption()]
     }
-    features = cost.get_features(plan, formats, stats, sf)
+    features = basis.get_features(plan, formats, stats, sf)
     # Allocation, write, and read rows for both the dense and element levels.
     assert features.shape == (6, 12)
     np.testing.assert_array_equal(features[1:3, 2:6], [[0, 0, 3, 0], [3, 0, 0, 0]])
@@ -395,7 +392,7 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
             (1, (3,), ElementLevelOption()),
         )
     )
-    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 12)
+    assert cost.get_features(Plan(()), {}, {}, sf).shape == (0, 72)
     assert cost.predict_cost(Plan(()), {}, {}, sf) == 0.0
     formatter = CostFormatter(cost_model=cost, options=(DenseLevelOption(),))
     fmt = formatter.get_tensor_ftype(
@@ -404,24 +401,23 @@ def test_nonlinear_format_cost_retains_allocations_and_query_accesses():
     assert isinstance(fmt.lvl_t, fl.DenseLevelFType)
 
 
-def test_format_selection_uses_custom_predictor():
+def test_format_selection_uses_custom_model():
     i = Field("i")
     a = HardAlias("a")
     tensor = fl.asarray(np.ones(3))
     query = fuse_loop_order(Query(Table(a, (i,)), Table(Literal(tensor), (i,))), (i,))
     machine = StatsMachine(DCStatsFactory())
     machine(query)
-    zeros = {
-        option_type.kind: LevelCostModel(
-            option_type, LinearPredictor(np.zeros(option_type.n_features + 4))
-        )
+    bases = {
+        option_type.kind: LevelBasis(option_type)
         for option_type in (DenseLevelOption, SparseHashLevelOption, ElementLevelOption)
     }
-    slots = LevelCostModel(
-        DenseLevelOption, lambda rows: float(np.square(rows[:, 1]).sum())
-    )
-    linear = ByKind(zeros)
-    nonlinear = ByKind({**zeros, "dense": slots})
+    linear = LinearCostModel(ByKind(bases), np.zeros(ByKind(bases).n_features))
+    # Charge the square of the dense slots, the second storage feature.
+    slots = ByKind({**bases, "dense": Quadratic(bases["dense"])})
+    coefficients = np.zeros(slots.n_features)
+    coefficients[bases["dense"].n_features + 1] = 1.0
+    nonlinear = LinearCostModel(slots, coefficients)
 
     def choose(cost):
         return CostFormatter(cost_model=cost).get_tensor_ftype(

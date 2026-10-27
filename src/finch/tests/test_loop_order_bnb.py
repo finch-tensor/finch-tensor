@@ -8,14 +8,14 @@ import numpy as np
 import finch as fl
 from finch import ffuncs
 from finch.autoschedule.cost_models import (
+    LOOP_COST_MODEL,
     Concat,
-    LinearPredictor,
-    LoopCostModel,
-    PigeonCostModel,
+    LinearCostModel,
+    LoopBasis,
+    PigeonBasis,
     Prefix,
-    QuadraticPredictor,
-    Sum,
-    TransposeCostModel,
+    Quadratic,
+    TransposeBasis,
 )
 from finch.autoschedule.loop_orderer import loop_order_bnb, loop_order_greedy
 from finch.autoschedule.loop_orderer.loop_order_bnb import (
@@ -159,15 +159,12 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     }
     arg = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), arg, (j,))
-    model = Concat(
-        PigeonCostModel(),
-        TransposeCostModel(),
-        predictor=QuadraticPredictor(np.ones(25)),
-    )
+    basis = Concat(PigeonBasis(), TransposeBasis())
+    model = LinearCostModel(Quadratic(basis), np.ones(25))
 
     def cost(order):
         query = fuse_loop_order(Query(Table(out, (i, k)), expr), order)
-        features = model.get_features(query, {}, stats, sf)
+        features = basis.get_features(query, {}, stats, sf)
         return sum(row.sum() ** 2 for row in features)
 
     chosen = search(expr, sf, stats, (i, k), cost_model=model)
@@ -179,13 +176,12 @@ def test_loop_search_minimizes_nonlinear_component_cost(search):
     assert cost(chosen) == expected
 
 
-class PreferFieldCostModel(LoopCostModel, LoopOrderedForm):
+class PreferFieldBasis(LoopBasis, LoopOrderedForm):
     @property
     def n_features(self) -> int:
         return 1
 
     def __init__(self, field):
-        super().__init__(LinearPredictor(np.array([1.0])))
         self.field = field
 
     def get_component_features(self, component, machine):
@@ -213,7 +209,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
     a, out = HardAlias("a"), HardAlias("out")
     expr = Table(a, (i, j))
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((16, 16))), (i, j))}
-    model = PreferFieldCostModel(j)
+    model = LinearCostModel(PreferFieldBasis(j), [1.0])
     assert search(expr, sf, stats, cost_model=model) == (j, i)
     if inplace:
         stats[out] = sf(fl.asarray(np.ones(())), ())
@@ -232,7 +228,7 @@ def test_loop_orderers_use_selected_model(search, orderer, inplace):
             assert (outer, inner) == (j, i)
         case _:
             pytest.fail("Expected an ordered query")
-    assert isinstance(orderer().cost_model, Sum)
+    assert orderer().cost_model is LOOP_COST_MODEL
 
 
 @pytest.mark.parametrize(
@@ -245,7 +241,13 @@ def test_loop_orderers_respect_output_order(search):
     a = HardAlias("a")
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Aggregate(Literal(ffuncs.add), Literal(0.0), Table(a, (i, j)), (j,))
-    order = search(expr, sf, stats, (unit, i), cost_model=PreferFieldCostModel(j))
+    order = search(
+        expr,
+        sf,
+        stats,
+        (unit, i),
+        cost_model=LinearCostModel(PreferFieldBasis(j), [1.0]),
+    )
     assert order == (j, unit, i)
 
 

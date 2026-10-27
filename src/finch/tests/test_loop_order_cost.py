@@ -10,10 +10,11 @@ from finch import ffuncs
 from finch.autoschedule import DefaultLogicFactorizer
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
-    PigeonCostModel,
+    LOOP_COST_MODEL,
+    LinearCostModel,
+    PigeonBasis,
     Prefix,
-    Sum,
-    TransposeCostModel,
+    TransposeBasis,
 )
 from finch.autoschedule.executor import LogicExecutor
 from finch.autoschedule.formatter.formatter import DefaultLogicFormatter
@@ -49,7 +50,7 @@ def test_empty_input_cost_matches_model():
         b: sf(fl.asarray(np.zeros((4, 4))), (j, k)),
     }
 
-    model = Sum(PigeonCostModel(), TransposeCostModel())
+    model = LOOP_COST_MODEL
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k), (j, k, i)):
         query = Query(
@@ -85,7 +86,7 @@ def test_empty_relation_cost_matches_model():
         }
     )
 
-    model = Sum(PigeonCostModel(), TransposeCostModel())
+    model = LOOP_COST_MODEL
     machine = StatsMachine(sf, dict(bindings))
     for order in ((i, j, k, l_, m), (m, l_, k, j, i)):
         query = Query(
@@ -187,7 +188,7 @@ def test_greedy_order_breaks_ties_by_field_order():
         b: sf(ones, (j, k)),
         c: sf(ones, (k, m)),
     }
-    pigeon = PigeonCostModel()
+    pigeon = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0])
     machine = StatsMachine(sf, dict(forward_bindings))
 
     # The chain's endpoints tie, so only the tie-break separates them.
@@ -236,9 +237,9 @@ def test_greedy_avoids_transposing_a_sparse_input():
     }
     assert tuple(dict.fromkeys(expr.fields())) == (j, i)
 
-    pigeon = PigeonCostModel()
-    transpose = TransposeCostModel()
-    model = Sum(pigeon, transpose)
+    pigeon = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0])
+    transpose = LinearCostModel(TransposeBasis(), [0.5, 60.0])
+    model = LOOP_COST_MODEL
     machine = StatsMachine(sf, dict(bindings))
     # Reads and writes alone cannot separate the two, so the field-order
     # tie-break would pick j; transposing the sparse B is what makes that order
@@ -263,7 +264,7 @@ def test_greedy_avoids_transposing_a_sparse_input():
 
 def test_prefix_totals_match_program_cost():
     sf = DCStatsFactory()
-    model = Sum(PigeonCostModel(), TransposeCostModel())
+    model = LOOP_COST_MODEL
     i, j, k = Field("i"), Field("j"), Field("k")
     a, b = HardAlias("A"), HardAlias("B")
     expr = MapJoin(Literal(ffuncs.mul), (Table(a, (i, j)), Table(b, (j, k))))

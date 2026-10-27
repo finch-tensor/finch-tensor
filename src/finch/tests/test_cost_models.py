@@ -9,16 +9,17 @@ import finch as fl
 from finch import ffuncs
 from finch.algebra import TensorFType
 from finch.autoschedule.cost_models import (
+    FLOPS_COST_MODEL,
+    LOOP_COST_MODEL,
     ByKind,
     Concat,
-    FlopsCostModel,
-    LinearPredictor,
-    PigeonCostModel,
+    FlopsBasis,
+    LinearCostModel,
+    PigeonBasis,
     Prefix,
-    QuadraticPredictor,
+    Quadratic,
     Statement,
-    Sum,
-    TransposeCostModel,
+    TransposeBasis,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -39,19 +40,47 @@ from finch.finch_logic import (
     TensorStats,
 )
 
+PIGEON = LinearCostModel(PigeonBasis(), [1.0, 1.0, 10.0])
+TRANSPOSE = LinearCostModel(TransposeBasis(), [0.5, 60.0])
+
+
+def test_linear_model_sums_row_predictions():
+    model = LinearCostModel(TransposeBasis(), [2.0, 3.0])
+    rows = np.array([[1.0, 2.0], [3.0, 4.0]])
+    assert model.predict(rows) == 26.0
+    assert model.predict(rows) == sum(model.predict(row[None, :]) for row in rows)
+    assert model.predict(np.empty((0, 2))) == 0.0
+
+
+def random_programs(rng, n_features, n_programs=40):
+    return [rng.random((rng.integers(0, 4), n_features)) for _ in range(n_programs)]
+
 
 @pytest.mark.parametrize(
-    "predictor, expected",
+    "basis",
     [
-        (LinearPredictor(np.array([2.0, 3.0])), 26.0),
-        (QuadraticPredictor(np.array([1.0, 2.0, 3.0, 4.0])), 160.0),
+        PigeonBasis(),
+        Quadratic(PigeonBasis()),
+        Concat(PigeonBasis(), TransposeBasis()),
+        Concat(PigeonBasis(), Quadratic(PigeonBasis())),
     ],
 )
-def test_predictors_sum_component_predictions(predictor, expected):
-    features = np.array([[1.0, 2.0], [3.0, 4.0]])
-    assert predictor(features) == expected
-    assert predictor(features) == sum(predictor(row[None, :]) for row in features)
-    assert predictor(np.empty((0, 2))) == 0.0
+def test_linear_model_fits_program_runtimes(rng, basis):
+    # Only the runtimes of whole programs are known, not those of their rows.
+    true = LinearCostModel(basis, rng.random(basis.n_features))
+    features = random_programs(rng, basis.n_features)
+    runtimes = [true.predict(rows) for rows in features]
+    untrained = LinearCostModel(basis, np.zeros(basis.n_features))
+    fitted = untrained.fit(features, runtimes)
+    assert fitted.basis is basis
+    np.testing.assert_allclose(untrained.coefficients, 0)
+    for rows in random_programs(rng, basis.n_features, 5):
+        assert fitted.predict(rows) == pytest.approx(true.predict(rows))
+
+
+def test_linear_model_checks_coefficients():
+    with pytest.raises(ValueError, match="Expected 3 coefficients"):
+        LinearCostModel(PigeonBasis(), [1.0, 2.0])
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
@@ -71,7 +100,7 @@ def test_flops_cost_retains_query_components(factory):
             Produces((out,)),
         )
     )
-    cost = FlopsCostModel()
+    cost = FLOPS_COST_MODEL
     np.testing.assert_array_equal(
         cost.get_features(plan, {}, stats, sf), [[6, 2], [2, 2]]
     )
@@ -82,7 +111,7 @@ def test_flops_cost_retains_query_components(factory):
         query_costs.append(cost.predict_component_cost(Statement(stmt), machine))
         machine(stmt)
     assert query_costs == [26.0, 22.0]
-    nonlinear = FlopsCostModel(QuadraticPredictor(np.array([1.0, 0.0, 0.0, 10.0])))
+    nonlinear = LinearCostModel(Quadratic(FlopsBasis()), [1.0, 0.0, 0.0, 10.0])
     assert nonlinear.predict_cost(plan, {}, stats, sf) == 120.0
     assert set(stats) == {a}
 
@@ -90,38 +119,34 @@ def test_flops_cost_retains_query_components(factory):
 @pytest.mark.parametrize(
     "cost",
     [
-        FlopsCostModel(),
-        PigeonCostModel(),
-        TransposeCostModel(),
-        Sum(PigeonCostModel(), TransposeCostModel()),
-        Concat(
-            PigeonCostModel(),
-            TransposeCostModel(),
-            predictor=QuadraticPredictor(np.ones(25)),
+        FLOPS_COST_MODEL,
+        PIGEON,
+        TRANSPOSE,
+        LOOP_COST_MODEL,
+        LinearCostModel(
+            Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(25)
         ),
-        PigeonCostModel(QuadraticPredictor(np.ones(9))),
+        LinearCostModel(Quadratic(PigeonBasis()), np.ones(9)),
     ],
 )
 @pytest.mark.parametrize("plan", [Plan(()), Plan((Produces(()),))])
 def test_empty_cost_components(cost, plan):
     sf = DCStatsFactory()
-    assert cost.get_features(plan, {}, {}, sf).shape == (0, cost.n_features)
+    assert cost.get_features(plan, {}, {}, sf).shape == (0, cost.basis.n_features)
     assert cost.predict_cost(plan, {}, {}, sf) == 0.0
 
 
-def test_concat_uses_joint_nonlinear_predictor():
+def test_quadratic_of_concat_crosses_bases():
     sf = DCStatsFactory()
     i, j = Field("i"), Field("j")
     a, out = HardAlias("a"), HardAlias("out")
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     plan = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
-    cost = Concat(
-        PigeonCostModel(),
-        TransposeCostModel(),
-        predictor=QuadraticPredictor(np.ones(25)),
-    )
-    features = cost.get_features(plan, {}, stats, sf)
+    basis = Concat(PigeonBasis(), TransposeBasis())
+    cost = LinearCostModel(Quadratic(basis), np.ones(25))
+    features = basis.get_features(plan, {}, stats, sf)
     assert features.shape == (3, 5)
+    assert cost.get_features(plan, {}, stats, sf).shape == (3, 25)
     expected = sum(row.sum() ** 2 for row in features)
     assert cost.predict_cost(plan, {}, stats, sf) == expected
     assert expected != features.sum() ** 2
@@ -130,17 +155,15 @@ def test_concat_uses_joint_nonlinear_predictor():
 @pytest.mark.parametrize(
     "cost",
     [
-        PigeonCostModel(QuadraticPredictor(np.ones(9))),
-        TransposeCostModel(QuadraticPredictor(np.ones(4))),
-        Sum(
-            PigeonCostModel(QuadraticPredictor(np.ones(9))),
-            TransposeCostModel(QuadraticPredictor(np.ones(4))),
+        LinearCostModel(Quadratic(PigeonBasis()), np.ones(9)),
+        LinearCostModel(Quadratic(TransposeBasis()), np.ones(4)),
+        LinearCostModel(
+            Concat(Quadratic(PigeonBasis()), Quadratic(TransposeBasis())), np.ones(13)
         ),
-        Concat(
-            PigeonCostModel(),
-            TransposeCostModel(),
-            predictor=QuadraticPredictor(np.ones(25)),
+        LinearCostModel(
+            Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(25)
         ),
+        LinearCostModel(Concat(PigeonBasis(), Quadratic(PigeonBasis())), np.ones(12)),
     ],
 )
 def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
@@ -164,7 +187,7 @@ def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):
 @pytest.mark.parametrize("kind", ["copy", "aggregate", "update"])
 def test_pigeon_cost_model_query_forms(factory, shape, kind):
     sf = factory()
-    model = PigeonCostModel()
+    model = PIGEON
     idxs = tuple(Field(f"i{n}") for n in range(len(shape)))
     a, out = HardAlias("a"), HardAlias("out")
     tensor = fl.asarray(np.ones(shape))
@@ -210,7 +233,7 @@ def test_pigeon_cost_model_query_forms(factory, shape, kind):
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
 def test_pigeon_cost_model_dependent_queries(factory):
     sf = factory()
-    model = PigeonCostModel()
+    model = PIGEON
     i, j = Field("i"), Field("j")
     a, b, out = HardAlias("a"), HardAlias("b"), HardAlias("out")
     tensor = fl.asarray(np.ones((2, 3)))
@@ -244,7 +267,7 @@ def test_pigeon_cost_model_dependent_queries(factory):
 
     np.testing.assert_allclose(features, np.concatenate(expected, axis=0))
     assert model.predict_cost(plan, bindings, stats, sf) == pytest.approx(
-        sum(model.predictor(rows) for rows in expected)
+        sum(model.predict(rows) for rows in expected)
     )
     assert set(stats) == {a}
 
@@ -278,7 +301,7 @@ def test_pigeon_cost_model_dependent_queries(factory):
 )
 def test_pigeon_prefix_costs_match_full_cost(factory, expected):
     sf = factory()
-    model = PigeonCostModel()
+    model = PIGEON
     i, j, k = (Field(name) for name in "ijk")
     a, b, out = (HardAlias(name) for name in ("a", "b", "out"))
     stats: dict[Alias, TensorStats] = {
@@ -329,7 +352,7 @@ def test_pigeon_prefix_costs_match_full_cost(factory, expected):
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
 def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
     sf = factory()
-    model = PigeonCostModel()
+    model = PIGEON
     i = Field("i")
     a = HardAlias("a")
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones(())), ())}
@@ -352,7 +375,7 @@ def test_pigeon_empty_prefix_and_loop_without_inputs(factory):
 @pytest.mark.parametrize("inplace", [False, True])
 def test_transpose_cost_model_queries(factory, sparse, transpose, inplace):
     sf = factory()
-    model = TransposeCostModel()
+    model = TRANSPOSE
     i, j = Field("i"), Field("j")
     a, out = HardAlias("a"), HardAlias("out")
     tensor = fl.asarray(np.eye(16) if sparse else np.ones((16, 16)))
@@ -384,7 +407,7 @@ def test_transpose_cost_model_queries(factory, sparse, transpose, inplace):
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
 def test_transpose_prefix_costs_charge_each_input_once(factory):
     sf = factory()
-    model = TransposeCostModel()
+    model = TRANSPOSE
     i, j, k = (Field(name) for name in "ijk")
     a, b, out = (HardAlias(name) for name in ("a", "b", "out"))
     stats: dict[Alias, TensorStats] = {
@@ -419,7 +442,7 @@ def test_transpose_prefix_costs_charge_each_input_once(factory):
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
 def test_transpose_cost_model_dependent_queries(factory):
     sf = factory()
-    model = TransposeCostModel()
+    model = TRANSPOSE
     i, j = Field("i"), Field("j")
     a, b, c, reduced = (HardAlias(name) for name in ("a", "b", "c", "reduced"))
     tensor = fl.asarray(np.ones((2, 3)))
@@ -452,7 +475,7 @@ def test_transpose_cost_model_dependent_queries(factory):
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
-def test_sum_cost_model_sums_submodels(factory):
+def test_linear_model_of_concat_sums_models(factory):
     sf = factory()
     i, j = Field("i"), Field("j")
     a, out = HardAlias("a"), HardAlias("out")
@@ -461,11 +484,14 @@ def test_sum_cost_model_sums_submodels(factory):
     bindings: dict[Alias, TensorFType] = {a: tensor.ftype}
     copy = fuse_loop_order(Query(Table(out, (j, i)), Table(a, (i, j))), (j, i))
     plan = Plan((copy, Produces((out,))))
-    models = (PigeonCostModel(), TransposeCostModel())
-    model = Sum(*models)
+    models = (PIGEON, TRANSPOSE)
+    model = LinearCostModel(
+        Concat(*(sub.basis for sub in models)),
+        np.concatenate([sub.coefficients for sub in models]),
+    )
     model.validate_inputs(plan, bindings, stats, sf)
 
-    assert model.n_features == 5
+    assert model.basis.n_features == 5
     np.testing.assert_allclose(
         model.get_features(plan, bindings, stats, sf),
         np.concatenate(
@@ -484,8 +510,14 @@ def test_by_kind_dispatches_components_by_key():
     stats: dict[Alias, TensorStats] = {a: sf(fl.asarray(np.ones((2, 3))), (i, j))}
     expr = Table(a, (i, j))
     query = fuse_loop_order(Query(Table(out, (j, i)), expr), (j, i))
-    models = {0: PigeonCostModel(), 1: TransposeCostModel(), 2: PigeonCostModel()}
-    cost = ByKind(models, key=lambda component: len(component.prefix))
+    models = {0: PIGEON, 1: TRANSPOSE, 2: PIGEON}
+    cost = LinearCostModel(
+        ByKind(
+            {n: model.basis for n, model in models.items()},
+            key=lambda component: len(component.prefix),
+        ),
+        np.concatenate([model.coefficients for model in models.values()]),
+    )
     machine = StatsMachine(sf, dict(stats))
     prefixes = [Prefix((j, i)[:n], expr, (j, i)) for n in range(3)]
 

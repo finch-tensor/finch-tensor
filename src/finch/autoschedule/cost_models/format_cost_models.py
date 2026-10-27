@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import ClassVar
 
@@ -26,8 +26,8 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS
 
-from .cost_models import NS, CostModel
-from .loop_cost_models import PigeonCostModel, Prefix
+from .cost_models import NS, Basis
+from .loop_cost_models import PigeonBasis, Prefix
 
 
 def nnz_after(stats: NS, stats_factory: StatsFactory[NS], depth: int, over: tuple = ()):
@@ -204,9 +204,9 @@ class LevelChoice:
         return self.option.kind
 
 
-class FormatCostModel(CostModel[LevelChoice]):
+class FormatBasis(Basis[LevelChoice]):
     """
-    A cost model where each level of each formatted alias is a component.
+    A basis where each level of each formatted alias is a component.
     bindings lists the options of the levels an alias stores, outermost first
     and ending with its element level. Each level is priced over every block of
     the alias in the program.
@@ -238,21 +238,16 @@ class FormatCostModel(CostModel[LevelChoice]):
         machine(term)
 
 
-class LevelCostModel(FormatCostModel, LoopOrderedForm):
+class LevelBasis(FormatBasis, LoopOrderedForm):
     """
-    The cost model of the levels of one type of option. Each level contributes
+    The basis of the levels of one type of option. Each level contributes
     an allocation row for each block of its alias, and an access row for each
     query loop prefix that uses it. The features are the storage features of
     the option for the allocation, followed by sequential reads, scatter reads,
     sequential writes, and scatter writes for the accesses.
     """
 
-    def __init__(
-        self,
-        option_type: type[LevelOption],
-        predictor: Callable[[np.ndarray], float],
-    ):
-        super().__init__(predictor)
+    def __init__(self, option_type: type[LevelOption]):
         self.option_type = option_type
 
     @property
@@ -271,7 +266,7 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
         of term: sequential reads, scatter reads, sequential writes, and scatter
         writes, with one row per loop prefix that accesses the level in each
         query.
-        Each access is counted by the PigeonCostModel iterations of the loops
+        Each access is counted by the PigeonBasis iterations of the loops
         from the root to the current level, which are the fields of the
         enclosing Fuse nodes. Every view of alias accesses its levels. The
         element level is accessed with its parent.
@@ -284,7 +279,7 @@ class LevelCostModel(FormatCostModel, LoopOrderedForm):
         stats_interpreter = StatsMachine(
             machine.stats_factory, OrderedDict(machine.bindings)
         )
-        pigeon = PigeonCostModel()
+        pigeon = PigeonBasis()
 
         def visit_access(tns, idxs, loop_order, rhs, lhs_idxs, is_write, prefixes):
             if not idxs:

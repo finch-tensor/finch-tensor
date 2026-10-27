@@ -114,7 +114,7 @@ class GalleyLogicFactorizer(LogicFactorizer):
     Default ``optimizer="bfs"`` is exact layered branch-and-bound; ``"dfs"`` uses the
     DFS kernel. Greedy ``k=1`` bounds are used only on the layered exact path, not
     inside ``branch_and_bound_dfs``. ``cost_model`` estimates the cost of each
-    reduction, and defaults to ``FlopsCostModel``.
+    reduction, and defaults to ``FLOPS_COST_MODEL``.
     """
 
     def __init__(

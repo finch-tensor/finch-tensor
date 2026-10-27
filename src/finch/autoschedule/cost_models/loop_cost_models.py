@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,7 +23,7 @@ from finch.finch_logic import (
 )
 from finch.symbolic import PostOrderDFS
 
-from .cost_models import NS, CostModel, LinearPredictor
+from .cost_models import NS, Basis, Concat, LinearCostModel
 
 
 @dataclass(frozen=True)
@@ -38,14 +38,14 @@ class Prefix:
     output_vars: tuple[Field, ...] | None = None
 
 
-class LoopCostModel(CostModel[Prefix]):
+class LoopBasis(Basis[Prefix]):
     """
-    A cost model where each loop prefix, including the empty prefix, is a component.
+    A basis where each loop prefix, including the empty prefix, is a component.
     components yields prefixes in query order, from the shortest prefix to the
     longest, and get_component_features returns one row for each prefix. The
-    loop order of a query is the fields of its enclosing Fuse nodes.
-    Predictors used with branch-and-bound loop search must predict nonnegative
-    component costs.
+    loop order of a query is the fields of its enclosing Fuse nodes. Models
+    used with branch-and-bound loop search must predict nonnegative component
+    costs.
     """
 
     def components(
@@ -81,22 +81,15 @@ class LoopCostModel(CostModel[Prefix]):
         machine(term)
 
 
-class PigeonCostModel(LoopCostModel, LoopOrderedForm):
+class PigeonBasis(LoopBasis, LoopOrderedForm):
     """
-    PigeonCostModel counts iteration, operation, and output costs across loop
-    prefixes. By default, allocations are weighted 10x reads and operations.
+    PigeonBasis counts iteration, operation, and output costs across loop
+    prefixes.
     """
 
     @property
     def n_features(self) -> int:
         return 3
-
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor
-            if predictor is not None
-            else LinearPredictor(np.array([1.0, 1.0, 10.0]))
-        )
 
     def get_component_features(
         self,
@@ -167,7 +160,7 @@ class PigeonCostModel(LoopCostModel, LoopOrderedForm):
         )
 
 
-class TransposeCostModel(LoopCostModel, LoopOrderedForm):
+class TransposeBasis(LoopBasis, LoopOrderedForm):
     """
     Count dense and sparse transposed entries, charging each input once per query.
     """
@@ -175,13 +168,6 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
     @property
     def n_features(self) -> int:
         return 2
-
-    def __init__(self, predictor: Callable[[np.ndarray], float] | None = None):
-        super().__init__(
-            predictor
-            if predictor is not None
-            else LinearPredictor(np.array([0.5, 60.0]))
-        )
 
     def get_component_features(
         self,
@@ -218,3 +204,9 @@ class TransposeCostModel(LoopCostModel, LoopOrderedForm):
                 dense = 0 < space < float("inf") and nnz / space > 0.1
                 features[0, 0 if dense else 1] += nnz
         return features
+
+
+# Allocations are weighted 10x reads and operations.
+LOOP_COST_MODEL = LinearCostModel(
+    Concat(PigeonBasis(), TransposeBasis()), [1.0, 1.0, 10.0, 0.5, 60.0]
+)
