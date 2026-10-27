@@ -3,8 +3,11 @@ from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import Any
 
+import numpy as np
+
 import numba
 import numba.core.types
+from numba.experimental.jitclass.base import JitClassType
 
 from finch import algebra
 from finch import finch_assembly as asm
@@ -18,6 +21,7 @@ from finch.algebra import (
     ffuncs,
     fisinstance,
     is_dynamic,
+    is_static,
     np_dtype,
 )
 from finch.algebra.ftypes import FDType
@@ -32,10 +36,21 @@ logger = logging.LoggerAdapter(logging.getLogger(__name__), extra=LOG_BACKEND_NU
 
 # Cache for Numba structs
 numba_structs: dict[Any, Any] = {}
-numba_structnames = Namespace()
+
+
+@numba.njit
+def resize_records(arr, new_length):
+    # numpy.resize isn't supported on record arrays; new entries are left
+    # uninitialized.
+    out = np.empty(new_length, arr.dtype)
+    for i in range(min(new_length, len(arr))):
+        out[i] = arr[i]
+    return out
+
+
 numba_globals: dict[str, Any] = {
-    "scansearch": numba.njit(ffuncs.scansearch._func),
     "resize_if_smaller": numba.njit(ffuncs.resize_if_smaller._func),
+    "resize_records": resize_records,
 }
 
 
@@ -108,8 +123,6 @@ def numba_function_name(op, ctx, *args: Any) -> str:
             return "min"
         case ffuncs._MaxFType():
             return "max"
-        case ffuncs._ScansearchFType():
-            return "scansearch"
         case ffuncs._ResizeIfSmallerFType():
             return "resize_if_smaller"
         case NumbaOperator():
@@ -174,7 +187,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return ctx(args[0])
         case ffuncs._OverwriteFType():
             return ctx(args[1])
-        case ffuncs._InitWriteFType(fill=fill):
+        case ffuncs._InitWriteFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError(
                     "Pass a dynamic init_write as a runtime operator"
@@ -182,14 +195,14 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return ctx(args[1])
         case ffuncs._SameFType():
             return numba_same(ctx, *args)
-        case ffuncs._ChooseFType(fill=fill):
+        case ffuncs._ChooseFType(fill_type=fill):
             if is_dynamic(fill) and isinstance(op, asm.Literal):
                 raise DynamicFillError("Pass a dynamic choose as a runtime operator")
             value = ctx.cache(
                 "fill",
-                asm.GetAttr(op, asm.Literal("fill_value"))
-                if is_dynamic(fill)
-                else asm.Literal(fill.value),
+                asm.Literal(fill.value)
+                if is_static(fill)
+                else asm.GetAttr(op, asm.Literal("fill_value")),
             )
             args = tuple(ctx.cache("choice", arg) for arg in args)
             result = ctx(value)
@@ -200,7 +213,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             condition, x1, x2 = args
             return f"({ctx(x1)} if {ctx(condition)} else {ctx(x2)})"
         case ffuncs._MakeTupleFType():
-            return f"({','.join([ctx(arg) for arg in args])},)"
+            return f"({','.join([ctx(arg) for arg in args])},)" if args else "()"
         case ffuncs._LastFType():
             (arg,) = args
             if not isinstance(arg.result_type, TupleFType):
@@ -253,12 +266,7 @@ def numba_function_call(op, ctx, *args: Any) -> str:
             return numba_binary_function_call(numba_name, ctx, *args)
         case ffuncs._NotFType() | ffuncs._InvertFType():
             return numba_unary_function_call(numba_name, ctx, *args)
-        case (
-            ffuncs._MinFType()
-            | ffuncs._MaxFType()
-            | ffuncs._ScansearchFType()
-            | ffuncs._ResizeIfSmallerFType()
-        ):
+        case ffuncs._MinFType() | ffuncs._MaxFType() | ffuncs._ResizeIfSmallerFType():
             return numba_call_function_call(numba_name, ctx, *args)
         case _:
             raise TypeError(f"{op} has no Numba representation.")
@@ -377,7 +385,8 @@ def assembly_struct_numba_type(ftype_: StructFType) -> type:
         (name, numba_jitclass_type(field_type))
         for (name, field_type) in ftype_.struct_fields
     ]
-    class_name = numba_structnames.freshen("Numba", ftype_.struct_name)
+    # Generated code names the class itself, see NumbaContext.struct_name.
+    class_name = f"Numba_{ftype_.struct_name}"
     # Dynamically define __init__ based on spec, unrolling the arguments
     field_names = [name for name, _ in spec]
     # Build the argument list for __init__
@@ -390,16 +399,12 @@ def assembly_struct_numba_type(ftype_: StructFType) -> type:
         class {class_name}:
             def __init__(self, {arg_list}):
                 {body if body else "pass"}
-            @staticmethod
-            def numba_name():
-                return '{class_name}'
         """
     )
     ns: dict[str, type] = {}
     exec(class_src, ns)
     new_struct = numba.experimental.jitclass(ns[class_name], spec)
     numba_structs[ftype_] = new_struct
-    numba_globals[new_struct.__name__] = new_struct
     # logger.debug(f"Numba class:\njitclass({spec})\n{class_src}")
     return new_struct
 
@@ -511,7 +516,8 @@ def construct_from_numba(fmt: FType, numba_obj: Any) -> Any:
 
 def _serialize_asm_struct_to_numba(fmt: StructFType, obj) -> Any:
     args = [
-        serialize_to_numba(fmt, getattr(obj, name)) for (name, fmt) in fmt.struct_fields
+        serialize_to_numba(field, fmt.struct_getattr(obj, name))
+        for (name, field) in fmt.struct_fields
     ]
     return numba_type(fmt)(*args)
 
@@ -521,9 +527,15 @@ def _deserialize_asm_struct_from_numba(
 ) -> None:
     for i, (name, field) in enumerate(fmt.struct_fields):
         value = getattr(numba_struct, name) if fmt.is_mutable else numba_struct[i]
-        deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
-        if fmt.is_mutable:
-            fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+        match field:
+            case NumbaArgumentFType() | MutableStructFType():
+                # Buffers and mutable structs are updated in place.
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
+            case _ if fmt.is_mutable:
+                # Immutable fields of a mutable struct are replaced.
+                fmt.struct_setattr(obj, name, construct_from_numba(field, value))
+            case _:
+                deserialize_from_numba(field, fmt.struct_getattr(obj, name), value)
 
 
 def struct_construct_from_numba(fmt: StructFType, numba_struct):
@@ -621,9 +633,10 @@ class NumbaCompiler(UnvalidatedForm, asm.AssemblyLoader):
     def lower(
         self, prgm: asm.Module, *, mode: CompilerMode | None = None
     ) -> NumbaLibrary:
-        numba_code = self.ctx(prgm, mode=mode).code
+        code = self.ctx(prgm, mode=mode)
+        numba_code = code.code
         logger.debug(f"Executing Numba code:\n{numba_code}")
-        _globals = {**globals(), **numba_globals}
+        _globals = {**globals(), **numba_globals, **code.structs}
         try:
             exec(numba_code, _globals, None)
         except Exception as e:
@@ -656,7 +669,8 @@ class NumbaGenerator(UnvalidatedForm, NumbaLowerer):
         if ctx.mode.debug:
             ctx.namespace = Namespace(prgm)
         ctx(prgm)
-        return NumbaCode(ctx.emit_global())
+        structs = {name: cls for cls, name in ctx.structs.items()}
+        return NumbaCode(ctx.emit_global(), structs)
 
 
 class NumbaContext(Context):
@@ -672,6 +686,7 @@ class NumbaContext(Context):
         self.indent = indent
         self.types = types
         self.slots = slots
+        self.structs: dict[Any, str] = {}
 
         self.imports = [
             "import _operator, builtins",
@@ -700,6 +715,7 @@ class NumbaContext(Context):
         blk.tab = self.tab
         blk.types = self.types
         blk.slots = self.slots
+        blk.structs = self.structs
         return blk
 
     def subblock(self):
@@ -726,10 +742,20 @@ class NumbaContext(Context):
             case _:
                 raise ValueError(f"Expected Slot, got: {type(node)}")
 
-    @staticmethod
-    def full_name(val: Any) -> str:
+    def struct_name(self, cls: JitClassType) -> str:
+        # Structs are numbered per module, so the code doesn't depend on which
+        # jitclasses were made before.
+        name = self.structs.get(cls)
+        if name is None:
+            name = self.freshen(cls.__name__)
+            self.structs[cls] = name
+        return name
+
+    def full_name(self, val: Any) -> str:
         if isinstance(val, algebra.ftypes.FType):
             val = numba_type(val)
+        if isinstance(val, JitClassType):
+            return self.struct_name(val)
         if hasattr(val, "numba_name"):
             return val.numba_name()
         if hasattr(val, "name"):
@@ -755,7 +781,15 @@ class NumbaContext(Context):
                     raise DynamicFillError(
                         "cannot emit a dynamic fill as a numba literal"
                     )
-                return str(value)
+                match value:
+                    case tuple():
+                        return numba_function_call(
+                            asm.Literal(ffuncs.make_tuple),
+                            self,
+                            *(asm.Literal(v) for v in value),
+                        )
+                    case _:
+                        return str(value)
             case asm.Variable(name, _) | asm.Slot(name, _):
                 return name.replace("#", "_")
             case asm.Assign(asm.Variable(var_n, var_t) as var, val):
@@ -786,7 +820,7 @@ class NumbaContext(Context):
                 obj_t = obj.result_type
                 if not isinstance(obj_t, StructFType):
                     raise TypeError(f"Expected struct type, got: {obj_t}")
-                if not fisinstance(val, obj_t.struct_attrtype(attr.val)):
+                if val.result_type != obj_t.struct_attrtype(attr.val):
                     raise TypeError(
                         f"Type mismatch: {val.result_type} != "
                         f"{obj_t.struct_attrtype(attr.val)}"

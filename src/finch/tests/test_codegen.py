@@ -3,6 +3,7 @@ import logging
 import re
 import sys
 from collections import namedtuple
+from typing import Any
 
 import pytest
 
@@ -21,7 +22,7 @@ from finch import (
     ftype,
     sparse_list,
 )
-from finch.algebra import DynamicFill, ftypes
+from finch.algebra import DynamicFill, TupleFType, ftypes, np_dtype
 from finch.codegen import (
     CCompiler,
     CGenerator,
@@ -32,7 +33,7 @@ from finch.codegen import (
     NumpyBuffer,
     NumpyBufferFType,
 )
-from finch.codegen.buffers import MallocBuffer
+from finch.codegen.buffers import MallocBuffer, MallocBufferFType
 from finch.codegen.buffers.memref_buffer import MemrefBufferFType
 from finch.codegen.c_codegen import (
     construct_from_c,
@@ -191,6 +192,77 @@ def test_codegen(compiler, buffer):
     result = buf.arr
     expected = np.array([1, 2, 3, 2, 3, 4], dtype=np.float64)
     finch_assert_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        NumbaCompiler(),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+def test_kernels_write_tensor_fields_back(compiler):
+    # A kernel which changes a dimension or a dynamic fill of a tensor it was
+    # given updates the tensor, so that kernels can redefine shapes and fills.
+    fill = DynamicFill(np.float64(0.0))
+    fiber = fiber_tensor(dense(element(fill.ftype))).from_numpy(np.zeros(3), fill)
+    array = finch.BufferizedNDArray.from_numpy(np.zeros(3), fill_value=fill)
+    formats = (fiber.ftype, array.ftype)
+    t, a = asm.Variable("t", fiber.ftype), asm.Variable("a", array.ftype)
+    alias = asm.Variable("alias", array.ftype)
+    dense_lvl = asm.GetAttr(t, asm.Literal("lvl"))
+    element_lvl = asm.GetAttr(dense_lvl, asm.Literal("lvl"))
+    body = asm.Block(
+        (
+            asm.Assign(alias, a),
+            asm.SetAttr(dense_lvl, asm.Literal("dimension"), asm.Literal(np.intp(5))),
+            asm.SetAttr(element_lvl, asm.Literal("fill"), asm.Literal(np.float64(7))),
+            asm.SetAttr(alias, asm.Literal("fill"), asm.Literal(np.float64(8))),
+            asm.Return(asm.Literal(np.intp(0))),
+        )
+    )
+    kernel_t = asm.AssemblyKernelFType("f", (fiber.ftype, array.ftype), finch.intp)
+    prgm = asm.Module((asm.Function(asm.Variable("f", kernel_t), (t, a), body),))
+    compiler(prgm).f(fiber, array)
+    assert fiber.shape == (5,)
+    assert fiber.fill_value == 7.0
+    assert array.fill_value == 8.0
+    # The tensors keep their formats, so later calls reuse the same kernels.
+    assert (fiber.ftype, array.ftype) == formats
+
+
+@pytest.mark.parametrize(
+    ["generator", "compiler", "prefix"],
+    [
+        pytest.param(CGenerator(), CCompiler(), "C", marks=pytest.mark.c_backend),
+        (NumbaGenerator(), NumbaCompiler(), "Numba"),
+    ],
+)
+def test_struct_names_are_numbered_per_module(generator, compiler, prefix):
+    # Generated code numbers structs in the order the module uses them, whichever
+    # structs other modules made first.
+    a = finch.BufferizedNDArray.from_numpy(np.zeros(3))
+    b = finch.BufferizedNDArray.from_numpy(np.zeros((2, 2), dtype=np.int64))
+
+    def module(*arrays):
+        args = tuple(asm.Variable(f"a{i}", arr.ftype) for i, arr in enumerate(arrays))
+        kernel_t = asm.AssemblyKernelFType(
+            "f", tuple(arr.ftype for arr in arrays), finch.intp
+        )
+        body = asm.Return(asm.Literal(np.intp(0)))
+        return asm.Module((asm.Function(asm.Variable("f", kernel_t), args, body),))
+
+    compiler(module(b)).f(b)
+    names = re.findall(
+        rf"\b{prefix}_BufferizedNDArray\w*", str(generator(module(a, b)))
+    )
+    assert list(dict.fromkeys(names)) == [
+        f"{prefix}_BufferizedNDArray",
+        f"{prefix}_BufferizedNDArray_2",
+    ]
+    assert compiler(module(a, b)).f(a, b) == 0
 
 
 @pytest.mark.c_backend
@@ -1056,7 +1128,7 @@ def mlir_kernel_under_test(caplog) -> str:
         and record.message.startswith("Compiling MLIR code:\n")
     ]
     assert kernels, "no MLIR kernel was compiled"
-    return re.sub(r"%(_A_\d+|__A)(?:_\d+)+", r"%\1", kernels[-1])
+    return re.sub(r"%(_A_\d+|__A|_eye|__eye)(?:_\d+)+", r"%\1", kernels[-1])
 
 
 @mlir_backend
@@ -1387,6 +1459,44 @@ def test_mlir_choose(fill, values, expected):
     assert result == expected
 
 
+@pytest.mark.c_backend
+@pytest.mark.parametrize("operator", [ffuncs.min, ffuncs.max])
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.int8(3), np.int32(-2)),
+        (np.int64(4), np.int64(9), np.int64(1)),
+        (np.float64(1.5), np.float64(-0.5), np.float64(2.0)),
+        (np.float64(1.0), np.float64(np.nan)),
+        (np.float64(np.nan), np.float64(1.0)),
+    ],
+)
+def test_c_min_max(operator, values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    call = asm.Call(asm.Literal(operator), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "extremum",
+                    asm.AssemblyKernelFType(
+                        "extremum",
+                        tuple(arg.result_type for arg in args),
+                        call.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(call),)),
+            ),
+        )
+    )
+
+    result = CCompiler()(program).extremum(*values)
+    expected = operator(*values)
+    assert type(result) is type(expected)
+    np.testing.assert_equal(result, expected)
+
+
 @mlir_backend
 @pytest.mark.parametrize(
     "condition,expected",
@@ -1455,6 +1565,39 @@ def test_mlir_operator_promote_mixed_argument_types(operator, values, expected):
     )
 
     assert MLIRCompiler()(program).apply_mixed(*values) == expected
+
+
+@mlir_backend
+@pytest.mark.parametrize(
+    "values",
+    [
+        (np.intp(2), np.intp(3)),
+        (2, 3.5, True),
+        ((np.intp(2), np.intp(3)), np.intp(4)),
+    ],
+)
+def test_mlir_make_tuple_with_indices(values):
+    args = tuple(asm.Variable(f"x{i}", ftype(value)) for i, value in enumerate(values))
+    result = asm.Call(asm.Literal(ffuncs.make_tuple), args)
+    program = asm.Module(
+        (
+            asm.Function(
+                asm.Variable(
+                    "make_tuple",
+                    asm.AssemblyKernelFType(
+                        "make_tuple",
+                        tuple(arg.result_type for arg in args),
+                        result.result_type,
+                    ),
+                ),
+                args,
+                asm.Block((asm.Return(result),)),
+            ),
+        )
+    )
+    actual = MLIRCompiler()(program).make_tuple(*values)
+    assert actual == values
+    assert ftype(actual) == ftype(values)
 
 
 @mlir_backend
@@ -1600,6 +1743,34 @@ def test_resize_mlir_regression(file_regression):
     np.testing.assert_array_equal(val_buf.arr, np.array([3.5], dtype=np.float64))
 
 
+@pytest.mark.parametrize(
+    "buffer_factory",
+    [
+        pytest.param(MallocBufferFType, marks=pytest.mark.c_backend),
+        pytest.param(MemrefBufferFType, marks=pytest.mark.mlir_backend),
+    ],
+)
+@pytest.mark.parametrize("copy", [None, False, True])
+@pytest.mark.parametrize("length", [0, 4])
+def test_native_buffer_to_numpy(buffer_factory, copy, length):
+    buffer = buffer_factory(ftypes.float64)(length)
+    expected = np.arange(length, dtype=np.float64)
+    for i, value in enumerate(expected):
+        buffer.store(i, value)
+    if copy is False:
+        with pytest.raises(ValueError, match="Unable to avoid copy"):
+            buffer.to_numpy(copy=False)
+        return
+    result = buffer.to_numpy(copy=copy)
+    assert result.dtype == expected.dtype
+    np.testing.assert_array_equal(result, expected)
+    if length:
+        buffer.store(0, 99.0)
+        buffer.resize(length + 2)
+    del buffer
+    np.testing.assert_array_equal(result, expected)
+
+
 # Test for resize with MemrefBuffer
 @pytest.mark.mlir_backend
 @pytest.mark.parametrize(
@@ -1658,3 +1829,85 @@ def test_numpy_buffer_construct_from_mlir_is_zero_copy():
     assert constructed is buf
     assert constructed.arr is arr
     assert constructed.arr.ctypes.data == arr.ctypes.data
+
+
+@pytest.mark.parametrize(
+    "compiler",
+    [
+        asm.AssemblyInterpreter(),
+        NumbaCompiler(),
+        pytest.param(CCompiler(), marks=pytest.mark.c_backend),
+        pytest.param(MLIRCompiler(), marks=pytest.mark.mlir_backend),
+    ],
+)
+@pytest.mark.parametrize("aligned", [False, True])
+def test_tuple_buffer(compiler, aligned):
+    key_t = TupleFType.from_tuple((ftypes.intp, ftypes.int32, ftypes.uint8))
+    buf_t = NumpyBufferFType(key_t)
+    out_t = NumpyBufferFType(ftypes.uint64)
+    buf, out = asm.Variable("buf", buf_t), asm.Variable("out", out_t)
+    buf_s, out_s = asm.Slot("buf_s", buf_t), asm.Slot("out_s", out_t)
+    i, n = asm.Variable("i", ftypes.intp), asm.Variable("n", ftypes.intp)
+    k = asm.Variable("k", key_t)
+    names: dict[str, Any] = {
+        "buf": buf_s,
+        "out": out_s,
+        "length_buf": asm.Length(buf_s),
+        "make_tuple": asm.Literal(ffuncs.make_tuple),
+        "to_u64": asm.Literal(ffuncs.astype(ftypes.uint64)),
+        "bnot": asm.Literal(ffuncs.invert),
+        "shl": asm.Literal(ffuncs.lshift),
+        "two": asm.Literal(np.int32(2)),
+        "one_u8": asm.Literal(np.uint8(1)),
+        "nine_u8": asm.Literal(np.uint8(9)),
+        "eight": asm.Literal(np.int32(8)),
+        "u21": asm.Literal(np.uint64(21)),
+        "i": i,
+        "n": n,
+        "k": k,
+    }
+    # Tuple fields are copied by offset, so C and MLIR keep NumPy's layout, and
+    # `~a + (a << 21)` must keep its grouping in C.
+    body = asm.parse_assembly(
+        """finch
+        n = length_buf
+        for (i in 0:n)
+            k = buf[i]
+            buf[i] = make_tuple(add(k.element_0, 10), mul(k.element_1, two), add(k.element_2, one_u8))
+            out[i] = add(bnot(to_u64(k.element_0)), shl(to_u64(k.element_0), u21))
+        end
+        resize(buf, add(n, 1))
+        buf[n] = make_tuple(7, eight, nine_u8)
+        """,  # noqa: E501
+        names,
+    )
+    kernel_t = asm.AssemblyKernelFType("tuples", (buf_t, out_t), ftypes.intp)
+    mod = compiler(
+        asm.Module(
+            (
+                asm.Function(
+                    asm.Variable("tuples", kernel_t),
+                    (buf, out),
+                    asm.Block(
+                        (
+                            asm.Unpack(buf_s, buf),
+                            asm.Unpack(out_s, out),
+                            *body.bodies,
+                            asm.Repack(buf_s),
+                            asm.Repack(out_s),
+                            asm.Return(n),
+                        )
+                    ),
+                ),
+            )
+        )
+    )
+    dtype = np.dtype(
+        [(name, np_dtype(t)) for name, t in key_t.struct_fields], align=aligned
+    )
+    keys = NumpyBuffer(np.array([(1, 4, 0), (2, 5, 1), (3, 6, 254)], dtype=dtype))
+    hashes = NumpyBuffer(np.zeros(3, dtype=np.uint64))
+    assert mod.tuples(keys, hashes) == 3
+    assert keys.arr.tolist() == [(11, 8, 1), (12, 10, 2), (13, 12, 255), (7, 8, 9)]
+    a = np.arange(1, 4, dtype=np.uint64)
+    np.testing.assert_array_equal(hashes.arr, ~a + (a << np.uint64(21)))

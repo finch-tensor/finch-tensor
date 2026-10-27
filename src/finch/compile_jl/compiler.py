@@ -5,12 +5,14 @@ import finch.finch_notation.nodes as ntn
 from finch.algebra.ffuncs import make_tuple
 from finch.algebra.fill import (
     AbstractFill,
+    AbstractFillFType,
     DynamicFill,
     DynamicFillError,
+    DynamicFillFType,
     StaticFill,
+    StaticFillFType,
     is_dynamic,
 )
-from finch.algebra.ftypes import ftype
 from finch.compile import NotationCompiler, dimension
 from finch.compile.lower import make_extent
 from finch.finch_assembly import AssemblyKernel, AssemblyLibrary
@@ -22,6 +24,7 @@ from .runtime import DefaultFinchJLRuntime, FinchJLRuntime
 from .types import (
     _julia_literal,
     _leaf_type_str,
+    _zero_value,
     ftype_to_jl_constructor_str,
     ftype_to_jl_type_str,
 )
@@ -32,7 +35,8 @@ _JULIA_OPS = {
     ffuncs.mul.ftype: "*",
     ffuncs.sub.ftype: "-",
     ffuncs.truediv.ftype: "/",
-    ffuncs.floordiv.ftype: "div",
+    # fld floors like numpy; div truncates toward zero
+    ffuncs.floordiv.ftype: "fld",
     ffuncs.mod.ftype: "mod",
     ffuncs.pow.ftype: "^",
     ffuncs.neg.ftype: "-",
@@ -118,7 +122,8 @@ class FinchJLKernel(AssemblyKernel):
         runtime: FinchJLRuntime,
         func_name: str,
         dynamic_args: tuple[int, ...] = (),
-        extents: tuple[tuple[int, int], ...] = (),
+        extents: tuple[tuple[int, int, tuple[ffuncs._Cast, ...]], ...] = (),
+        declares: tuple[tuple[int, tuple], ...] = (),
     ):
         super().__init__(type_)
         # We store this code so that we can verify it in pytest
@@ -127,8 +132,11 @@ class FinchJLKernel(AssemblyKernel):
         self.runtime = runtime
         self.func_name = func_name
         self.dynamic_args = dynamic_args
-        # The position and axis of the argument each trailing extent measures.
+        # The input dimension and casts used to compute each trailing extent.
         self.extents = extents
+        # The position of each mask argument, and the dimensions it's declared
+        # with, which are computed like extents or are constant.
+        self.declares = declares
 
     def __call__(self, *args):
         return self.runtime.kernel_call(self.func_name, self, args)
@@ -142,6 +150,17 @@ class FinchJLLibrary(AssemblyLibrary):
         return self.kernel_dict[name]
 
 
+def register_julia_op(op, julia_name: str, definition: str | None = None) -> None:
+    # generated kernels call op as julia_name; definition (Julia source) runs once
+    if definition is not None and _JULIA_DEFINITIONS.get(julia_name) != definition:
+        jl.seval(definition)
+        _JULIA_DEFINITIONS[julia_name] = definition
+    _JULIA_OPS[op.ftype] = julia_name
+
+
+_JULIA_DEFINITIONS: dict[str, str] = {}
+
+
 class FinchJLGenerator:
     def __init__(self):
         self.pack_dict = {}
@@ -150,10 +169,11 @@ class FinchJLGenerator:
         self.slot_args: dict[str, int] = {}
         # Loop extents are passed to the kernel as extra integer arguments, so
         # that loops don't have to infer them from the tensors they read. Each
-        # is the Julia name of the extent and the position and axis of the
-        # Python argument it measures.
-        self.extents: list[tuple[str, int, int]] = []
+        # records its Julia name, input position/axis, and call-time casts.
+        self.extents: list[tuple[str, int, int, tuple[ffuncs._Cast, ...]]] = []
         self.used_extents: set[str] = set()
+        self.constants: dict[str, ntn.Literal] = {}
+        self.declares: list[tuple[int, tuple]] = []
 
     def __call__(self, prgm: ntn.Module | ntn.Function) -> str:
         self.pack_dict.clear()
@@ -162,10 +182,38 @@ class FinchJLGenerator:
         self.slot_args.clear()
         self.extents.clear()
         self.used_extents.clear()
+        self.constants.clear()
+        self.declares.clear()
         return self.generate_julia(prgm)
 
     def emit_name(self, sym: str) -> str:
         return self.names.setdefault(sym, f"v{len(self.names)}")
+
+    def resolve_constant(self, expr):
+        match expr:
+            case ntn.Literal():
+                return expr
+            case ntn.Variable(name, _):
+                return self.constants.get(name)
+            case ntn.Call(ntn.Literal(ffuncs._Cast() as cast), (arg,)):
+                match self.resolve_constant(arg):
+                    case ntn.Literal(value):
+                        return ntn.Literal(cast(value))
+        return None
+
+    def shape_extent(self, expr):
+        match expr:
+            case ntn.Variable(name, _):
+                return next(
+                    (ext[1:] for ext in self.extents if ext[0] == self.names.get(name)),
+                    None,
+                )
+            case ntn.Call(ntn.Literal(ffuncs._Cast() as cast), (arg,)):
+                extent = self.shape_extent(arg)
+                if extent is not None:
+                    pos, axis, casts = extent
+                    return pos, axis, (*casts, cast)
+        return None
 
     def generate_julia(self, prgm, nestingLvl=0):
         match prgm:
@@ -191,7 +239,7 @@ class FinchJLGenerator:
                             arg_strs.append(arg_name)
                         case _:
                             raise NotImplementedError
-                for extent, _, _ in self.extents:
+                for extent, _, _, _ in self.extents:
                     proto_lines.append(f"        {extent} = 1")
                     arg_strs.append(extent)
                 arg_str = ",".join(arg_strs)
@@ -205,10 +253,8 @@ class FinchJLGenerator:
                 )
 
             case ntn.Block(bodies):
-                body_str = ""
                 body_strs = [self.generate_julia(body, nestingLvl) for body in bodies]
-                body_strs = [body_str for body_str in body_strs if body_str != ""]
-                return "\n".join(body_strs)
+                return "\n".join(body for body in body_strs if body)
 
             case ntn.Assign(
                 ntn.Variable(name, _),
@@ -223,16 +269,43 @@ class FinchJLGenerator:
                         pos = self.slot_args[tns_name]
                     case ntn.Variable(tns_name, _):
                         pos = self.arg_positions[tns_name]
-                self.extents.append((self.emit_name(name), pos, int(axis)))
+                self.extents.append((self.emit_name(name), pos, int(axis), ()))
                 return ""
 
             case ntn.Assign(lhs, rhs):
-                tab_str = "    " * nestingLvl
-                stmt = (
-                    f"{self.generate_julia(lhs, nestingLvl)} = "
-                    f"{self.generate_julia(rhs, nestingLvl)}"
+                constant = self.resolve_constant(rhs)
+                if constant is not None:
+                    self.constants[lhs.name] = constant
+                    return ""
+                extent = self.shape_extent(rhs)
+                if extent is not None:
+                    # Resolve shape aliases and casts before the kernel call,
+                    # without opening scopes around tensor declarations.
+                    self.extents.append((self.emit_name(lhs.name), *extent))
+                    return ""
+                raise NotImplementedError(
+                    "Julia lowering only supports shape variable bindings"
                 )
-                return f"{tab_str}{stmt}"
+
+            case ntn.Declare(ntn.Slot(name, type_), _, _, shape) if isinstance(
+                type_, PatternTensorFType
+            ):
+                # Masks are declared in Python before the kernel call, with
+                # dimensions measured like loop extents.
+                dims = []
+                for dim in shape:
+                    match self.resolve_constant(dim), self.shape_extent(dim):
+                        case ntn.Literal(value), _:
+                            dims.append(int(value))
+                        case None, None:
+                            raise NotImplementedError(
+                                "Julia lowering only supports mask shapes of "
+                                "argument dimensions"
+                            )
+                        case None, extent:
+                            dims.append(extent)
+                self.declares.append((self.slot_args[name], tuple(dims)))
+                return ""
 
             case ntn.Declare(tns, init, _, _):
                 tab_str = "    " * nestingLvl
@@ -259,7 +332,6 @@ class FinchJLGenerator:
                     ):
                         # Python extents are zero-based and half-open.
                         stop_str = self.generate_julia(stop, nestingLvl)
-                        self.used_extents.add(stop_str)
                         ext_str = f"{int(start) + 1}:{stop_str}"
                     case _:
                         ext_str = "_"
@@ -355,6 +427,9 @@ class FinchJLGenerator:
                     raise Exception(f"{name} Slot does not exist in registry.")
                 return self.pack_dict[name]
 
+            case ntn.Literal(ffuncs._Cast(dtype=dtype)):
+                return _leaf_type_str(dtype)
+
             case ntn.Literal(ffuncs._InitWrite(fill=fill)):
                 if is_dynamic(fill):
                     raise DynamicFillError("Julia init_write requires a static fill")
@@ -368,7 +443,7 @@ class FinchJLGenerator:
                 return f"Finch.choose({value})"
 
             case ntn.Literal(val):
-                if isinstance(val, AbstractFill):
+                if isinstance(val, AbstractFill | AbstractFillFType):
                     # str() would silently emit broken source.
                     raise DynamicFillError(
                         "cannot emit a wrapped fill as a Julia literal"
@@ -376,8 +451,12 @@ class FinchJLGenerator:
                 return _julia_literal(val)
 
             case ntn.Variable(name, _):
+                if name in self.constants:
+                    return self.generate_julia(self.constants[name], nestingLvl)
                 # finch uses '#' in generated names; not valid Julia syntax.
-                return self.emit_name(name)
+                emitted = self.emit_name(name)
+                self.used_extents.add(emitted)
+                return emitted
 
             case _:
                 # Dimension, Stack, Value are deliberately unimplemented.
@@ -385,22 +464,29 @@ class FinchJLGenerator:
 
 
 def handle_fills(func: ntn.Function) -> tuple[ntn.Function, tuple[int, ...]]:
-    """Rewrite every Dynamic fill in `func` to a zero of its dtype, and report
-    which argument positions carried a Dynamic fill. This is a necessary but
-    potentially unsound rewrite which should be removed eventually.
+    """Rewrite every Dynamic fill in `func`, and every read of one, to a zero of
+    its dtype, and report which argument positions carried a Dynamic fill. This
+    is a necessary but potentially unsound rewrite which should be removed
+    eventually.
     """
     dynamic_args = tuple(
         i
         for i, arg in enumerate(func.args)
-        if is_dynamic(getattr(arg.type_, "fill_value", None))
+        if is_dynamic(getattr(arg.type_, "fill_type", None))
     )
 
     def rule(node):
         match node:
-            case ntn.Literal(DynamicFill() as fill):
-                return ntn.Literal(ftype(fill.value)(0))
-            case ntn.Literal(StaticFill() as fill):
+            case ntn.Literal(DynamicFill() | DynamicFillFType() as fill):
+                return ntn.Literal(_zero_value(fill.element_type))
+            case ntn.Literal(StaticFill() | StaticFillFType() as fill):
                 return ntn.Literal(fill.value)
+            case ntn.FillValue(tns):
+                match tns.result_type.fill_type:
+                    case DynamicFillFType() as fill:
+                        return ntn.Literal(_zero_value(fill.element_type))
+                    case StaticFillFType() as fill:
+                        return ntn.Literal(fill.value)
         return None
 
     return Rewrite(PostWalk(rule))(func), dynamic_args
@@ -417,7 +503,10 @@ class FinchJLCompiler(NotationCompiler):
         for orig_func in prgm.children:
             func, dynamic_args = handle_fills(orig_func)
             generated_prgm = generator(func)
-            extents = tuple((pos, axis) for _, pos, axis in generator.extents)
+            extents = tuple(
+                (pos, axis, casts) for _, pos, axis, casts in generator.extents
+            )
+            declares = tuple(generator.declares)
             arg_type_strs = tuple(
                 ftype_to_jl_type_str(arg.type_)
                 for arg in func.args
@@ -425,7 +514,7 @@ class FinchJLCompiler(NotationCompiler):
             )
             # Flat key: source, argument types, pinned fills, and extents all
             # vary independently, so none may be folded into another.
-            key = (generated_prgm, arg_type_strs, dynamic_args, extents)
+            key = (generated_prgm, arg_type_strs, dynamic_args, extents, declares)
             kernel = self.runtime.get_cached_kernel(key)
             if kernel is None:
                 func_name = f"kernel_{uuid.uuid4().hex}"
@@ -439,6 +528,7 @@ class FinchJLCompiler(NotationCompiler):
                     func_name,
                     dynamic_args,
                     extents,
+                    declares,
                 )
                 self.runtime.cache_kernel(key, kernel)
             elif kernel.ftype != func.name.result_type:
@@ -450,6 +540,7 @@ class FinchJLCompiler(NotationCompiler):
                     kernel.func_name,
                     dynamic_args,
                     extents,
+                    declares,
                 )
                 self.runtime.cache_kernel(key, kernel)
             kernel_dict[func.name.name] = kernel

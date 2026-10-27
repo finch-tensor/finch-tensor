@@ -13,7 +13,7 @@ from finch.algebra import (
     fisinstance,
     ftype,
 )
-from finch.symbolic import ScopedDict, UnvalidatedForm
+from finch.symbolic import CompilerMode, ScopedDict, UnvalidatedForm
 
 from . import nodes as ntn
 from .stages import NotationLoader
@@ -57,12 +57,11 @@ class TensorViewFType(TensorFType[FT]):
         return self.tns.element_type
 
     @property
-    def fill_value(self):
+    def fill_type(self):
         """
-        Get the fill value of the tensor view.
-        This is the value used to fill the tensor at the specified indices.
+        Get the fill of the tensor view's format.
         """
-        return self.tns.fill_value
+        return self.tns.fill_type
 
     @property
     def shape_type(self):
@@ -136,7 +135,7 @@ class TensorView(Tensor[FT]):
         Get the fill value of the tensor view.
         This is the value used to fill the tensor at the specified indices.
         """
-        return self.tns.ftype.fill_value.value
+        return self.tns.fill_value
 
     @property
     def shape_type(self):
@@ -272,12 +271,7 @@ def declare(tns, init, op, shape):
 
 
 def np_declare(tns, init, op, shape):
-    for dim in shape:
-        if dim.start != 0:
-            raise ValueError(
-                f"Invalid dimension start value {dim.start} for ndarray declaration."
-            )
-    shape = tuple(dim.end for dim in shape)
+    shape = tuple(int(dim) for dim in shape)
     tns.fill(init)
     if tns.shape != shape:
         tns = np.broadcast_to(tns, shape).copy()
@@ -350,6 +344,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
     An interpreter for FinchNotation.
     """
 
+    mode = CompilerMode(safe=True, debug=True)
+
     def __init__(
         self,
         bindings: ScopedDict | None = None,
@@ -419,6 +415,10 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
 
     def _dispatch(self, prgm: ntn.NotationNode | asm.AssemblyNode):
         match prgm:
+            case ntn.Assert(exp):
+                if not self(exp):
+                    raise AssertionError(f"Finch assertion failed: {exp}")
+                return None
             case ntn.Literal(val) | asm.Literal(val):
                 return val
             case ntn.Value(val, val_t):
@@ -515,6 +515,8 @@ class NotationInterpreter(UnvalidatedForm, NotationLoader):
                 r_e = self(r)
                 shape_ft = tns_e.ftype.shape_type[r_e]
                 return shape_ft(tns_e.shape[r_e])
+            case ntn.FillValue(tns):
+                return self(tns).fill_value
             case ntn.Increment(tns, val):
                 tns_e = self(tns)
                 val_e = self(val)

@@ -56,8 +56,8 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         return 1 + self.lvl_t.ndim
 
     @property
-    def fill_value(self):
-        return self.lvl_t.fill_value
+    def fill_type(self):
+        return self.lvl_t.fill_type
 
     @property
     def element_type(self):
@@ -105,7 +105,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         reduce_fields = fields[lvl + 1 :]
         if reduce_fields:
             reduced_stats = stats_factory.aggregate(
-                ffuncs.or_, False, reduce_fields, stats
+                ffuncs.or_, False, reduce_fields, stats_factory.support(stats)
             )
         else:
             reduced_stats = stats
@@ -163,6 +163,12 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         )
 
     def level_lower_declare(self, ctx, tns, init, op, shape, pos):
+        dimension = shape[0]
+        if dimension.result_type != self.dimension_type:
+            dimension = asm.Call(
+                asm.Literal(ffuncs.astype(self.dimension_type)), (dimension,)
+            )
+        ctx.exec(asm.SetAttr(tns, asm.Literal("dimension"), dimension))
         p_t = self.ptr_type.length_type
         p = asm.Variable(ctx.freshen("p"), p_t)
         stop = asm.Variable(ctx.freshen("pos_stop"), p_t)
@@ -181,7 +187,7 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         """
         ctx.exec(parse_assembly(expr, locals(), position_type=p_t))
         return self.lvl_t.level_lower_declare(
-            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape, zero
+            ctx, asm.GetAttr(tns, asm.Literal("lvl")), init, op, shape[1:], zero
         )
 
     def level_lower_thaw(self, ctx, lvl, op, pos):
@@ -296,8 +302,8 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
         i_last = asm.Variable(ctx.freshen("i_last"), self.position_type)
         fill = (
             ntn.Value(self.lower_fill(lvl_asm), self.element_type)
-            if is_dynamic(self.fill_value)
-            else ntn.Literal(self.fill_value.value)
+            if is_dynamic(self.fill_type)
+            else ntn.Literal(self.fill_type.value)
         )
         full = ntn.Full(
             fill,
@@ -323,17 +329,61 @@ class SparseListLevelFType(SingleDimensionLevelFType, MutableStructFType):
 
         def seek_fn(ctx, ext):
             start = ctx.ctx(ext.get_start())
+            p_t = self.position_type
+            lo = asm.Variable(ctx.freshen("lo"), p_t)
+            hi = asm.Variable(ctx.freshen("hi"), p_t)
+            d = asm.Variable(ctx.freshen("d"), p_t)
+            m = asm.Variable(ctx.freshen("m"), p_t)
+            go = asm.Variable(ctx.freshen("go"), ffuncs.lt.ftype.return_type(p_t, p_t))
+            stop = asm.Literal(np.bool_(False))
 
-            code = f"""finch
-            if (idx_s[q] < {start})
-              q = scansearch(idx_s, {start}, q, q_stop - 1)
+            # Move q to the first index of the fiber which is at least start.
+            # Gallop from q until an index is at least start, then bisect the
+            # last step. Expressions have one operation each, and loads only
+            # happen in bounds, since the assembly has no short circuits.
+            code = """finch
+            if (q < q_stop)
+              if (idx_s[q] < start)
+                lo = q
+                d = 1
+                hi = q + d
+                go = hi < q_stop
+                while (go)
+                  if (idx_s[hi] < start)
+                    lo = hi
+                    d = d + d
+                    hi = hi + d
+                    hi = min(hi, q_stop)
+                    go = hi < q_stop
+                  else
+                    go = stop
+                  end
+                end
+                m = lo + 1
+                go = m < hi
+                while (go)
+                  m = hi - lo
+                  m = m >> 1
+                  m = lo + m
+                  if (idx_s[m] < start)
+                    lo = m
+                  else
+                    hi = m
+                  end
+                  m = lo + 1
+                  go = m < hi
+                end
+                q = hi
+              end
             end
             """
 
             return parse_assembly(
                 code,
-                tmp_locals | asm.get_vars_in_expr(start),
-                position_type=self.position_type,
+                tmp_locals
+                | {"start": start, "lo": lo, "hi": hi, "d": d, "m": m, "go": go}
+                | {"stop": stop},
+                position_type=p_t,
             )
 
         def chunk_tail_fn(ctx, idx):

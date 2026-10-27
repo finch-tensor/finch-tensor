@@ -6,6 +6,7 @@ from .interpreter import NotationInterpreter, TensorView
 from .nodes import (
     Access,
     AccessMode,
+    Assert,
     Assign,
     Block,
     Cached,
@@ -15,6 +16,7 @@ from .nodes import (
     Declare,
     Dimension,
     Fiber,
+    FillValue,
     Freeze,
     Full,
     Function,
@@ -48,6 +50,7 @@ from .stages import NotationLoader, NotationTransform
 __all__ = [
     "Access",
     "AccessMode",
+    "Assert",
     "Assign",
     "Block",
     "Cached",
@@ -57,6 +60,7 @@ __all__ = [
     "Declare",
     "Dimension",
     "Fiber",
+    "FillValue",
     "Freeze",
     "Full",
     "Function",

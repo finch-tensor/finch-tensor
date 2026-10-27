@@ -16,6 +16,7 @@ from finch import (
 )
 from finch.tensor import (
     BufferizedNDArray,
+    BufferizedNDArrayFType,
     ChunkMaskTensor,
     DenseLevel,
     ElementLevel,
@@ -113,7 +114,7 @@ def test_bufferized_ndarray_fill_value_dtype():
         a = BufferizedNDArray.from_numpy(arr, fill_value=0)
 
         assert a.fill_value.dtype == arr.dtype
-        assert a.ftype.fill_value.value.dtype == arr.dtype
+        assert a.ftype.fill_type.value.dtype == arr.dtype
         assert finch.defer(a).fill_value.dtype == arr.dtype
         assert asarray(a, copy=True).fill_value.dtype == arr.dtype
         assert a[0:1].fill_value.dtype == arr.dtype
@@ -128,7 +129,7 @@ def test_bufferized_ndarray_custom_fill_value():
     a = BufferizedNDArray.from_numpy(arr, fill_value=2)
 
     assert a.fill_value == np.float32(2)
-    assert a.ftype.fill_value.value == np.float32(2)
+    assert a.ftype.fill_type.value == np.float32(2)
     assert np.all(a.ftype.construct((2, 3)).to_numpy() == np.float32(2))
 
     x = BufferizedNDArray.from_numpy(arr, fill_value=np.nan)
@@ -136,6 +137,22 @@ def test_bufferized_ndarray_custom_fill_value():
     assert finch.same(x.fill_value, y.fill_value)
     assert x.ftype == y.ftype
     assert hash(x.ftype) == hash(y.ftype)
+
+
+def test_bufferized_ndarray_ftype_distinguishes_dimension_types():
+    def fmt(dimension_type):
+        return BufferizedNDArrayFType(
+            buffer_type=NumpyBufferFType(finch.int64),
+            ndim=1,
+            dimension_type=(dimension_type,),
+        )
+
+    # The dimension type sets the layout of the shape field, so kernels
+    # compiled for one dimension type can't be reused for another.
+    assert fmt(int32) == fmt(int32)
+    assert hash(fmt(int32)) == hash(fmt(int32))
+    assert fmt(int32) != fmt(finch.int64)
+    assert len({fmt(int32), fmt(finch.int64)}) == 2
 
 
 def test_bufferized_ndarray_to_numpy_returns_view():
@@ -273,8 +290,11 @@ def test_sparse_level_construct_initializes_empty_storage():
     np.testing.assert_array_equal(hash_level.ptr.arr, np.zeros(4, dtype=np.intp))
     assert hash_level.tbl_ctrl.length() == 0
     assert hash_level.tbl.length() == 0
-    assert hash_level.pool.length() == 0
+    assert hash_level.key.length() == 0
     assert hash_level.perm.length() == 0
+    np.testing.assert_array_equal(hash_level.tbl_count.arr, np.zeros(1, dtype=np.intp))
+    assert hash_level.pos_multiplier.dtype == np.dtype(np.uintp)
+    assert int(hash_level.pos_multiplier) & 1
     assert hash_level.lvl.val.length() == 0
 
     coo_level = finch.sparse_coo(elem_t, 2, finch.intp).construct((4, 5), pos=3)
@@ -284,10 +304,49 @@ def test_sparse_level_construct_initializes_empty_storage():
     assert coo_level.lvl.val.length() == 0
 
     bytemap_level = finch.sparse_bytemap(elem_t, finch.intp).construct((4,), pos=3)
-    np.testing.assert_array_equal(bytemap_level.ptr.arr, np.zeros(4, dtype=np.intp))
+    # Unoccupied parents' pointers are unset, as Finch.jl's 0 shifted to -1.
+    np.testing.assert_array_equal(bytemap_level.ptr.arr, [0, -1, -1, -1])
     np.testing.assert_array_equal(bytemap_level.tbl.arr, np.zeros(12, dtype=np.bool_))
     assert bytemap_level.srt.length() == 0
     assert bytemap_level.lvl.val.length() == 12
+
+
+def test_sparse_hash_fields_preserve_table_metadata():
+    child = element(0.0).construct((), pos=0)
+    level = finch.SparseHashLevel(
+        child, np.int32(4), subtables=4, pos_multiplier=np.uintp(17)
+    )
+    assert (
+        level.tbl_count is not None and level.tbl is not None and level.key is not None
+    )
+    np.testing.assert_array_equal(level.tbl_count.arr, np.zeros(4, dtype=np.intp))
+    assert level.tbl.element_type == finch.intp
+    assert level.key.element_type.struct_fieldtypes == [
+        finch.intp,
+        finch.int32,
+        finch.uint8,
+    ]
+    fields = [getattr(level, name) for name, _ in level.ftype.struct_fields]
+    rebuilt = level.ftype.from_fields(*fields)
+    assert rebuilt.ftype == level.ftype
+    assert rebuilt.subtables == 4
+    assert rebuilt.pos_multiplier == 17
+    for name in ("ptr", "tbl_ctrl", "tbl", "key", "perm", "tbl_count"):
+        assert getattr(rebuilt, name) is getattr(level, name)
+
+
+@pytest.mark.parametrize("subtables", [0, -1, 3, 1.5])
+def test_sparse_hash_rejects_invalid_subtables(subtables):
+    child = element(0.0).construct((), pos=0)
+    with pytest.raises(ValueError, match="positive power of two"):
+        finch.SparseHashLevel(child, np.intp(4), subtables=subtables)
+
+
+@pytest.mark.parametrize("pos_multiplier", [0, 2, 1.5])
+def test_sparse_hash_rejects_invalid_position_multiplier(pos_multiplier):
+    child = element(0.0).construct((), pos=0)
+    with pytest.raises(ValueError, match="odd integer"):
+        finch.SparseHashLevel(child, np.intp(4), pos_multiplier=pos_multiplier)
 
 
 def test_bufferized_ndarray_level_format_properties():
@@ -826,7 +885,7 @@ def test_fiber_tensor_to_csr():
             SparseListLevel(
                 ElementLevel(
                     element(
-                        fill_value=np.float64(0),
+                        fill_type=np.float64(0),
                         position_type=int32,
                     ),
                     NumpyBuffer(data),
@@ -859,7 +918,7 @@ def test_fiber_tensor_to_coo():
         SparseCOOLevel(
             ElementLevel(
                 element(
-                    fill_value=np.float64(0),
+                    fill_type=np.float64(0),
                     position_type=int32,
                 ),
                 NumpyBuffer(data),

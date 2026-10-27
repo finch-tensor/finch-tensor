@@ -5,21 +5,38 @@ Shared functionality across TensorStats implementations.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import TypeVar
 
 import numpy as np
 
-from finch.algebra import Tensor, ffuncs
+from finch.algebra import AbstractFillFType, Tensor, ffuncs
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
+    StatsFactory,
     Table,
+    TensorStats,
 )
+from finch.tensor import Scalar
+
+TS = TypeVar("TS", bound=TensorStats)
+
+
+def fill_statistics(
+    stats_factory: StatsFactory[TS], fill_type: AbstractFillFType
+) -> TS:
+    # The value is entirely fill, so its support is empty even when the fill
+    # itself is unknown. Build that structure without inventing a dynamic value.
+    stats = stats_factory(Scalar(False), ())
+    stats.fill_type = fill_type
+    return stats
 
 
 def get_lp_norms(
@@ -63,7 +80,7 @@ def get_lp_norms(
     bodies: list[Query] = []
     outputs: list[Alias] = []
     for dim, field in enumerate(fields):
-        degrees = Alias(f"degrees_{dim}")
+        degrees = HardAlias(f"degrees_{dim}")
         bodies.append(
             Query(
                 Table(degrees, (field,)),
@@ -78,7 +95,7 @@ def get_lp_norms(
         degree_table = Table(degrees, (field,))
 
         for k, norm in enumerate(norms):
-            out = Alias(f"norm_{dim}_{k}")
+            out = HardAlias(f"norm_{dim}_{k}")
             rhs: Aggregate
             if norm == 0:
                 rhs = Aggregate(

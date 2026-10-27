@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 import numpy as np
@@ -9,14 +9,13 @@ import finch as fl
 from finch.algebra import FinchOperator, ffuncs, is_annihilator, is_identity
 from finch.finch_logic import (
     Aggregate,
-    Alias,
     Field,
+    HardAlias,
     Literal,
     MapJoin,
     Plan,
     Produces,
     Query,
-    Reorder,
     StatsFactory,
     Table,
 )
@@ -29,6 +28,7 @@ def build_grid_uniform(
     d: BaseTensorStats, blocks_per_dim: Mapping[Field, int], data: Any
 ) -> tuple[np.ndarray, dict[Field, np.ndarray]]:
     from finch.autoschedule.default_schedulers import NON_RECURSIVE_STANDARD_SCHEDULER
+    from finch.autoschedule.util import fuse_loop_order
 
     index_order = d.index_order
     block_order = tuple(Field(f"out_{idx.name}") for idx in index_order)
@@ -53,22 +53,17 @@ def build_grid_uniform(
         idx for pair in zip(block_order, index_order, strict=True) for idx in pair
     )
     nnz_grid_expr = Aggregate(
-        Literal(ffuncs.add),
-        Literal(np.intp(0)),
-        Reorder(joined, loop_order),
-        index_order,
+        Literal(ffuncs.add), Literal(np.intp(0)), joined, index_order
     )
-    out = Alias("blocked_uniform_nnz_grid")
-    size_outputs = tuple(Alias(f"block_sizes_{axis}") for axis in range(len(masks)))
+    out = HardAlias("blocked_uniform_nnz_grid")
+    size_outputs = tuple(HardAlias(f"block_sizes_{axis}") for axis in range(len(masks)))
     size_queries = tuple(
-        Query(
-            Table(size_out, (block_idx,)),
-            Aggregate(
-                Literal(ffuncs.add),
-                Literal(np.intp(0)),
-                Reorder(mask, (block_idx, idx)),
-                (idx,),
+        fuse_loop_order(
+            Query(
+                Table(size_out, (block_idx,)),
+                Aggregate(Literal(ffuncs.add), Literal(np.intp(0)), mask, (idx,)),
             ),
+            (block_idx, idx),
         )
         for idx, block_idx, mask, size_out in zip(
             index_order, block_order, masks, size_outputs, strict=True
@@ -76,7 +71,7 @@ def build_grid_uniform(
     )
     prgm = Plan(
         (
-            Query(Table(out, block_order), nnz_grid_expr),
+            fuse_loop_order(Query(Table(out, block_order), nnz_grid_expr), loop_order),
             *size_queries,
             Produces((out, *size_outputs)),
         )
@@ -233,16 +228,16 @@ class BlockedUniformStatsFactory(
             shape[axis] = -1
             k = k * stats.block_sizes[idx].reshape(shape)
 
-        if is_annihilator(op.ftype, stats.fill_value):
+        if is_annihilator(op.ftype, stats.fill_type):
             local_p = np.power(density, k)
-        elif is_identity(op.ftype, stats.fill_value):
+        elif is_identity(op.ftype, stats.fill_type):
             local_p = 1 - np.power(1 - density, k)
         else:
             local_p = np.ones_like(density)
 
-        if is_annihilator(op.ftype, base.fill_value):
+        if is_annihilator(op.ftype, base.fill_type):
             combined_p = np.prod(local_p, axis=reduce_axes)
-        elif is_identity(op.ftype, base.fill_value):
+        elif is_identity(op.ftype, base.fill_type):
             combined_p = 1 - np.prod(1 - local_p, axis=reduce_axes)
         else:
             combined_p = np.mean(local_p, axis=reduce_axes)
@@ -336,8 +331,17 @@ class BlockedUniformStats(NumericStats):
         shape = [next(it) if idx in self.index_order else 1 for idx in base_index_order]
         return density.reshape(shape)
 
-    def estimate_non_fill_values(self) -> float:
-        return float(np.sum(self.nnz_grid))
+    def estimate_non_fill_values(self, over: Iterable[Field] = ()) -> float:
+        # Within a block, non-fill values are spread evenly over its slices.
+        fields = set(over)
+        fixed = tuple(idx for idx in self.index_order if idx in fields)
+        rest = tuple(
+            axis for axis, idx in enumerate(self.index_order) if idx not in fields
+        )
+        nnz = np.sum(self.nnz_grid, axis=rest, dtype=float)
+        vol = _block_volume_grid(fixed, self.block_sizes)
+        slices = np.divide(nnz, vol, out=np.zeros_like(nnz), where=vol > 0)
+        return float(np.max(slices, initial=0.0))
 
     def get_embedding(self) -> np.ndarray:
         sizes = [float(self.dim_sizes[field]) for field in self.index_order]

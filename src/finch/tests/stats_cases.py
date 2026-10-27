@@ -27,6 +27,7 @@ RANDOM_DENSITY = 0.001
 BLOCK_COUNT = 10
 SEED = 42
 SAMPLE_NNZ = 10_000
+DATA_DIR = Path(__file__).parent / "data"
 KERNELS = ("Hadamard", "SpGEMM", "SpGEMM2", "Triangle Counting")
 
 
@@ -77,8 +78,7 @@ def make_striped(n):
 
 
 def load_matrix_market(filename):
-    path = Path(__file__).parent / "data" / filename
-    matrix = sps.csr_array(mmread(path), dtype=np.float64)
+    matrix = sps.csr_array(mmread(DATA_DIR / filename), dtype=np.float64)
     # Match the synthetic inputs: measure sparsity, without signed cancellation.
     matrix.sum_duplicates()
     matrix.eliminate_zeros()
@@ -107,6 +107,10 @@ DATASETS = {
     "Striped": partial(make_striped, DENSE_MATRIX_SIZE),
     "Uniform Random": make_uniform_random,
     "ct20stif": partial(load_matrix_market, "ct20stif.mtx"),
+    "bcsstk39": partial(load_matrix_market, "bcsstk39.mtx"),
+    "ca-GrQc": partial(load_matrix_market, "ca-GrQc.mtx"),
+    "ca-HepTh": partial(load_matrix_market, "ca-HepTh.mtx"),
+    "web-NotreDame": partial(load_matrix_market, "web-NotreDame.mtx"),
     "roadNet-PA": partial(load_matrix_market, "roadNet-PA.mtx"),
     "soc-sign-epinions": partial(load_matrix_market, "soc-sign-epinions.mtx"),
 }

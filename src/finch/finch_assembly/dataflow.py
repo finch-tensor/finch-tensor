@@ -1,6 +1,5 @@
-import copy
 from abc import abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, TypeVar
 
 from finch.symbolic import (
@@ -118,6 +117,22 @@ class AbstractAssemblyDataflow(DataFlowAnalysis):
             return f"{stmt} \t# {annostr}"
         return str(stmt)
 
+    def statement_states(self) -> Iterator[tuple[NumberedStatement, dict]]:
+        """
+        yield each numbered statement of the reached blocks with the state
+        flowing into its transfer (before it for forward, after it for backward).
+        """
+        forward = self.direction() == "forward"
+        for block in self.cfg.blocks.values():
+            if block.id not in self.reached:
+                continue
+            state = self.input_states[block.id]
+            for stmt in block.statements if forward else block.statements[::-1]:
+                match stmt:
+                    case NumberedStatement():
+                        yield stmt, state
+                state = self.transfer([stmt], state)
+
     @abstractmethod
     def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
         """Return list of (var_instance_name, lattice_value) pairs for a stmt/expr."""
@@ -139,6 +154,9 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         """Copy propagation is a forward analysis."""
         return "forward"
 
+    def boundary_state(self) -> dict:
+        return {"defs": {}, "copies": {}}
+
     def collect_copy_replacements(self) -> dict[tuple[int, str], str]:
         """Collect per-statement copy replacements.
 
@@ -148,20 +166,10 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
                 statement ``stmt_id`` based on copy-propagation facts.
         """
         replacements: dict[tuple[int, str], str] = {}
-
-        for block in self.cfg.blocks.values():
-            input_state = self.input_states.get(block.id, {})
-            state = copy.deepcopy(input_state)
-
-            for stmt in block.statements:
-                sid = getattr(stmt, "sid", None)
-                if sid is not None:
-                    for name, value in self.get_lattice_value(state, stmt):
-                        if isinstance(value, tuple) and value:
-                            replacements[(sid, name)] = value[0]
-
-                state = self.transfer([stmt], state)
-
+        for stmt, state in self.statement_states():
+            for name, value in self.get_lattice_value(state, stmt):
+                if isinstance(value, tuple) and value:
+                    replacements[(stmt.sid, name)] = value[0]
         return replacements
 
     def get_lattice_value(self, state, stmt) -> list[tuple[str, object]]:
@@ -176,7 +184,7 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
             case Assign(_, rhs):
                 target = rhs
 
-        copies = state.get("copies", {}) if isinstance(state, dict) else {}
+        copies = state["copies"]
 
         for node in PostOrderDFS(target):
             match node:
@@ -202,7 +210,6 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         Returns:
             dict: The outgoing lattice mapping after processing ``stmts``.
         """
-        state = self._normalize_state(state)
         new_state = {"defs": state["defs"].copy(), "copies": state["copies"].copy()}
 
         defs: dict[str, int | None] = new_state["defs"]
@@ -248,14 +255,10 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         - copies join: keep a copy only if both agree exactly, and it remains
           consistent with the joined defs.
         """
-
-        s1 = self._normalize_state(state_1)
-        s2 = self._normalize_state(state_2)
-
-        defs_1: dict[str, int | None] = s1["defs"]
-        defs_2: dict[str, int | None] = s2["defs"]
-        copies_1: dict[str, tuple[str, int | None]] = s1["copies"]
-        copies_2: dict[str, tuple[str, int | None]] = s2["copies"]
+        defs_1: dict[str, int | None] = state_1["defs"]
+        defs_2: dict[str, int | None] = state_2["defs"]
+        copies_1: dict[str, tuple[str, int | None]] = state_1["copies"]
+        copies_2: dict[str, tuple[str, int | None]] = state_2["copies"]
 
         joined_defs: dict[str, int | None] = {}
         for name in set(defs_1) | set(defs_2):
@@ -272,16 +275,6 @@ class AssemblyCopyPropagation(AbstractAssemblyDataflow):
         joined_copies = self._prune_inconsistent_copies(joined_defs, joined_copies)
 
         return {"defs": joined_defs, "copies": joined_copies}
-
-    def _normalize_state(self, state: dict) -> dict:
-        if not state:
-            return {"defs": {}, "copies": {}}
-
-        if "defs" not in state or "copies" not in state:
-            # allow old/empty shapes; upgrade in place
-            return {"defs": state.get("defs", {}), "copies": state.get("copies", {})}
-
-        return state
 
     def _unpack_stmt(self, stmt):
         if isinstance(stmt, NumberedStatement):

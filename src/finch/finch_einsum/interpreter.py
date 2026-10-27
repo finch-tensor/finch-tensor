@@ -7,7 +7,6 @@ from finch.finch_assembly import AssemblyKernel, AssemblyKernelFType, AssemblyLi
 from finch.finch_einsum.stages import (
     EinsumEvaluator,
     EinsumLoader,
-    compute_shape_vars,
 )
 from finch.symbolic.stage import UnvalidatedForm
 
@@ -63,15 +62,17 @@ unary_ops = {
     ffuncs.arctanh: "arctanh",
 }
 
+# Each reduction operator, as the array function which reduces with it and the
+# elementwise function which folds with it.
 reduction_ops = {
-    ffuncs.add: "sum",
-    ffuncs.mul: "prod",
-    ffuncs.and_: "all",
-    ffuncs.or_: "any",
-    ffuncs.min: "min",
-    ffuncs.max: "max",
-    ffuncs.logical_and: "all",
-    ffuncs.logical_or: "any",
+    ffuncs.add: ("sum", "add"),
+    ffuncs.mul: ("prod", "multiply"),
+    ffuncs.and_: ("all", "logical_and"),
+    ffuncs.or_: ("any", "logical_or"),
+    ffuncs.min: ("min", "minimum"),
+    ffuncs.max: ("max", "maximum"),
+    ffuncs.logical_and: ("all", "logical_and"),
+    ffuncs.logical_or: ("any", "logical_or"),
 }
 
 
@@ -127,6 +128,7 @@ class EinsumMachine:
     def __init__(self, xp, bindings):
         self.xp = xp
         self.bindings = bindings
+        self.inputs = set(bindings)
 
     def __call__(self, node):
         xp = self.xp
@@ -148,28 +150,32 @@ class EinsumMachine:
                 arg = ctx(arg)
                 axis = tuple(i for i in range(len(loops)) if loops[i] not in idxs)
                 if op != ffuncs.overwrite:
-                    op = getattr(xp, reduction_ops[op])
-                    val = op(arg, axis=axis)
+                    reduce_name, fold_name = reduction_ops[op]
+                    val = getattr(xp, reduce_name)(arg, axis=axis)
                 else:
                     val = arg
                     for i in sorted(axis, reverse=True):
                         val = xp.take(val, -1, axis=i)
                 dropped = [idx for idx in loops if idx in idxs]
-                axis = [dropped.index(idx) for idx in idxs]
+                val = xp.permute_dims(val, [dropped.index(idx) for idx in idxs])
                 if tns in self.bindings:
-                    if self.bindings[tns].ndim == 0:
-                        self.bindings[tns][()] = val
+                    if op != ffuncs.overwrite:
+                        # An einsum folds into its tensor, which an initializing
+                        # einsum may have set.
+                        val = getattr(xp, fold_name)(self.bindings[tns], val)
+                    if tns in self.inputs:
+                        self.bindings[tns][...] = val
                     else:
-                        self.bindings[tns][:] = xp.permute_dims(val, axis)
+                        self.bindings[tns] = val
                 else:
-                    self.bindings[tns] = xp.permute_dims(val, axis)
+                    self.bindings[tns] = val
                 return (self.bindings[tns],)
             case _:
                 raise ValueError(f"Unknown einsum type: {type(node)}")
 
 
 class MockEinsumKernel(AssemblyKernel):
-    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType], defined=None):
         super().__init__(
             AssemblyKernelFType(
                 "main",
@@ -181,6 +187,7 @@ class MockEinsumKernel(AssemblyKernel):
         )
         self.prgm = prgm
         self.bindings = bindings
+        self.defined = defined or set()
 
     def __call__(self, *args):
         if len(args) != len(self.bindings):
@@ -192,17 +199,20 @@ class MockEinsumKernel(AssemblyKernel):
         for key in bindings:
             assert fisinstance(bindings[key], self.bindings[key])
         ctx = EinsumInterpreter()
-        return ctx(self.prgm, bindings)
+        return ctx(
+            self.prgm, {k: v for k, v in bindings.items() if k not in self.defined}
+        )
 
 
 class MockEinsumLibrary(AssemblyLibrary):
-    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType]):
+    def __init__(self, prgm, bindings: dict[ein.Alias, TensorFType], defined=None):
         self.prgm = prgm
         self.bindings = bindings
+        self.defined = defined
 
     def __getattr__(self, name):
         if name == "main":
-            self.main = MockEinsumKernel(self.prgm, self.bindings)
+            self.main = MockEinsumKernel(self.prgm, self.bindings, self.defined)
             return self.main
         if name == "prgm":
             return self.prgm
@@ -214,11 +224,13 @@ class MockEinsumLoader(UnvalidatedForm, EinsumLoader):
         pass
 
     def lower(
-        self, prgm: ein.EinsumStatement, bindings: dict[ein.Alias, TensorFType]
+        self,
+        prgm: ein.EinsumStatement,
+        bindings: dict[ein.Alias, TensorFType],
+        *,
+        defined: set[ein.Alias] | None = None,
     ) -> tuple[
         MockEinsumLibrary,
         dict[ein.Alias, TensorFType],
-        dict[ein.Alias, tuple[ein.Index | None, ...]],
     ]:
-        shape_vars = compute_shape_vars(prgm, bindings)
-        return MockEinsumLibrary(prgm, bindings), bindings, shape_vars
+        return MockEinsumLibrary(prgm, bindings, defined), bindings

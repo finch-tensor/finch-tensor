@@ -5,7 +5,13 @@ from abc import abstractmethod
 import numpy as np
 
 from finch import finch_logic as lgc
-from finch.algebra import AbstractFill, FType, TensorFType, TupleFType, ftype
+from finch.algebra import (
+    AbstractFillFType,
+    FType,
+    TensorFType,
+    TupleFType,
+    ftype,
+)
 from finch.autoschedule.stages import LogicFormatter
 from finch.codegen import NumpyBufferFType
 from finch.finch_logic import (
@@ -31,7 +37,7 @@ class MonoLogicFormatter(LogicFormatter):
 
     @abstractmethod
     def get_tensor_ftype(
-        self, fill_value: AbstractFill, shape_type: tuple[FType, ...]
+        self, fill_type: AbstractFillFType, shape_type: tuple[FType, ...]
     ) -> TensorFType: ...
 
     def lower(
@@ -42,11 +48,11 @@ class MonoLogicFormatter(LogicFormatter):
         stats_factory: StatsFactory,
     ):
         bindings = bindings.copy()
-        shape_types = prgm.infer_shape_type(
-            {var: val.shape_type for var, val in bindings.items()}
-        )
-        fill_values = prgm.infer_fill_value(
-            {var: val.fill_value for var, val in bindings.items()}
+        shape_types: dict[lgc.Alias, tuple[FType | None, ...]] = {
+            var: val.shape_type for var, val in bindings.items()
+        }
+        fill_types = prgm.infer_fill_type(
+            {var: val.fill_type for var, val in bindings.items()}
         )
 
         def formatter(node: lgc.LogicStatement) -> lgc.LogicStatement:
@@ -54,16 +60,20 @@ class MonoLogicFormatter(LogicFormatter):
                 case lgc.Plan(bodies):
                     new_bodies = tuple(formatter(body) for body in bodies)
                     return lgc.Plan(new_bodies)
+                case lgc.Fuse(idx, body):
+                    return lgc.Fuse(idx, formatter(body))
                 case lgc.Query(lgc.Table(lgc.Alias() as lhs, _), _) | lgc.QueryInto(
                     lgc.Table(lgc.Alias() as lhs, _), _, _
                 ):
+                    node.infer_shape_type(shape_types)
+                    lhs = lhs.unfused
                     if lhs not in bindings:
                         shape_type = tuple(
                             ftype(dim) if dim is not None else ftype(np.intp)
                             for dim in shape_types[lhs]
                         )
 
-                        tns = self.get_tensor_ftype(fill_values[lhs], shape_type)
+                        tns = self.get_tensor_ftype(fill_types[lhs], shape_type)
 
                         bindings[lhs] = tns
                     return node
@@ -82,29 +92,27 @@ class MonoLogicFormatter(LogicFormatter):
 
 
 class BufferizedNDArrayFormatter(MonoLogicFormatter):
-    def get_tensor_ftype(self, fill_value: AbstractFill, shape_type: tuple[FType, ...]):
+    def get_tensor_ftype(
+        self, fill_type: AbstractFillFType, shape_type: tuple[FType, ...]
+    ):
         """
         Return the FType of the output tensor produced within the
         autoscheduler.
         """
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-        )
+        fill_ftype = fill_type.element_type
         return BufferizedNDArrayFType(
             buffer_type=NumpyBufferFType(fill_ftype),
             ndim=len(shape_type),
             dimension_type=TupleFType.from_tuple(shape_type),
-            fill_value=fill_value,
+            fill_type=fill_type,
         )
 
 
 class RandomLogicFormatter(LogicFormatter):
-    def get_output_tns_ftype(self, fill_value, shape_type):
-        fill_ftype = ftype(
-            fill_value.dtype if isinstance(fill_value, np.ndarray) else fill_value
-        )
+    def get_output_tns_ftype(self, fill_type, shape_type):
+        fill_ftype = fill_type.element_type
         elem = ElementLevelFType(
-            fill_value=fill_value,
+            fill_type=fill_type,
             element_type=fill_ftype,
             buffer_type=NumpyBufferFType(fill_ftype),
         )

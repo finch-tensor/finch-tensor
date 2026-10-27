@@ -306,7 +306,7 @@ def test_simplify_assembly():
 
 
 def test_simplify_logic_mapjoin():
-    a = lgc.Table(lgc.Alias("A"), ())
+    a = lgc.Table(lgc.HardAlias("A"), ())
     term = lgc.MapJoin(
         lgc.Literal(ffuncs.mul),
         (lgc.MapJoin(lgc.Literal(ffuncs.mul), (a, lgc.Literal(2))), lgc.Literal(3)),
@@ -354,7 +354,7 @@ def test_logic_simplify_unwraps_literals():
     assert unwrap_literal(lgc.Relabel(lit, ())) == lit
     # A reorder that does something is left alone.
     idxs = (lgc.Field("i"), lgc.Field("j"))
-    table = lgc.Reorder(lgc.Table(lgc.Alias("A"), idxs), idxs[::-1])
+    table = lgc.Reorder(lgc.Table(lgc.HardAlias("A"), idxs), idxs[::-1])
     assert unwrap_literal(table) is None
 
 
@@ -374,15 +374,38 @@ def test_logic_simplify_folds_wrapped_literals():
     ],
     ids=["drops_identity", "drops_zero_addend"],
 )
-def test_logic_simplify_drops_identity_operands(build, ids):
-    """An identity operand disappears together with the MapJoin holding it."""
+def test_logic_simplify_preserves_untyped_identity_operands(build, ids):
+    """Identity elimination waits until element types are known."""
     arr = np.arange(6, dtype=np.int64).reshape(2, 3)
     x = finch.asarray(arr)
     capture, ctx = _capturing_scheduler()
     out = finch.compute(build(finch.defer(x)), ctx=ctx)
 
     np.testing.assert_array_equal(out.to_numpy(), arr)
-    assert not _mapjoins(capture.last_prgm)
+    assert _mapjoins(capture.last_prgm)
+
+
+@pytest.mark.parametrize("dtype", [np.bool_, np.int64, np.float64])
+@pytest.mark.parametrize("identity_first", [False, True])
+@pytest.mark.parametrize(
+    "op,identity", [(finch.logical_and, True), (finch.logical_or, False)]
+)
+def test_logic_simplify_preserves_boolean_conversion(
+    dtype, identity_first, op, identity
+):
+    arr = np.array([0, 2, -3], dtype=dtype)
+    x = finch.defer(finch.asarray(arr))
+    args = (
+        (ConstantScalar(identity), x)
+        if identity_first
+        else (x, ConstantScalar(identity))
+    )
+    capture, ctx = _capturing_scheduler()
+    out = finch.compute(op(*args), ctx=ctx).to_numpy()
+
+    np.testing.assert_array_equal(out, arr.astype(bool))
+    assert out.dtype == np.dtype(bool)
+    assert _mapjoins(capture.last_prgm)
 
 
 def test_logic_simplify_leaves_annihilators_to_notation():

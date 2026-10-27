@@ -182,3 +182,19 @@ def test_if_statement():
     )
 
     assert result == expected
+
+
+def test_operator_call_in_index():
+    buf = Variable("buf", NumpyBufferFType(ftype(np.intp)))
+    i = Variable("i", ftype(np.intp))
+    x = Variable("x", ftype(np.intp))
+    result = parse_assembly(
+        """finch
+        x = buf[add(i, 1)]
+        """,
+        locals(),
+    )
+    expected = Block(
+        (Assign(x, Load(buf, Call(Literal(ffuncs.add), (i, Literal(np.intp(1)))))),)
+    )
+    assert result == expected

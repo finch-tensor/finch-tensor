@@ -7,11 +7,15 @@ from typing import Any, Self, TypeVar
 from finch import finch_assembly as asm
 from finch.algebra import (
     AbstractFill,
+    AbstractFillFType,
     FType,
     FTyped,
     StructFType,
+    ffuncs,
     ftypes,
+    is_static,
 )
+from finch.finch_assembly import parse_assembly
 from finch.tensor.traits import FormatProperty
 
 
@@ -36,11 +40,11 @@ class LevelFType(FType, ABC):
         self.level_get_child_type(attr)
         return asm.GetAttr(obj, asm.Literal(attr))
 
-    def with_fill(self, fill_value: Any) -> LevelFType:
-        """Rebuild this level ftype with the leaf fill value replaced."""
+    def with_fill(self, fill_type: AbstractFillFType) -> LevelFType:
+        """Rebuild this level ftype with the leaf fill replaced."""
         # Level ftypes are dataclasses with a `_lvl_t` child field; non-
         # dataclass levels must override.
-        return replace(self, _lvl_t=self.lvl_t.with_fill(fill_value))  # type: ignore[type-var]
+        return replace(self, _lvl_t=self.lvl_t.with_fill(fill_type))  # type: ignore[type-var]
 
     def lower_fill(self, lvl_expr):
         """Assembly expression reading the runtime fill from the leaf level's
@@ -57,10 +61,9 @@ class LevelFType(FType, ABC):
 
     @property
     @abstractmethod
-    def fill_value(self) -> AbstractFill:
+    def fill_type(self) -> AbstractFillFType:
         """
-        Fill value of the fibers, and whether kernels may specialize on it.
-        Use `.value` for the value itself.
+        Fill of the fibers, and whether kernels may specialize on its value.
         """
         ...
 
@@ -218,9 +221,14 @@ class Level(FTyped[LT], ABC):
 
     @property
     def fill_value(self):
-        """The fill value itself; see `self.ftype.fill_value` for
-        dynamic vs static."""
-        return self.ftype.fill_value.value
+        """The fill value itself; see `self.ftype.fill_type` for
+        dynamic vs static. A level with a dynamic fill holds its own value."""
+        fill_type = self.ftype.fill_type
+        if is_static(fill_type):
+            return fill_type.value
+        raise NotImplementedError(
+            f"{type(self).__name__} must hold its dynamic fill value"
+        )
 
     @property
     def element_type(self):
@@ -257,6 +265,10 @@ class MultiDimensionLevelFType(LevelFType):
 class SingleDimensionLevel(Level):
     lvl: Level
 
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
@@ -265,6 +277,104 @@ class SingleDimensionLevel(Level):
 class MultiDimensionLevel(Level):
     lvl: Level
 
+    @property
+    def fill_value(self):
+        return self.lvl.fill_value
+
     def with_fill(self, fill_value: AbstractFill) -> Self:
         """Rebuild this level with the leaf fill value replaced."""
         return replace(self, lvl=self.lvl.with_fill(fill_value))  # type: ignore[type-var, attr-defined]
+
+
+def exec_block(ctx, block: asm.Block):
+    """Emit the statements of `block` into the current scope of `ctx`."""
+    for body in block.bodies:
+        ctx.exec(body)
+
+
+def lower_heapsort(ctx, buf, n, lt):
+    """
+    Emit an in-place heapsort of ``buf[0:n]``. ``lt(a, b)`` builds the strict
+    order on two element variables. Sorting in place needs no scratch buffers,
+    which assembly can't allocate.
+    """
+    len_t = buf.result_type.length_type
+    elem_t = buf.result_type.element_type
+    root, child, lo, hi = (
+        asm.Variable(ctx.freshen(name), len_t) for name in ("root", "child", "lo", "hi")
+    )
+    a, b = (asm.Variable(ctx.freshen(name), elem_t) for name in ("a", "b"))
+    sifting = asm.Variable(ctx.freshen("sifting"), ftypes.bool_)
+    fld = asm.Literal(ffuncs.floordiv)
+    bindings = locals() | {"a_lt_b": lt(a, b), "b_lt_a": lt(b, a)}
+    sift = parse_assembly(
+        """finch
+        root = lo
+        sifting = true
+        while (sifting)
+            child = add(mul(root, 2), 1)
+            if (child < hi)
+                a = buf[child]
+                if (add(child, 1) < hi)
+                    b = buf[add(child, 1)]
+                    if (a_lt_b)
+                        child = add(child, 1)
+                        a = b
+                    end
+                end
+                b = buf[root]
+                if (b_lt_a)
+                    buf[root] = a
+                    buf[child] = b
+                    root = child
+                else
+                    sifting = false
+                end
+            else
+                sifting = false
+            end
+        end
+        """,
+        bindings,
+        position_type=len_t,
+    )
+    heapify = parse_assembly(
+        """finch
+        lo = fld(n, 2)
+        hi = n
+        """,
+        bindings,
+        position_type=len_t,
+    )
+    exec_block(ctx, heapify)
+    ctx.exec(
+        asm.WhileLoop(
+            asm.Call(asm.Literal(ffuncs.gt), (lo, asm.Literal(len_t(0)))),
+            asm.Block(
+                (
+                    asm.Assign(
+                        lo,
+                        asm.Call(asm.Literal(ffuncs.sub), (lo, asm.Literal(len_t(1)))),
+                    ),
+                    *sift.bodies,
+                )
+            ),
+        )
+    )
+    pop = parse_assembly(
+        """finch
+        hi = sub(hi, 1)
+        a = buf[0]
+        buf[0] = buf[hi]
+        buf[hi] = a
+        lo = 0
+        """,
+        bindings,
+        position_type=len_t,
+    )
+    ctx.exec(
+        asm.WhileLoop(
+            asm.Call(asm.Literal(ffuncs.gt), (hi, asm.Literal(len_t(1)))),
+            asm.Block((*pop.bodies, *sift.bodies)),
+        )
+    )
