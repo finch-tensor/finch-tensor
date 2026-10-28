@@ -4,6 +4,7 @@ import pytest
 
 import numpy as np
 from scipy.linalg import block_diag
+from scipy.optimize import nnls
 
 import finch as fl
 from finch import ffuncs
@@ -14,11 +15,14 @@ from finch.autoschedule.cost_models import (
     ByKind,
     Concat,
     FlopsBasis,
+    KNearest,
     LinearCostModel,
     PigeonBasis,
     Prefix,
     Quadratic,
+    RowMap,
     Statement,
+    Stratify,
     TransposeBasis,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory, UniformStatsFactory
@@ -63,6 +67,13 @@ def random_programs(rng, n_features, n_programs=40):
         Quadratic(PigeonBasis()),
         Concat(PigeonBasis(), TransposeBasis()),
         Concat(PigeonBasis(), Quadratic(PigeonBasis())),
+        KNearest(PigeonBasis(), np.random.default_rng(0).random((6, 3)), 2),
+        Concat(
+            PigeonBasis(),
+            KNearest(PigeonBasis(), np.random.default_rng(1).random((4, 3))),
+        ),
+        Stratify(PigeonBasis(), 0, [0.3, 0.7]),
+        Stratify(Quadratic(TransposeBasis()), 0, [0.5]),
     ],
 )
 def test_linear_model_fits_program_runtimes(rng, basis):
@@ -81,6 +92,117 @@ def test_linear_model_fits_program_runtimes(rng, basis):
 def test_linear_model_checks_coefficients():
     with pytest.raises(ValueError, match="Expected 3 coefficients"):
         LinearCostModel(PigeonBasis(), [1.0, 2.0])
+
+
+def test_stratify_places_rows_in_regime_blocks():
+    basis = Stratify(TransposeBasis(), 1, [1.0, 3.0])
+    assert basis.n_regimes == 3
+    assert basis.n_features == 6
+    np.testing.assert_array_equal(basis.ridge, np.ones(6))
+    rows = np.array([[5.0, 0.5], [6.0, 1.0], [7.0, 2.0], [8.0, 3.5]])
+    np.testing.assert_array_equal(
+        basis.transform(rows),
+        [
+            [5.0, 0.5, 0.0, 0.0, 0.0, 0.0],
+            [0.0, 0.0, 6.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 7.0, 2.0, 0.0, 0.0],
+            [0.0, 0.0, 0.0, 0.0, 8.0, 3.5],
+        ],
+    )
+    assert basis.transform(np.empty((0, 2))).shape == (0, 6)
+    with pytest.raises(ValueError, match="Expected 0 <= feature < 2"):
+        Stratify(TransposeBasis(), 2, [1.0])
+    with pytest.raises(ValueError, match="increasing thresholds"):
+        Stratify(TransposeBasis(), 0, [3.0, 1.0])
+
+
+def test_stratify_fits_separate_coefficients_per_regime(rng):
+    # The per-unit costs differ once the first feature reaches the threshold,
+    # and only program runtimes are observed.
+    basis = Stratify(TransposeBasis(), 0, [0.5])
+    coefficients = np.array([1.0, 2.0, 10.0, 0.5])
+    programs = random_programs(rng, 2)
+    features = [basis.transform(rows) for rows in programs]
+    runtimes = [rows.sum(axis=0) @ coefficients for rows in features]
+    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, runtimes)
+    np.testing.assert_allclose(fitted.coefficients, coefficients, atol=1e-9)
+
+
+def test_knearest_basis_averages_nearest_landmark_costs():
+    # A linear model of KNearest is k nearest neighbors over the landmarks.
+    basis = KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 0.0], [5.0, 5.0]], 2)
+    rows = np.array([[0.2, 0.0], [5.0, 4.0]])
+    np.testing.assert_allclose(
+        basis.transform(rows), [[0.5, 0.5, 0.0], [0.0, 0.5, 0.5]]
+    )
+    model = LinearCostModel(basis, [1.0, 3.0, 100.0])
+    assert model.predict(basis.transform(rows)) == 53.5
+    assert basis.transform(np.empty((0, 2))).shape == (0, 3)
+    with pytest.raises(ValueError, match="Expected 1 <= k <= 3"):
+        KNearest(TransposeBasis(), np.zeros((3, 2)), 4)
+
+
+def test_knearest_fit_apportions_program_runtimes(rng):
+    # Each program's runtime is the sum of the costs of the landmarks nearest
+    # its rows, and least squares recovers those costs from the sums alone.
+    landmarks = rng.random((5, 2)) * 10
+    costs = rng.random(5)
+    basis = KNearest(TransposeBasis(), landmarks)
+    features, runtimes = [], []
+    for _ in range(40):
+        nearest = rng.integers(0, 5, size=rng.integers(0, 4))
+        rows = landmarks[nearest] + rng.normal(scale=0.1, size=(len(nearest), 2))
+        features.append(basis.transform(rows))
+        runtimes.append(costs[nearest].sum())
+    fitted = LinearCostModel(basis, np.zeros(5)).fit(features, runtimes)
+    np.testing.assert_allclose(fitted.coefficients, costs)
+
+
+class Unpenalized(RowMap):
+    @property
+    def n_features(self):
+        return self.basis.n_features
+
+    @property
+    def ridge(self):
+        return np.zeros(self.n_features)
+
+    def transform(self, rows):
+        return rows
+
+
+def test_fit_is_nonnegative_least_squares_with_basis_ridge(rng):
+    # Six landmark costs from three runtimes is underdetermined, and the
+    # penalty is alpha times the ridge weights of each basis.
+    raw = Unpenalized(TransposeBasis())
+    nearest = KNearest(TransposeBasis(), rng.random((6, 2)))
+    basis = Concat(raw, nearest)
+    np.testing.assert_array_equal(basis.ridge, [0, 0, 1, 1, 1, 1, 1, 1])
+    features = []
+    for _ in range(3):
+        rows = rng.random((3, 2))
+        features.append(
+            np.concatenate([raw.transform(rows), nearest.transform(rows)], axis=1)
+        )
+    runtimes = np.array([1.0, 2.0, 3.0])
+    design = np.stack([rows.sum(axis=0) for rows in features])
+    for alpha in (0.0, 0.5, 2.0):
+        fitted = LinearCostModel(basis, np.zeros(8)).fit(features, runtimes, alpha)
+        augmented = np.concatenate([design, np.sqrt(alpha) * np.diag(basis.ridge)])
+        expected = nnls(augmented, np.concatenate([runtimes, np.zeros(8)]))[0]
+        np.testing.assert_allclose(fitted.coefficients, expected, atol=1e-9)
+        assert fitted.coefficients.min() >= 0
+
+
+def test_fit_clamps_negative_coefficients(rng):
+    basis = Concat(PigeonBasis(), TransposeBasis())
+    features = random_programs(rng, 5)
+    design = np.stack([rows.sum(axis=0) for rows in features])
+    runtimes = design @ [1.0, -2.0, 3.0, -1.0, 0.5] + rng.normal(scale=0.1, size=40)
+    fitted = LinearCostModel(basis, np.zeros(5)).fit(features, runtimes)
+    np.testing.assert_allclose(fitted.coefficients, nnls(design, runtimes)[0])
+    assert fitted.coefficients[1] == 0 and fitted.coefficients[3] == 0
+    assert np.any(np.linalg.lstsq(design, runtimes)[0] < 0)
 
 
 @pytest.mark.parametrize("factory", [DCStatsFactory, UniformStatsFactory])
@@ -127,6 +249,8 @@ def test_flops_cost_retains_query_components(factory):
             Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(25)
         ),
         LinearCostModel(Quadratic(PigeonBasis()), np.ones(9)),
+        LinearCostModel(KNearest(PigeonBasis(), np.ones((2, 3))), np.ones(2)),
+        LinearCostModel(Stratify(PigeonBasis(), 0, [4.0]), np.ones(6)),
     ],
 )
 @pytest.mark.parametrize("plan", [Plan(()), Plan((Produces(()),))])
@@ -164,6 +288,14 @@ def test_quadratic_of_concat_crosses_bases():
             Quadratic(Concat(PigeonBasis(), TransposeBasis())), np.ones(25)
         ),
         LinearCostModel(Concat(PigeonBasis(), Quadratic(PigeonBasis())), np.ones(12)),
+        LinearCostModel(
+            Concat(
+                KNearest(PigeonBasis(), [[0, 0, 0], [6, 2, 2], [6, 6, 0]], 2),
+                Quadratic(TransposeBasis()),
+            ),
+            np.arange(7),
+        ),
+        LinearCostModel(Stratify(PigeonBasis(), 0, [2.0, 4.0]), np.arange(9)),
     ],
 )
 def test_nonlinear_loop_costs_are_additive_over_prefixes(cost):

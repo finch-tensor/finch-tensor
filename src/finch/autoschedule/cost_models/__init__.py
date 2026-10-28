@@ -3,8 +3,11 @@ from .cost_models import (
     ByKind,
     Concat,
     CostModel,
+    KNearest,
     LinearCostModel,
     Quadratic,
+    RowMap,
+    Stratify,
 )
 from .factorize_cost_models import (
     FLOPS_COST_MODEL,
@@ -41,6 +44,7 @@ __all__ = [
     "FactorizeBasis",
     "FlopsBasis",
     "FormatBasis",
+    "KNearest",
     "LevelBasis",
     "LevelChoice",
     "LevelOption",
@@ -49,7 +53,9 @@ __all__ = [
     "PigeonBasis",
     "Prefix",
     "Quadratic",
+    "RowMap",
     "SparseHashLevelOption",
     "Statement",
+    "Stratify",
     "TransposeBasis",
 ]

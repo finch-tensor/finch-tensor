@@ -5,6 +5,7 @@ from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike
+from scipy.optimize import nnls
 
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -27,11 +28,18 @@ class Basis(Form, Generic[C]):
     (n_rows, n_features), with one row for each independently modeled part of
     the component. Like a Stage, a Basis inherits the form of statements it
     accepts.
+
+    A basis also weights the ridge penalty on the square of each coefficient
+    of a linear model of it.
     """
 
     @property
     @abstractmethod
     def n_features(self) -> int: ...
+
+    @property
+    def ridge(self) -> np.ndarray:
+        return np.ones(self.n_features)
 
     @abstractmethod
     def components(
@@ -79,6 +87,10 @@ class Concat(Basis[C]):
     @property
     def n_features(self) -> int:
         return sum(basis.n_features for basis in self.bases)
+
+    @property
+    def ridge(self) -> np.ndarray:
+        return np.concatenate([basis.ridge for basis in self.bases])
 
     def validate_inputs(self, *inputs):
         for basis in self.bases:
@@ -137,18 +149,14 @@ class ByKind(Concat[C], Generic[C, K]):
         raise KeyError(kind)
 
 
-class Quadratic(Basis[C]):
+class RowMap(Basis[C]):
     """
-    The products of each pair of features of each row of a basis, flattened
-    row-major, so a linear model of them sums a quadratic form of each row.
+    A basis whose rows are a function, transform, of the rows of another
+    basis for the same components.
     """
 
     def __init__(self, basis: Basis[C]):
         self.basis = basis
-
-    @property
-    def n_features(self) -> int:
-        return self.basis.n_features**2
 
     def validate_inputs(self, *inputs):
         self.basis.validate_inputs(*inputs)
@@ -161,13 +169,103 @@ class Quadratic(Basis[C]):
     ) -> Iterator[C]:
         return self.basis.components(term, bindings, machine)
 
+    @abstractmethod
+    def transform(self, rows: np.ndarray) -> np.ndarray: ...
+
     def get_component_features(
         self,
         component: C,
         machine: StatsMachine[NS],
     ) -> np.ndarray:
-        rows = self.basis.get_component_features(component, machine)
+        return self.transform(self.basis.get_component_features(component, machine))
+
+
+class Quadratic(RowMap[C]):
+    """
+    The products of each pair of features of each row of a basis, flattened
+    row-major, so a linear model of them sums a quadratic form of each row.
+    """
+
+    @property
+    def n_features(self) -> int:
+        return self.basis.n_features**2
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
         return np.einsum("ij,ik->ijk", rows, rows).reshape(len(rows), -1)
+
+
+class KNearest(RowMap[C]):
+    """
+    The membership of each row of a basis in the neighborhoods of fixed
+    landmark rows: 1/k in the columns of the k landmarks nearest the row by
+    Euclidean distance, and zero elsewhere. A linear model of this basis is a
+    k nearest neighbors model whose coefficients are the costs of the
+    landmarks, so fitting it by least squares apportions the runtime of each
+    program among the landmarks its rows are nearest to. The landmarks are
+    usually rows of the basis from the programs the model is fitted to.
+    """
+
+    def __init__(self, basis: Basis[C], landmarks: ArrayLike, k: int = 1):
+        super().__init__(basis)
+        self.landmarks = np.asarray(landmarks, dtype=float).reshape(
+            -1, basis.n_features
+        )
+        if not 1 <= k <= len(self.landmarks):
+            raise ValueError(f"Expected 1 <= k <= {len(self.landmarks)}, got {k}")
+        self.k = k
+
+    @property
+    def n_features(self) -> int:
+        return len(self.landmarks)
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
+        distances = np.linalg.norm(rows[:, None] - self.landmarks[None], axis=2)
+        nearest = np.argsort(distances, axis=1, kind="stable")[:, : self.k]
+        features = np.zeros((len(rows), len(self.landmarks)))
+        np.put_along_axis(features, nearest, 1 / self.k, axis=1)
+        return features
+
+
+class Stratify(RowMap[C]):
+    """
+    The features of each row of a basis, in the block of columns of the
+    regime of the row, with zeros in the blocks of the other regimes. The
+    regime of a row is the number of thresholds its feature at index feature
+    meets or exceeds. A linear model of this basis has separate coefficients
+    for each regime, so a feature can cost differently once, say, the working
+    set exceeds a cache.
+    """
+
+    def __init__(self, basis: Basis[C], feature: int, thresholds: ArrayLike):
+        super().__init__(basis)
+        if not 0 <= feature < basis.n_features:
+            raise ValueError(
+                f"Expected 0 <= feature < {basis.n_features}, got {feature}"
+            )
+        self.feature = feature
+        self.thresholds = np.asarray(thresholds, dtype=float)
+        if self.thresholds.ndim != 1 or not np.all(np.diff(self.thresholds) > 0):
+            raise ValueError(f"Expected increasing thresholds, got {thresholds}")
+
+    @property
+    def n_regimes(self) -> int:
+        return len(self.thresholds) + 1
+
+    @property
+    def n_features(self) -> int:
+        return self.n_regimes * self.basis.n_features
+
+    @property
+    def ridge(self) -> np.ndarray:
+        return np.tile(self.basis.ridge, self.n_regimes)
+
+    def transform(self, rows: np.ndarray) -> np.ndarray:
+        n = self.basis.n_features
+        regime = np.searchsorted(self.thresholds, rows[:, self.feature], side="right")
+        columns = regime[:, None] * n + np.arange(n)
+        features = np.zeros((len(rows), self.n_features))
+        np.put_along_axis(features, columns, rows, axis=1)
+        return features
 
 
 class CostModel(Form, Generic[C]):
@@ -182,7 +280,9 @@ class CostModel(Form, Generic[C]):
 
     Runtimes are measured for whole programs rather than components, so fit
     takes the features of each program, as get_features returns them, with
-    its runtime, and returns a model fitted to all of them at once.
+    its runtime, and returns a model fitted to all of them at once, with
+    alpha scaling the ridge penalty of the basis. Fitted models predict
+    nonnegative row costs, as branch-and-bound searches require.
     """
 
     def __init__(self, basis: Basis[C]):
@@ -193,7 +293,10 @@ class CostModel(Form, Generic[C]):
 
     @abstractmethod
     def fit(
-        self, features: Sequence[np.ndarray], runtimes: Sequence[float]
+        self,
+        features: Sequence[np.ndarray],
+        runtimes: ArrayLike,
+        alpha: float = 0.0,
     ) -> Self: ...
 
     def validate_inputs(self, *inputs):
@@ -235,7 +338,9 @@ class CostModel(Form, Generic[C]):
 class LinearCostModel(CostModel[C]):
     """
     Weight the features of each row by coefficients, and sum over the rows.
-    fit finds the coefficients by least squares.
+    fit finds nonnegative coefficients by least squares, penalized by alpha
+    times the ridge weights of the basis. The coefficients are nonnegative so
+    that the costs of rows of nonnegative features are.
     """
 
     def __init__(self, basis: Basis[C], coefficients: ArrayLike):
@@ -250,7 +355,20 @@ class LinearCostModel(CostModel[C]):
     def predict(self, features: np.ndarray) -> float:
         return float(features.sum(axis=0) @ self.coefficients)
 
-    def fit(self, features: Sequence[np.ndarray], runtimes: Sequence[float]) -> Self:
-        design = np.stack([rows.sum(axis=0) for rows in features])
-        coefficients, *_ = np.linalg.lstsq(design, np.asarray(runtimes, dtype=float))
+    def fit(
+        self,
+        features: Sequence[np.ndarray],
+        runtimes: ArrayLike,
+        alpha: float = 0.0,
+    ) -> Self:
+        n = self.basis.n_features
+        # The ridge penalty is least squares against extra rows of zeros.
+        design = np.concatenate(
+            [
+                np.stack([rows.sum(axis=0) for rows in features]),
+                np.diag(np.sqrt(alpha * self.basis.ridge)),
+            ]
+        )
+        target = np.concatenate([np.asarray(runtimes, dtype=float), np.zeros(n)])
+        coefficients, _ = nnls(design, target)
         return type(self)(self.basis, coefficients)
