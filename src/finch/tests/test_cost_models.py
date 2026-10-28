@@ -128,18 +128,95 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
     np.testing.assert_allclose(fitted.coefficients, coefficients, atol=1e-9)
 
 
-def test_knearest_basis_averages_nearest_landmark_costs():
-    # A linear model of KNearest is k nearest neighbors over the landmarks.
-    basis = KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 0.0], [5.0, 5.0]], 2)
-    rows = np.array([[0.2, 0.0], [5.0, 4.0]])
-    np.testing.assert_allclose(
-        basis.transform(rows), [[0.5, 0.5, 0.0], [0.0, 0.5, 0.5]]
+def test_stratify_increasing_orders_regimes(rng):
+    basis = Stratify(TransposeBasis(), 0, [0.5], increasing=True)
+    np.testing.assert_array_equal(basis.constraints, [[-1, 0, 1, 0], [0, -1, 0, 1]])
+    np.testing.assert_array_equal(
+        Stratify(TransposeBasis(), 0, [0.3, 0.6], increasing=True).constraints,
+        [
+            [-1, 0, 1, 0, 0, 0],
+            [0, -1, 0, 1, 0, 0],
+            [0, 0, -1, 0, 1, 0],
+            [0, 0, 0, -1, 0, 1],
+        ],
     )
+    programs = random_programs(rng, 2)
+    features = [basis.transform(rows) for rows in programs]
+    design = np.stack([rows.sum(axis=0) for rows in features])
+    # Costs that rise with the regime are fitted exactly.
+    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, design @ [1, 2, 3, 2])
+    np.testing.assert_allclose(fitted.coefficients, [1, 2, 3, 2], atol=1e-7)
+    # Costs that fall with the regime are tied between the regimes.
+    runtimes = design @ [3.0, 2.0, 1.0, 2.0]
+    fitted = LinearCostModel(basis, np.zeros(4)).fit(features, runtimes)
+    assert fitted.coefficients[2] >= fitted.coefficients[0] - 1e-9
+    assert fitted.coefficients[2] == pytest.approx(fitted.coefficients[0])
+    assert fitted.coefficients[3] == pytest.approx(fitted.coefficients[1])
+
+
+def test_knearest_basis_interpolates_nearest_landmark_costs():
+    # A linear model of KNearest is k nearest neighbors over the landmarks,
+    # weighted by inverse distance.
+    basis = KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 0.0], [5.0, 5.0]], 2)
+    rows = np.array([[0.2, 0.0], [5.0, 4.0], [1.0, 0.0]])
+    far = 1 / np.sqrt(32)
+    expected = [
+        [0.8, 0.2, 0.0],
+        [0.0, far / (1 + far), 1 / (1 + far)],
+        [0.0, 1.0, 0.0],
+    ]
+    np.testing.assert_allclose(basis.transform(rows), expected)
     model = LinearCostModel(basis, [1.0, 3.0, 100.0])
-    assert model.predict(basis.transform(rows)) == 53.5
+    assert model.predict(basis.transform(rows)) == pytest.approx(
+        (np.asarray(expected) @ [1.0, 3.0, 100.0]).sum()
+    )
     assert basis.transform(np.empty((0, 2))).shape == (0, 3)
+    # Rows on several coincident landmarks share their weight.
+    tied = KNearest(TransposeBasis(), [[0.0, 0.0], [0.0, 0.0], [1.0, 1.0]], 3)
+    np.testing.assert_allclose(tied.transform(np.zeros((1, 2))), [[0.5, 0.5, 0.0]])
     with pytest.raises(ValueError, match="Expected 1 <= k <= 3"):
         KNearest(TransposeBasis(), np.zeros((3, 2)), 4)
+
+
+class Increasing(RowMap):
+    """The rows of a basis, with nondecreasing coefficients."""
+
+    @property
+    def n_features(self):
+        return self.basis.n_features
+
+    @property
+    def constraints(self):
+        return np.diff(np.eye(self.n_features), axis=0)
+
+    def transform(self, rows):
+        return rows
+
+
+def test_constraints_compose_and_bind_fit(rng):
+    basis = Concat(PigeonBasis(), Increasing(TransposeBasis()))
+    np.testing.assert_array_equal(basis.constraints, [[0, 0, 0, -1, 1]])
+    assert PigeonBasis().constraints.shape == (0, 3)
+    np.testing.assert_array_equal(
+        Stratify(Increasing(TransposeBasis()), 0, [0.5]).constraints,
+        [[-1, 1, 0, 0], [0, 0, -1, 1]],
+    )
+    programs = random_programs(rng, 5)
+    design = np.stack([rows.sum(axis=0) for rows in programs])
+    # The true coefficients of the constrained block decrease, so the fit can
+    # do no better than equal coefficients there, and no worse either.
+    runtimes = design @ [1.0, 2.0, 3.0, 5.0, 1.0]
+    loss = lambda c: np.sum((design @ c - runtimes) ** 2)  # noqa: E731
+    fitted = LinearCostModel(basis, np.zeros(5)).fit(programs, runtimes)
+    assert fitted.coefficients[4] - fitted.coefficients[3] >= -1e-9
+    assert fitted.coefficients.min() >= 0
+    tied = nnls(np.column_stack([design[:, :3], design[:, 3:].sum(axis=1)]), runtimes)[
+        0
+    ]
+    assert loss(fitted.coefficients) == pytest.approx(
+        loss(np.repeat(tied, [1, 1, 1, 2]))
+    )
+    assert loss(nnls(design, runtimes)[0]) < loss(fitted.coefficients)
 
 
 def test_knearest_fit_apportions_program_runtimes(rng):

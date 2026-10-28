@@ -5,7 +5,8 @@ from typing import Any, Generic, Self, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike
-from scipy.optimize import nnls
+from scipy.linalg import block_diag
+from scipy.optimize import LinearConstraint, minimize, nnls
 
 from finch.autoschedule.tensor_stats.numeric_stats import NumericStats
 from finch.autoschedule.tensor_stats.stats_interpreter import StatsMachine
@@ -29,8 +30,9 @@ class Basis(Form, Generic[C]):
     the component. Like a Stage, a Basis inherits the form of statements it
     accepts.
 
-    A basis also weights the ridge penalty on the square of each coefficient
-    of a linear model of it.
+    A basis also describes the coefficients of a linear model of it: ridge
+    weights the penalty on the square of each coefficient, and constraints is
+    a matrix whose product with the coefficients must be nonnegative.
     """
 
     @property
@@ -40,6 +42,10 @@ class Basis(Form, Generic[C]):
     @property
     def ridge(self) -> np.ndarray:
         return np.ones(self.n_features)
+
+    @property
+    def constraints(self) -> np.ndarray:
+        return np.empty((0, self.n_features))
 
     @abstractmethod
     def components(
@@ -91,6 +97,10 @@ class Concat(Basis[C]):
     @property
     def ridge(self) -> np.ndarray:
         return np.concatenate([basis.ridge for basis in self.bases])
+
+    @property
+    def constraints(self) -> np.ndarray:
+        return block_diag(*[basis.constraints for basis in self.bases])
 
     def validate_inputs(self, *inputs):
         for basis in self.bases:
@@ -196,13 +206,15 @@ class Quadratic(RowMap[C]):
 
 class KNearest(RowMap[C]):
     """
-    The membership of each row of a basis in the neighborhoods of fixed
-    landmark rows: 1/k in the columns of the k landmarks nearest the row by
-    Euclidean distance, and zero elsewhere. A linear model of this basis is a
-    k nearest neighbors model whose coefficients are the costs of the
-    landmarks, so fitting it by least squares apportions the runtime of each
-    program among the landmarks its rows are nearest to. The landmarks are
-    usually rows of the basis from the programs the model is fitted to.
+    The weights of the k landmark rows nearest each row of a basis by
+    Euclidean distance, in the columns of those landmarks, and zero
+    elsewhere. The weights are inversely proportional to distance and sum to
+    one, so a row on a landmark takes all of its weight. A linear model of
+    this basis is a k nearest neighbors model whose coefficients are the
+    costs of the landmarks, so fitting it by least squares apportions the
+    runtime of each program among the landmarks its rows are near. The
+    landmarks are usually rows of the basis from the programs the model is
+    fitted to.
     """
 
     def __init__(self, basis: Basis[C], landmarks: ArrayLike, k: int = 1):
@@ -221,8 +233,17 @@ class KNearest(RowMap[C]):
     def transform(self, rows: np.ndarray) -> np.ndarray:
         distances = np.linalg.norm(rows[:, None] - self.landmarks[None], axis=2)
         nearest = np.argsort(distances, axis=1, kind="stable")[:, : self.k]
+        distances = np.take_along_axis(distances, nearest, axis=1)
+        # Rows on a landmark weight the landmarks at distance zero equally.
+        on_landmark = distances == 0
+        weights = np.where(
+            on_landmark.any(axis=1, keepdims=True),
+            on_landmark,
+            1 / np.where(on_landmark, 1, distances),
+        )
+        weights = weights / weights.sum(axis=1, keepdims=True)
         features = np.zeros((len(rows), len(self.landmarks)))
-        np.put_along_axis(features, nearest, 1 / self.k, axis=1)
+        np.put_along_axis(features, nearest, weights, axis=1)
         return features
 
 
@@ -233,10 +254,17 @@ class Stratify(RowMap[C]):
     regime of a row is the number of thresholds its feature at index feature
     meets or exceeds. A linear model of this basis has separate coefficients
     for each regime, so a feature can cost differently once, say, the working
-    set exceeds a cache.
+    set exceeds a cache. increasing constrains each coefficient to be
+    nondecreasing from each regime to the next.
     """
 
-    def __init__(self, basis: Basis[C], feature: int, thresholds: ArrayLike):
+    def __init__(
+        self,
+        basis: Basis[C],
+        feature: int,
+        thresholds: ArrayLike,
+        increasing: bool = False,
+    ):
         super().__init__(basis)
         if not 0 <= feature < basis.n_features:
             raise ValueError(
@@ -246,6 +274,7 @@ class Stratify(RowMap[C]):
         self.thresholds = np.asarray(thresholds, dtype=float)
         if self.thresholds.ndim != 1 or not np.all(np.diff(self.thresholds) > 0):
             raise ValueError(f"Expected increasing thresholds, got {thresholds}")
+        self.increasing = increasing
 
     @property
     def n_regimes(self) -> int:
@@ -258,6 +287,16 @@ class Stratify(RowMap[C]):
     @property
     def ridge(self) -> np.ndarray:
         return np.tile(self.basis.ridge, self.n_regimes)
+
+    @property
+    def constraints(self) -> np.ndarray:
+        constraints = block_diag(*[self.basis.constraints] * self.n_regimes)
+        if not self.increasing:
+            return constraints
+        steps = np.diff(np.eye(self.n_regimes), axis=0)
+        return np.concatenate(
+            [constraints, np.kron(steps, np.eye(self.basis.n_features))]
+        )
 
     def transform(self, rows: np.ndarray) -> np.ndarray:
         n = self.basis.n_features
@@ -339,8 +378,9 @@ class LinearCostModel(CostModel[C]):
     """
     Weight the features of each row by coefficients, and sum over the rows.
     fit finds nonnegative coefficients by least squares, penalized by alpha
-    times the ridge weights of the basis. The coefficients are nonnegative so
-    that the costs of rows of nonnegative features are.
+    times the ridge weights of the basis and subject to its constraints. The
+    coefficients are nonnegative so that the costs of rows of nonnegative
+    features are.
     """
 
     def __init__(self, basis: Basis[C], coefficients: ArrayLike):
@@ -370,5 +410,20 @@ class LinearCostModel(CostModel[C]):
             ]
         )
         target = np.concatenate([np.asarray(runtimes, dtype=float), np.zeros(n)])
-        coefficients, _ = nnls(design, target)
-        return type(self)(self.basis, coefficients)
+        constraints = self.basis.constraints
+        if not len(constraints):
+            coefficients, _ = nnls(design, target)
+            return type(self)(self.basis, coefficients)
+        result = minimize(
+            lambda c: 0.5 * np.sum((design @ c - target) ** 2),
+            np.zeros(n),
+            jac=lambda c: design.T @ (design @ c - target),
+            method="SLSQP",
+            constraints=[
+                LinearConstraint(np.concatenate([constraints, np.eye(n)]), 0, np.inf)
+            ],
+            options={"ftol": 1e-12, "maxiter": 1000},
+        )
+        if not result.success:
+            raise ValueError(f"Constrained fit failed: {result.message}")
+        return type(self)(self.basis, np.maximum(result.x, 0))
