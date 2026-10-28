@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections.abc import Callable, Hashable, Iterator, Mapping, Sequence
 from operator import attrgetter
-from typing import Any, Generic, Self, TypeVar
+from typing import Any, ClassVar, Generic, Self, TypeVar
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -14,11 +14,41 @@ from finch.finch_logic import Alias, LogicStatement, StatsFactory, TensorStats
 from finch.symbolic import Form
 
 NS = TypeVar("NS", bound=NumericStats)
+by_kind = attrgetter("kind")
 C = TypeVar("C")
 K = TypeVar("K", bound=Hashable)
 
 
-class Basis(Form, Generic[C]):
+class Serializable:
+    """
+    An object that to_json describes as a JSON-compatible dict with its type
+    name, which from_json reads back. Subclasses with state extend to_json and
+    override _from_json, which by default constructs the type with no
+    arguments.
+    """
+
+    registry: ClassVar[dict[str, type]] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        Serializable.registry[cls.__name__] = cls
+
+    def to_json(self) -> dict[str, Any]:
+        return {"type": type(self).__name__}
+
+    @classmethod
+    def from_json(cls, data: Mapping[str, Any]) -> Self:
+        subclass = Serializable.registry[data["type"]]
+        if not issubclass(subclass, cls):
+            raise ValueError(f"Expected a {cls.__name__}, got {data['type']}")
+        return subclass._from_json(data)
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls()
+
+
+class Basis(Serializable, Form, Generic[C]):
     """
     A basis describes a logic statement by the features of its components,
     such as queries, loop prefixes, or tensor levels. Each stage decomposes
@@ -106,6 +136,13 @@ class Concat(Basis[C]):
         for basis in self.bases:
             basis.validate_inputs(*inputs)
 
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "bases": [b.to_json() for b in self.bases]}
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(*[Basis.from_json(b) for b in data["bases"]])
+
     def components(
         self,
         term: LogicStatement,
@@ -136,11 +173,28 @@ class ByKind(Concat[C], Generic[C, K]):
     def __init__(
         self,
         bases: Mapping[K, Basis[C]],
-        key: Callable[[C], K] = attrgetter("kind"),
+        key: Callable[[C], K] = by_kind,
     ):
         super().__init__(*bases.values())
         self.by_kind = dict(bases)
         self.key = key
+
+    def to_json(self) -> dict[str, Any]:
+        if self.key is not by_kind or not all(
+            isinstance(kind, str) for kind in self.by_kind
+        ):
+            raise ValueError(
+                f"{type(self).__name__} serializes only string kinds "
+                "with the default key"
+            )
+        return {
+            "type": type(self).__name__,
+            "bases": {kind: basis.to_json() for kind, basis in self.by_kind.items()},
+        }
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls({kind: Basis.from_json(b) for kind, b in data["bases"].items()})
 
     def get_component_features(
         self,
@@ -181,6 +235,13 @@ class RowMap(Basis[C]):
 
     @abstractmethod
     def transform(self, rows: np.ndarray) -> np.ndarray: ...
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "basis": self.basis.to_json()}
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(Basis.from_json(data["basis"]))
 
     def get_component_features(
         self,
@@ -229,6 +290,13 @@ class KNearest(RowMap[C]):
     @property
     def n_features(self) -> int:
         return len(self.landmarks)
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "landmarks": self.landmarks.tolist(), "k": self.k}
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(Basis.from_json(data["basis"]), data["landmarks"], data["k"])
 
     def transform(self, rows: np.ndarray) -> np.ndarray:
         distances = np.linalg.norm(rows[:, None] - self.landmarks[None], axis=2)
@@ -280,6 +348,23 @@ class Stratify(RowMap[C]):
     def n_regimes(self) -> int:
         return len(self.thresholds) + 1
 
+    def to_json(self) -> dict[str, Any]:
+        return {
+            **super().to_json(),
+            "feature": self.feature,
+            "thresholds": self.thresholds.tolist(),
+            "increasing": self.increasing,
+        }
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(
+            Basis.from_json(data["basis"]),
+            data["feature"],
+            data["thresholds"],
+            data["increasing"],
+        )
+
     @property
     def n_features(self) -> int:
         return self.n_regimes * self.basis.n_features
@@ -307,7 +392,7 @@ class Stratify(RowMap[C]):
         return features
 
 
-class CostModel(Form, Generic[C]):
+class CostModel(Serializable, Form, Generic[C]):
     """
     A cost model predicts the cost of a logic statement from the features its
     basis gives the components of the statement. predict takes the features
@@ -326,6 +411,9 @@ class CostModel(Form, Generic[C]):
 
     def __init__(self, basis: Basis[C]):
         self.basis = basis
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "basis": self.basis.to_json()}
 
     @abstractmethod
     def predict(self, features: np.ndarray) -> float: ...
@@ -394,6 +482,13 @@ class LinearCostModel(CostModel[C]):
 
     def predict(self, features: np.ndarray) -> float:
         return float(features.sum(axis=0) @ self.coefficients)
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "coefficients": self.coefficients.tolist()}
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(Basis.from_json(data["basis"]), data["coefficients"])
 
     def fit(
         self,

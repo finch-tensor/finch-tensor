@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
 import numpy as np
 
@@ -109,6 +109,12 @@ class LevelOption(ABC):
 
     kind: ClassVar[str]
     n_features: ClassVar[int]
+    kinds: ClassVar[dict[str, type["LevelOption"]]] = {}
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if "kind" in cls.__dict__:
+            LevelOption.kinds[cls.kind] = cls
 
     @abstractmethod
     def next_num_pos(
@@ -253,6 +259,13 @@ class LevelBasis(FormatBasis, LoopOrderedForm):
     @property
     def n_features(self) -> int:
         return self.option_type.n_features + 4
+
+    def to_json(self) -> dict[str, Any]:
+        return {**super().to_json(), "option": self.option_type.kind}
+
+    @classmethod
+    def _from_json(cls, data: Mapping[str, Any]) -> Self:
+        return cls(LevelOption.kinds[data["option"]])
 
     def get_access_features(
         self,

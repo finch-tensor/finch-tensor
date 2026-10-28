@@ -7,6 +7,7 @@ from .cost_models import (
     LinearCostModel,
     Quadratic,
     RowMap,
+    Serializable,
     Stratify,
 )
 from .factorize_cost_models import (
@@ -54,6 +55,7 @@ __all__ = [
     "Prefix",
     "Quadratic",
     "RowMap",
+    "Serializable",
     "SparseHashLevelOption",
     "Statement",
     "Stratify",

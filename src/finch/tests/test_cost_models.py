@@ -1,4 +1,5 @@
 import itertools
+import json
 
 import pytest
 
@@ -14,13 +15,17 @@ from finch.autoschedule.cost_models import (
     LOOP_COST_MODEL,
     ByKind,
     Concat,
+    CostModel,
+    DenseLevelOption,
     FlopsBasis,
     KNearest,
+    LevelBasis,
     LinearCostModel,
     PigeonBasis,
     Prefix,
     Quadratic,
     RowMap,
+    SparseHashLevelOption,
     Statement,
     Stratify,
     TransposeBasis,
@@ -126,6 +131,52 @@ def test_stratify_fits_separate_coefficients_per_regime(rng):
     runtimes = [rows.sum(axis=0) @ coefficients for rows in features]
     fitted = LinearCostModel(basis, np.zeros(4)).fit(features, runtimes)
     np.testing.assert_allclose(fitted.coefficients, coefficients, atol=1e-9)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        FLOPS_COST_MODEL,
+        LOOP_COST_MODEL,
+        LinearCostModel(
+            Concat(
+                Stratify(Quadratic(PigeonBasis()), 0, [2.0, 4.0], increasing=True),
+                KNearest(TransposeBasis(), [[0.0, 0.0], [1.0, 2.0]], 2),
+            ),
+            np.arange(29),
+        ),
+        LinearCostModel(
+            ByKind(
+                {
+                    "dense": LevelBasis(DenseLevelOption),
+                    "sparse_hash": LevelBasis(SparseHashLevelOption),
+                }
+            ),
+            np.arange(14),
+        ),
+    ],
+)
+def test_models_round_trip_through_json(rng, model):
+    data = json.loads(json.dumps(model.to_json()))
+    restored = CostModel.from_json(data)
+    assert type(restored) is type(model)
+    assert restored.to_json() == model.to_json()
+    for rows in random_programs(rng, model.basis.n_features, 3):
+        assert restored.predict(rows) == model.predict(rows)
+    assert type(restored.basis) is type(model.basis)
+    assert restored.basis.n_features == model.basis.n_features
+    np.testing.assert_array_equal(restored.basis.ridge, model.basis.ridge)
+    np.testing.assert_array_equal(restored.basis.constraints, model.basis.constraints)
+
+
+def test_json_rejects_wrong_types_and_custom_keys():
+    with pytest.raises(ValueError, match="Expected a CostModel, got PigeonBasis"):
+        CostModel.from_json(PigeonBasis().to_json())
+    with pytest.raises(KeyError):
+        PigeonBasis.from_json({"type": "NoSuchBasis"})
+    custom = ByKind({"a": PigeonBasis()}, key=lambda c: "a")
+    with pytest.raises(ValueError, match="default key"):
+        custom.to_json()
 
 
 def test_stratify_increasing_orders_regimes(rng):
