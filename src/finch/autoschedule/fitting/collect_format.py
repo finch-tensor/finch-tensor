@@ -5,20 +5,30 @@ into C. Their fields cover each region of the Venn diagram of the fields of A,
 B, and C which lies in A or B, since nothing would give a field of C alone an
 extent. The layouts of all tensors follow one drawn order of the fields, and
 each query has its own drawn loop order. The formats of w and C, and the
-extents, densities, and dtype of the inputs are drawn too. Each program is
-compiled by Finch.jl with those formats, its format features are recorded,
-and its runtime is measured. A LinearCostModel of the formatter's basis is
-then fitted to all of them.
+extents, densities, and dtype of the inputs are drawn too.
+
+The script runs in three steps, which share a directory. generate draws the
+programs, writing each as JSON and its inputs as binsparse. time compiles each
+program with Finch.jl and its formats, records its format features, measures
+its runtime, and writes both as JSON. fit fits a LinearCostModel of the
+formatter's basis to all the timings.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.collect_format \
-        [examples] [model.json]
+        generate DIR [--examples N] [--lg-max-space N] [--lg-max-dim N] [--seed S]
+    pixi run -e test-julia python -m finch.autoschedule.fitting.collect_format \
+        time DIR [--repeat N]
+    pixi run -e test-julia python -m finch.autoschedule.fitting.collect_format \
+        fit DIR [model.json]
 """
 
+import argparse
 import json
-import sys
 import timeit
+from pathlib import Path
 
 import numpy as np
+
+import binsparse as bsp
 
 import finch as fl
 from finch import ffuncs
@@ -56,6 +66,8 @@ from finch.finch_logic import (
 from finch.tensor import element, fiber_tensor
 
 A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
+OPS = {"add": ffuncs.add, "mul": ffuncs.mul}
+OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 BASIS = ByKind(
     {
         option.kind: LevelBasis(type(option))
@@ -197,75 +209,119 @@ def rmat(S, lg_shape, density, rng):
     )
 
 
-def program(rng):
-    op = choose(rng, [ffuncs.add, ffuncs.mul])
+def program(rng, lg_max_space, lg_max_dim):
+    """A random program, as the JSON which build turns into a plan."""
     # Each region of the Venn diagram of the indices of A, B, and C has one
     # field or none: i is only in A, j only in B, k in A and C, l in B and C,
-    # m in A and B, and n in all three.
-    i, j, k, l, m, n = (  # noqa: E741
-        choose(rng, [(Field(name),), ()]) for name in "ijklmn"
-    )
-    idxs = (*i, *j, *k, *l, *m, *n)
+    # m in A and B, and n in all three. Every field has 2 ** lg_dims values,
+    # and all of them together address at most 2 ** lg_max_space entries.
     while True:
-        lg_dims = {idx: int(rng.integers(1, 10)) for idx in idxs}
-        if sum(lg_dims.values()) < 18:
+        names = [name for name in "ijklmn" if rng.random() < 0.5]
+        lg_dims = {name: int(rng.integers(1, lg_max_dim + 1)) for name in names}
+        if sum(lg_dims.values()) <= lg_max_space:
             break
-    idx_perm = shuffled(rng, idxs)
+    order = shuffled(rng, names)
+    w_names = with_subsequence(order, "kln")
+    nfused = int(rng.integers(0, len(w_names) + 1))
+    return {
+        "op": choose(rng, list(OPS)),
+        "order": order,
+        "lg_dims": lg_dims,
+        "nfused": nfused,
+        "reduce_order": shuffled(
+            rng, (*w_names[nfused:], *with_subsequence(order, "ijm"))
+        ),
+        "copy_order": shuffled(rng, w_names[nfused:]),
+        "formats": {
+            name: [choose(rng, list(OPTIONS)) for _ in range(ndim)]
+            for name, ndim in (("w", len(w_names) - nfused), ("C", len(w_names)))
+        },
+        "dtype": choose(rng, ["float32", "float64"]),
+    }
 
-    C_idxs = with_subsequence(idx_perm, (*k, *l, *n))
-    A_idxs = with_subsequence(idx_perm, (*i, *k, *m, *n))
-    B_idxs = with_subsequence(idx_perm, (*j, *l, *m, *n))
-    w_idxs = with_subsequence(idx_perm, (*k, *l, *n))
 
-    reduced = with_subsequence(idx_perm, (*i, *j, *m))
+def build(prgm) -> tuple[Plan, dict[Alias, list[LevelOption]]]:
+    """The plan of a program, and the formats of its w and C."""
+    A_idxs, B_idxs, C_idxs, w_idxs, reduced = (
+        tuple(Field(name) for name in with_subsequence(prgm["order"], names))
+        for names in ("ikmn", "jlmn", "kln", "kln", "ijm")
+    )
     # w is fused along its leading fields, which become the outer loops of
     # both queries, so it stores a slice of its other fields for each of them.
-    nfused = int(rng.integers(0, len(w_idxs) + 1))
+    nfused = prgm["nfused"]
     fused = w_idxs[:nfused]
     view = FusedAlias(w, nfused) if nfused else w
 
-    product = MapJoin(Literal(op), (Table(A, A_idxs), Table(B, B_idxs)))
+    product = MapJoin(Literal(OPS[prgm["op"]]), (Table(A, A_idxs), Table(B, B_idxs)))
     reduce = Query(
         Table(view, w_idxs),
         Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
     )
     copy = Query(Table(C, C_idxs), Table(view, w_idxs))
-    reduce_order = shuffled(rng, (*w_idxs[nfused:], *reduced))
-    copy_order = shuffled(rng, with_subsequence(C_idxs, set(C_idxs) - set(fused)))
+    reduce_order = tuple(Field(name) for name in prgm["reduce_order"])
+    copy_order = tuple(Field(name) for name in prgm["copy_order"])
     body = Plan(
         (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
     )
     plan = flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
-
-    stored = ((w, len(w_idxs) - nfused), (C, len(C_idxs)))
     formats: dict[Alias, list[LevelOption]] = {
-        tns: [choose(rng, LEVEL_OPTIONS) for _ in range(ndim)] for tns, ndim in stored
+        tns: [OPTIONS[kind] for kind in prgm["formats"][tns.name]] for tns in (w, C)
     }
+    return plan, formats
 
+
+def inputs(rng, prgm) -> dict[str, bsp.CustomTensor]:
+    """Binsparse COO tensors A and B for a program, drawn from R-MAT seeds."""
+    order, lg_dims = prgm["order"], prgm["lg_dims"]
     lg_A, lg_B, lg_C, lg_red, lg_m = (
-        sum(lg_dims[idx] for idx in f) for f in (A_idxs, B_idxs, C_idxs, reduced, m)
+        sum(lg_dims.get(name, 0) for name in names)
+        for names in ("ikmn", "jlmn", "kln", "ijm", "m")
     )
     (p_A, S_A), (p_B, S_B) = seeds(rng, lg_A, lg_B, lg_C, lg_red, lg_m)
-    dtype = choose(rng, [np.float32, np.float64])
-    bindings = {}
+    dtype = np.dtype(prgm["dtype"])
+    tensors = {}
     # The seeds skew A[k, m] B[m, l], and leave i, j, and n unskewed.
-    for tns, tns_idxs, p, S, (x, y) in (
-        (A, A_idxs, p_A, S_A, (k, m)),
-        (B, B_idxs, p_B, S_B, (m, l)),
+    for tns, names, p, S, xy in (
+        ("A", "ikmn", p_A, S_A, "km"),
+        ("B", "jlmn", p_B, S_B, "ml"),
     ):
-        axes = [*x, *y]
-        S = S.sum(axis=tuple(ax for ax, f in enumerate((x, y)) if not f))
-        for idx in tns_idxs:
+        idxs = with_subsequence(order, names)
+        axes = [idx for idx in xy if idx in lg_dims]
+        S = S.sum(axis=tuple(ax for ax, idx in enumerate(xy) if idx not in lg_dims))
+        for idx in idxs:
             if idx not in axes:
                 S = np.multiply.outer(S, [0.5, 0.5])
                 axes.append(idx)
-        S = np.transpose(S, [axes.index(idx) for idx in tns_idxs])
-        lg_shape = tuple(lg_dims[idx] for idx in tns_idxs)
-        data = np.zeros(tuple(2**lg for lg in lg_shape), dtype=dtype)
+        S = np.transpose(S, [axes.index(idx) for idx in idxs])
+        lg_shape = tuple(lg_dims[idx] for idx in idxs)
         coords = rmat(S, lg_shape, p, rng)
-        data[coords] = rng.random(data[coords].shape)
-        bindings[tns] = fl.asarray(data)
-    return plan, formats, bindings
+        tensors[tns] = coo(rng, coords, tuple(2**lg for lg in lg_shape), dtype)
+    return tensors
+
+
+def coo(rng, coords, shape, dtype) -> bsp.CustomTensor:
+    """A binsparse COO tensor of random values at coords, merging duplicates."""
+    if shape:
+        flat = np.unique(np.ravel_multi_index(coords, shape))
+        values = rng.random(flat.size).astype(dtype)
+        indices = np.unravel_index(flat, shape)
+        level = bsp.SparseLevel(len(shape), bsp.ElementLevel(values), indices)
+    else:
+        values = rng.random(1).astype(dtype)
+        level = bsp.ElementLevel(values)
+    return bsp.CustomTensor(shape, values.size, True, dtype.type(0), level)
+
+
+def dense(tensor: bsp.BinsparseTensor) -> np.ndarray:
+    """Allocates an array of the shape of a coo tensor and copies it in."""
+    match tensor.level:
+        case bsp.ElementLevel(values=values):
+            return values.reshape(())
+        case bsp.SparseLevel(level=bsp.ElementLevel(values=values), indices=indices):
+            out = np.zeros(tensor.shape, dtype=values.dtype)
+            out[indices] = values
+            return out
+    raise ValueError(f"expected a binsparse COO tensor, got {tensor}")
 
 
 def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
@@ -278,21 +334,39 @@ def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
     return formatter.features, min(runs)
 
 
-def collect(examples: int) -> tuple[list[np.ndarray], list[float]]:
-    rng = np.random.default_rng()
-    features: list[np.ndarray] = []
-    runtimes: list[float] = []
-    for _ in range(examples):
-        rows, runtime = measure(*program(rng))
-        features.append(rows)
-        runtimes.append(runtime)
-        print(f"{len(runtimes)}: {runtime:.2e}s", flush=True)
-    return features, runtimes
+def generate(directory: Path, examples, lg_max_space, lg_max_dim, rng) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    for example in range(examples):
+        prgm = program(rng, lg_max_space, lg_max_dim)
+        (directory / f"{example:05d}.program.json").write_text(json.dumps(prgm))
+        for tns, tensor in inputs(rng, prgm).items():
+            bsp.save_binsparse(tensor, directory / f"{example:05d}.{tns}.bsp.npz")
 
 
-def main() -> None:
-    examples = int(sys.argv[1]) if len(sys.argv) > 1 else 20
-    features, runtimes = collect(examples)
+def time_programs(directory: Path, repeat) -> None:
+    for path in sorted(directory.glob("*.program.json")):
+        example = path.name.removesuffix(".program.json")
+        plan, formats = build(json.loads(path.read_text()))
+        bindings = {
+            tns: fl.asarray(
+                dense(bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz"))
+            )
+            for tns in (A, B)
+        }
+        features, runtime = measure(plan, formats, bindings, repeat)
+        timing = {"features": features.tolist(), "runtime": runtime}
+        (directory / f"{example}.timing.json").write_text(json.dumps(timing))
+        print(f"{example}: {runtime:.2e}s", flush=True)
+
+
+def fit(directory: Path, output: Path | None) -> None:
+    timings = [
+        json.loads(path.read_text()) for path in sorted(directory.glob("*.timing.json"))
+    ]
+    features = [
+        np.array(timing["features"]).reshape(-1, BASIS.n_features) for timing in timings
+    ]
+    runtimes = [timing["runtime"] for timing in timings]
     model = LinearCostModel(BASIS, np.zeros(BASIS.n_features)).fit(features, runtimes)
     start = 0
     for kind, basis in BASIS.by_kind.items():
@@ -302,9 +376,48 @@ def main() -> None:
     predicted = np.array([model.predict(rows) for rows in features])
     error = np.abs(predicted - runtimes) / np.asarray(runtimes)
     print(f"median relative error {np.median(error):.2f}")
-    if len(sys.argv) > 2:
-        with open(sys.argv[2], "w") as file:
-            json.dump(model.to_json(), file, indent=2)
+    if output is not None:
+        output.write_text(json.dumps(model.to_json(), indent=2))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    steps = parser.add_subparsers(dest="step", required=True)
+    step = steps.add_parser("generate", help="draw programs and their inputs")
+    step.add_argument("directory", type=Path)
+    step.add_argument("--examples", type=int, default=20)
+    step.add_argument(
+        "--lg-max-space",
+        type=int,
+        default=17,
+        help="log2 of the most entries all the fields of a program may address",
+    )
+    step.add_argument(
+        "--lg-max-dim",
+        type=int,
+        default=9,
+        help="log2 of the most values of any one field",
+    )
+    step.add_argument("--seed", type=int)
+    step = steps.add_parser("time", help="time the programs in a directory")
+    step.add_argument("directory", type=Path)
+    step.add_argument("--repeat", type=int, default=5)
+    step = steps.add_parser("fit", help="fit the cost model to the timings")
+    step.add_argument("directory", type=Path)
+    step.add_argument("model", type=Path, nargs="?")
+    args = parser.parse_args()
+    match args.step:
+        case "generate":
+            rng = np.random.default_rng(args.seed)
+            generate(
+                args.directory, args.examples, args.lg_max_space, args.lg_max_dim, rng
+            )
+        case "time":
+            time_programs(args.directory, args.repeat)
+        case "fit":
+            fit(args.directory, args.model)
 
 
 if __name__ == "__main__":
