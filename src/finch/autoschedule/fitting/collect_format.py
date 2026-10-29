@@ -1,5 +1,5 @@
 """
-Fit the formatter's cost model from measured programs. Hypothesis draws
+Fit the formatter's cost model from measured programs. We draw random
 programs which reduce a map of inputs A and B into a workspace w and copy w
 into C. Their fields cover each region of the Venn diagram of the fields of A,
 B, and C which lies in A or B, since nothing would give a field of C alone an
@@ -19,9 +19,6 @@ import sys
 import timeit
 
 import numpy as np
-
-from hypothesis import HealthCheck, Phase, assume, given, settings
-from hypothesis import strategies as st
 
 import finch as fl
 from finch import ffuncs
@@ -116,17 +113,22 @@ def interaction_range(s_x, s_y):
     return abs(s_x + s_y) - 1, 1 - abs(s_x - s_y)
 
 
-@st.composite
-def interactions(draw, base, scale, align, r_range):
+def choose(rng, options):
+    return options[rng.integers(len(options))]
+
+
+def shuffled(rng, items):
+    return tuple(items[p] for p in rng.permutation(len(items)))
+
+
+def interaction(rng, base, scale, align, r_range):
     """Draws a skew (base + scale * r) / (1 + align) of C and solves for r."""
-    lo, hi = sorted((base + scale * r) / (1 + align) for r in r_range)
-    s = draw(st.floats(lo, hi))
+    s = rng.uniform(*sorted((base + scale * r) / (1 + align) for r in r_range))
     # Clipping only absorbs rounding, which dividing by a small scale amplifies.
     return np.clip(((1 + align) * s - base) / scale, *r_range)
 
 
-@st.composite
-def seeds(draw, lg_A, lg_B, lg_C, lg_red, lg_k):
+def seeds(rng, lg_A, lg_B, lg_C, lg_red, lg_k):
     # R-MAT seeds and densities for A[i, k] and B[k, j], whose product sums
     # over k into C[i, j]. A, B, and C may have other fields, which the seeds
     # leave unskewed, so lg_A, lg_B, and lg_C are the bits of their whole
@@ -152,23 +154,24 @@ def seeds(draw, lg_A, lg_B, lg_C, lg_red, lg_k):
     # interaction keeps S nonnegative when it lies in
     # [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw s_Ci and s_Cj from the images
     # of those intervals and solve for r_Aik and r_Bkj.
-    lg_pA = draw(st.floats(-lg_A, 0))
-    lg_pB = draw(st.floats(-lg_B, 0))
-    if lg_k:
-        # A batch field can leave too few products for one nonzero of C.
+    # A batch field can leave too few products for one nonzero of C, so
+    # redraw p_A and p_B until there are enough.
+    while True:
+        lg_pA, lg_pB = rng.uniform(-lg_A, 0), rng.uniform(-lg_B, 0)
         lg_max = min(0, lg_pA + lg_pB + lg_red + lg_k)
-        assume(-lg_C <= lg_max)
-        lg_pC = draw(st.floats(-lg_C, lg_max))
+        if not lg_k or -lg_C <= lg_max:
+            break
+    if lg_k:
+        lg_pC = rng.uniform(-lg_C, lg_max)
         align = 2 ** ((lg_pC - lg_pA - lg_pB - lg_red) / lg_k) - 1
     else:
         # Without levels of k, p_C = p_A p_B 2 ** lg_red whatever align is.
-        align = draw(st.floats(-1, 1))
-    assume(0 < abs(align) < 1)
-    s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
-    s_Ak = np.copysign(draw(st.floats(abs(align), 1)), align)
+        align = rng.uniform(-1, 1)
+    s_Ai, s_Bj = rng.uniform(-1, 1, 2)
+    s_Ak = np.copysign(rng.uniform(abs(align), 1), align)
     s_Bk = align / s_Ak
-    r_Aik = draw(interactions(s_Ai, s_Bk, align, interaction_range(s_Ai, s_Ak)))
-    r_Bkj = draw(interactions(s_Bj, s_Ak, align, interaction_range(s_Bk, s_Bj)))
+    r_Aik = interaction(rng, s_Ai, s_Bk, align, interaction_range(s_Ai, s_Ak))
+    r_Bkj = interaction(rng, s_Bj, s_Ak, align, interaction_range(s_Bk, s_Bj))
     return (
         (2**lg_pA, seed(s_Ai, s_Ak, r_Aik)),
         (2**lg_pB, seed(s_Bk, s_Bj, r_Bkj)),
@@ -194,19 +197,20 @@ def rmat(S, lg_shape, density, rng):
     )
 
 
-@st.composite
-def programs(draw):
-    op = draw(st.sampled_from([ffuncs.add, ffuncs.mul]))
+def program(rng):
+    op = choose(rng, [ffuncs.add, ffuncs.mul])
     # Each region of the Venn diagram of the indices of A, B, and C has one
     # field or none: i is only in A, j only in B, k in A and C, l in B and C,
     # m in A and B, and n in all three.
     i, j, k, l, m, n = (  # noqa: E741
-        draw(st.sampled_from([(Field(name),), ()])) for name in "ijklmn"
+        choose(rng, [(Field(name),), ()]) for name in "ijklmn"
     )
     idxs = (*i, *j, *k, *l, *m, *n)
-    lg_dims = {idx: draw(st.integers(1, 9)) for idx in idxs}
-    assume(sum(lg_dims.values()) < 18)
-    idx_perm = tuple(draw(st.permutations(idxs)))
+    while True:
+        lg_dims = {idx: int(rng.integers(1, 10)) for idx in idxs}
+        if sum(lg_dims.values()) < 18:
+            break
+    idx_perm = shuffled(rng, idxs)
 
     C_idxs = with_subsequence(idx_perm, (*k, *l, *n))
     A_idxs = with_subsequence(idx_perm, (*i, *k, *m, *n))
@@ -216,7 +220,7 @@ def programs(draw):
     reduced = with_subsequence(idx_perm, (*i, *j, *m))
     # w is fused along its leading fields, which become the outer loops of
     # both queries, so it stores a slice of its other fields for each of them.
-    nfused = draw(st.integers(0, len(w_idxs)))
+    nfused = int(rng.integers(0, len(w_idxs) + 1))
     fused = w_idxs[:nfused]
     view = FusedAlias(w, nfused) if nfused else w
 
@@ -226,27 +230,23 @@ def programs(draw):
         Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
     )
     copy = Query(Table(C, C_idxs), Table(view, w_idxs))
-    reduce_order = tuple(draw(st.permutations((*w_idxs[nfused:], *reduced))))
-    copy_order = tuple(
-        draw(st.permutations(with_subsequence(C_idxs, set(C_idxs) - set(fused))))
-    )
+    reduce_order = shuffled(rng, (*w_idxs[nfused:], *reduced))
+    copy_order = shuffled(rng, with_subsequence(C_idxs, set(C_idxs) - set(fused)))
     body = Plan(
         (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
     )
     plan = flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
 
-    level = st.sampled_from(LEVEL_OPTIONS)
     stored = ((w, len(w_idxs) - nfused), (C, len(C_idxs)))
     formats: dict[Alias, list[LevelOption]] = {
-        tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns, ndim in stored
+        tns: [choose(rng, LEVEL_OPTIONS) for _ in range(ndim)] for tns, ndim in stored
     }
 
     lg_A, lg_B, lg_C, lg_red, lg_m = (
         sum(lg_dims[idx] for idx in f) for f in (A_idxs, B_idxs, C_idxs, reduced, m)
     )
-    (p_A, S_A), (p_B, S_B) = draw(seeds(lg_A, lg_B, lg_C, lg_red, lg_m))
-    dtype = draw(st.sampled_from([np.float32, np.float64]))
-    rng = np.random.default_rng(draw(st.integers(0, 2**32 - 1)))
+    (p_A, S_A), (p_B, S_B) = seeds(rng, lg_A, lg_B, lg_C, lg_red, lg_m)
+    dtype = choose(rng, [np.float32, np.float64])
     bindings = {}
     # The seeds skew A[k, m] B[m, l], and leave i, j, and n unskewed.
     for tns, tns_idxs, p, S, (x, y) in (
@@ -279,24 +279,14 @@ def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
 
 
 def collect(examples: int) -> tuple[list[np.ndarray], list[float]]:
+    rng = np.random.default_rng()
     features: list[np.ndarray] = []
     runtimes: list[float] = []
-
-    @settings(
-        max_examples=examples,
-        deadline=None,
-        database=None,
-        phases=[Phase.generate],
-        suppress_health_check=list(HealthCheck),
-    )
-    @given(programs())
-    def run(sample):
-        rows, runtime = measure(*sample)
+    for _ in range(examples):
+        rows, runtime = measure(*program(rng))
         features.append(rows)
         runtimes.append(runtime)
         print(f"{len(runtimes)}: {runtime:.2e}s", flush=True)
-
-    run()
     return features, runtimes
 
 
