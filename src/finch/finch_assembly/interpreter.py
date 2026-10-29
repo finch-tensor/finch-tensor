@@ -255,7 +255,10 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
                 buf_e = self(buf)
                 idx_e = self(idx)
                 if self.mode.debug and not 0 <= idx_e < buf_e.length():
-                    raise AssertionError(f"Buffer index {idx_e} is out of bounds")
+                    raise AssertionError(
+                        f"Buffer index {idx_e} ({buf}[{idx}]) is out of bounds"
+                        " for array of length {buf_e.length()}"
+                    )
                 return buf_e.load(idx_e)
             case asm.Store(buf, idx, val):
                 buf_e = self(buf)
