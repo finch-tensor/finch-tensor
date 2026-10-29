@@ -146,7 +146,6 @@ class StepperPass(LoopletPass):
         ext: SymbolicExtent,
         body,
     ) -> None:
-
         def stepper_body(ctx, node: ntn.NotationNode):
             match node:
                 case ntn.Access(
@@ -202,7 +201,7 @@ class StepperPass(LoopletPass):
             ctx_2 = ctx.scope()
             ext_2 = SymbolicExtent(
                 idx_start,
-                ntn.Call(ntn.L(ffuncs.add), (stepper.stop(ctx), ext.get_unit())),
+                stepper.stop(ctx),
             )
             ctx_2(ext_2, full_body)
             stepper_block = asm.If(
