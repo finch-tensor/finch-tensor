@@ -103,6 +103,59 @@ def with_subsequence(order, fields):
     return tuple(idx for idx in order if idx in fields)
 
 
+def seed(u, s_x, s_y, r_xy):
+    S = [
+        [1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
+        [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy],
+    ]
+    return u * np.array(S)
+
+
+def interaction_range(s_x, s_y):
+    return abs(s_x + s_y) - 1, 1 - abs(s_x - s_y)
+
+
+@st.composite
+def interactions(draw, base, scale, align, r_range):
+    """Draws a skew (base + scale * r) / (1 + align) of C and solves for r."""
+    lo, hi = sorted((base + scale * r) / (1 + align) for r in r_range)
+    s = draw(st.floats(lo, hi))
+    # Clipping only absorbs rounding, which dividing by a small scale amplifies.
+    return np.clip(((1 + align) * s - base) / scale, *r_range)
+
+
+@st.composite
+def seeds(draw):
+    # Kronecker seeds for A and B. Each level of a seed is a 2x2 matrix S over
+    # fields x and y, with mean u = S.mean(), skews s_x and s_y in [-1, 1], and
+    # interaction r_xy, where
+    #     S = u * [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
+    #              [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]].
+    # The expected number of products of A[i, k] B[k, j] which land in C[i, j]
+    # has the seed S_A @ S_B, so with align = s_Ak s_Bk,
+    #     u_C = 2 u_A u_B (1 + align),
+    #     s_Ci = (s_Ai + r_Aik s_Bk) / (1 + align),
+    #     s_Cj = (s_Bj + s_Ak r_Bkj) / (1 + align),
+    #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align).
+    # This is also the seed of C while its products rarely collide. Drawing
+    # u_A, u_B, and u_C in (0, 4 u_A u_B) fixes align, and align = 0 would pin a
+    # skew of C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align
+    # and |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An interaction
+    # keeps S nonnegative when it lies in [|s_x + s_y| - 1, 1 - |s_x - s_y|], so
+    # draw s_Ci and s_Cj from the images of those intervals and solve for r_Aik
+    # and r_Bkj.
+    u_A, u_B = draw(st.floats(1 / 4, 1)), draw(st.floats(1 / 4, 1))
+    u_C = draw(st.floats(0, 4 * u_A * u_B, exclude_min=True, exclude_max=True))
+    align = u_C / (2 * u_A * u_B) - 1
+    assume(0 < abs(align) < 1)
+    s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
+    s_Ak = np.copysign(draw(st.floats(abs(align), 1)), align)
+    s_Bk = align / s_Ak
+    r_Aik = draw(interactions(s_Ai, s_Bk, align, interaction_range(s_Ai, s_Ak)))
+    r_Bkj = draw(interactions(s_Bj, s_Ak, align, interaction_range(s_Bk, s_Bj)))
+    return seed(u_A, s_Ai, s_Ak, r_Aik), seed(u_B, s_Bk, s_Bj, r_Bkj)
+
+
 @st.composite
 def programs(draw):
     op = draw(st.sampled_from([ffuncs.add, ffuncs.mul]))
