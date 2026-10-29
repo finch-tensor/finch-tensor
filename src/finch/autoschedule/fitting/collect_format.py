@@ -152,8 +152,12 @@ def seeds(draw, lg_i, lg_k, lg_j):
     # r_Bkj.
     lg_pA = draw(st.floats(-(lg_i + lg_k), 0))
     lg_pB = draw(st.floats(-(lg_k + lg_j), 0))
-    lg_pC = draw(st.floats(-(lg_i + lg_j), min(0, 2 * lg_k + lg_pA + lg_pB)))
-    align = 2 ** ((lg_pC - lg_pA - lg_pB) / lg_k - 1) - 1
+    if lg_k:
+        lg_pC = draw(st.floats(-(lg_i + lg_j), min(0, 2 * lg_k + lg_pA + lg_pB)))
+        align = 2 ** ((lg_pC - lg_pA - lg_pB) / lg_k - 1) - 1
+    else:
+        # Without levels of k, p_C = p_A p_B whatever align is.
+        align = draw(st.floats(-1, 1))
     assume(0 < abs(align) < 1)
     s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
     s_Ak = np.copysign(draw(st.floats(abs(align), 1)), align)
@@ -173,6 +177,8 @@ def rmat(S, lg_shape, density, rng):
     each axis with bits left takes that entry's bit along it, so an axis which
     has run out of bits marginalizes S over it.
     """
+    if not lg_shape:
+        return ()
     S = np.asarray(S)
     nnz = round(density * 2 ** sum(lg_shape))
     picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel())
@@ -230,14 +236,28 @@ def programs(draw):
         tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns, ndim in stored
     }
 
+    lg_k, lg_m, lg_l = (sum(lg_dims[idx] for idx in f) for f in (k, m, l))
+    (p_A, S_A), (p_B, S_B) = draw(seeds(lg_k, lg_m, lg_l))
     dtype = draw(st.sampled_from([np.float32, np.float64]))
     rng = np.random.default_rng(draw(st.integers(0, 2**32 - 1)))
     bindings = {}
-    for tns, tns_idxs in ((A, A_idxs), (B, B_idxs)):
-        shape = tuple(2 ** lg_dims[idx] for idx in tns_idxs)
-        density = draw(st.sampled_from([0.01, 0.1, 1.0]))
-        data = rng.random(shape) * (rng.random(shape) < density)
-        bindings[tns] = fl.asarray(np.asarray(data, dtype=dtype))
+    # The seeds skew A[k, m] B[m, l], and leave i, j, and n unskewed.
+    for tns, tns_idxs, p, S, (x, y) in (
+        (A, A_idxs, p_A, S_A, (k, m)),
+        (B, B_idxs, p_B, S_B, (m, l)),
+    ):
+        axes = [*x, *y]
+        S = S.sum(axis=tuple(ax for ax, f in enumerate((x, y)) if not f))
+        for idx in tns_idxs:
+            if idx not in axes:
+                S = np.multiply.outer(S, [0.5, 0.5])
+                axes.append(idx)
+        S = np.transpose(S, [axes.index(idx) for idx in tns_idxs])
+        lg_shape = tuple(lg_dims[idx] for idx in tns_idxs)
+        data = np.zeros(tuple(2**lg for lg in lg_shape), dtype=dtype)
+        coords = rmat(S, lg_shape, p, rng)
+        data[coords] = rng.random(data[coords].shape)
+        bindings[tns] = fl.asarray(data)
     return plan, formats, bindings
 
 
