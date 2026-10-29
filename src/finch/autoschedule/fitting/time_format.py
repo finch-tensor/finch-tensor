@@ -1,8 +1,8 @@
 """
 Time the programs which generate_format wrote to DIR. Each program is compiled
-by Finch.jl with its formats of w and C, and its inputs are copied out of
-binsparse into dense arrays. Its format features are recorded and its runtime
-is measured, and both are written to DIR as JSON.
+by Finch.jl with its formats of w and C, and reads its inputs as the sparse
+tensors which Finch parses from binsparse. Its format features are recorded
+and its runtime is measured, and both are written to DIR as JSON.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.time_format \
         DIR [--repeat N]
@@ -17,7 +17,6 @@ import numpy as np
 
 import binsparse as bsp
 
-import finch as fl
 from finch import ffuncs
 from finch.algebra import ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
@@ -37,6 +36,7 @@ from finch.autoschedule.formatter.smart_formatter import (
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
+from finch.fileio import from_binsparse
 from finch.finch_logic import (
     Aggregate,
     Alias,
@@ -122,18 +122,6 @@ def build(prgm) -> tuple[Plan, dict[Alias, list[LevelOption]]]:
     return plan, formats
 
 
-def dense(tensor: bsp.BinsparseTensor) -> np.ndarray:
-    """Allocates an array of the shape of a coo tensor and copies it in."""
-    match tensor.level:
-        case bsp.ElementLevel(values=values):
-            return values.reshape(())
-        case bsp.SparseLevel(level=bsp.ElementLevel(values=values), indices=indices):
-            out = np.zeros(tensor.shape, dtype=values.dtype)
-            out[indices] = values
-            return out
-    raise ValueError(f"expected a binsparse COO tensor, got {tensor}")
-
-
 def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
     """The format features of plan, and the fastest of its runs."""
     formatter = FixedFormatter(julia_loader(), formats)
@@ -149,8 +137,8 @@ def time_programs(directory: Path, repeat) -> None:
         example = path.name.removesuffix(".program.json")
         plan, formats = build(json.loads(path.read_text()))
         bindings = {
-            tns: fl.asarray(
-                dense(bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz"))
+            tns: from_binsparse(
+                bsp.load_binsparse(directory / f"{example}.{tns.name}.bsp.npz")
             )
             for tns in (A, B)
         }
