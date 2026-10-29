@@ -14,64 +14,15 @@ Also tests:
 Run: ``pixi run benchmark``
 """
 
-import contextlib
-import logging
-from types import SimpleNamespace
-
 import pytest
 
 import numpy as np
 import scipy.sparse as sp
 
 import finch as ft
-from finch.util.logging import FORMAT, get_logger_handler
 
 NUMPY_RANDOM_DEFAULT_RNG_SEED = 42
 VECTOR_SPARSITY_RUNS = [0.80, 0.99]
-
-
-def create_backend(scheduler):
-    @contextlib.contextmanager
-    def inner(pattern="r.l.pre,r.c.nb,root.assembly", logged=False):
-        if logged:
-            with (
-                stage_logging(pattern),
-                ft.autoschedule.with_default_scheduler(scheduler),
-            ):
-                yield
-        else:
-            with ft.autoschedule.with_default_scheduler(scheduler):
-                yield
-
-    return inner
-
-
-@contextlib.contextmanager
-def stage_logging(pattern):
-    handler = get_logger_handler(filter_pattern=pattern)
-    logging.basicConfig(level=logging.DEBUG, handlers=[handler], format=FORMAT)
-
-    yield
-
-    logger = logging.getLogger()
-
-    i = 0
-    while i < len(logger.handlers):
-        if logger.handlers[i] == handler:
-            logger.handlers.pop(i)
-        else:
-            i += 1
-
-
-context = SimpleNamespace()
-
-context.compile_numba = create_backend(ft.autoschedule.COMPILE_NUMBA)
-context.compile_numba_galley = create_backend(ft.autoschedule.COMPILE_NUMBA_GALLEY)
-context.interpret_assembly = create_backend(ft.autoschedule.INTERPRET_ASSEMBLY)
-
-
-def benchmark(a, *rest):
-    a(*rest)
 
 
 @pytest.fixture
@@ -195,19 +146,6 @@ def test_compute_tr3(scheduler, benchmark, matrix_dimension, sparsity):
     benchmark(compute_tr3, filled_matrix)
 
 
-def compute_tr3_():
-    with context.compile_numba_galley(logged=True):
-        filled_matrix = create_random_fill_matrix(
-            2000,
-            2000,
-            0.95,
-            rng,
-            lambda x: rng.integers(1, 10 + 1, x),
-        )
-
-        compute_tr3(filled_matrix)
-
-
 def sparse_vector_gen(dimension, sparsity):
     nnf = int(dimension * (1 - sparsity))
 
@@ -235,45 +173,6 @@ def sparse_list(dimension, idx, val):
             idx=ft.NumpyBuffer(idx),
         )
     )
-
-
-a = sparse_list(10, [0], [1])
-b = sparse_list(10, [1], [2])
-c = sparse_list(10, [9], [3])
-d = sparse_list(10, [9], [4])
-
-
-def add():
-    with context.interpret_assembly(logged=False):
-        return a + b + c + d
-
-
-def add_empty():
-    with context.compile_numba(logged=False):
-        a = sparse_list(10, np.asarray([], dtype=np.int64), [])
-        b = sparse_list(10, np.asarray([], dtype=np.int64), [])
-        return a + b
-
-
-def add_longer_vector():
-    with context.compile_numba(logged=True):
-        vgen = sparse_vector_gen(100, 0.8)
-        a = next(vgen)
-        b = next(vgen)
-        a = next(vgen)
-        b = next(vgen)
-
-        assert a.lvl.idx.arr.shape[0] == a.lvl.val.arr.shape[0]
-        assert b.lvl.idx.arr.shape[0] == b.lvl.val.arr.shape[0]
-
-        print(f"{a.lvl.idx=}")
-        print(f"{a.lvl.ptr=}")
-        print(f"{a.lvl.val=}")
-        print(f"{b.lvl.idx=}")
-        print(f"{b.lvl.ptr=}")
-        print(f"{b.lvl.val=}")
-
-        return a + b
 
 
 @pytest.mark.parametrize("dimension", [10**7])
