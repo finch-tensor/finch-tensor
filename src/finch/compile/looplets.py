@@ -201,7 +201,7 @@ class StepperPass(LoopletPass):
             ctx_2 = ctx.scope()
             ext_2 = SymbolicExtent(
                 idx_start,
-                stepper.stop(ctx),
+                ntn.Call(ntn.L(ffuncs.add), (stepper.stop(ctx), ext.get_unit())),
             )
             ctx_2(ext_2, full_body)
             stepper_block = asm.If(
