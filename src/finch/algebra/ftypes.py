@@ -1087,7 +1087,9 @@ def ftype(x: Any) -> FType:
                 [(fieldname, ftype(getattr(x, fieldname))) for fieldname in T._fields],
             )
         return TupleFType.from_tuple(tuple(ftype(elem) for elem in x))
-    raise NotImplementedError
+    raise NotImplementedError(
+        f"finch.ftype cannot be constructed from instance of: {type(x)}"
+    )
 
 
 def np_dtype(dtype: FType) -> np.dtype:
