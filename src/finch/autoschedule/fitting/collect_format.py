@@ -125,27 +125,31 @@ def interactions(draw, base, scale, align, r_range):
 
 
 @st.composite
-def seeds(draw):
+def seeds(draw, levels):
     # Kronecker seeds for A and B. Each level of a seed is a 2x2 matrix S over
     # fields x and y, with mean u = S.mean(), skews s_x and s_y in [-1, 1], and
     # interaction r_xy, where
     #     S = u * [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
-    #              [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]].
+    #              [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]],
+    # so a tensor drawn from the seed has density p = u ** levels.
     # The expected number of products of A[i, k] B[k, j] which land in C[i, j]
     # has the seed S_A @ S_B, so with align = s_Ak s_Bk,
     #     u_C = 2 u_A u_B (1 + align),
     #     s_Ci = (s_Ai + r_Aik s_Bk) / (1 + align),
     #     s_Cj = (s_Bj + s_Ak r_Bkj) / (1 + align),
     #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align).
-    # This is also the seed of C while its products rarely collide. Drawing
-    # u_A, u_B, and u_C in (0, 4 u_A u_B) fixes align, and align = 0 would pin a
-    # skew of C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align
-    # and |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An interaction
-    # keeps S nonnegative when it lies in [|s_x + s_y| - 1, 1 - |s_x - s_y|], so
-    # draw s_Ci and s_Cj from the images of those intervals and solve for r_Aik
-    # and r_Bkj.
-    u_A, u_B = draw(st.floats(1 / 4, 1)), draw(st.floats(1 / 4, 1))
-    u_C = draw(st.floats(0, 4 * u_A * u_B, exclude_min=True, exclude_max=True))
+    # This is also the seed of C while its products rarely collide. Drawing log
+    # densities p_A, p_B, and p_C, from one expected nonzero up to dense with
+    # u_C < 4 u_A u_B, fixes align, and align = 0 would pin a skew of C. Then
+    # draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align and
+    # |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An interaction keeps
+    # S nonnegative when it lies in [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw
+    # s_Ci and s_Cj from the images of those intervals and solve for r_Aik and
+    # r_Bkj.
+    lg_pA = draw(st.floats(-2 * levels, 0))
+    lg_pB = draw(st.floats(-2 * levels, 0))
+    lg_pC = draw(st.floats(-2 * levels, min(0, 2 * levels + lg_pA + lg_pB)))
+    u_A, u_B, u_C = (2 ** (lg_p / levels) for lg_p in (lg_pA, lg_pB, lg_pC))
     align = u_C / (2 * u_A * u_B) - 1
     assume(0 < abs(align) < 1)
     s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
