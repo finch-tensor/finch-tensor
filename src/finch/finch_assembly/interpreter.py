@@ -7,6 +7,8 @@ from typing import Any, overload
 import numpy as np
 
 from finch.algebra import FDTypeUnsignedInteger, fisinstance
+from finch.algebra import fisinstance
+from finch.algebra.ffuncs import scansearch
 from finch.symbolic import CompilerMode, ScopedDict, UnvalidatedForm
 
 from . import nodes as asm
@@ -229,10 +231,25 @@ class AssemblyInterpreter(UnvalidatedForm, AssemblyLoader):
             case asm.Call(f, args):
                 f_e = self(f)
                 args_e = [self(arg) for arg in args]
+
+                # TODO: finch assembly never operates on raw numpy
+                # buffers, instead it wraps them with a `NumpyBuffer`,
+                # but the issue is that scansearch is defined in algebra,
+                # which in the module graph, is deeper than the module that defines
+                # `NumpyBuffer` (which is in codegen). Someday we need to invert
+                # these orderings to make this actually work correctly.
+                # For now, though we need to do this weird hack to remove
+                # a level of indirection to the buffer.
+                if f_e == scansearch:
+                    first_arg = args_e.pop(0)
+                    args_e.insert(0, first_arg.arr)
+                    return f_e(*args_e)
+
                 if isinstance(prgm.result_type, FDTypeUnsignedInteger):
                     # Unsigned arithmetic wraps, as in compiled code.
                     with np.errstate(over="ignore"):
                         return f_e(*args_e)
+
                 return f_e(*args_e)
             case asm.Load(buf, idx):
                 buf_e = self(buf)
