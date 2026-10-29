@@ -1,10 +1,13 @@
 """
 Fit the formatter's cost model from measured programs. Hypothesis draws
-programs which write a tensor B from an input A and then copy B into C, each
-in a drawn loop order and layout, along with the formats of B and C and the
-shape, density, and dtype of A. Each program is compiled by Finch.jl with
-those formats, its format features are recorded, and its runtime is measured.
-A LinearCostModel of the formatter's basis is then fitted to all of them.
+programs which reduce a map of inputs A and B into a workspace w and copy w
+into C. Their fields cover each region of the Venn diagram of the fields of A,
+B, and C, the layouts of all tensors follow one drawn order of the fields, and
+each query has its own drawn loop order. The formats of w and C, and the
+extents, densities, and dtype of the inputs are drawn too. Each program is
+compiled by Finch.jl with those formats, its format features are recorded,
+and its runtime is measured. A LinearCostModel of the formatter's basis is
+then fitted to all of them.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.collect_format \
         [examples] [model.json]
@@ -13,9 +16,9 @@ A LinearCostModel of the formatter's basis is then fitted to all of them.
 import json
 import sys
 import timeit
-from math import prod
 
 import numpy as np
+
 from hypothesis import HealthCheck, Phase, assume, given, settings
 from hypothesis import strategies as st
 
@@ -39,10 +42,21 @@ from finch.autoschedule.formatter.smart_formatter import (
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
-from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
+from finch.finch_logic import (
+    Aggregate,
+    Alias,
+    Field,
+    HardAlias,
+    Literal,
+    MapJoin,
+    Plan,
+    Produces,
+    Query,
+    Table,
+)
 from finch.tensor import element, fiber_tensor
 
-A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
+A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
 BASIS = ByKind(
     {
         option.kind: LevelBasis(type(option))
@@ -82,14 +96,19 @@ def julia_loader():
     return CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
 
 
+def with_subsequence(order, fields):
+    """The fields of order which are in fields, in the order of order."""
+    return tuple(idx for idx in order if idx in fields)
+
+
 @st.composite
 def programs(draw):
-    ndim = draw(st.integers(1, 3))
     op = draw(st.sampled_from([ffuncs.add, ffuncs.mul]))
     # Each region of the Venn diagram of the indices of A, B, and C has one
     # field or none: i is only in C, j only in A, k only in B, l in A and C,
-    # m in B and C, n in A and B, and p in all three.
-    i, j, k, l, m, n, p = (
+    # m in B and C, n in A and B, and p in all three. Nothing gives i an
+    # extent, so C broadcasts it with extent 1.
+    i, j, k, l, m, n, p = (  # noqa: E741
         draw(st.sampled_from([(Field(name),), ()])) for name in "ijklmnp"
     )
     idxs = (*i, *j, *k, *l, *m, *n, *p)
@@ -100,45 +119,48 @@ def programs(draw):
     A_idxs = with_subsequence(idx_perm, (*j, *l, *n, *p))
     B_idxs = with_subsequence(idx_perm, (*k, *m, *n, *p))
     w_idxs = with_subsequence(idx_perm, (*l, *m, *p))
+    reduced = with_subsequence(idx_perm, (*j, *k, *n))
 
-    shape = tuple(
-        draw(st.lists(st.sampled_from([8, 64, 512]), min_size=ndim, max_size=ndim))
+    product = MapJoin(Literal(op), (Table(A, A_idxs), Table(B, B_idxs)))
+    reduce = Query(
+        Table(w, w_idxs),
+        Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
     )
-    assume(prod(shape) <= 2**18)
-    density = draw(st.sampled_from([0.01, 0.1, 1.0]))
-    dtype = draw(st.sampled_from([np.float32, np.float64]))
-    seed = draw(st.integers(0, 2**32 - 1))
-
-    fields = tuple(Field(f"i{n}") for n in range(ndim))
-    b_idxs, c_idxs, b_order, c_order = (
-        tuple(draw(st.permutations(fields))) for _ in range(4)
-    )
-    level = st.sampled_from(LEVEL_OPTIONS)
-    formats: dict[Alias, list[LevelOption]] = {
-        tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns in (B, C)
-    }
-
-
-
-    rng = np.random.default_rng(seed)
-    data = rng.random(shape) * (rng.random(shape) < density)
+    copy = Query(Table(C, C_idxs), Table(w, w_idxs))
+    reduce_order = tuple(draw(st.permutations((*w_idxs, *reduced))))
+    copy_order = tuple(draw(st.permutations(C_idxs)))
     plan = Plan(
         (
-            Query(Table(w, w_idxs), Aggregate(ffuncs.add, Literal(0), MapJoin(op, Table(A, A_idxs), Table(B, B_idxs)))),
-            Query(Table(C, C_idxs), Table(w, w_idxs)),
+            fuse_loop_order(reduce, reduce_order),
+            fuse_loop_order(copy, copy_order),
             Produces((C,)),
         )
     )
-    return plan, formats, fl.asarray(data.astype(dtype))
+
+    level = st.sampled_from(LEVEL_OPTIONS)
+    formats: dict[Alias, list[LevelOption]] = {
+        tns: draw(st.lists(level, min_size=len(tns_idxs), max_size=len(tns_idxs)))
+        for tns, tns_idxs in ((w, w_idxs), (C, C_idxs))
+    }
+
+    dtype = draw(st.sampled_from([np.float32, np.float64]))
+    rng = np.random.default_rng(draw(st.integers(0, 2**32 - 1)))
+    bindings = {}
+    for tns, tns_idxs in ((A, A_idxs), (B, B_idxs)):
+        shape = tuple(2 ** lg_dims[idx] for idx in tns_idxs)
+        density = draw(st.sampled_from([0.01, 0.1, 1.0]))
+        data = rng.random(shape) * (rng.random(shape) < density)
+        bindings[tns] = fl.asarray(np.asarray(data, dtype=dtype))
+    return plan, formats, bindings
 
 
-def measure(plan, formats, tensor, repeat=5) -> tuple[np.ndarray, float]:
+def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
     """The format features of plan, and the fastest of its runs."""
     formatter = FixedFormatter(julia_loader(), formats)
     executor = LogicExecutor(formatter, stats_factory=DCStatsFactory(), cache=True)
     # The first run compiles the kernel, which the others reuse.
-    executor(plan, {A: tensor})
-    runs = timeit.repeat(lambda: executor(plan, {A: tensor}), number=1, repeat=repeat)
+    executor(plan, bindings)
+    runs = timeit.repeat(lambda: executor(plan, bindings), number=1, repeat=repeat)
     return formatter.features, min(runs)
 
 
