@@ -2,11 +2,12 @@
 Fit the formatter's cost model from measured programs. Hypothesis draws
 programs which write a tensor B from an input A and then copy B into C, each
 in a drawn loop order and layout, along with the formats of B and C and the
-shape, density, and dtype of A. Each program is compiled with those formats,
-its format features are recorded, and its runtime is measured. A
-LinearCostModel of the formatter's basis is then fitted to all of them.
+shape, density, and dtype of A. Each program is compiled by Finch.jl with
+those formats, its format features are recorded, and its runtime is measured.
+A LinearCostModel of the formatter's basis is then fitted to all of them.
 
-    python -m finch.autoschedule.fitting.collect_format [examples] [model.json]
+    pixi run -e test-julia python -m finch.autoschedule.fitting.collect_format \
+        [examples] [model.json]
 """
 
 import json
@@ -19,6 +20,7 @@ from hypothesis import HealthCheck, Phase, assume, given, settings
 from hypothesis import strategies as st
 
 import finch as fl
+from finch import ffuncs
 from finch.algebra import ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import (
@@ -36,9 +38,7 @@ from finch.autoschedule.formatter.smart_formatter import (
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import fuse_loop_order
-from finch.codegen import NumbaCompiler
-from finch.compile import NotationCompiler
-from finch.finch_assembly import AssemblySimplify, LowerPackedStructSlots
+from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import Alias, Field, HardAlias, Plan, Produces, Query, Table
 from finch.tensor import element, fiber_tensor
 
@@ -78,20 +78,29 @@ class FixedFormatter(CostFormatter):
         return super().lower(prgm, bindings, stats, stats_factory)
 
 
-def numba_loader():
-    return CompilerFormLowerer(
-        LogicCompiler(
-            NotationCompiler(
-                NumbaCompiler(),
-                ctx_transforms=(LowerPackedStructSlots(), AssemblySimplify()),
-            )
-        )
-    )
+def julia_loader():
+    return CompilerFormLowerer(LogicCompiler(FinchJLCompiler()))
 
 
 @st.composite
 def programs(draw):
     ndim = draw(st.integers(1, 3))
+    op = draw(st.sampled_from([ffuncs.add, ffuncs.mul]))
+    # Each region of the Venn diagram of the indices of A, B, and C has one
+    # field or none: i is only in C, j only in A, k only in B, l in A and C,
+    # m in B and C, n in A and B, and p in all three.
+    i, j, k, l, m, n, p = (
+        draw(st.sampled_from([(Field(name),), ()])) for name in "ijklmnp"
+    )
+    idxs = (*i, *j, *k, *l, *m, *n, *p)
+    lg_dims = {idx: draw(st.integers(1, 9)) for idx in idxs}
+    assume(sum(lg_dims.values()) < 18)
+    idx_perm = tuple(draw(st.permutations(idxs)))
+    C_idxs = with_subsequence(idx_perm, (*i, *l, *m, *p))
+    A_idxs = with_subsequence(idx_perm, (*j, *l, *n, *p))
+    B_idxs = with_subsequence(idx_perm, (*k, *m, *n, *p))
+    w_idxs = with_subsequence(idx_perm, (*l, *m, *p))
+
     shape = tuple(
         draw(st.lists(st.sampled_from([8, 64, 512]), min_size=ndim, max_size=ndim))
     )
@@ -109,12 +118,14 @@ def programs(draw):
         tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns in (B, C)
     }
 
+
+
     rng = np.random.default_rng(seed)
     data = rng.random(shape) * (rng.random(shape) < density)
     plan = Plan(
         (
-            fuse_loop_order(Query(Table(B, b_idxs), Table(A, fields)), b_order),
-            fuse_loop_order(Query(Table(C, c_idxs), Table(B, b_idxs)), c_order),
+            Query(Table(w, w_idxs), Aggregate(ffuncs.add, Literal(0), MapJoin(op, Table(A, A_idxs), Table(B, B_idxs)))),
+            Query(Table(C, C_idxs), Table(w, w_idxs)),
             Produces((C,)),
         )
     )
@@ -123,7 +134,7 @@ def programs(draw):
 
 def measure(plan, formats, tensor, repeat=5) -> tuple[np.ndarray, float]:
     """The format features of plan, and the fastest of its runs."""
-    formatter = FixedFormatter(numba_loader(), formats)
+    formatter = FixedFormatter(julia_loader(), formats)
     executor = LogicExecutor(formatter, stats_factory=DCStatsFactory(), cache=True)
     # The first run compiles the kernel, which the others reuse.
     executor(plan, {A: tensor})
