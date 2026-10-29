@@ -103,12 +103,13 @@ def with_subsequence(order, fields):
     return tuple(idx for idx in order if idx in fields)
 
 
-def seed(u, s_x, s_y, r_xy):
+def seed(s_x, s_y, r_xy):
     S = [
         [1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
         [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy],
     ]
-    return u * np.array(S)
+    # Rounding can leave an empty corner slightly below zero.
+    return np.maximum(S, 0) / 4
 
 
 def interaction_range(s_x, s_y):
@@ -125,39 +126,61 @@ def interactions(draw, base, scale, align, r_range):
 
 
 @st.composite
-def seeds(draw, levels):
-    # Kronecker seeds for A and B. Each level of a seed is a 2x2 matrix S over
-    # fields x and y, with mean u = S.mean(), skews s_x and s_y in [-1, 1], and
+def seeds(draw, lg_i, lg_k, lg_j):
+    # R-MAT seeds and densities for A[i, k] and B[k, j], where i, k, and j have
+    # 2 ** lg_i, 2 ** lg_k, and 2 ** lg_j values. Each level of a seed is a 2x2
+    # matrix S over fields x and y, with skews s_x and s_y in [-1, 1] and
     # interaction r_xy, where
-    #     S = u * [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
-    #              [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]],
-    # so a tensor drawn from the seed has density p = u ** levels.
-    # The expected number of products of A[i, k] B[k, j] which land in C[i, j]
-    # has the seed S_A @ S_B, so with align = s_Ak s_Bk,
-    #     u_C = 2 u_A u_B (1 + align),
+    #     S = [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
+    #          [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]] / 4.
+    # rmat marginalizes S over a field once it runs out of bits, so only the
+    # levels of k see both A and B. The expected number of products of
+    # A[i, k] B[k, j] which land in each C[i, j] is
+    #     p_C = p_A p_B (2 (1 + align)) ** lg_k, where align = s_Ak s_Bk,
+    # and on the levels of k,
     #     s_Ci = (s_Ai + r_Aik s_Bk) / (1 + align),
     #     s_Cj = (s_Bj + s_Ak r_Bkj) / (1 + align),
-    #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align).
-    # This is also the seed of C while its products rarely collide. Drawing log
+    #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align),
+    # while C copies s_Ai and s_Bj on the other levels of i and j. This is also
+    # the seed and density of C while its products rarely collide. Drawing log
     # densities p_A, p_B, and p_C, from one expected nonzero up to dense with
-    # u_C < 4 u_A u_B, fixes align, and align = 0 would pin a skew of C. Then
-    # draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align and
+    # p_C < p_A p_B 4 ** lg_k, fixes align, and align = 0 would pin a skew of
+    # C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align and
     # |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An interaction keeps
     # S nonnegative when it lies in [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw
     # s_Ci and s_Cj from the images of those intervals and solve for r_Aik and
     # r_Bkj.
-    lg_pA = draw(st.floats(-2 * levels, 0))
-    lg_pB = draw(st.floats(-2 * levels, 0))
-    lg_pC = draw(st.floats(-2 * levels, min(0, 2 * levels + lg_pA + lg_pB)))
-    u_A, u_B, u_C = (2 ** (lg_p / levels) for lg_p in (lg_pA, lg_pB, lg_pC))
-    align = u_C / (2 * u_A * u_B) - 1
+    lg_pA = draw(st.floats(-(lg_i + lg_k), 0))
+    lg_pB = draw(st.floats(-(lg_k + lg_j), 0))
+    lg_pC = draw(st.floats(-(lg_i + lg_j), min(0, 2 * lg_k + lg_pA + lg_pB)))
+    align = 2 ** ((lg_pC - lg_pA - lg_pB) / lg_k - 1) - 1
     assume(0 < abs(align) < 1)
     s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
     s_Ak = np.copysign(draw(st.floats(abs(align), 1)), align)
     s_Bk = align / s_Ak
     r_Aik = draw(interactions(s_Ai, s_Bk, align, interaction_range(s_Ai, s_Ak)))
     r_Bkj = draw(interactions(s_Bj, s_Ak, align, interaction_range(s_Bk, s_Bj)))
-    return seed(u_A, s_Ai, s_Ak, r_Aik), seed(u_B, s_Bk, s_Bj, r_Bkj)
+    return (
+        (2**lg_pA, seed(s_Ai, s_Ak, r_Aik)),
+        (2**lg_pB, seed(s_Bk, s_Bj, r_Bkj)),
+    )
+
+
+def rmat(S, lg_shape, density, rng):
+    """
+    Coordinates of density * 2 ** sum(lg_shape) balls dropped into a tensor of
+    shape 2 ** lg_shape. At each level a ball picks an entry of the seed S, and
+    each axis with bits left takes that entry's bit along it, so an axis which
+    has run out of bits marginalizes S over it.
+    """
+    S = np.asarray(S)
+    nnz = round(density * 2 ** sum(lg_shape))
+    picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel())
+    bits = np.unravel_index(picks, S.shape)
+    return tuple(
+        (b[:, :lg] << np.arange(lg - 1, -1, -1)).sum(axis=1)
+        for b, lg in zip(bits, lg_shape, strict=True)
+    )
 
 
 @st.composite
