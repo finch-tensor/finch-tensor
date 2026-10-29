@@ -2,7 +2,8 @@
 Fit the formatter's cost model from measured programs. Hypothesis draws
 programs which reduce a map of inputs A and B into a workspace w and copy w
 into C. Their fields cover each region of the Venn diagram of the fields of A,
-B, and C, the layouts of all tensors follow one drawn order of the fields, and
+B, and C which lies in A or B, since nothing would give a field of C alone an
+extent. The layouts of all tensors follow one drawn order of the fields, and
 each query has its own drawn loop order. The formats of w and C, and the
 extents, densities, and dtype of the inputs are drawn too. Each program is
 compiled by Finch.jl with those formats, its format features are recorded,
@@ -40,12 +41,13 @@ from finch.autoschedule.formatter.smart_formatter import (
     CostFormatter,
 )
 from finch.autoschedule.tensor_stats import DCStatsFactory
-from finch.autoschedule.util import fuse_loop_order
+from finch.autoschedule.util import flatten_plans, fuse_loop_order
 from finch.compile_jl.compiler import FinchJLCompiler
 from finch.finch_logic import (
     Aggregate,
     Alias,
     Field,
+    FusedAlias,
     HardAlias,
     Literal,
     MapJoin,
@@ -105,42 +107,47 @@ def with_subsequence(order, fields):
 def programs(draw):
     op = draw(st.sampled_from([ffuncs.add, ffuncs.mul]))
     # Each region of the Venn diagram of the indices of A, B, and C has one
-    # field or none: i is only in C, j only in A, k only in B, l in A and C,
-    # m in B and C, n in A and B, and p in all three. Nothing gives i an
-    # extent, so C broadcasts it with extent 1.
-    i, j, k, l, m, n, p = (  # noqa: E741
-        draw(st.sampled_from([(Field(name),), ()])) for name in "ijklmnp"
+    # field or none: i is only in A, j only in B, k in A and C, l in B and C,
+    # m in A and B, and n in all three.
+    i, j, k, l, m, n = (  # noqa: E741
+        draw(st.sampled_from([(Field(name),), ()])) for name in "ijklmn"
     )
-    idxs = (*i, *j, *k, *l, *m, *n, *p)
+    idxs = (*i, *j, *k, *l, *m, *n)
     lg_dims = {idx: draw(st.integers(1, 9)) for idx in idxs}
     assume(sum(lg_dims.values()) < 18)
     idx_perm = tuple(draw(st.permutations(idxs)))
-    C_idxs = with_subsequence(idx_perm, (*i, *l, *m, *p))
-    A_idxs = with_subsequence(idx_perm, (*j, *l, *n, *p))
-    B_idxs = with_subsequence(idx_perm, (*k, *m, *n, *p))
-    w_idxs = with_subsequence(idx_perm, (*l, *m, *p))
-    reduced = with_subsequence(idx_perm, (*j, *k, *n))
+
+    C_idxs = with_subsequence(idx_perm, (*k, *l, *n))
+    A_idxs = with_subsequence(idx_perm, (*i, *k, *m, *n))
+    B_idxs = with_subsequence(idx_perm, (*j, *l, *m, *n))
+    w_idxs = with_subsequence(idx_perm, (*k, *l, *n))
+
+    reduced = with_subsequence(idx_perm, (*i, *j, *m))
+    # w is fused along its leading fields, which become the outer loops of
+    # both queries, so it stores a slice of its other fields for each of them.
+    nfused = draw(st.integers(0, len(w_idxs)))
+    fused = w_idxs[:nfused]
+    view = FusedAlias(w, nfused) if nfused else w
 
     product = MapJoin(Literal(op), (Table(A, A_idxs), Table(B, B_idxs)))
     reduce = Query(
-        Table(w, w_idxs),
+        Table(view, w_idxs),
         Aggregate(Literal(ffuncs.add), Literal(0.0), product, reduced),
     )
-    copy = Query(Table(C, C_idxs), Table(w, w_idxs))
-    reduce_order = tuple(draw(st.permutations((*w_idxs, *reduced))))
-    copy_order = tuple(draw(st.permutations(C_idxs)))
-    plan = Plan(
-        (
-            fuse_loop_order(reduce, reduce_order),
-            fuse_loop_order(copy, copy_order),
-            Produces((C,)),
-        )
+    copy = Query(Table(C, C_idxs), Table(view, w_idxs))
+    reduce_order = tuple(draw(st.permutations((*w_idxs[nfused:], *reduced))))
+    copy_order = tuple(
+        draw(st.permutations(with_subsequence(C_idxs, set(C_idxs) - set(fused))))
     )
+    body = Plan(
+        (fuse_loop_order(reduce, reduce_order), fuse_loop_order(copy, copy_order))
+    )
+    plan = flatten_plans(Plan((fuse_loop_order(body, fused), Produces((C,)))))
 
     level = st.sampled_from(LEVEL_OPTIONS)
+    stored = ((w, len(w_idxs) - nfused), (C, len(C_idxs)))
     formats: dict[Alias, list[LevelOption]] = {
-        tns: draw(st.lists(level, min_size=len(tns_idxs), max_size=len(tns_idxs)))
-        for tns, tns_idxs in ((w, w_idxs), (C, C_idxs))
+        tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns, ndim in stored
     }
 
     dtype = draw(st.sampled_from([np.float32, np.float64]))
