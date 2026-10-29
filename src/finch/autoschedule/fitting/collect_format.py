@@ -126,37 +126,42 @@ def interactions(draw, base, scale, align, r_range):
 
 
 @st.composite
-def seeds(draw, lg_i, lg_k, lg_j):
-    # R-MAT seeds and densities for A[i, k] and B[k, j], where i, k, and j have
-    # 2 ** lg_i, 2 ** lg_k, and 2 ** lg_j values. Each level of a seed is a 2x2
-    # matrix S over fields x and y, with skews s_x and s_y in [-1, 1] and
-    # interaction r_xy, where
+def seeds(draw, lg_A, lg_B, lg_C, lg_red, lg_k):
+    # R-MAT seeds and densities for A[i, k] and B[k, j], whose product sums
+    # over k into C[i, j]. A, B, and C may have other fields, which the seeds
+    # leave unskewed, so lg_A, lg_B, and lg_C are the bits of their whole
+    # shapes, lg_red the bits of every field reduced, and lg_k those of k.
+    # Each level of a seed is a 2x2 matrix S over fields x and y, with skews
+    # s_x and s_y in [-1, 1] and interaction r_xy, where
     #     S = [[1 + s_x + s_y + r_xy, 1 + s_x - s_y - r_xy],
     #          [1 - s_x + s_y - r_xy, 1 - s_x - s_y + r_xy]] / 4.
     # rmat marginalizes S over a field once it runs out of bits, so only the
-    # levels of k see both A and B. The expected number of products of
-    # A[i, k] B[k, j] which land in each C[i, j] is
-    #     p_C = p_A p_B (2 (1 + align)) ** lg_k, where align = s_Ak s_Bk,
-    # and on the levels of k,
+    # levels of k see both A and B. The expected number of products which
+    # land in each entry of C is
+    #     p_C = p_A p_B 2 ** lg_red (1 + align) ** lg_k,
+    # where align = s_Ak s_Bk, and on the levels of k,
     #     s_Ci = (s_Ai + r_Aik s_Bk) / (1 + align),
     #     s_Cj = (s_Bj + s_Ak r_Bkj) / (1 + align),
     #     r_Cij = (s_Ai s_Bj + r_Aik r_Bkj) / (1 + align),
     # while C copies s_Ai and s_Bj on the other levels of i and j. This is also
     # the seed and density of C while its products rarely collide. Drawing log
     # densities p_A, p_B, and p_C, from one expected nonzero up to dense with
-    # p_C < p_A p_B 4 ** lg_k, fixes align, and align = 0 would pin a skew of
-    # C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of align and
-    # |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An interaction keeps
-    # S nonnegative when it lies in [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw
-    # s_Ci and s_Cj from the images of those intervals and solve for r_Aik and
-    # r_Bkj.
-    lg_pA = draw(st.floats(-(lg_i + lg_k), 0))
-    lg_pB = draw(st.floats(-(lg_k + lg_j), 0))
+    # p_C < p_A p_B 2 ** (lg_red + lg_k), fixes align, and align = 0 would pin
+    # a skew of C. Then draw s_Ai and s_Bj in [-1, 1], s_Ak with the sign of
+    # align and |align| <= |s_Ak| <= 1, and set s_Bk = align / s_Ak. An
+    # interaction keeps S nonnegative when it lies in
+    # [|s_x + s_y| - 1, 1 - |s_x - s_y|], so draw s_Ci and s_Cj from the images
+    # of those intervals and solve for r_Aik and r_Bkj.
+    lg_pA = draw(st.floats(-lg_A, 0))
+    lg_pB = draw(st.floats(-lg_B, 0))
     if lg_k:
-        lg_pC = draw(st.floats(-(lg_i + lg_j), min(0, 2 * lg_k + lg_pA + lg_pB)))
-        align = 2 ** ((lg_pC - lg_pA - lg_pB) / lg_k - 1) - 1
+        # A batch field can leave too few products for one nonzero of C.
+        lg_max = min(0, lg_pA + lg_pB + lg_red + lg_k)
+        assume(-lg_C <= lg_max)
+        lg_pC = draw(st.floats(-lg_C, lg_max))
+        align = 2 ** ((lg_pC - lg_pA - lg_pB - lg_red) / lg_k) - 1
     else:
-        # Without levels of k, p_C = p_A p_B whatever align is.
+        # Without levels of k, p_C = p_A p_B 2 ** lg_red whatever align is.
         align = draw(st.floats(-1, 1))
     assume(0 < abs(align) < 1)
     s_Ai, s_Bj = draw(st.floats(-1, 1)), draw(st.floats(-1, 1))
@@ -236,8 +241,10 @@ def programs(draw):
         tns: draw(st.lists(level, min_size=ndim, max_size=ndim)) for tns, ndim in stored
     }
 
-    lg_k, lg_m, lg_l = (sum(lg_dims[idx] for idx in f) for f in (k, m, l))
-    (p_A, S_A), (p_B, S_B) = draw(seeds(lg_k, lg_m, lg_l))
+    lg_A, lg_B, lg_C, lg_red, lg_m = (
+        sum(lg_dims[idx] for idx in f) for f in (A_idxs, B_idxs, C_idxs, reduced, m)
+    )
+    (p_A, S_A), (p_B, S_B) = draw(seeds(lg_A, lg_B, lg_C, lg_red, lg_m))
     dtype = draw(st.sampled_from([np.float32, np.float64]))
     rng = np.random.default_rng(draw(st.integers(0, 2**32 - 1)))
     bindings = {}
