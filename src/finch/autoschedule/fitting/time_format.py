@@ -2,10 +2,11 @@
 Time the programs which generate_format wrote to DIR. Each program is compiled
 by Finch.jl with its formats of w and C, and reads its inputs as the sparse
 tensors which Finch parses from binsparse. Its format features are recorded
-and its runtime is measured, and both are written to DIR as JSON.
+and its runtime is measured, and both are written to DIR as JSON. Given a
+chunk, only the programs of that chunk are timed.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.time_format \
-        DIR [--repeat N]
+        DIR [--chunk K] [--repeat N]
 """
 
 import argparse
@@ -132,8 +133,9 @@ def measure(plan, formats, bindings, repeat=5) -> tuple[np.ndarray, float]:
     return formatter.features, min(runs)
 
 
-def time_programs(directory: Path, repeat) -> None:
-    for path in sorted(directory.glob("*.program.json")):
+def time_programs(directory: Path, chunk, repeat) -> None:
+    prefix = "*" if chunk is None else f"{chunk:04d}-*"
+    for path in sorted(directory.glob(f"{prefix}.program.json")):
         example = path.name.removesuffix(".program.json")
         plan, formats = build(json.loads(path.read_text()))
         bindings = {
@@ -153,9 +155,10 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--chunk", type=int, help="the only chunk to time")
     parser.add_argument("--repeat", type=int, default=5)
     args = parser.parse_args()
-    time_programs(args.directory, args.repeat)
+    time_programs(args.directory, args.chunk, args.repeat)
 
 
 if __name__ == "__main__":

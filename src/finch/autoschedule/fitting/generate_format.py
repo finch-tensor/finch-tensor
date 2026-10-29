@@ -6,10 +6,12 @@ and C which lies in A or B, since nothing would give a field of C alone an
 extent. The layouts of all tensors follow one drawn order of the fields, and
 each query has its own drawn loop order. The formats of w and C, and the
 extents, densities, and dtype of the inputs are drawn too. Each program is
-written to DIR as JSON, and its inputs as binsparse.
+written to DIR as JSON, and its inputs as binsparse, under the name of its
+chunk and its index in the chunk, so jobs of different chunks can share DIR.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.generate_format \
-        DIR [--examples N] [--lg-max-space N] [--lg-max-dim N] [--seed S]
+        DIR [--examples N] [--chunk K] [--lg-max-space N] [--lg-max-dim N] \
+        [--seed S]
 """
 
 import argparse
@@ -202,13 +204,14 @@ def coo(rng, coords, shape, dtype) -> bsp.CustomTensor:
     return bsp.CustomTensor(shape, values.size, True, dtype.type(0), level)
 
 
-def generate(directory: Path, examples, lg_max_space, lg_max_dim, rng) -> None:
+def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for example in range(examples):
+        name = f"{chunk:04d}-{example:05d}"
         prgm = program(rng, lg_max_space, lg_max_dim)
-        (directory / f"{example:05d}.program.json").write_text(json.dumps(prgm))
+        (directory / f"{name}.program.json").write_text(json.dumps(prgm))
         for tns, tensor in inputs(rng, prgm).items():
-            bsp.save_binsparse(tensor, directory / f"{example:05d}.{tns}.bsp.npz")
+            bsp.save_binsparse(tensor, directory / f"{name}.{tns}.bsp.npz")
 
 
 def main() -> None:
@@ -217,6 +220,9 @@ def main() -> None:
     )
     parser.add_argument("directory", type=Path)
     parser.add_argument("--examples", type=int, default=20)
+    parser.add_argument(
+        "--chunk", type=int, default=0, help="the chunk which names the examples"
+    )
     parser.add_argument(
         "--lg-max-space",
         type=int,
@@ -231,8 +237,16 @@ def main() -> None:
     )
     parser.add_argument("--seed", type=int)
     args = parser.parse_args()
-    rng = np.random.default_rng(args.seed)
-    generate(args.directory, args.examples, args.lg_max_space, args.lg_max_dim, rng)
+    # Chunks drawn with one seed still draw different programs.
+    rng = np.random.default_rng(None if args.seed is None else (args.seed, args.chunk))
+    generate(
+        args.directory,
+        args.examples,
+        args.chunk,
+        args.lg_max_space,
+        args.lg_max_dim,
+        rng,
+    )
 
 
 if __name__ == "__main__":

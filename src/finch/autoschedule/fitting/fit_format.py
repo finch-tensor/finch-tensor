@@ -1,9 +1,10 @@
 """
 Fit a LinearCostModel of the formatter's basis to the timings which
-time_format wrote to DIR, and write it to model.json if given.
+time_format wrote to DIR, or to those of one chunk, and write it to model.json
+if given.
 
     pixi run -e test-julia python -m finch.autoschedule.fitting.fit_format \
-        DIR [model.json]
+        DIR [--chunk K] [model.json]
 """
 
 import argparse
@@ -16,9 +17,11 @@ from finch.autoschedule.cost_models import LinearCostModel
 from finch.autoschedule.fitting.time_format import BASIS
 
 
-def fit(directory: Path, output: Path | None) -> None:
+def fit(directory: Path, chunk, output: Path | None) -> None:
+    prefix = "*" if chunk is None else f"{chunk:04d}-*"
     timings = [
-        json.loads(path.read_text()) for path in sorted(directory.glob("*.timing.json"))
+        json.loads(path.read_text())
+        for path in sorted(directory.glob(f"{prefix}.timing.json"))
     ]
     features = [
         np.array(timing["features"]).reshape(-1, BASIS.n_features) for timing in timings
@@ -42,9 +45,10 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--chunk", type=int, help="the only chunk to fit to")
     parser.add_argument("model", type=Path, nargs="?")
     args = parser.parse_args()
-    fit(args.directory, args.model)
+    fit(args.directory, args.chunk, args.model)
 
 
 if __name__ == "__main__":
