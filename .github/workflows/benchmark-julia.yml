@@ -1,5 +1,12 @@
 name: Julia Benchmark
 
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   benchmark-julia:
     runs-on: codspeed-macro-arm64-graviton-ubuntu-22-04
@@ -20,15 +27,3 @@ jobs:
         with:
           mode: walltime
           run: pixi run benchmark-julia -vvv -m "not slow"
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-concurrency:
-  # Cancel superseded runs on PR branches; pushes to main get a unique group
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
