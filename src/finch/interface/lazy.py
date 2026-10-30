@@ -60,9 +60,16 @@ from finch.finch_logic import (
     Table,
     TensorStats,
 )
+from finch.interface.constructor import (
+    _from_numpy,
+    _from_pydata,
+    _from_scipy,
+    _is_pydata_sparse,
+)
 from finch.symbolic import gensym
 from finch.tensor import (
     BufferizedNDArray,
+    BufferizedNDArrayFType,
     EyeTensor,
     FiberTensor,
     FiberTensorFType,
@@ -150,6 +157,26 @@ class LazyTensorFType(TensorFType):
         Returns:
             A LazyTensor instance of this type.
         """
+        # if isinstance(val, FiberTensor):
+        #     if val.ftype==self:
+        #         return val
+        #     scipy_mat= val.to_scipy()
+        #     return FiberTensor.from_scipy_csr(scipy_mat)
+        # if isinstance(val,np.ndarray):
+        #     if self.is_dense():
+        #         return FiberTensor.from_numpy(val)
+        #     scipy_mat = sps.csr_matrix(val)
+        #     return FiberTensor.from_scipy_csr(scipy_mat)
+        # if isinstance(val,BufferizedNDArray):
+        #     return self(val.to_numpy())
+        # if sps.issparse(val):
+        #     if val.format == "csr":
+        #         return FiberTensor.from_scipy_csr(val)
+        #     elif val.format == "coo":
+        #         return FiberTensor.from_scipy_coo(val)
+        #     else:
+        #         return FiberTensor.from_scipy_coo(val.tocoo())
+
         raise NotImplementedError(
             f"Tensor conversion not yet implemented for {type(self).__name__}"
         )
@@ -468,43 +495,13 @@ def asarray(
                 return obj.to_device(device)
             return obj
         if isinstance(obj, np.ndarray):
-            if copy is True:
-                obj = obj.copy()
-            return BufferizedNDArray.from_numpy(obj, device=device)
+            return _from_numpy(obj, device=device, copy=copy)
         if sps.issparse(obj):
-            if obj.format == "csc":  # CSC has no native Finch layout yet
-                if dtype is not None or copy is True:
-                    raise NotImplementedError(
-                        "asarray cannot honor dtype or copy for CSC input; "
-                        "convert to CSR or COO first."
-                    )
-                return obj
-            if copy is False and not (
-                obj.format in ("coo", "csr") and obj.has_canonical_format
-            ):
-                raise ValueError(
-                    "Unable to avoid copy while creating an array as requested."
-                )
-            if obj.format not in ("coo", "csr"):
-                obj = obj.asformat("coo")
+            return _from_scipy(obj, device=device, dtype=dtype, copy=copy)
 
-            if dtype is not None:
-                if copy is False:
-                    obj = obj.astype(dtype, copy=False)
-                else:
-                    obj = obj.astype(dtype, copy=True)
-            elif copy is True:
-                obj = obj.copy()
-
-            if not obj.has_canonical_format:
-                obj = obj.copy()
-                obj.sum_duplicates()
-
-            match obj.format:
-                case "csr":
-                    return FiberTensor.from_scipy_csr(obj, device=device)
-                case "coo":
-                    return FiberTensor.from_scipy_coo(obj, device=device)
+        # check pydata import to see if they have an is sparse function
+        if _is_pydata_sparse(obj):
+            return _from_pydata(obj, device=device, dtype=dtype, copy=copy)
 
         if np.isscalar(obj) or obj is None:
             if dtype is not None:
@@ -524,8 +521,50 @@ def asarray(
             pass
         return obj
 
-    out = format.from_numpy(obj) if isinstance(obj, np.ndarray) else format(obj)
-    return out.to_device(device) if explicit_device else out
+    # Where def format would be called
+    # Should be left hand side a table, right hand side a table
+    # Going on scipy, numpy to FiberTensor csr, coo
+    # out = format.from_numpy(obj) if isinstance(obj, np.ndarray) else format(obj)
+    # tensor = asarray(obj, dtype=dtype, device=device, copy=copy)
+    # out = reformat(tensor, format)
+    # tensor = defer(obj)
+    # assert isinstance(tensor, LazyTensor), (
+    #     "defer(obj) must return a LazyTensor for non-tuple obj"
+    # )
+    # out = reformat(tensor, format)
+    # return out.to_device(device) if explicit_device else out
+    tensor = asarray(obj, dtype=dtype, device=device, copy=copy, format=None)
+    if tensor.ftype == format:
+        return tensor
+    if isinstance(format, BufferizedNDArrayFType):
+        return BufferizedNDArray.from_numpy(
+            tensor.to_numpy(), fill_value=tensor.fill_value, device=device
+        )
+    if isinstance(format, FiberTensorFType):
+        try:
+            result = format.from_numpy(tensor.to_numpy())
+            return result.to_device(device) if explicit_device else result
+        except NotImplementedError:
+            pass
+
+        if isinstance(tensor, BufferizedNDArray):
+            arr = tensor.to_numpy()
+        else:
+            arr = tensor.to_numpy()
+
+        if arr.ndim != 2:
+            raise NotImplementedError(
+                f"Cannot convert {arr.ndim}-D array to a sparse format via CSR"
+            )
+
+        scipy_mat = sps.csr_matrix(arr)
+        scipy_mat.indices = scipy_mat.indices.astype(np.int64)
+        scipy_mat.indptr = scipy_mat.indptr.astype(np.int64)
+        return FiberTensor.from_scipy_csr(scipy_mat, device=device)
+    raise NotImplementedError(
+        f"Tensor conversion not yet implemented "
+        f"for {type(tensor).__name__} to {type(format).__name__}"
+    )
 
 
 @overload
