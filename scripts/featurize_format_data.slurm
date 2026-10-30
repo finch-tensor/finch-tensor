@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=8G
 #SBATCH --time=02:00:00
-#SBATCH --array=0-63
+#SBATCH --array=0-7
 #SBATCH --output=featurize-format-data-%A_%a.log
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ahrens@gatech.edu

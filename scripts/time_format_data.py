@@ -20,12 +20,6 @@ from finch.algebra import Tensor, ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.executor import LogicExecutor
-from scripts.generate_format_data import (
-    OPS,
-    OPTIONS,
-    examples,
-    with_subsequence,
-)
 from finch.autoschedule.formatter.smart_formatter import LEVEL_BUILDERS, CostFormatter
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.autoschedule.util import flatten_plans, fuse_loop_order
@@ -45,6 +39,12 @@ from finch.finch_logic import (
     Table,
 )
 from finch.tensor import element, fiber_tensor
+from scripts.generate_format_data import (
+    OPS,
+    OPTIONS,
+    examples,
+    with_subsequence,
+)
 
 A, B, C, w = HardAlias("A"), HardAlias("B"), HardAlias("C"), HardAlias("w")
 

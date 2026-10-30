@@ -228,7 +228,7 @@ def main() -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--examples", type=int, default=20)
+    parser.add_argument("--examples", type=int, default=10)
     parser.add_argument(
         "--chunk", type=int, default=0, help="the chunk which names the examples"
     )

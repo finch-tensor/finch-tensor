@@ -14,11 +14,9 @@ import argparse
 import json
 from pathlib import Path
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
+
+import matplotlib.pyplot as plt
 
 from finch.autoschedule.cost_models import LinearCostModel
 from scripts.featurize_format_data import BASIS
@@ -53,12 +51,18 @@ def learning_curve(features, runtimes, rng, n_points=12) -> tuple[list, list]:
 
 
 def plot_learning_curve(sizes, scores, n_test, path: Path) -> None:
+    # A model fitted to a few programs can score far below zero, so scores
+    # below -1 are drawn at -1 and marked.
+    sizes, scores = np.asarray(sizes), np.asarray(scores)
+    clipped = np.maximum(scores, -1)
     fig, ax = plt.subplots()
-    ax.plot(sizes, scores, marker="o")
+    ax.plot(sizes, clipped, marker="o")
+    low = scores < -1
+    if low.any():
+        ax.plot(sizes[low], clipped[low], "v", color="C3", label="R^2 < -1")
     ax.axvline(BASIS.n_features, color="gray", linestyle="--", label="# features")
     ax.set_xscale("log")
-    # A model fitted to a few programs can score far below zero.
-    ax.set_ylim(max(min(scores), -1) - 0.05, 1.05)
+    ax.set_ylim(-1.05, 1.05)
     ax.set_xlabel("# programs trained on")
     ax.set_ylabel(f"R^2 on {n_test} held-out programs")
     ax.legend()
@@ -91,9 +95,7 @@ def fit(directory: Path, chunk, output: Path | None, seed) -> None:
         print(f"R^2 on {n_test} held-out programs:")
         for size, score in zip(sizes, scores, strict=True):
             print(f"{size:8d} {score:8.3f}")
-        plot_learning_curve(
-            sizes, scores, n_test, directory / "learning_curve.png"
-        )
+        plot_learning_curve(sizes, scores, n_test, directory / "learning_curve.png")
     if output is not None:
         output.write_text(json.dumps(model.to_json(), indent=2))
 

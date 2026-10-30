@@ -18,12 +18,12 @@ import numpy as np
 
 from finch.autoschedule.cost_models import ByKind, ElementLevelOption, LevelBasis
 from finch.autoschedule.executor import LogicExecutor
-from scripts.generate_format_data import examples
-from scripts.time_format_data import load
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import LogicLoader
 from finch.symbolic import UnvalidatedForm
+from scripts.generate_format_data import examples
+from scripts.time_format_data import load
 
 BASIS = ByKind(
     {

@@ -9,7 +9,7 @@
 set -euo pipefail
 
 usage="usage: $0 [--chunks N] [--repeat N] DIR [generate_format_data options]"
-chunks=64
+chunks=8
 repeat=5
 while [[ $# -gt 0 ]]; do
   case $1 in

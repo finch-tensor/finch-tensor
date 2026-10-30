@@ -9,7 +9,7 @@
 #SBATCH --nodes=1
 #SBATCH --exclusive
 #SBATCH --time=08:00:00
-#SBATCH --array=0-63
+#SBATCH --array=0-7
 #SBATCH --output=time-format-data-%A_%a.log
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ahrens@gatech.edu

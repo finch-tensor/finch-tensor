@@ -11,7 +11,7 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4G
 #SBATCH --time=01:00:00
-#SBATCH --array=0-63
+#SBATCH --array=0-7
 #SBATCH --output=generate-format-data-%A_%a.log
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=ahrens@gatech.edu
