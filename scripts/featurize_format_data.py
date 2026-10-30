@@ -5,7 +5,7 @@ from each program, its formats of w and C, and the stats of its inputs, so
 they are extracted without compiling or running it, and a new basis needs no
 new timings.
 
-    pixi run -e test-julia python -m finch.autoschedule.fitting.featurize_format \
+    pixi run -e test-julia python -m finch.autoschedule.fitting.featurize_format_data \
         DIR [--chunk K]
 """
 
@@ -18,8 +18,8 @@ import numpy as np
 
 from finch.autoschedule.cost_models import ByKind, ElementLevelOption, LevelBasis
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.fitting.generate_format import examples
-from finch.autoschedule.fitting.time_format_data import load
+from scripts.generate_format_data import examples
+from scripts.time_format_data import load
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
 from finch.autoschedule.tensor_stats import DCStatsFactory
 from finch.finch_logic import LogicLoader

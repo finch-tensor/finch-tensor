@@ -3,7 +3,7 @@ Fit a LinearCostModel of the formatter's basis to the features which
 featurize_format and the timings which time_format wrote to DIR, or to those
 of one chunk, and write it to model.json if given.
 
-    pixi run -e test-julia python -m finch.autoschedule.fitting.fit_format \
+    pixi run -e test-julia python -m finch.autoschedule.fitting.fit_format_data \
         DIR [--chunk K] [model.json]
 """
 
@@ -14,8 +14,8 @@ from pathlib import Path
 import numpy as np
 
 from finch.autoschedule.cost_models import LinearCostModel
-from finch.autoschedule.fitting.featurize_format_data import BASIS
-from finch.autoschedule.fitting.generate_format import examples
+from scripts.featurize_format_data import BASIS
+from scripts.generate_format_data import examples
 
 
 def fit(directory: Path, chunk, output: Path | None) -> None:

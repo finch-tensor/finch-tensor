@@ -4,7 +4,7 @@ Each program is compiled by Finch.jl with its formats of w and C, and reads its
 inputs as the sparse tensors which Finch parses from binsparse. Its runtime is
 measured and written to DIR as JSON.
 
-    pixi run -e test-julia python -m finch.autoschedule.fitting.time_format \
+    pixi run -e test-julia python -m finch.autoschedule.fitting.time_format_data \
         DIR [--chunk K] [--repeat N]
 """
 
@@ -20,7 +20,7 @@ from finch.algebra import Tensor, ftypes
 from finch.autoschedule.compiler import CompilerFormLowerer, LogicCompiler
 from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.executor import LogicExecutor
-from finch.autoschedule.fitting.generate_format_data import (
+from scripts.generate_format_data import (
     OPS,
     OPTIONS,
     examples,
