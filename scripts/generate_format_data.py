@@ -21,7 +21,7 @@ import binsparse as bsp
 
 import finch as fl
 from finch import ffuncs
-from finch.algebra import Tensor, ftype, ftypes
+from finch.algebra import Tensor, ftype
 from finch.autoschedule.cost_models import LevelOption
 from finch.autoschedule.default_schedulers import COMPILE_NUMBA
 from finch.autoschedule.formatter.smart_formatter import LEVEL_OPTIONS
@@ -43,7 +43,6 @@ from finch.finch_logic import (
 )
 from finch.tensor import ElementLevel, FiberTensor, SparseCOOLevel, element
 
-OPS = {"add": ffuncs.add, "mul": ffuncs.mul}
 OPTIONS = {option.kind: option for option in LEVEL_OPTIONS}
 A, B, C = HardAlias("A"), HardAlias("B"), HardAlias("C")
 
@@ -68,7 +67,7 @@ def seed(skew, sparsity):
     return S * sparsity
 
 
-def rmat(S, lg_shape, rng):
+def rmat(S, lg_shape, dtype, rng):
     """
     A dense array of S.sum() * 2 ** sum(lg_shape) balls dropped into a tensor of
     shape 2 ** lg_shape. At each level a ball picks an entry of the seed S, and
@@ -77,7 +76,7 @@ def rmat(S, lg_shape, rng):
     """
     # Values are in (0, 1], so neither a sum nor a product of them is zero.
     if not lg_shape:
-        return np.array(1 - rng.random())
+        return np.array(1 - rng.random(), dtype)
     S = np.asarray(S)
     nnz = round(S.sum() * 2 ** sum(lg_shape))
     picks = rng.choice(S.size, size=(nnz, max(lg_shape)), p=S.ravel() / S.sum())
@@ -86,15 +85,15 @@ def rmat(S, lg_shape, rng):
         (b[:, :lg] << np.arange(lg - 1, -1, -1)).sum(axis=1)
         for b, lg in zip(bits, lg_shape, strict=True)
     )
-    tns = np.zeros(tuple(2**lg for lg in lg_shape))
+    tns = np.zeros(tuple(2**lg for lg in lg_shape), dtype)
     tns[coords] = 1 - rng.random(nnz)
     return tns
 
 
 def program(rng, lg_max_space, lg_max_dim):
     """
-    A random subprogram of C_lmq += A_jlpq * B_kmpq, where * is add or mul. C
-    has no fields of its own, since nothing would give them extents.
+    A random subprogram of C_lmq += A_jlpq * B_kmpq. C has no fields of its
+    own, since nothing would give them extents.
     """
     while True:
         idxs = [idx for idx in "jklmpq" if rng.random() < 0.5]
@@ -112,7 +111,6 @@ def program(rng, lg_max_space, lg_max_dim):
     if rng.random() < 0.2:
         C_idxs = shuffled(rng, C_idxs)
     r_idxs = tuple(Field(idx) for idx in with_subsequence(order, "jkp"))
-    op = rng.choice([ffuncs.add, ffuncs.mul])
     prgm = Plan.from_children(
         Query(
             Table(HardAlias("C"), C_idxs),
@@ -120,7 +118,7 @@ def program(rng, lg_max_space, lg_max_dim):
                 Literal(ffuncs.add),
                 Literal(0.0),
                 MapJoin.from_children(
-                    Literal(op),
+                    Literal(ffuncs.mul),
                     Table(HardAlias("A"), A_idxs),
                     Table(HardAlias("B"), B_idxs),
                 ),
@@ -145,14 +143,14 @@ def choose_seed(rng, idxs, lg_dims):
     return seed(skews, sparsity)
 
 
-def inputs(rng, prgm, input_fields, output_fields, lg_dims):
+def inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype):
     samples = []
     for _ in range(100):
         seeds = {
             name: choose_seed(rng, idxs, lg_dims) for name, idxs in input_fields.items()
         }
         inputs = {
-            name: rmat(S, [lg_dims[idx.name] for idx in input_fields[name]], rng)
+            name: rmat(S, [lg_dims[idx.name] for idx in input_fields[name]], dtype, rng)
             for name, S in seeds.items()
         }
         # The default scheduler interprets, which is too slow to run this often.
@@ -184,19 +182,19 @@ def inputs(rng, prgm, input_fields, output_fields, lg_dims):
     return min(samples, key=distance)[0]
 
 
-def coo(tns: np.ndarray) -> FiberTensor:
-    """A Finch COO tensor of the nonzeros of tns."""
-    fmt = element(tns.dtype.type(0), ftype(tns.dtype), ftypes.intp)
+def coo(tns: np.ndarray, idx_type) -> FiberTensor:
+    """A Finch COO tensor of the nonzeros of tns, indexed by idx_type."""
+    fmt = element(tns.dtype.type(0), ftype(tns.dtype), ftype(idx_type))
     if not tns.ndim:
         return FiberTensor(ElementLevel(fmt, NumpyBuffer(tns.reshape(1))))
     indices = np.nonzero(tns)
-    ptr = NumpyBuffer(np.array([0, indices[0].size], dtype=np.intp))
+    ptr = NumpyBuffer(np.array([0, indices[0].size], dtype=idx_type))
     return FiberTensor(
         SparseCOOLevel(
             ElementLevel(fmt, NumpyBuffer(tns[indices])),
-            tuple(np.intp(n) for n in tns.shape),
+            tuple(idx_type(n) for n in tns.shape),
             ptr,
-            tuple(NumpyBuffer(np.ascontiguousarray(idx)) for idx in indices),
+            tuple(NumpyBuffer(idx.astype(idx_type)) for idx in indices),
         )
     )
 
@@ -237,7 +235,9 @@ def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) ->
         prgm, input_fields, output_fields, lg_dims = program(
             rng, lg_max_space, lg_max_dim
         )
-        tensors = inputs(rng, prgm, input_fields, output_fields, lg_dims)
+        dtype = choose(rng, [np.float32, np.float64])
+        idx_type = choose(rng, [np.int32, np.int64])
+        tensors = inputs(rng, prgm, input_fields, output_fields, lg_dims, dtype)
         query, produces = prgm.bodies
         loop_order = shuffled(rng, tuple(Field(idx) for idx in lg_dims))
         plan = Plan((fuse_loop_order(query, loop_order), produces))
@@ -249,7 +249,7 @@ def generate(directory: Path, examples, chunk, lg_max_space, lg_max_dim, rng) ->
         (directory / f"{name}.program.json").write_text(json.dumps(record, indent=2))
         for tns, array in tensors.items():
             path = directory / f"{name}.{tns.name}.bsp.npz"
-            bsp.save_binsparse(to_binsparse(coo(array)), path)
+            bsp.save_binsparse(to_binsparse(coo(array, idx_type)), path)
 
 
 def main() -> None:
